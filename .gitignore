@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build / package output
+dist/
+out/
+release/
+*.exe
+*.blockmap
+*.dmg
+*.AppImage
+
+# Electron / native build
+obj/
+build/
+*.node
+
+# Local data & secrets (절대 올리지 말 것)
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+credentials*.json
+
+# Logs & temp
+*.log
+logs/
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local caches
+.cache/
+AppData/
