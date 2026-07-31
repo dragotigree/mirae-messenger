@@ -4624,10 +4624,11 @@ ipcMain.handle('check-for-update', async () => {
   } catch (e) {
     if (e.code === 'ENOENT') return { available: false, msg: 'GitHub에서 version.json을 찾을 수 없습니다.' };
     const msg = String(e.message || e);
-    if (/401|403|Bad credentials|Requires authentication/i.test(msg)) {
+    // Private 저장소는 토큰 없이 요청하면 401이 아니라 404로 온다.
+    if (/401|403|404|Bad credentials|Requires authentication|Not Found/i.test(msg)) {
       return {
         available: false,
-        msg: 'GitHub 인증이 필요합니다. 데이터 폴더에 github-update-token.txt(Contents 읽기 권한 PAT)를 저장한 뒤 다시 확인해 주세요.'
+        msg: 'GitHub 인증이 필요합니다. 「토큰 폴더 열기」→ github-update-token.txt 파일을 만들고 PAT(Contents 읽기)를 한 줄로 저장한 뒤 다시 확인해 주세요.'
       };
     }
     if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|응답 시간 초과/i.test(msg)) {
