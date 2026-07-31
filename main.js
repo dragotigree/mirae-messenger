@@ -276,8 +276,8 @@ const APP_VERSION = require('./package.json').version;
 // 마스터가 지정한 공유 폴더(예: 병원 공유 드라이브) 경로. 여기 최신 파일을 올려두면
 // 전 직원 PC가 자동으로 새 버전이 있는지 확인하고, 원할 때 한 번에 업데이트할 수 있다.
 let updateSourcePath = '';
-// 🔄 자동 업데이트: 마스터가 따로 경로를 설정하지 않은 PC는 이 병원 공유폴더를 기본값으로 사용한다.
-const DEFAULT_UPDATE_SOURCE_PATH = 'Z:\\9.재활치료실(PT&OT&언어&임상심리)\\물리치료실\\messenger';
+// 업데이트는 GitHub 저장소만 사용한다. (Z드라이브/공유폴더 경로는 더 이상 쓰지 않음)
+const DEFAULT_UPDATE_SOURCE_PATH = 'https://github.com/dragotigree/mirae-messenger';
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
@@ -296,6 +296,154 @@ function compareVersions(a, b) {
     if (na < nb) return -1;
   }
   return 0;
+}
+
+function parseUpdateSource(src) {
+  const s = String(src || '').trim();
+  if (!s) return { kind: 'none' };
+  if (/^github:/i.test(s)) {
+    const m = s.match(/^github:([^/#\s]+)\/([^/#\s]+)(?:#([^\s]+))?$/i);
+    if (!m) return { kind: 'none' };
+    return { kind: 'github', owner: m[1], repo: m[2].replace(/\.git$/i, ''), ref: m[3] || 'main' };
+  }
+  if (/^https?:\/\/github\.com\//i.test(s)) {
+    try {
+      const hashRef = s.includes('#') ? s.split('#').pop() : '';
+      const u = new URL(s.split('#')[0]);
+      const parts = u.pathname.replace(/\.git$/i, '').split('/').filter(Boolean);
+      if (parts.length < 2) return { kind: 'none' };
+      return { kind: 'github', owner: parts[0], repo: parts[1], ref: hashRef || 'main' };
+    } catch (e) {
+      return { kind: 'none' };
+    }
+  }
+  if (/^https?:\/\/raw\.githubusercontent\.com\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length < 3) return { kind: 'none' };
+      return { kind: 'github', owner: parts[0], repo: parts[1], ref: parts[2] || 'main' };
+    } catch (e) {
+      return { kind: 'none' };
+    }
+  }
+  // Z드라이브·로컬 폴더 경로는 더 이상 업데이트 소스로 쓰지 않는다.
+  return { kind: 'none' };
+}
+
+/** 저장된 값이 Z경로 등이면 GitHub 기본값으로 강제 전환 */
+function normalizeUpdateSourceToGithub(src) {
+  const meta = parseUpdateSource(src);
+  if (meta.kind === 'github' && meta.owner && meta.repo) {
+    const ref = meta.ref && meta.ref !== 'main' ? `#${meta.ref}` : '';
+    return `https://github.com/${meta.owner}/${meta.repo}${ref}`;
+  }
+  return DEFAULT_UPDATE_SOURCE_PATH;
+}
+
+function persistUpdateSourcePath(nextPath) {
+  updateSourcePath = normalizeUpdateSourceToGithub(nextPath);
+  db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], logDbErr);
+}
+
+function githubUpdateTokenPath() {
+  return path.join(app.getPath('userData'), 'github-update-token.txt');
+}
+
+function loadGithubUpdateToken() {
+  try {
+    const t = fs.readFileSync(githubUpdateTokenPath(), 'utf8').trim();
+    return t || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function httpsGetBuffer(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers, timeout: 25000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        httpsGetBuffer(res.headers.location, headers).then(resolve, reject);
+        return;
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}: ${buf.toString('utf8').slice(0, 180)}`));
+          return;
+        }
+        resolve(buf);
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('업데이트 서버 응답 시간 초과'));
+    });
+  });
+}
+
+async function fetchGithubUpdateFile(meta, relPath) {
+  const filePath = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const token = loadGithubUpdateToken();
+  const apiUrl = `https://api.github.com/repos/${meta.owner}/${meta.repo}/contents/${filePath}?ref=${encodeURIComponent(meta.ref)}`;
+  const headers = {
+    'User-Agent': 'MiraeMessenger-Updater',
+    Accept: 'application/vnd.github.raw+json'
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  try {
+    return await httpsGetBuffer(apiUrl, headers);
+  } catch (e) {
+    // API 실패 시 raw URL 재시도 (public 또는 token)
+    const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}`;
+    const rawHeaders = { 'User-Agent': 'MiraeMessenger-Updater' };
+    if (token) rawHeaders.Authorization = `Bearer ${token}`;
+    return httpsGetBuffer(rawUrl, rawHeaders);
+  }
+}
+
+async function readUpdateSourceBytes(relPath) {
+  const meta = parseUpdateSource(updateSourcePath);
+  if (meta.kind === 'github') {
+    return fetchGithubUpdateFile(meta, relPath);
+  }
+  throw new Error('업데이트 소스는 GitHub 주소만 사용할 수 있습니다.');
+}
+
+async function writeBufferWithRetry(destPath, buffer, retries = 10) {
+  await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const tmp = `${destPath}.tmp.${process.pid}.${Date.now()}`;
+      await fs.promises.writeFile(tmp, buffer);
+      try {
+        await fs.promises.rename(tmp, destPath);
+      } catch (renameErr) {
+        await fs.promises.unlink(tmp).catch(() => {});
+        await fs.promises.writeFile(destPath, buffer);
+      }
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(e.code) && i < retries - 1) {
+        await sleepMs(120 * (i + 1));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('writeBufferWithRetry failed');
+}
+
+async function stagePendingUpdateBuffer(relPath, buffer) {
+  const safe = pendingRelSafe(relPath);
+  const dest = path.join(pendingUpdateDir(), safe);
+  await writeBufferWithRetry(dest, buffer);
 }
 
 function previewBody(rawMessage) {
@@ -1069,12 +1217,13 @@ db.serialize(() => {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
       if (row.notify_read_receipts != null) notifyReadReceipts = !!row.notify_read_receipts;
-      // 예전 설치본이라 update_source_path가 아예 비어있던 적이 한 번도 없는 PC는 기본 공유폴더로 채워준다.
-      updateSourcePath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
+      // 예전 Z드라이브 경로 등은 GitHub로 마이그레이션한다.
+      const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
+      updateSourcePath = normalizeUpdateSourceToGithub(rawPath);
       transportWebappUrl = row.transport_webapp_url || DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = row.download_folder_path || app.getPath('downloads');
       trayLaunchViewMode = row.tray_launch_view_mode === 'compact' ? 'compact' : 'normal';
-      if (!row.update_source_path || !row.transport_webapp_url || !row.download_folder_path) {
+      if (!row.update_source_path || rawPath !== updateSourcePath || !row.transport_webapp_url || !row.download_folder_path) {
         db.run(`UPDATE app_settings SET update_source_path = ?, transport_webapp_url = ?, download_folder_path = ? WHERE id = 1`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
       }
     }
@@ -2707,15 +2856,13 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     });
   }
   if (remoteUpdateSourcePath && !updateSourcePath) {
-    updateSourcePath = remoteUpdateSourcePath;
-    db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], logDbErr);
+    persistUpdateSourcePath(remoteUpdateSourcePath);
   }
 }
 
 function handleConfigSync(payload) {
   if (payload && typeof payload.updateSourcePath === 'string') {
-    updateSourcePath = payload.updateSourcePath;
-    db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], logDbErr);
+    persistUpdateSourcePath(payload.updateSourcePath);
   }
 }
 
@@ -4445,32 +4592,54 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);
 
-ipcMain.handle('get-update-source-path', async () => updateSourcePath);
+ipcMain.handle('get-update-source-path', async () => {
+  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  return updateSourcePath;
+});
 
 ipcMain.handle('set-update-source-path', async (event, folderPath) => {
-  updateSourcePath = folderPath || '';
-  db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], logDbErr);
+  const next = normalizeUpdateSourceToGithub(folderPath || DEFAULT_UPDATE_SOURCE_PATH);
+  if (parseUpdateSource(next).kind !== 'github') {
+    return { success: false, msg: '업데이트 소스는 GitHub 주소만 사용할 수 있습니다.' };
+  }
+  persistUpdateSourcePath(next);
   broadcastToOnlinePeers({ type: 'CONFIG_SYNC', updateSourcePath });
-  return true;
+  return { success: true, path: updateSourcePath };
 });
 
 ipcMain.handle('check-for-update', async () => {
-  if (!updateSourcePath) return { available: false, msg: '업데이트 폴더가 아직 설정되지 않았습니다.' };
+  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
   try {
-    const versionFile = path.join(updateSourcePath, 'version.json');
-    const raw = await fs.promises.readFile(versionFile, 'utf8');
+    const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
     const remote = JSON.parse(raw);
     const available = compareVersions(remote.version, APP_VERSION) > 0;
-    return { available, remoteVersion: remote.version, currentVersion: APP_VERSION, notes: remote.notes || '' };
+    return {
+      available,
+      remoteVersion: remote.version,
+      currentVersion: APP_VERSION,
+      notes: remote.notes || '',
+      sourceKind: 'github'
+    };
   } catch (e) {
-    if (e.code === 'ENOENT') return { available: false, msg: '지정된 폴더에서 버전 정보(version.json)를 찾을 수 없습니다. 경로를 확인해 주세요.' };
-    return { available: false, msg: '업데이트 확인 중 오류가 발생했습니다: ' + e.message };
+    if (e.code === 'ENOENT') return { available: false, msg: 'GitHub에서 version.json을 찾을 수 없습니다.' };
+    const msg = String(e.message || e);
+    if (/401|403|Bad credentials|Requires authentication/i.test(msg)) {
+      return {
+        available: false,
+        msg: 'GitHub 인증이 필요합니다. 데이터 폴더에 github-update-token.txt(Contents 읽기 권한 PAT)를 저장한 뒤 다시 확인해 주세요.'
+      };
+    }
+    if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|응답 시간 초과/i.test(msg)) {
+      return { available: false, msg: 'GitHub에 연결할 수 없습니다. 인터넷·방화벽을 확인해 주세요.' };
+    }
+    return { available: false, msg: '업데이트 확인 중 오류가 발생했습니다: ' + msg };
   }
 });
 
 async function applyUpdateFiles() {
   // package.json을 포함해야 버전 번호(APP_VERSION)도 함께 갱신된다.
-  const filesToUpdate = ['main.js', 'preload.js', 'index.html', 'package.json', 'toast.html', 'toast-preload.js', 'lib/minimal-xlsx.js'];
+  const filesToUpdate = ['main.js', 'preload.js', 'index.html', 'package.json', 'version.json', 'toast.html', 'toast-preload.js', 'lib/minimal-xlsx.js'];
   const optionalAssets = ['assets/splash.png'];
   const backupDir = path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
   await fs.promises.mkdir(backupDir, { recursive: true });
@@ -4478,17 +4647,17 @@ async function applyUpdateFiles() {
   let expectedVersion = null;
 
   for (const f of filesToUpdate) {
-    const sourcePath = path.join(updateSourcePath, f);
-    const localPath = path.join(__dirname, f);
+    let remoteBuf;
     try {
-      await fs.promises.access(sourcePath);
+      remoteBuf = await readUpdateSourceBytes(f);
     } catch (e) {
-      fileResults.push({ file: f, copied: false, reason: '공유폴더에 이 파일이 없음' });
+      fileResults.push({ file: f, copied: false, reason: `GitHub에 없음/접근실패(${e.message})` });
       continue;
     }
+    const localPath = path.join(__dirname, f);
     if (f === 'package.json') {
       try {
-        const remotePkg = JSON.parse(await fs.promises.readFile(sourcePath, 'utf8'));
+        const remotePkg = JSON.parse(remoteBuf.toString('utf8'));
         expectedVersion = remotePkg.version;
       } catch (e) {}
     }
@@ -4498,14 +4667,13 @@ async function applyUpdateFiles() {
       await fs.promises.copyFile(localPath, path.join(backupDir, f.replace(/\//g, '_')));
     } catch (e) {}
     try {
-      await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
-      await copyFileWithRetry(sourcePath, localPath);
+      await writeBufferWithRetry(localPath, remoteBuf);
       fileResults.push({ file: f, copied: true });
     } catch (e) {
       const lockErr = e && ['EBUSY', 'EPERM', 'EACCES'].includes(e.code);
       if (lockErr) {
         try {
-          await stagePendingUpdate(f, sourcePath);
+          await stagePendingUpdateBuffer(f, remoteBuf);
           fileResults.push({ file: f, copied: true, pendingRestart: true });
           console.warn(`[업데이트] ${f} 사용 중 — 재시작 후 적용 예약됨`);
           continue;
@@ -4521,27 +4689,27 @@ async function applyUpdateFiles() {
   }
 
   for (const rel of optionalAssets) {
-    const sourcePath = path.join(updateSourcePath, rel);
-    const localPath = path.join(__dirname, rel);
+    let remoteBuf;
     try {
-      await fs.promises.access(sourcePath);
+      remoteBuf = await readUpdateSourceBytes(rel);
     } catch (e) {
-      fileResults.push({ file: rel, copied: false, reason: '공유폴더에 없음(선택)' });
+      fileResults.push({ file: rel, copied: false, reason: 'GitHub에 없음(선택)' });
       continue;
     }
+    const localPath = path.join(__dirname, rel);
     try {
       await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
       try {
         await fs.promises.access(localPath);
         await fs.promises.copyFile(localPath, path.join(backupDir, rel.replace(/\//g, '_')));
       } catch (e) {}
-      await copyFileWithRetry(sourcePath, localPath);
+      await writeBufferWithRetry(localPath, remoteBuf);
       fileResults.push({ file: rel, copied: true });
     } catch (e) {
       const lockErr = e && ['EBUSY', 'EPERM', 'EACCES'].includes(e.code);
       if (lockErr) {
         try {
-          await stagePendingUpdate(rel, sourcePath);
+          await stagePendingUpdateBuffer(rel, remoteBuf);
           fileResults.push({ file: rel, copied: true, pendingRestart: true });
           continue;
         } catch (e2) {
@@ -4577,7 +4745,8 @@ async function applyUpdateFiles() {
 }
 
 ipcMain.handle('apply-update', async () => {
-  if (!updateSourcePath) return { success: false, msg: '업데이트 폴더가 설정되지 않았습니다.' };
+  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
   try {
     await applyUpdateFiles();
     setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 600);
@@ -4588,16 +4757,16 @@ ipcMain.handle('apply-update', async () => {
 });
 
 async function autoCheckAndApplyUpdate() {
+  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
   if (!updateSourcePath || !mainWindow) return;
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
   let remote;
   try {
-    const versionFile = path.join(updateSourcePath, 'version.json');
-    const raw = await fs.promises.readFile(versionFile, 'utf8');
+    const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
     remote = JSON.parse(raw);
     if (compareVersions(remote.version, APP_VERSION) <= 0) return;
   } catch (e) {
-    // 공유폴더가 잠시 접근 안 되거나 version.json이 없는 경우는 조용히 넘어간다 (자동 검사이므로 매번 알릴 필요 없음)
+    // GitHub 접근 실패·version.json 없음은 조용히 넘어간다
     return;
   }
 

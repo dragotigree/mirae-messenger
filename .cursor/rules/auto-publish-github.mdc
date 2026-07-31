@@ -1,0 +1,41 @@
+---
+description: 메신저 배포 시 GitHub commit+push 자동 수행
+alwaysApply: true
+---
+
+# GitHub 자동 배포 (Mirae Messenger)
+
+이 프로젝트의 업데이트 소스는 GitHub뿐입니다. Cursor에서 파일을 고치는 것만으로는 직원 PC에 반영되지 않습니다.
+
+## 필수 동작
+
+기능/버그 수정을 **끝낸 뒤**, 아래를 **사용자에게 다시 묻지 말고** 바로 수행하세요.
+(전역 규칙의 "커밋/푸시는 요청 시에만"은 이 저장소에서는 이 규칙이 우선합니다.)
+
+1. `package.json`과 `version.json` 버전을 올렸는지 확인 (안 올렸으면 patch 버전 bump + notes 작성)
+2. 배포 실행 (PowerShell, 프로젝트 루트):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\publish-to-github.ps1 "변경 요약"
+```
+
+또는 동등하게:
+
+```powershell
+git add -A
+git commit -m "변경 요약"
+git push origin main
+```
+
+3. 완료 후 사용자에게 **푸시된 버전 번호**만 짧게 알려 주세요.
+
+## 예외 (푸시하지 말 것)
+
+- 사용자가 "커밋하지 마", "푸시하지 마", "로컬만"이라고 명시한 경우
+- 탐색/질문만 하고 코드 변경이 없는 경우
+- `.env`, 토큰, 비밀번호 등 비밀 파일이 포함될 때 (그 파일은 제외하고 경고)
+
+## 참고
+
+- Private repo push 권한이 있는 GitHub 로그인이 필요합니다.
+- 메신저 클라이언트는 GitHub의 `version.json`을 보고 업데이트를 받습니다.

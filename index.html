@@ -2527,12 +2527,17 @@
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
         <div style="font-size:13px; font-weight:700; color:var(--accent);">🔄 프로그램 업데이트</div>
         <div style="font-size:12px; color:#475569;">현재 버전: <b id="update-current-version">-</b></div>
-        <label style="font-size:12px; color:#475569;">업데이트 폴더 경로 (마스터가 설정, 예: 병원 공유 드라이브 경로):
-          <input type="text" id="update-source-path-input" placeholder="예: \\\\hospital-nas\\mirae_messenger_update" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
+        <label style="font-size:12px; color:#475569;">업데이트 소스 (GitHub 전용):
+          <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
         </label>
-        <div style="display:flex; gap:6px;">
+        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">
+          업데이트는 GitHub 저장소만 사용합니다. (Z드라이브·공유폴더 경로는 무시됩니다)<br>
+          Private 저장소는 데이터 폴더에 <b>github-update-token.txt</b>(Contents 읽기 PAT)가 필요합니다.
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button onclick="checkUpdateNow()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">지금 확인</button>
-          <button id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">경로 저장</button>
+          <button id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">GitHub 주소 저장</button>
+          <button type="button" onclick="window.api.openUserDataFolder()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">토큰 폴더 열기</button>
         </div>
         <div id="update-check-result" style="font-size:12px; color:#64748b;"></div>
       </div>
@@ -7148,9 +7153,16 @@
 
     async function saveUpdateSourcePath() {
       const p = document.getElementById('update-source-path-input').value.trim();
-      await window.api.setUpdateSourcePath(p);
-      await appAlert('업데이트 폴더 경로가 저장되었습니다. (온라인 상태인 다른 PC에도 자동으로 전달됩니다)');
-      return;
+      const res = await window.api.setUpdateSourcePath(p);
+      if (res && res.success === false) {
+        await appAlert(res.msg || 'GitHub 주소만 저장할 수 있습니다.');
+        await loadUpdatePanel();
+        return;
+      }
+      if (res && res.path) {
+        document.getElementById('update-source-path-input').value = res.path;
+      }
+      await appAlert('업데이트 소스가 GitHub로 저장되었습니다. (온라인인 다른 PC에도 전달됩니다)\n\nPrivate 저장소면 각 PC 데이터 폴더에 github-update-token.txt가 필요합니다.');
     }
 
     async function checkUpdateNow() {

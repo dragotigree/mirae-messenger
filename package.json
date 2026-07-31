@@ -1,12 +1,13 @@
 {
   "name": "mirae-messenger",
-  "version": "1.0.187",
+  "version": "1.0.189",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w sqlite3",
     "package": "powershell -ExecutionPolicy Bypass -File build.ps1",
-    "installer": "powershell -ExecutionPolicy Bypass -File installer\\build-installer.ps1"
+    "installer": "powershell -ExecutionPolicy Bypass -File installer\\build-installer.ps1",
+    "publish:github": "powershell -ExecutionPolicy Bypass -File scripts\\publish-to-github.ps1"
   },
   "dependencies": {
     "sqlite3": "^5.1.7"
