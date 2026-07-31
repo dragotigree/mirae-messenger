@@ -2480,8 +2480,18 @@
               <span class="settings-toggle-desc">끄면 「메시지가 도착했습니다」만 표시</span>
             </span>
           </label>
+          <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px;">
+            <span class="settings-toggle-text" style="flex:1;">
+              <span class="settings-toggle-title" style="display:block; font-size:13px; font-weight:700; color:#0f172a;">토스트 표시 시간</span>
+              <span class="settings-toggle-desc" style="display:block; font-size:11px; color:#94a3b8; margin-top:2px;">중앙 토스트가 자동으로 사라지기까지 (2~60초, 긴급은 +2초)</span>
+            </span>
+            <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+              <input type="number" id="setting-toast-duration" min="2" max="60" step="1" value="7" style="width:64px; padding:7px 8px; border:1px solid #cbd5e1; border-radius:9px; font-size:13px; text-align:center;">
+              <span style="font-size:12px; color:#64748b; font-weight:600;">초</span>
+            </span>
+          </label>
         </div>
-        <p class="settings-notify-note">새 메시지·읽음 알림은 설정에서 각각 끌 수 있습니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다.</p>
+        <p class="settings-notify-note">토스트의 <b>열기</b>는 해당 대화로 이동하고, <b>닫기</b>는 바로 숨깁니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다.</p>
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
@@ -5251,6 +5261,41 @@
       const key = `GROUP:${g.uid}`;
       const display = getChannelDisplayName(key, g.name);
       return { ip: key, username: display, rank: '', dept: '그룹 대화방', floor: '', extNo: '', isGroup: true, groupUid: g.uid, groupName: display, serverGroupName: g.name, groupMembers: (() => { try { return JSON.parse(g.members); } catch (e) { return []; } })() };
+    }
+
+    function openChatFromToastChannelKey(channelKey) {
+      const key = String(channelKey || '').trim();
+      if (!key) return;
+      if (key === 'BROADCAST') {
+        selectUserChat(BROADCAST_CHANNEL);
+        return;
+      }
+      if (key.startsWith('DEPT:')) {
+        selectUserChat(makeDeptChannel(key.slice(5)));
+        return;
+      }
+      if (key.startsWith('FLOOR:')) {
+        selectUserChat(makeFloorChannel(key.slice(6)));
+        return;
+      }
+      if (key.startsWith('GROUP:')) {
+        const uid = key.slice(6);
+        const g = (myGroupChats || []).find((x) => String(x.uid) === String(uid));
+        if (g) selectUserChat(makeGroupChannel(g));
+        return;
+      }
+      const user = findUserByIp(key) || (allUsers || []).find((u) => u.ip === key);
+      if (user) {
+        selectUserChat(user);
+        return;
+      }
+      selectUserChat({ ip: key, username: key, rank: '', dept: '', floor: '', extNo: '' });
+    }
+
+    if (window.api && typeof window.api.onOpenChatFromToast === 'function') {
+      window.api.onOpenChatFromToast((data) => {
+        openChatFromToastChannelKey(data && data.channelKey);
+      });
     }
 
     const CHANNEL_DRAG_MIME = 'application/x-mirae-channel-key';
@@ -11890,8 +11935,13 @@
     const msgNotify = await window.api.getMessageNotificationSettings();
     const incomingEl = document.getElementById('setting-notify-incoming');
     const readReceiptEl = document.getElementById('setting-notify-read-receipt');
+    const toastDurEl = document.getElementById('setting-toast-duration');
     if (incomingEl) incomingEl.checked = msgNotify.notifyIncomingMessages !== false;
     if (readReceiptEl) readReceiptEl.checked = msgNotify.notifyReadReceipts !== false;
+    if (toastDurEl) {
+      const secs = parseInt(msgNotify.toastDurationSeconds, 10);
+      toastDurEl.value = String(Number.isFinite(secs) ? Math.max(2, Math.min(60, secs)) : 7);
+    }
     const spellEl = document.getElementById('setting-spellcheck');
     if (spellEl) spellEl.checked = appSettings.spellcheck === true;
 
@@ -11919,6 +11969,12 @@
   const notificationPreview = document.getElementById('setting-notification-preview').checked;
   const notifyIncomingMessages = document.getElementById('setting-notify-incoming') ? document.getElementById('setting-notify-incoming').checked : true;
   const notifyReadReceipts = document.getElementById('setting-notify-read-receipt') ? document.getElementById('setting-notify-read-receipt').checked : true;
+  let toastDurationSeconds = 7;
+  const toastDurEl = document.getElementById('setting-toast-duration');
+  if (toastDurEl) {
+    const n = parseInt(toastDurEl.value, 10);
+    if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
+  }
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
@@ -11944,7 +12000,7 @@
   
   await window.api.setAutoLaunch(autoLaunch);
   await window.api.setNotificationPreviewSetting(notificationPreview);
-  await window.api.setMessageNotificationSettings({ notifyIncomingMessages, notifyReadReceipts });
+  await window.api.setMessageNotificationSettings({ notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds });
   await syncSpellcheckEngine();
 
   applyAppSettingsToUI();

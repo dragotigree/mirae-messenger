@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('toastApi', {
-  activate: () => ipcRenderer.send('message-toast-activate')
+  open: () => ipcRenderer.send('message-toast-open'),
+  close: () => ipcRenderer.send('message-toast-close'),
+  // 하위 호환
+  activate: () => ipcRenderer.send('message-toast-open')
 });

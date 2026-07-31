@@ -267,6 +267,9 @@ let profileLoaded = false;
 let showNotificationPreview = true;
 let notifyIncomingMessages = true;
 let notifyReadReceipts = true;
+/** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
+let toastDurationSeconds = 7;
+let pendingToastChannelKey = '';
 let spellCheckerEnabled = false;
 
 // 🔄 쉬운 업데이트 기능: package.json의 version 값을 단일 기준으로 사용한다.
@@ -490,16 +493,17 @@ function closeMessageToast() {
   toastWindow = null;
 }
 
-function showMessageToast({ title, body, urgent }) {
+function showMessageToast({ title, body, urgent, channelKey }) {
   if (!notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
   const work = display.workArea || display.bounds;
   const width = 420;
-  const height = 128;
+  const height = 168;
   // 화면(작업 영역) 정중앙
   const x = Math.round(work.x + (work.width - width) / 2);
   const y = Math.round(work.y + (work.height - height) / 2);
 
+  pendingToastChannelKey = String(channelKey || '');
   closeMessageToast();
 
   toastWindow = new BrowserWindow({
@@ -512,7 +516,7 @@ function showMessageToast({ title, body, urgent }) {
     backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
-    focusable: false,
+    focusable: true,
     resizable: false,
     show: false,
     hasShadow: false,
@@ -535,10 +539,12 @@ function showMessageToast({ title, body, urgent }) {
   });
   toastWindow.on('closed', () => { toastWindow = null; });
 
-  toastDismissTimer = setTimeout(() => closeMessageToast(), urgent ? 9000 : 6500);
+  const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
+  const ms = (urgent ? secs + 2 : secs) * 1000;
+  toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
 }
 
-function showDesktopNotification({ title, body, urgent }) {
+function showDesktopNotification({ title, body, urgent, channelKey }) {
   if (!Notification.isSupported()) return;
   try {
     const notification = new Notification({
@@ -548,7 +554,11 @@ function showDesktopNotification({ title, body, urgent }) {
       silent: false,
       urgency: urgent ? 'critical' : 'normal'
     });
-    notification.on('click', () => showAndFocusWindow());
+    const openKey = channelKey != null && channelKey !== '' ? String(channelKey) : '';
+    notification.on('click', () => {
+      showAndFocusWindow();
+      if (openKey && mainWindow) safeWebContentsSend('open-chat-from-toast', { channelKey: openKey });
+    });
     notification.show();
   } catch (e) {
     console.error('데스크톱 알림 표시 오류:', e.message);
@@ -559,12 +569,12 @@ function notifyIncomingMessageNotification(opts) {
   if (!notifyIncomingMessages) return;
   if (shouldSuppressMessageToast(opts && opts.channelKey)) return;
   const o = opts || {};
-  // 커스텀 토스트 + OS 알림 (읽음 알림과 동일하게 데스크탑에서도 보이도록)
   showMessageToast(o);
   showDesktopNotification({
     title: o.title || '새 메시지',
     body: o.body || '메시지가 도착했습니다.',
-    urgent: !!o.urgent
+    urgent: !!o.urgent,
+    channelKey: o.channelKey
   });
 }
 
@@ -1227,6 +1237,7 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN tray_launch_view_mode TEXT DEFAULT 'normal'`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_incoming_messages INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_read_receipts INTEGER DEFAULT 1`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
@@ -1237,6 +1248,10 @@ db.serialize(() => {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
       if (row.notify_read_receipts != null) notifyReadReceipts = !!row.notify_read_receipts;
+      if (row.toast_duration_seconds != null) {
+        const n = parseInt(row.toast_duration_seconds, 10);
+        if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
+      }
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
@@ -1570,8 +1585,21 @@ ipcMain.handle('close-schedule-board-window', async (event) => {
 });
 
 ipcMain.on('message-toast-activate', () => {
+  const key = pendingToastChannelKey;
   closeMessageToast();
   showAndFocusWindow();
+  if (key && mainWindow) safeWebContentsSend('open-chat-from-toast', { channelKey: key });
+});
+
+ipcMain.on('message-toast-open', () => {
+  const key = pendingToastChannelKey;
+  closeMessageToast();
+  showAndFocusWindow();
+  if (key && mainWindow) safeWebContentsSend('open-chat-from-toast', { channelKey: key });
+});
+
+ipcMain.on('message-toast-close', () => {
+  closeMessageToast();
 });
 
 ipcMain.on('toast-ui-state', (_, state) => {
@@ -4629,7 +4657,8 @@ ipcMain.handle('set-notification-preview-setting', async (event, enabled) => {
 
 ipcMain.handle('get-message-notification-settings', async () => ({
   notifyIncomingMessages,
-  notifyReadReceipts
+  notifyReadReceipts,
+  toastDurationSeconds
 }));
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
@@ -4639,12 +4668,16 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
   if (settings && typeof settings.notifyReadReceipts === 'boolean') {
     notifyReadReceipts = settings.notifyReadReceipts;
   }
+  if (settings && settings.toastDurationSeconds != null) {
+    const n = parseInt(settings.toastDurationSeconds, 10);
+    if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
+  }
   db.run(
-    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ? WHERE id = 1`,
-    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0],
+    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ? WHERE id = 1`,
+    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds],
     logDbErr
   );
-  return { notifyIncomingMessages, notifyReadReceipts };
+  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds };
 });
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);

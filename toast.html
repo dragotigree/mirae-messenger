@@ -15,21 +15,25 @@
     }
     .toast {
       margin: 8px;
-      padding: 14px 16px 14px 14px;
+      padding: 14px 14px 12px;
       border-radius: 14px;
       background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
       border: 1px solid #e2e8f0;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
-      cursor: pointer;
       display: flex;
+      flex-direction: column;
       gap: 12px;
-      align-items: flex-start;
       animation: toast-in 0.28s ease-out;
       max-height: calc(100vh - 16px);
     }
     .toast.is-urgent {
       border-color: #fecaca;
       background: linear-gradient(145deg, #fff5f5 0%, #fff 100%);
+    }
+    .toast-main {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
     }
     .icon {
       flex-shrink: 0;
@@ -56,6 +60,35 @@
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden; word-break: break-word;
     }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-close {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    .btn-close:hover { background: #e2e8f0; }
+    .btn-open {
+      background: #0284c7;
+      color: #fff;
+    }
+    .btn-open:hover { background: #0369a1; }
+    .toast.is-urgent .btn-open {
+      background: #dc2626;
+    }
+    .toast.is-urgent .btn-open:hover { background: #b91c1c; }
     @keyframes toast-in {
       from { opacity: 0; transform: translateY(12px) scale(0.96); }
       to { opacity: 1; transform: translateY(0) scale(1); }
@@ -64,10 +97,16 @@
 </head>
 <body>
   <div class="toast" id="toast" role="alert">
-    <div class="icon" id="icon">💬</div>
-    <div class="content">
-      <div class="title" id="title"></div>
-      <div class="body" id="body"></div>
+    <div class="toast-main">
+      <div class="icon" id="icon">💬</div>
+      <div class="content">
+        <div class="title" id="title"></div>
+        <div class="body" id="body"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-close" id="btn-close">닫기</button>
+      <button type="button" class="btn btn-open" id="btn-open">열기</button>
     </div>
   </div>
   <script>
@@ -80,8 +119,13 @@
     document.getElementById('icon').textContent = urgent ? '🚨' : '💬';
     const el = document.getElementById('toast');
     if (urgent) el.classList.add('is-urgent');
-    el.addEventListener('click', () => {
-      if (window.toastApi) window.toastApi.activate();
+    document.getElementById('btn-open').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.toastApi) window.toastApi.open();
+    });
+    document.getElementById('btn-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.toastApi) window.toastApi.close();
     });
   </script>
 </body>

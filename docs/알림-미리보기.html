@@ -19,7 +19,7 @@
     .panel h2 { font-size: 14px; color: #cbd5e1; margin-bottom: 12px; }
     .desktop-mock {
       position: relative;
-      height: 220px;
+      height: 260px;
       background: #0f172a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 0h40v40' fill='none'/%3E%3C/svg%3E");
       border-radius: 12px;
       border: 1px solid #334155;
@@ -28,18 +28,21 @@
     .toast {
       position: absolute; left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      width: 360px;
-      padding: 14px 16px 14px 14px;
+      width: 380px;
+      padding: 14px 14px 12px;
       border-radius: 14px;
       background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
       border: 1px solid #e2e8f0;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
-      display: flex; gap: 12px; align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
     .toast.is-urgent {
       border-color: #fecaca;
       background: linear-gradient(145deg, #fff5f5 0%, #fff 100%);
     }
+    .toast-main { display: flex; gap: 12px; align-items: flex-start; }
     .icon {
       flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px;
       display: flex; align-items: center; justify-content: center; font-size: 20px;
@@ -52,6 +55,14 @@
     }
     .title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
     .body { font-size: 12px; line-height: 1.45; color: #475569; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn {
+      border: none; border-radius: 10px; font-size: 12px; font-weight: 700;
+      padding: 8px 14px; cursor: pointer; font-family: inherit;
+    }
+    .btn-close { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-open { background: #0284c7; color: #fff; }
+    .toast.is-urgent .btn-open { background: #dc2626; }
     .os-notify {
       width: 360px;
       background: #2d2d2d;
@@ -75,17 +86,24 @@
   <h1>메시지 도착 알림 — 미리보기</h1>
   <p>
     상대가 메시지를 보내면 <b>두 가지</b>가 함께 뜹니다.<br>
-    ① 화면 <b>정중앙</b> 커스텀 토스트 &nbsp; ② Windows 데스크탑 알림
+    ① 화면 <b>정중앙</b> 커스텀 토스트(열기/닫기) &nbsp; ② Windows 데스크탑 알림<br>
+    설정에서 토스트 표시 시간(초)을 바꿀 수 있습니다.
   </p>
   <div class="row">
     <div class="panel">
       <h2>① 커스텀 토스트 (화면 정중앙)</h2>
       <div class="desktop-mock">
         <div class="toast" id="toast-normal">
-          <div class="icon">💬</div>
-          <div>
-            <div class="title">작업치료팀장 김기범님의 메시지</div>
-            <div class="body">지금도 안되시나요</div>
+          <div class="toast-main">
+            <div class="icon">💬</div>
+            <div>
+              <div class="title">작업치료팀장 김기범님의 메시지</div>
+              <div class="body">지금도 안되시나요</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn btn-close">닫기</button>
+            <button type="button" class="btn btn-open">열기</button>
           </div>
         </div>
       </div>
@@ -102,8 +120,9 @@
         <div class="os-body" id="os-body">지금도 안되시나요</div>
       </div>
       <p style="margin-top:14px; color:#64748b; font-size:12px;">
+        ※ <b>열기</b> → 해당 대화로 이동 · <b>닫기</b> → 바로 숨김<br>
         ※ 이미 그 대화를 보고 있으면 알림을 띄우지 않습니다.<br>
-        ※ 설정 → 「새 메시지 알림」이 켜져 있어야 합니다.
+        ※ 설정 → 「새 메시지 알림」·「토스트 표시 시간」
       </p>
     </div>
   </div>
