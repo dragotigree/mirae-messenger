@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>메시지 알림 미리보기</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: linear-gradient(160deg, #1e293b 0%, #334155 50%, #0f172a 100%);
+      color: #fff;
+      padding: 40px 24px;
+    }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p { color: #94a3b8; font-size: 13px; margin-bottom: 28px; line-height: 1.5; }
+    .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+    .panel { flex: 1; min-width: 320px; }
+    .panel h2 { font-size: 14px; color: #cbd5e1; margin-bottom: 12px; }
+    .desktop-mock {
+      position: relative;
+      height: 220px;
+      background: #0f172a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 0h40v40' fill='none'/%3E%3C/svg%3E");
+      border-radius: 12px;
+      border: 1px solid #334155;
+      overflow: hidden;
+    }
+    .toast {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 360px;
+      padding: 14px 16px 14px 14px;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .toast.is-urgent {
+      border-color: #fecaca;
+      background: linear-gradient(145deg, #fff5f5 0%, #fff 100%);
+    }
+    .icon {
+      flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      background: linear-gradient(145deg, #0ea5e9, #0284c7);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+    }
+    .toast.is-urgent .icon {
+      background: linear-gradient(145deg, #ef4444, #dc2626);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    }
+    .title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .body { font-size: 12px; line-height: 1.45; color: #475569; }
+    .os-notify {
+      width: 360px;
+      background: #2d2d2d;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+      border: 1px solid #3f3f46;
+    }
+    .os-app { font-size: 11px; color: #a1a1aa; margin-bottom: 6px; }
+    .os-title { font-size: 13px; font-weight: 700; color: #fafafa; margin-bottom: 4px; }
+    .os-body { font-size: 12px; color: #d4d4d8; line-height: 1.4; }
+    .btns { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 700; background: #0ea5e9; color: #fff;
+    }
+    button.secondary { background: #475569; }
+  </style>
+</head>
+<body>
+  <h1>메시지 도착 알림 — 미리보기</h1>
+  <p>
+    상대가 메시지를 보내면 <b>두 가지</b>가 함께 뜹니다.<br>
+    ① 화면 <b>정중앙</b> 커스텀 토스트 &nbsp; ② Windows 데스크탑 알림
+  </p>
+  <div class="row">
+    <div class="panel">
+      <h2>① 커스텀 토스트 (화면 정중앙)</h2>
+      <div class="desktop-mock">
+        <div class="toast" id="toast-normal">
+          <div class="icon">💬</div>
+          <div>
+            <div class="title">작업치료팀장 김기범님의 메시지</div>
+            <div class="body">지금도 안되시나요</div>
+          </div>
+        </div>
+      </div>
+      <div class="btns">
+        <button type="button" onclick="showNormal()">일반 메시지</button>
+        <button type="button" class="secondary" onclick="showUrgent()">긴급 메시지</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>② Windows 데스크탑 알림 (예시)</h2>
+      <div class="os-notify">
+        <div class="os-app">미래병원 메신저</div>
+        <div class="os-title" id="os-title">💬 작업치료팀장 김기범님의 메시지</div>
+        <div class="os-body" id="os-body">지금도 안되시나요</div>
+      </div>
+      <p style="margin-top:14px; color:#64748b; font-size:12px;">
+        ※ 이미 그 대화를 보고 있으면 알림을 띄우지 않습니다.<br>
+        ※ 설정 → 「새 메시지 알림」이 켜져 있어야 합니다.
+      </p>
+    </div>
+  </div>
+  <script>
+    function showNormal() {
+      const t = document.getElementById('toast-normal');
+      t.classList.remove('is-urgent');
+      t.querySelector('.icon').textContent = '💬';
+      t.querySelector('.title').textContent = '작업치료팀장 김기범님의 메시지';
+      t.querySelector('.body').textContent = '지금도 안되시나요';
+      document.getElementById('os-title').textContent = '💬 작업치료팀장 김기범님의 메시지';
+      document.getElementById('os-body').textContent = '지금도 안되시나요';
+    }
+    function showUrgent() {
+      const t = document.getElementById('toast-normal');
+      t.classList.add('is-urgent');
+      t.querySelector('.icon').textContent = '🚨';
+      t.querySelector('.title').textContent = '🚨 [긴급] 작업치료팀장 김기범님의 메시지';
+      t.querySelector('.body').textContent = '지금 바로 확인 부탁드립니다';
+      document.getElementById('os-title').textContent = '🚨 [긴급] 작업치료팀장 김기범님의 메시지';
+      document.getElementById('os-body').textContent = '지금 바로 확인 부탁드립니다';
+    }
+  </script>
+</body>
+</html>

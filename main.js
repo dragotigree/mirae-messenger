@@ -494,11 +494,11 @@ function showMessageToast({ title, body, urgent }) {
   if (!notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
   const work = display.workArea || display.bounds;
-  const width = 380;
-  const height = 112;
-  const margin = 20;
-  const x = Math.round(work.x + work.width - width - margin);
-  const y = Math.round(work.y + work.height - height - margin);
+  const width = 420;
+  const height = 128;
+  // 화면(작업 영역) 정중앙
+  const x = Math.round(work.x + (work.width - width) / 2);
+  const y = Math.round(work.y + (work.height - height) / 2);
 
   closeMessageToast();
 
