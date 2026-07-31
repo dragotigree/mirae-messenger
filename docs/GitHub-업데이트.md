@@ -37,12 +37,16 @@ Mirae Messenger — GitHub로 업데이트하기
   위치 예:
     %APPDATA%\MiraeMessenger\github-update-token.txt
 
-■ 병원망에서 GitHub가 막힌 경우
-  - 인터넷·방화벽에서 github.com / api.github.com / raw.githubusercontent.com 허용이 필요합니다.
-  - Z드라이브 폴더로는 더 이상 업데이트를 받지 않습니다.
+■ 병원망에서 GitHub가 막힌 경우 / 옛 버전(Z만 아는 PC)
+  1) 관리 PC에서 Z 브리지 배포:
+       .\scripts\publish-z-bridge.ps1
+  2) 옛 PC는 Z 연결 후 메신저 실행(또는 「지금 확인」)
+  3) GitHub 지원 버전으로 올라가면 이후는 GitHub만 사용
+  자세한 내용: docs\Z드라이브-브리지.md
 
 ■ 새 버전 배포 체크리스트
   [ ] package.json version 증가
   [ ] version.json version + notes 수정
   [ ] git push (또는 publish-to-github.ps1)
+  [ ] (옛 PC가 남아 있으면) publish-z-bridge.ps1 도 실행
   [ ] 테스트 PC에서 「지금 확인」 → 업데이트

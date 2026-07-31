@@ -2552,12 +2552,12 @@
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
         <div style="font-size:13px; font-weight:700; color:var(--accent);">🔄 프로그램 업데이트</div>
         <div style="font-size:12px; color:#475569;">현재 버전: <b id="update-current-version">-</b></div>
-        <label style="font-size:12px; color:#475569;">업데이트 소스 (GitHub 전용):
-          <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
+        <label style="font-size:12px; color:#475569;">업데이트 소스 (GitHub 또는 Z 브리지):
+          <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.45;">
-          업데이트는 GitHub 저장소만 사용합니다. (Z드라이브·공유폴더 경로는 무시됩니다)<br>
-          Private 저장소는 데이터 폴더에 <b>github-update-token.txt</b>(Contents 읽기 PAT)가 필요합니다.
+          기본은 GitHub입니다. 옛 버전 PC는 <b>Z:\...\물리치료실\messenger</b> 경로로도 받을 수 있습니다.<br>
+          Private GitHub는 <b>github-update-token.txt</b>(Contents 읽기 PAT)가 필요할 수 있습니다.
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button onclick="checkUpdateNow()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">지금 확인</button>

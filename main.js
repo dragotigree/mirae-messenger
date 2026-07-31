@@ -276,8 +276,9 @@ const APP_VERSION = require('./package.json').version;
 // 마스터가 지정한 공유 폴더(예: 병원 공유 드라이브) 경로. 여기 최신 파일을 올려두면
 // 전 직원 PC가 자동으로 새 버전이 있는지 확인하고, 원할 때 한 번에 업데이트할 수 있다.
 let updateSourcePath = '';
-// 업데이트는 GitHub 저장소만 사용한다. (Z드라이브/공유폴더 경로는 더 이상 쓰지 않음)
+// 기본: GitHub. 옛 버전 브리지용으로 Z/공유폴더 경로도 계속 지원한다.
 const DEFAULT_UPDATE_SOURCE_PATH = 'https://github.com/dragotigree/mirae-messenger';
+const Z_BRIDGE_UPDATE_SOURCE_PATH = 'Z:\\9.재활치료실(PT&OT&언어&임상심리)\\물리치료실\\messenger';
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
@@ -327,22 +328,31 @@ function parseUpdateSource(src) {
       return { kind: 'none' };
     }
   }
-  // Z드라이브·로컬 폴더 경로는 더 이상 업데이트 소스로 쓰지 않는다.
-  return { kind: 'none' };
+  // Z드라이브·공유폴더 경로 (옛 버전 브리지)
+  return { kind: 'folder', dir: s };
 }
 
-/** 저장된 값이 Z경로 등이면 GitHub 기본값으로 강제 전환 */
-function normalizeUpdateSourceToGithub(src) {
-  const meta = parseUpdateSource(src);
+/** 빈 값·잘못된 값만 기본(GitHub)으로. Z경로는 유지(잘린 경로는 messenger로 보정). */
+function normalizeUpdateSourcePath(src) {
+  const s = String(src || '').trim();
+  if (!s) return DEFAULT_UPDATE_SOURCE_PATH;
+  const meta = parseUpdateSource(s);
   if (meta.kind === 'github' && meta.owner && meta.repo) {
     const ref = meta.ref && meta.ref !== 'main' ? `#${meta.ref}` : '';
     return `https://github.com/${meta.owner}/${meta.repo}${ref}`;
+  }
+  if (meta.kind === 'folder') {
+    const cleaned = s.replace(/[\\/]+$/, '');
+    if (/물리치료실$/i.test(cleaned) && !/messenger$/i.test(cleaned)) {
+      return Z_BRIDGE_UPDATE_SOURCE_PATH;
+    }
+    return s;
   }
   return DEFAULT_UPDATE_SOURCE_PATH;
 }
 
 function persistUpdateSourcePath(nextPath) {
-  updateSourcePath = normalizeUpdateSourceToGithub(nextPath);
+  updateSourcePath = normalizeUpdateSourcePath(nextPath);
   db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], logDbErr);
 }
 
@@ -411,7 +421,10 @@ async function readUpdateSourceBytes(relPath) {
   if (meta.kind === 'github') {
     return fetchGithubUpdateFile(meta, relPath);
   }
-  throw new Error('업데이트 소스는 GitHub 주소만 사용할 수 있습니다.');
+  if (meta.kind === 'folder') {
+    return fs.promises.readFile(path.join(meta.dir, relPath));
+  }
+  throw new Error('업데이트 소스가 설정되지 않았습니다.');
 }
 
 async function writeBufferWithRetry(destPath, buffer, retries = 10) {
@@ -1217,9 +1230,9 @@ db.serialize(() => {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
       if (row.notify_read_receipts != null) notifyReadReceipts = !!row.notify_read_receipts;
-      // 예전 Z드라이브 경로 등은 GitHub로 마이그레이션한다.
+      // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
-      updateSourcePath = normalizeUpdateSourceToGithub(rawPath);
+      updateSourcePath = normalizeUpdateSourcePath(rawPath);
       transportWebappUrl = row.transport_webapp_url || DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = row.download_folder_path || app.getPath('downloads');
       trayLaunchViewMode = row.tray_launch_view_mode === 'compact' ? 'compact' : 'normal';
@@ -4630,46 +4643,54 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
 ipcMain.handle('get-app-version', async () => APP_VERSION);
 
 ipcMain.handle('get-update-source-path', async () => {
-  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   return updateSourcePath;
 });
 
 ipcMain.handle('set-update-source-path', async (event, folderPath) => {
-  const next = normalizeUpdateSourceToGithub(folderPath || DEFAULT_UPDATE_SOURCE_PATH);
-  if (parseUpdateSource(next).kind !== 'github') {
-    return { success: false, msg: '업데이트 소스는 GitHub 주소만 사용할 수 있습니다.' };
+  const next = normalizeUpdateSourcePath(folderPath || DEFAULT_UPDATE_SOURCE_PATH);
+  const meta = parseUpdateSource(next);
+  if (meta.kind !== 'github' && meta.kind !== 'folder') {
+    return { success: false, msg: 'GitHub 주소 또는 Z/공유폴더 경로를 입력해 주세요.' };
   }
   persistUpdateSourcePath(next);
-  broadcastToOnlinePeers({ type: 'CONFIG_SYNC', updateSourcePath });
+  // 옛 PC 브리지: Z 경로를 함께 알려 주면 Z만 아는 버전도 따라올 수 있다.
+  const syncPath = meta.kind === 'folder' ? updateSourcePath : Z_BRIDGE_UPDATE_SOURCE_PATH;
+  broadcastToOnlinePeers({ type: 'CONFIG_SYNC', updateSourcePath: syncPath });
+  if (meta.kind === 'github') {
+    // GitHub도 저장돼 있으니 로컬은 GitHub 유지. 피어에는 Z 브리지를 보낸다.
+  }
   return { success: true, path: updateSourcePath };
 });
 
 ipcMain.handle('check-for-update', async () => {
-  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
     const remote = JSON.parse(raw);
     const available = compareVersions(remote.version, APP_VERSION) > 0;
+    const src = parseUpdateSource(updateSourcePath);
     return {
       available,
       remoteVersion: remote.version,
       currentVersion: APP_VERSION,
       notes: remote.notes || '',
-      sourceKind: 'github'
+      sourceKind: src.kind
     };
   } catch (e) {
-    if (e.code === 'ENOENT') return { available: false, msg: 'GitHub에서 version.json을 찾을 수 없습니다.' };
+    if (e.code === 'ENOENT') {
+      return { available: false, msg: '업데이트 소스에서 version.json을 찾을 수 없습니다. 경로(Z:\\...\\messenger)를 확인해 주세요.' };
+    }
     const msg = String(e.message || e);
-    // Private 저장소는 토큰 없이 요청하면 401이 아니라 404로 온다.
     if (/401|403|404|Bad credentials|Requires authentication|Not Found/i.test(msg)) {
       return {
         available: false,
-        msg: 'GitHub 인증이 필요합니다. 「토큰 폴더 열기」→ github-update-token.txt 파일을 만들고 PAT(Contents 읽기)를 한 줄로 저장한 뒤 다시 확인해 주세요.'
+        msg: 'GitHub 인증이 필요합니다. 「토큰 폴더 열기」→ github-update-token.txt 파일을 만들고 PAT(Contents 읽기)를 한 줄로 저장한 뒤 다시 확인해 주세요. (또는 업데이트 소스를 Z:\\...\\messenger 로 두세요)'
       };
     }
     if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|응답 시간 초과/i.test(msg)) {
-      return { available: false, msg: 'GitHub에 연결할 수 없습니다. 인터넷·방화벽을 확인해 주세요.' };
+      return { available: false, msg: '업데이트 서버에 연결할 수 없습니다. 인터넷 또는 Z드라이브 연결을 확인해 주세요.' };
     }
     return { available: false, msg: '업데이트 확인 중 오류가 발생했습니다: ' + msg };
   }
@@ -4783,7 +4804,7 @@ async function applyUpdateFiles() {
 }
 
 ipcMain.handle('apply-update', async () => {
-  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
   try {
     await applyUpdateFiles();
@@ -4795,7 +4816,7 @@ ipcMain.handle('apply-update', async () => {
 });
 
 async function autoCheckAndApplyUpdate() {
-  updateSourcePath = normalizeUpdateSourceToGithub(updateSourcePath);
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath || !mainWindow) return;
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
   let remote;
