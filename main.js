@@ -2358,16 +2358,18 @@ function canonicalPersonName(u) {
 function preferUserListEntry(a, b) {
   if (!a) return b;
   if (!b) return a;
-  if (!!a.isMe !== !!b.isMe) return a.isMe ? a : b;
+  // 대화 상대 카드는 접속 중인 IP를 우선 (여러 PC면 가장 최근 PING)
   if (!!a.online !== !!b.online) return a.online ? a : b;
+  // 자기 자신 카드는 목록에서 제외하므로, 합칠 때는 이 PC(isMe)를 대표로 잡아 alias에만 남긴다
+  if (!!a.isMe !== !!b.isMe) return a.isMe ? a : b;
   return (Number(a.lastSeen) || 0) >= (Number(b.lastSeen) || 0) ? a : b;
 }
 
 /**
- * 같은 사람이 다른 PC(IP)로 잡힌 중복 항목을 사이드바용으로 정리한다.
- * - 동시에 여러 PC가 온라인이면 모두 유지
- * - 온라인 1 + 오프라인 유령(이전 PC) → 온라인만 표시
- * - 모두 오프라인 → 가장 최근 lastSeen 하나만
+ * 같은 사람이 다른 PC(IP)로 잡힌 중복 항목을 사이드바용으로 한 명만 남긴다.
+ * - 여러 PC가 동시에 온라인이어도 표시는 1명 (나머지 IP는 aliasIps)
+ * - 온라인 + 오프라인 유령(이전 PC) → 온라인만
+ * - 모두 오프라인 → 가장 최근 lastSeen
  */
 function dedupeUsersByPersonIdentity(list) {
   const byName = new Map();
@@ -2388,17 +2390,18 @@ function dedupeUsersByPersonIdentity(list) {
       out.push(entries[0]);
       return;
     }
-    const onlineOnes = entries.filter((e) => e.online || e.isMe);
-    if (onlineOnes.length >= 2) {
-      out.push(...onlineOnes.map((e) => {
-        const aliasIps = entries.map((x) => x.ip).filter((ip) => ip && ip !== e.ip);
-        return aliasIps.length ? { ...e, aliasIps } : e;
-      }));
-      return;
-    }
     let best = entries[0];
     for (let i = 1; i < entries.length; i++) best = preferUserListEntry(best, entries[i]);
     const aliasIps = entries.map((e) => e.ip).filter((ip) => ip && ip !== best.ip);
+    // 대표가 오프라인인데 별칭 중 온라인이 있으면 그쪽으로 승격
+    if (!best.online) {
+      const onlineAlt = entries.find((e) => e.online && e.ip !== best.ip);
+      if (onlineAlt) {
+        const rest = entries.map((e) => e.ip).filter((ip) => ip && ip !== onlineAlt.ip);
+        out.push(rest.length ? { ...onlineAlt, aliasIps: rest } : onlineAlt);
+        return;
+      }
+    }
     out.push(aliasIps.length ? { ...best, aliasIps } : best);
   });
   return out;
@@ -2408,7 +2411,7 @@ function notifyUserList() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const combinedList = dedupeUsersByPersonIdentity(
     Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
-  );
+  ).filter((u) => !u.isMe);
   safeWebContentsSend('user-list-update', combinedList);
 }
 

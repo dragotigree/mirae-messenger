@@ -4207,7 +4207,11 @@
     window.api.onProfilePhotoUpdate((data) => applyProfilePhotoUpdate(data));
 
     function isChatCurrentlyOpen(key) {
-      return !!(activeChatUser && activeChatUser.ip === key);
+      if (!activeChatUser || !key) return false;
+      if (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup) {
+        return activeChatUser.ip === key;
+      }
+      return userMatchesIp(activeChatUser, key);
     }
 
     function isDirectMessagePeerKey(key) {
@@ -4255,7 +4259,7 @@
     }
 
     function getDmSectionUnread() {
-      return allUsers.reduce((sum, u) => sum + getUnreadCount(u.ip), 0);
+      return allUsers.reduce((sum, u) => sum + getUnreadForUser(u), 0);
     }
 
     function getTotalUnread() {
@@ -6695,7 +6699,17 @@
     }
 
     function findUserByIp(ip) {
-      return (allUsers || []).find((u) => u.ip === ip) || null;
+      if (!ip) return null;
+      return (allUsers || []).find((u) => {
+        if (u.ip === ip) return true;
+        return Array.isArray(u.aliasIps) && u.aliasIps.includes(ip);
+      }) || null;
+    }
+
+    function userMatchesIp(u, ip) {
+      if (!u || !ip) return false;
+      if (u.ip === ip) return true;
+      return Array.isArray(u.aliasIps) && u.aliasIps.includes(ip);
     }
 
     function isUserDragEvent(e) {
@@ -6855,7 +6869,7 @@
 
     function buildUserCard(u) {
       const unread = getUnreadForUser(u);
-      const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && activeChatUser.ip === u.ip;
+      const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && userMatchesIp(u, activeChatUser.ip);
       const card = document.createElement('div');
       card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}`;
       card.dataset.userIp = u.ip;
