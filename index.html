@@ -1444,9 +1444,13 @@
     .schedule-board-export-btn.secondary:hover { background: #e0f2fe; }
     .schedule-board-export-hint { font-size: 11px; color: #64748b; line-height: 1.45; flex: 1; min-width: 200px; }
     .schedule-board-quick-add {
+      display: none;
       margin: 0 18px 10px; padding: 12px 14px 14px; background: #fff; border: 1px solid #bae6fd;
       border-radius: 14px; box-shadow: 0 1px 3px rgba(14, 165, 233, 0.1); flex-shrink: 0;
     }
+    .schedule-board-quick-add.is-open,
+    .schedule-board-quick-add[data-open="1"] { display: block; }
+    .schedule-board-quick-add[hidden] { display: none !important; }
     .sb-board-content .schedule-board-quick-add { margin: 10px 14px 0; }
     .sb-quick-add-toolbar { display: flex; justify-content: flex-end; margin: -4px 0 6px; }
     .sb-quick-close-btn {
@@ -2579,7 +2583,7 @@
           <div class="schedule-board-top-summary" id="schedule-board-day-summary">날짜를 선택하세요.</div>
         </div>
         <div class="schedule-board-top-bar-actions">
-          <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()">+ 빠른 등록</button>
+          <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add">+ 빠른 등록</button>
           <button type="button" class="calendar-day-close-btn sb-top-close" onclick="closeScheduleBoardModal()" title="닫기">✕</button>
         </div>
       </div>
@@ -2634,7 +2638,7 @@
           <div id="schedule-board-login-hint" class="schedule-board-login-hint" style="display:none;">
             프로필을 불러오는 중이거나 연결되지 않았습니다. 잠시 후 다시 시도해 주세요. (타인 일정·공지 관리는 <a onclick="openOperatorLoginModal()">작성자 로그인</a>)
           </div>
-          <div id="schedule-board-quick-add" class="schedule-board-quick-add" style="display:none;" hidden>
+          <div id="schedule-board-quick-add" class="schedule-board-quick-add" style="display:none;" hidden data-open="0">
             <div class="sb-quick-add-toolbar">
               <button type="button" class="sb-quick-close-btn" onclick="hideScheduleBoardQuickAddPanel()" title="닫기">✕ 닫기</button>
             </div>
@@ -3902,10 +3906,13 @@
       const show = !!(visible && canWrite);
       scheduleBoardQuickPanelOpen = show;
       panel.hidden = !show;
+      panel.classList.toggle('is-open', show);
+      panel.dataset.open = show ? '1' : '0';
       panel.style.display = show ? 'block' : 'none';
       if (addBtn && canWrite) {
         addBtn.classList.toggle('is-active', show);
         addBtn.title = show ? '빠른 등록 닫기' : '빠른 등록 열기';
+        addBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
       }
     }
 
@@ -9805,6 +9812,7 @@
       const o = pendingScheduleBoardQuickOpts;
       pendingScheduleBoardQuickOpts = null;
       if (!o) {
+        scheduleBoardQuickPanelOpen = false;
         if (!scheduleBoardEditingUid) setScheduleBoardQuickAddPanelVisible(false);
         return;
       }
@@ -9812,6 +9820,11 @@
       if (o.editUid) {
         const sch = findScheduleByUid(o.editUid);
         if (sch) startScheduleBoardQuickEdit(sch);
+        return;
+      }
+      if (!o.focusQuickAdd) {
+        scheduleBoardQuickPanelOpen = false;
+        setScheduleBoardQuickAddPanelVisible(false);
         return;
       }
       if (scheduleBoardEditingUid) cancelScheduleBoardQuickEdit();
