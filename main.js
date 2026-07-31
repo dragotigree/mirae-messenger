@@ -558,7 +558,14 @@ function showDesktopNotification({ title, body, urgent }) {
 function notifyIncomingMessageNotification(opts) {
   if (!notifyIncomingMessages) return;
   if (shouldSuppressMessageToast(opts && opts.channelKey)) return;
-  showMessageToast(opts || {});
+  const o = opts || {};
+  // 커스텀 토스트 + OS 알림 (읽음 알림과 동일하게 데스크탑에서도 보이도록)
+  showMessageToast(o);
+  showDesktopNotification({
+    title: o.title || '새 메시지',
+    body: o.body || '메시지가 도착했습니다.',
+    urgent: !!o.urgent
+  });
 }
 
 let chatLogDirEnsured = false;
