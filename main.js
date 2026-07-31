@@ -3394,16 +3394,33 @@ ipcMain.handle('choose-download-folder', async () => {
 });
 
 ipcMain.handle('notify-read', async (event, targetIP) => {
-  if (!targetIP || targetIP === 'BROADCAST' || String(targetIP).startsWith('DEPT:')) return true;
-  const client = new net.Socket();
-  client.setTimeout(900);
-  client.connect(TCP_PORT, targetIP, () => {
-    client.write(JSON.stringify({ type: 'READ_RECEIPT', readerName: senderLabelForMe() }) + '\n');
-    client.end();
+  if (!targetIP || targetIP === 'BROADCAST' || String(targetIP).startsWith('DEPT:') ||
+      String(targetIP).startsWith('FLOOR:') || String(targetIP).startsWith('GROUP:')) {
+    return { success: false };
+  }
+  return new Promise((resolve) => {
+    const client = new net.Socket();
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      try { client.destroy(); } catch (e) {}
+      resolve({ success: !!ok });
+    };
+    client.setTimeout(2500);
+    client.connect(TCP_PORT, targetIP, () => {
+      try {
+        client.write(JSON.stringify({ type: 'READ_RECEIPT', readerName: senderLabelForMe() }) + '\n', () => {
+          client.end();
+          finish(true);
+        });
+      } catch (e) {
+        finish(false);
+      }
+    });
+    client.on('error', () => finish(false));
+    client.on('timeout', () => finish(false));
   });
-  client.on('error', () => {});
-  client.on('timeout', () => client.destroy());
-  return true;
 });
 
 ipcMain.handle('notify-channel-read', async (event, { channelKey, lastReadMsgUid }) => {

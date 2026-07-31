@@ -3665,8 +3665,9 @@
     let scheduleBoardCalViewDate = new Date();
     let isUrgentMode = false;
     let quickPhrases = JSON.parse(localStorage.getItem('quickPhrases') || '["환자 이동 도움 요청드립니다.","치료실 변경 안내드립니다.","확인했습니다.","잠시 후 연락드리겠습니다."]');
-    /** 1:1 읽음 확인 TCP는 상대에게 미확인 메시지를 읽을 때 전송 (동일 대화 중 재전송 가능) */
+    /** 1:1 읽음 확인 TCP는 상대에게 미확인 메시지를 읽을 때 전송 (실패 시 재시도) */
     const dmReadReceiptSentFor = {};
+    const dmReadReceiptInFlight = {};
 
     function getDmReadReceiptFlags() {
       try { return JSON.parse(localStorage.getItem('dmReadReceiptFlags') || '{}'); } catch (e) { return {}; }
@@ -3717,14 +3718,14 @@
       if (!isDmOutboundStatusContext()) return;
       const peerRead = !!(activeChatUser && getDmReadReceiptFlags()[activeChatUser.ip]);
       const rows = document.querySelectorAll('#chat-messages-area .is-mine-msg');
-      rows.forEach((row, idx) => {
+      rows.forEach((row) => {
         const span = ensureOutboundStatusSpan(row);
         if (!span) return;
-        const isLast = idx === rows.length - 1;
         const st = row.getAttribute('data-outbound-status') || '';
         if (st === 'PENDING' || messageRowIsOutboundPending(row)) {
           paintSendStatusSpan(span, 'error');
-        } else if (isLast && peerRead) {
+        } else if (peerRead) {
+          // 상대가 읽으면 보낸 메시지 전체에 읽음 표시
           paintSendStatusSpan(span, 'read');
         } else {
           paintSendStatusSpan(span, 'sent');
@@ -3740,15 +3741,34 @@
       updateMineOutboundStatusLabels();
     }
 
-    function requestDmReadReceipt(peerIp) {
-      if (!isDirectMessagePeerKey(peerIp)) return;
-      if (dmReadReceiptSentFor[peerIp]) return;
-      dmReadReceiptSentFor[peerIp] = true;
-      window.api.notifyRead(peerIp);
+    async function requestDmReadReceipt(peerIp, opts) {
+      if (!isDirectMessagePeerKey(peerIp)) return false;
+      const force = !!(opts && opts.force);
+      if (!force && dmReadReceiptSentFor[peerIp]) return true;
+      if (dmReadReceiptInFlight[peerIp]) return false;
+      dmReadReceiptInFlight[peerIp] = true;
+      try {
+        const res = await window.api.notifyRead(peerIp);
+        const ok = !!(res && res.success);
+        if (ok) dmReadReceiptSentFor[peerIp] = true;
+        else delete dmReadReceiptSentFor[peerIp];
+        return ok;
+      } catch (e) {
+        delete dmReadReceiptSentFor[peerIp];
+        return false;
+      } finally {
+        delete dmReadReceiptInFlight[peerIp];
+      }
     }
 
     function maybeNotifyDmRead(peerIp) {
-      requestDmReadReceipt(peerIp);
+      requestDmReadReceipt(peerIp).catch(() => {});
+    }
+
+    function retryDmReadReceiptIfNeeded() {
+      if (!activeChatUser || !isDirectMessagePeerKey(activeChatUser.ip)) return;
+      if (dmReadReceiptSentFor[activeChatUser.ip]) return;
+      requestDmReadReceipt(activeChatUser.ip, { force: true }).catch(() => {});
     }
     let idleTimer = null;
     let autoAwayTriggered = false;
@@ -4450,7 +4470,7 @@
       if (isChatCurrentlyOpen(data.senderIP)) {
         appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
         delete dmReadReceiptSentFor[data.senderIP];
-        maybeNotifyDmRead(data.senderIP);
+        requestDmReadReceipt(data.senderIP, { force: true }).catch(() => {});
       } else {
         bumpUnread(data.senderIP);
       }
@@ -4517,6 +4537,13 @@
         updateMineOutboundStatusLabels();
       }
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') retryDmReadReceiptIfNeeded();
+    });
+    window.addEventListener('focus', () => {
+      retryDmReadReceiptIfNeeded();
+    });
 
     window.api.onMessageReactionUpdate((data) => {
       if (data && data.msgKey) updateRowReactions(data.msgKey, data.summary);
@@ -7765,7 +7792,7 @@
           await refreshChannelMessageUnreadCounts();
           if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
             delete dmReadReceiptSentFor[activeChatUser.ip];
-            maybeNotifyDmRead(activeChatUser.ip);
+            await requestDmReadReceipt(activeChatUser.ip, { force: true });
             updateMineOutboundStatusLabels();
           }
         }
@@ -9339,8 +9366,9 @@
       const displayName = resolveMessageSenderDisplay(senderName, isMe, senderIP) || (isMe ? '나' : '상대방');
       const compact = document.body.classList.contains('compact-mode');
       const urgentBadgeHtml = urgent ? `<div class="urgent-badge">🚨 긴급</div>` : '';
+      const peerAlreadyRead = isMe && !isGroupChannel && activeChatUser && !!getDmReadReceiptFlags()[activeChatUser.ip];
       const sendStatusHtml = (isMe && !isGroupChannel)
-        ? `<span class="msg-send-status is-sent"> · 보냄</span>` : '';
+        ? `<span class="msg-send-status ${peerAlreadyRead ? 'is-read' : 'is-sent'}">${peerAlreadyRead ? ' · 읽음' : ' · 보냄'}</span>` : '';
       // 텍스트는 수정·삭제, 사진·파일은 삭제만 (msg_uid 필요)
       const isDeletedAlready = typeof msg === 'string' && msg.indexOf('class="deleted-msg-flag"') !== -1;
       const isSystemNotice = typeof msg === 'string' && msg.indexOf('class="system-notice-flag"') !== -1;
