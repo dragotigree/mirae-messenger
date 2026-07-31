@@ -1555,18 +1555,28 @@
     .all-logs-subtitle { font-size: 11.5px; color: #94a3b8; margin-top: 2px; font-weight: 400; }
     .all-logs-close-btn { width: 32px; height: 32px; border: none; background: #f1f5f9; border-radius: 10px; font-size: 14px; color: #64748b; cursor: pointer; transition: background 0.12s, color 0.12s; flex-shrink: 0; }
     .all-logs-close-btn:hover { background: #e2e8f0; color: #334155; }
-    .all-logs-toolbar { display: flex; gap: 8px; padding: 14px 22px; background: #fafbfc; border-bottom: 1px solid #eef2f6; flex-shrink: 0; }
+    .all-logs-toolbar { display: flex; gap: 8px; padding: 14px 22px 10px; background: #fafbfc; border-bottom: none; flex-shrink: 0; }
     .all-logs-search-wrap { flex: 1; position: relative; }
     .all-logs-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.4; pointer-events: none; }
     .all-logs-search-wrap input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12.5px; outline: none; background: #fff; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box; }
     .all-logs-search-wrap input:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
     .all-logs-folder-btn { padding: 9px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 11.5px; font-weight: 600; cursor: pointer; color: #475569; white-space: nowrap; transition: background 0.12s; flex-shrink: 0; }
     .all-logs-folder-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .all-logs-filterbar {
+      display: flex; align-items: center; gap: 2px; padding: 0 22px 12px; background: #fafbfc;
+      border-bottom: 1px solid #eef2f6; flex-shrink: 0;
+    }
+    .all-logs-filter-tab {
+      padding: 8px 12px; border: none; background: transparent; font-size: 12.5px; font-weight: 600;
+      color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit;
+    }
+    .all-logs-filter-tab:hover { color: #475569; }
+    .all-logs-filter-tab.is-active { color: #0f172a; border-bottom-color: #0f172a; }
     .all-logs-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; box-sizing: border-box; }
     .all-logs-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.65; }
     .log-card-item {
       width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e8edf2;
-      border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 0;
+      border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px;
       flex-shrink: 0; border-left-width: 3px;
     }
     .log-card-item.is-received { background: #fff; border-left-color: #94a3b8; }
@@ -1575,6 +1585,15 @@
     }
     /* 채팅창과 동일: 전체 대화 기록에서도 이름 이니셜 아바타 숨김 */
     .log-card-avatar { display: none !important; }
+    .log-card-thumb {
+      width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+      background: #e2e8f0; border: 1px solid #e8edf2;
+    }
+    .log-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .log-card-file-icon {
+      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; font-size: 22px; background: #f1f5f9; border: 1px solid #e8edf2;
+    }
     .log-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
     .log-card-top {
       display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; flex-wrap: nowrap;
@@ -2215,6 +2234,12 @@
           <input type="text" id="all-logs-search-input" placeholder="대화 내용 또는 보낸 사람 검색..." oninput="onAllLogsSearchInput(this.value)">
         </div>
         <button type="button" class="all-logs-folder-btn" onclick="window.api.openUserDataFolder()">📂 로그 폴더</button>
+      </div>
+      <div class="all-logs-filterbar" role="tablist" aria-label="대화 기록 종류">
+        <button type="button" class="all-logs-filter-tab is-active" data-all-logs-filter="all" onclick="setAllLogsFilter('all')">전체</button>
+        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="photo" onclick="setAllLogsFilter('photo')">사진</button>
+        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="file" onclick="setAllLogsFilter('file')">파일</button>
+        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
       </div>
       <div id="all-logs-container" class="all-logs-list"></div>
     </div>
@@ -3805,6 +3830,7 @@
     }
     applyChannelsSectionCollapseState();
     let allLogsSearchDebounce = null;
+    let allLogsFilter = 'all';
     let cachedNoticesList = [];
     let chatSearchDebounce = null;
     let scheduledForCurrentChat = [];
@@ -6849,6 +6875,10 @@
 
 
     function openAllLogsModal() {
+      allLogsFilter = 'all';
+      document.querySelectorAll('.all-logs-filter-tab').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-all-logs-filter') === 'all');
+      });
       document.getElementById('all-logs-search-input').value = '';
       loadAllChatLogs('');
       document.getElementById('all-logs-modal').style.display = 'flex';
@@ -6856,6 +6886,16 @@
 
     function closeAllLogsModal() {
       document.getElementById('all-logs-modal').style.display = 'none';
+    }
+
+    function setAllLogsFilter(kind) {
+      const next = ['all', 'photo', 'file', 'link'].includes(kind) ? kind : 'all';
+      allLogsFilter = next;
+      document.querySelectorAll('.all-logs-filter-tab').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-all-logs-filter') === next);
+      });
+      const kw = (document.getElementById('all-logs-search-input')?.value || '').trim();
+      loadAllChatLogs(kw);
     }
 
     function onAllLogsSearchInput(value) {
@@ -6879,9 +6919,44 @@
       tmp.innerHTML = html;
       const text = (tmp.textContent || tmp.innerText || '').trim();
       if (text) return text;
-      if (html.includes('<img')) return '🖼️ 이미지';
+      if (html.includes('<img') || html.includes('chat-img-preview') || html.includes('data:image')) return '🖼️ 사진';
       if (html.includes('chat-file-box')) return '📎 파일';
       return html.replace(/<[^>]+>/g, '').trim() || '(내용 없음)';
+    }
+
+    function extractAllLogMediaMeta(html, kind) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html || '';
+      if (kind === 'photo') {
+        const img = wrap.querySelector('img.chat-img-preview, img[src^="data:image"], img[src]');
+        const src = img ? (img.getAttribute('src') || '') : '';
+        return { thumbSrc: src, preview: '🖼️ 사진' };
+      }
+      if (kind === 'file') {
+        const box = wrap.querySelector('.chat-file-box');
+        let fileName = '파일';
+        let sizeText = '';
+        if (box) {
+          const metaCol = box.querySelector(':scope > div');
+          if (metaCol) {
+            const kids = metaCol.children;
+            if (kids[0]) fileName = (kids[0].textContent || '').trim() || fileName;
+            if (kids[1]) sizeText = (kids[1].textContent || '').trim();
+          }
+        }
+        return { fileName, sizeText, preview: sizeText ? `${fileName} · ${sizeText}` : fileName };
+      }
+      if (kind === 'link') {
+        const anchors = [...wrap.querySelectorAll('a[href^="http"]')].filter((a) => !a.closest('.chat-file-box'));
+        let url = anchors[0] ? (anchors[0].getAttribute('href') || anchors[0].href || '') : '';
+        if (!url) {
+          const plain = (wrap.textContent || '');
+          const m = plain.match(/https?:\/\/[^\s<>"')\]}]+/i);
+          if (m) url = m[0];
+        }
+        return { url, preview: url || '링크' };
+      }
+      return { preview: logMessagePreview(html) };
     }
 
     function escapeHtml(str) {
@@ -6893,14 +6968,22 @@
       const countEl = document.getElementById('all-logs-count');
       if (!container) return;
 
-      const logs = await window.api.getAllChatHistory(keyword || '');
+      const kind = allLogsFilter || 'all';
+      const logs = await window.api.getAllChatHistory({ keyword: keyword || '', kind });
       if (countEl) countEl.textContent = String(logs ? logs.length : 0);
+
+      const emptyByKind = {
+        all: keyword ? '검색어에 일치하는 대화 내역이 없습니다.' : '아직 기록된 대화 내역이 없습니다.',
+        photo: keyword ? '검색 조건에 맞는 사진이 없습니다.' : '사진이 포함된 대화가 없습니다.',
+        file: keyword ? '검색 조건에 맞는 파일이 없습니다.' : '파일이 포함된 대화가 없습니다.',
+        link: keyword ? '검색 조건에 맞는 링크가 없습니다.' : '링크가 포함된 대화가 없습니다.'
+      };
 
       if (!logs || logs.length === 0) {
         container.innerHTML = `
           <div class="all-logs-empty">
             <div class="all-logs-empty-icon">📭</div>
-            ${keyword ? '검색어에 일치하는 대화 내역이 없습니다.' : '아직 기록된 대화 내역이 없습니다.'}
+            ${emptyByKind[kind] || emptyByKind.all}
           </div>`;
         return;
       }
@@ -6913,10 +6996,21 @@
         const card = document.createElement('div');
         card.className = `log-card-item ${typeMeta.class} ${dirClass}`;
         const senderName = item.sender_name || '익명';
-        const preview = logMessagePreview(item.message);
+        const media = extractAllLogMediaMeta(item.message, kind === 'all' ? '' : kind);
+        const preview = media.preview || logMessagePreview(item.message);
         const dirLabel = isSent ? '보냄' : '받음';
 
+        let sideHtml = '';
+        if (kind === 'photo' && media.thumbSrc) {
+          sideHtml = `<div class="log-card-thumb"><img src="${escapeHtml(media.thumbSrc)}" alt="사진" loading="lazy" decoding="async"></div>`;
+        } else if (kind === 'file') {
+          sideHtml = `<div class="log-card-file-icon" aria-hidden="true">📄</div>`;
+        } else if (kind === 'link') {
+          sideHtml = `<div class="log-card-file-icon" aria-hidden="true">🔗</div>`;
+        }
+
         card.innerHTML = `
+          ${sideHtml}
           <div class="log-card-main">
             <div class="log-card-top">
               <span class="log-card-direction ${dirClass}">${dirLabel}</span>
@@ -6927,6 +7021,22 @@
             <div class="log-card-body">${escapeHtml(preview)}</div>
           </div>
         `;
+
+        if (kind === 'link' && media.url) {
+          card.style.cursor = 'pointer';
+          card.title = media.url;
+          card.addEventListener('click', () => {
+            if (window.api && typeof window.api.openExternalUrl === 'function') window.api.openExternalUrl(media.url);
+            else window.open(media.url, '_blank', 'noopener,noreferrer');
+          });
+        } else if (kind === 'photo' && media.thumbSrc) {
+          card.style.cursor = 'pointer';
+          card.addEventListener('click', () => {
+            if (typeof openImageLightbox === 'function') openImageLightbox(media.thumbSrc);
+            else window.open(media.thumbSrc, '_blank');
+          });
+        }
+
         container.appendChild(card);
       });
     }

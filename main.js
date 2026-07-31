@@ -3778,23 +3778,45 @@ ipcMain.handle('clear-chat-view', async (event, channelKey) => {
   }
 });
 
-ipcMain.handle('get-all-chat-history', async (event, keyword) => {
+ipcMain.handle('get-all-chat-history', async (event, opts) => {
   return new Promise((resolve) => {
-    let sql = `SELECT id, sender_name, sender_ip, receiver_ip, message, status, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_time FROM messages`;
-    let params = [];
+    const keyword = typeof opts === 'string' ? opts : ((opts && opts.keyword) || '');
+    const kind = typeof opts === 'object' && opts && opts.kind ? String(opts.kind) : 'all';
+    const clauses = [];
+    const params = [];
+
     if (keyword) {
-      sql += ` WHERE message LIKE ? OR sender_name LIKE ?`;
+      clauses.push(`(message LIKE ? OR sender_name LIKE ?)`);
       params.push(`%${keyword}%`, `%${keyword}%`);
     }
-    sql += ` ORDER BY id DESC LIMIT 300`;
+    if (kind === 'photo') {
+      clauses.push(`(message LIKE '%chat-img-preview%' OR message LIKE '%data:image%')`);
+    } else if (kind === 'file') {
+      clauses.push(`(message LIKE '%chat-file-box%')`);
+    } else if (kind === 'link') {
+      clauses.push(`(message LIKE '%http://%' OR message LIKE '%https://%')`);
+    }
+
+    let sql = `SELECT id, sender_name, sender_ip, receiver_ip, message, status, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_time FROM messages`;
+    if (clauses.length) sql += ` WHERE ` + clauses.join(' AND ');
+    sql += ` ORDER BY id DESC LIMIT ${kind === 'all' ? 300 : 500}`;
 
     db.all(sql, params, (err, rows) => {
       if (err) { logDbErr(err); resolve([]); return; }
-      resolve((rows || []).map(r => ({
+      let list = (rows || []).map(r => ({
         ...r,
         sender_name: formatSenderDisplay(r.sender_name, r.sender_ip),
         isMe: r.sender_ip === MY_IP || r.sender_name === senderLabelForMe()
-      })));
+      }));
+      // 링크 탭: 파일 첨부 박스 안의 다운로드 링크만 있는 항목은 제외
+      if (kind === 'link') {
+        list = list.filter((r) => {
+          const html = String(r.message || '');
+          const stripped = html.replace(/<div[^>]*class="[^"]*chat-file-box[^"]*"[^>]*>[\s\S]*?<\/div>/gi, ' ');
+          return /https?:\/\//i.test(stripped);
+        });
+      }
+      resolve(list);
     });
   });
 });
