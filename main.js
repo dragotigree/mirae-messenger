@@ -1985,9 +1985,18 @@ function mergeUserProfile(base, overlay, online) {
     return merged;
   }
   const fields = ['username', 'rank', 'dept', 'floor', 'extNo', 'phone', 'statusState', 'photo', 'appVersion'];
+  // 접속 중(PING)일 때는 빈 직급도 "의도적으로 비움"으로 반영한다.
+  // 비우지 않으면 known_users / 스냅샷에 남은 "실장" 등이 영원히 되살아난다.
+  const clearableWhenOnline = new Set(['rank', 'dept', 'floor', 'extNo', 'phone']);
   fields.forEach((f) => {
     const o = overlay[f];
-    if (o == null || String(o).trim() === '') return;
+    if (o == null) return;
+    if (String(o).trim() === '') {
+      if (online && clearableWhenOnline.has(f) && Object.prototype.hasOwnProperty.call(overlay, f)) {
+        merged[f] = '';
+      }
+      return;
+    }
     const b = merged[f];
     if (f === 'username' && looksLikeIpv4(o) && b && String(b).trim() && !looksLikeIpv4(b)) return;
     if (f === 'photo' && !isUsableProfilePhotoValue(o) && isUsableProfilePhotoValue(b)) return;
@@ -2153,9 +2162,10 @@ function supplementKnownUsersFromMessagePeers(callback) {
             merged.username = displayName;
           }
           const parsed = parseSenderNameToProfile(displayName);
-          if (parsed && (!merged.rank || !merged.username || looksLikeIpv4(merged.username))) {
-            merged.username = parsed.username || merged.username;
-            if (parsed.rank) merged.rank = parsed.rank;
+          // 과거 메시지 sender_name("실장 정용범")에서 직급을 다시 채우지 않는다.
+          // 직급은 실시간 PING / 마스터 지정값만 신뢰한다.
+          if (parsed && parsed.username && (looksLikeIpv4(merged.username) || !String(merged.username || '').trim())) {
+            merged.username = parsed.username;
           }
           allKnownUsers.set(row.ip, applyStoredProfileOverride(merged));
           persistKnownUserSnapshot(merged);
@@ -2163,9 +2173,9 @@ function supplementKnownUsersFromMessagePeers(callback) {
         }
         if (looksLikeIpv4(stub.username) && !displayName) return;
         const parsedNew = parseSenderNameToProfile(displayName);
-        if (parsedNew) {
+        if (parsedNew && parsedNew.username) {
           stub.username = parsedNew.username;
-          stub.rank = parsedNew.rank;
+          // 신규 stub도 메시지에서 직급을 추정하지 않음 (빈 직급 유지)
         }
         allKnownUsers.set(row.ip, applyStoredProfileOverride(stub));
         persistKnownUserSnapshot(stub);
@@ -2200,7 +2210,7 @@ function repairKnownUsersProfiles(callback) {
         const snap = {
           ip: m.ip,
           username: m.username || '',
-          rank: m.rank || '',
+          // 그룹 멤버 스냅샷의 옛 직급은 복원하지 않음 ("실장" 부활 방지)
           dept: m.dept || '',
           floor: m.floor || '',
           extNo: m.extNo || m.ext_no || '',
@@ -2245,11 +2255,11 @@ function repairKnownUsersProfiles(callback) {
             if (e) logDbErr(e);
             const name = String((msg && msg.sender_name) || '').trim();
             const parsed = parseSenderNameToProfile(name);
-            if (parsed) {
+            if (parsed && parsed.username) {
+              // 과거 말풍선 이름에서 직급을 복원하지 않음 — "실장" 등이 되살아나는 원인
               merged = mergeUserProfile(merged, {
                 ip: row.ip,
-                username: parsed.username,
-                rank: parsed.rank
+                username: parsed.username
               }, onlineUsers.has(row.ip));
             }
             const before = JSON.stringify({ rank: base.rank, dept: base.dept, extNo: base.extNo, phone: base.phone });
@@ -2289,8 +2299,8 @@ function repairKnownUsersFromMessages(callback) {
           if (name && !looksLikeIpv4(name)) {
             const base = userObjFromKnownUsersRow(row);
             const parsed = parseSenderNameToProfile(name);
-            const patch = parsed
-              ? { username: parsed.username, rank: parsed.rank, ip: row.ip, lastSeen: base.lastSeen }
+            const patch = parsed && parsed.username
+              ? { username: parsed.username, ip: row.ip, lastSeen: base.lastSeen }
               : { username: name, ip: row.ip, lastSeen: base.lastSeen };
             const patched = mergeUserProfile(base, patch, false);
             allKnownUsers.set(row.ip, { ...patched, online: onlineUsers.has(row.ip) });
@@ -2323,9 +2333,82 @@ function userListEntryForRenderer(u) {
   };
 }
 
+/** 표시용 이름에서 직급 접두를 제거한 동일인 키 */
+function canonicalPersonName(u) {
+  if (!u) return '';
+  let n = String(u.username || '').trim();
+  if (!n || looksLikeIpv4(n)) return '';
+  const r = normalizeRankText(u.rank);
+  if (r) {
+    while (n === r || n.startsWith(`${r} `)) {
+      if (n === r) return '';
+      n = n.slice(r.length).trim();
+    }
+  }
+  const knownRanks = ['부장', '실장', '팀장', '부팀장', '주임', '과장', '대리', '사원'];
+  for (const label of knownRanks) {
+    if (n.startsWith(label + ' ')) {
+      n = n.slice(label.length).trim();
+      break;
+    }
+  }
+  return n;
+}
+
+function preferUserListEntry(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  if (!!a.isMe !== !!b.isMe) return a.isMe ? a : b;
+  if (!!a.online !== !!b.online) return a.online ? a : b;
+  return (Number(a.lastSeen) || 0) >= (Number(b.lastSeen) || 0) ? a : b;
+}
+
+/**
+ * 같은 사람이 다른 PC(IP)로 잡힌 중복 항목을 사이드바용으로 정리한다.
+ * - 동시에 여러 PC가 온라인이면 모두 유지
+ * - 온라인 1 + 오프라인 유령(이전 PC) → 온라인만 표시
+ * - 모두 오프라인 → 가장 최근 lastSeen 하나만
+ */
+function dedupeUsersByPersonIdentity(list) {
+  const byName = new Map();
+  const passthrough = [];
+  (list || []).forEach((u) => {
+    const key = canonicalPersonName(u);
+    if (!key) {
+      passthrough.push(u);
+      return;
+    }
+    const k = key.toLowerCase();
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(u);
+  });
+  const out = [...passthrough];
+  byName.forEach((entries) => {
+    if (entries.length === 1) {
+      out.push(entries[0]);
+      return;
+    }
+    const onlineOnes = entries.filter((e) => e.online || e.isMe);
+    if (onlineOnes.length >= 2) {
+      out.push(...onlineOnes.map((e) => {
+        const aliasIps = entries.map((x) => x.ip).filter((ip) => ip && ip !== e.ip);
+        return aliasIps.length ? { ...e, aliasIps } : e;
+      }));
+      return;
+    }
+    let best = entries[0];
+    for (let i = 1; i < entries.length; i++) best = preferUserListEntry(best, entries[i]);
+    const aliasIps = entries.map((e) => e.ip).filter((ip) => ip && ip !== best.ip);
+    out.push(aliasIps.length ? { ...best, aliasIps } : best);
+  });
+  return out;
+}
+
 function notifyUserList() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const combinedList = Array.from(allKnownUsers.values()).map(userListEntryForRenderer);
+  const combinedList = dedupeUsersByPersonIdentity(
+    Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
+  );
   safeWebContentsSend('user-list-update', combinedList);
 }
 

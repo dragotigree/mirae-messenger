@@ -3422,16 +3422,27 @@
           changed = true;
         }
       }
-      ['username', 'rank', 'dept', 'floor', 'extNo', 'phone'].forEach((f) => {
-        const v = u[f];
-        if (v != null && String(v).trim()) {
-          const s = String(v).trim();
+      if (u.online || u.isMe) {
+        // 접속 중 프로필은 빈 직급도 그대로 저장해, 로컬 스냅샷이 "실장"을 되살리지 않게 한다.
+        ['username', 'rank', 'dept', 'floor', 'extNo', 'phone'].forEach((f) => {
+          const s = String(u[f] ?? '').trim();
           if (prev[f] !== s) {
             next[f] = s;
             changed = true;
           }
-        }
-      });
+        });
+      } else {
+        ['username', 'dept', 'floor', 'extNo', 'phone'].forEach((f) => {
+          const v = u[f];
+          if (v != null && String(v).trim()) {
+            const s = String(v).trim();
+            if (prev[f] !== s) {
+              next[f] = s;
+              changed = true;
+            }
+          }
+        });
+      }
       if (!changed) return false;
       map[u.ip] = next;
       return true;
@@ -3452,7 +3463,8 @@
         const curSeen = Number(merged.lastSeen) || 0;
         if (snapSeen > curSeen) merged.lastSeen = snapSeen;
       }
-      ['rank', 'dept', 'floor', 'extNo', 'phone'].forEach((f) => {
+      // 직급(rank)은 스냅샷으로 채우지 않는다 — 비운 직급에 "실장"이 되살아나는 원인
+      ['dept', 'floor', 'extNo', 'phone'].forEach((f) => {
         if (!merged[f] || !String(merged[f]).trim()) {
           if (snap[f] && String(snap[f]).trim()) merged[f] = snap[f];
         }
@@ -4218,8 +4230,15 @@
       return unreadCounts[key] || 0;
     }
 
+    function getUnreadForUser(u) {
+      if (!u) return 0;
+      let n = getUnreadCount(u.ip);
+      (u.aliasIps || []).forEach((ip) => { n += getUnreadCount(ip); });
+      return n;
+    }
+
     function sumUnreadForUsers(users) {
-      return (users || []).reduce((sum, u) => sum + getUnreadCount(u.ip), 0);
+      return (users || []).reduce((sum, u) => sum + getUnreadForUser(u), 0);
     }
 
     function getGroupHeaderUnread(groupingKey, groupName, groupUsers) {
@@ -4964,7 +4983,7 @@
     }
 
     function appendCompactUserItem(container, u) {
-      const unread = unreadCounts[u.ip] || 0;
+      const unread = getUnreadForUser(u);
       const timeLabel = compactUserTimeLabel(u);
       const timeClass = u.online ? 'compact-item-time is-live' : 'compact-item-time';
       const item = document.createElement('div');
@@ -5038,14 +5057,15 @@
         (u.floor || '').toLowerCase().includes(userFilterKeyword) ||
         (u.rank || '').toLowerCase().includes(userFilterKeyword)
       );
+      const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
       if (compactListFilter === 'online') filtered = filtered.filter(u => u.online);
-      if (compactListFilter === 'favorite') filtered = filtered.filter(u => favoriteIps.has(u.ip));
-      if (compactListFilter === 'unread') filtered = filtered.filter(u => (unreadCounts[u.ip] || 0) > 0);
+      if (compactListFilter === 'favorite') filtered = filtered.filter(isFavoriteUser);
+      if (compactListFilter === 'unread') filtered = filtered.filter(u => getUnreadForUser(u) > 0);
 
       const sorted = [...filtered].sort(compareUsersSidebarOrder);
 
-      const favorites = compactListFilter !== 'favorite' ? sorted.filter(u => favoriteIps.has(u.ip)) : [];
-      const rest = compactListFilter !== 'favorite' ? sorted.filter(u => !favoriteIps.has(u.ip)) : sorted;
+      const favorites = compactListFilter !== 'favorite' ? sorted.filter(isFavoriteUser) : [];
+      const rest = compactListFilter !== 'favorite' ? sorted.filter(u => !isFavoriteUser(u)) : sorted;
 
       if (favorites.length > 0) {
         const favUnread = sumUnreadForUsers(favorites);
@@ -6834,7 +6854,7 @@
     }
 
     function buildUserCard(u) {
-      const unread = unreadCounts[u.ip] || 0;
+      const unread = getUnreadForUser(u);
       const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && activeChatUser.ip === u.ip;
       const card = document.createElement('div');
       card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}`;
@@ -6875,9 +6895,10 @@
         (u.floor || '').toLowerCase().includes(userFilterKeyword)
       );
 
-      const favorites = filtered.filter(u => favoriteIps.has(u.ip));
+      const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
+      const favorites = filtered.filter(isFavoriteUser);
       favorites.sort(compareUsersSidebarOrder);
-      const rest = filtered.filter(u => !favoriteIps.has(u.ip));
+      const rest = filtered.filter(u => !isFavoriteUser(u));
 
       if (favorites.length > 0) {
         const favUnread = sumUnreadForUsers(favorites);
