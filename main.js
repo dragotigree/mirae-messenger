@@ -4130,22 +4130,20 @@ ipcMain.handle('set-notice-operator-session', async (event, active) => {
 
 function scheduleModifyAllowed(uid) {
   return new Promise((resolve) => {
-    if (noticeOperatorSessionActive) {
+    if (noticeOperatorSessionActive || masterSessionActive) {
       resolve(true);
       return;
     }
-    db.get(`SELECT author_ip FROM hospital_schedules WHERE uid = ?`, [uid], (err, row) => {
-      if (err || !row) {
-        resolve(false);
-        return;
-      }
-      resolve(row.author_ip === MY_IP);
-    });
+    resolve(false);
   });
 }
 
 ipcMain.handle('add-schedule', async (event, payload) => {
   return new Promise((resolve) => {
+    if (!noticeOperatorSessionActive && !masterSessionActive) {
+      resolve({ success: false, msg: '작성 권한자로 로그인한 뒤 일정을 등록할 수 있습니다.' });
+      return;
+    }
     const p = payload || {};
     const meta = schedulePatientMetaFromPayload(p);
     const record = {
@@ -4169,7 +4167,7 @@ ipcMain.handle('add-schedule', async (event, payload) => {
       [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name],
       (err) => {
         if (!err) broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
-        resolve(record);
+        resolve(err ? { success: false, msg: err.message || '등록 실패' } : { success: true, ...record });
       }
     );
   });
@@ -4178,7 +4176,7 @@ ipcMain.handle('add-schedule', async (event, payload) => {
 ipcMain.handle('delete-schedule', async (event, uid) => {
   const allowed = await scheduleModifyAllowed(uid);
   if (!allowed) {
-    return { success: false, msg: '본인이 작성한 일정이거나 작성자 로그인 상태에서만 삭제할 수 있습니다.' };
+    return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 삭제할 수 있습니다.' };
   }
   return new Promise((resolve) => {
     db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [uid], (err) => {
@@ -4194,7 +4192,7 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
   if (!uid) return { success: false, msg: '일정 ID가 없습니다.' };
   const allowed = await scheduleModifyAllowed(uid);
   if (!allowed) {
-    return { success: false, msg: '본인이 작성한 일정이거나 작성자 로그인 상태에서만 수정할 수 있습니다.' };
+    return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 수정할 수 있습니다.' };
   }
   return new Promise((resolve) => {
     const meta = schedulePatientMetaFromPayload(p);

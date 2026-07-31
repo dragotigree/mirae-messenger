@@ -2583,6 +2583,7 @@
           <div class="schedule-board-top-summary" id="schedule-board-day-summary">날짜를 선택하세요.</div>
         </div>
         <div class="schedule-board-top-bar-actions">
+          <button type="button" id="schedule-board-login-btn" class="schedule-board-add-btn" style="display:none;" onclick="openOperatorLoginModal()">✍️ 작성자 로그인</button>
           <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add">+ 빠른 등록</button>
           <button type="button" class="calendar-day-close-btn sb-top-close" onclick="closeScheduleBoardModal()" title="닫기">✕</button>
         </div>
@@ -2636,7 +2637,9 @@
         </aside>
         <div class="sb-board-content">
           <div id="schedule-board-login-hint" class="schedule-board-login-hint" style="display:none;">
-            프로필을 불러오는 중이거나 연결되지 않았습니다. 잠시 후 다시 시도해 주세요. (타인 일정·공지 관리는 <a onclick="openOperatorLoginModal()">작성자 로그인</a>)
+            일정 등록·수정은 <b>작성 권한자</b> 로그인 후 가능합니다.
+            <a onclick="openOperatorLoginModal()">작성자 로그인</a>
+            (마스터가 발급한 아이디·비밀번호)
           </div>
           <div id="schedule-board-quick-add" class="schedule-board-quick-add" style="display:none;" hidden data-open="0">
             <div class="sb-quick-add-toolbar">
@@ -3231,8 +3234,8 @@
     }
 
     function canWriteScheduleBoard() {
-      if (canManageNotices) return true;
-      return !!(myProfile && myProfile.ip);
+      // 현황판 일정 등록: 마스터 또는 작성 권한자 로그인 필수
+      return !!(isMasterAuthenticated || isNoticeOperatorAuthenticated);
     }
 
     function isMySchedule(sch) {
@@ -3243,7 +3246,8 @@
     }
 
     function canModifySchedule(sch) {
-      return canManageNotices || isMySchedule(sch);
+      // 수정·삭제도 작성 권한 로그인(또는 마스터)이 있어야 함
+      return !!(isMasterAuthenticated || isNoticeOperatorAuthenticated);
     }
 
     let myProfile = null;
@@ -3922,6 +3926,10 @@
     }
 
     function toggleScheduleBoardQuickAddPanel() {
+      if (!canWriteScheduleBoard()) {
+        openOperatorLoginModal();
+        return;
+      }
       if (scheduleBoardQuickPanelOpen) {
         hideScheduleBoardQuickAddPanel();
         return;
@@ -3932,11 +3940,13 @@
     function refreshScheduleBoardEntryUi() {
       const loginHint = document.getElementById('schedule-board-login-hint');
       const addBtn = document.getElementById('schedule-board-add-btn');
+      const loginBtn = document.getElementById('schedule-board-login-btn');
       const sbVisible = document.body.classList.contains('schedule-board-standalone') ||
         (document.getElementById('schedule-board-modal')?.style.display === 'flex');
       if (!sbVisible) return;
       const canWrite = canWriteScheduleBoard();
       if (addBtn) addBtn.style.display = canWrite ? 'inline-block' : 'none';
+      if (loginBtn) loginBtn.style.display = canWrite ? 'none' : 'inline-block';
       if (loginHint) loginHint.style.display = canWrite ? 'none' : 'block';
       if (!canWrite) {
         setScheduleBoardQuickAddPanelVisible(false);
@@ -7547,6 +7557,7 @@
       saveNoticeOperatorSession();
       refreshNoticePermission();
       updateBoardAuthStatusText();
+      refreshScheduleBoardEntryUi();
     }
 
     function updateMyStatusBadge(status) {
@@ -9784,7 +9795,8 @@
 
     async function startEditSchedule(sch) {
       if (!canModifySchedule(sch)) {
-        await appAlert('수정 권한이 없습니다. 본인이 작성한 일정만 수정할 수 있습니다.');
+        await appAlert('수정 권한이 없습니다. 작성 권한자로 로그인해 주세요.');
+        openOperatorLoginModal();
         return;
       }
       const d = sch.time_str ? new Date(sch.time_str) : new Date();
@@ -9834,7 +9846,7 @@
 
     function openScheduleBoardForQuickAdd(dateStr, opts) {
       if (!canWriteScheduleBoard()) {
-        appAlert('프로필을 불러온 뒤 다시 시도해 주세요.');
+        openOperatorLoginModal();
         return;
       }
       const d = dateStr || selectedCalendarDateStr || formatDateStr(new Date());
@@ -10522,6 +10534,11 @@
         rmTeam: shared.rmTeam,
         roomNo,
         patientName
+      }).then((res) => {
+        if (res && res.success === false) {
+          throw new Error(res.msg || 'denied');
+        }
+        return res;
       });
       return title;
     }
@@ -10731,7 +10748,8 @@
           return;
         }
       } else if (!canWriteScheduleBoard()) {
-        await appAlert('프로필을 불러온 뒤 다시 시도해 주세요.');
+        await appAlert('작성 권한자로 로그인한 뒤 일정을 등록할 수 있습니다.');
+        openOperatorLoginModal();
         return;
       }
       let roomNo = (document.getElementById('sb-quick-room')?.value || '').trim();
@@ -10787,6 +10805,9 @@
           await appAlert('귀원 시간은 출발 시간보다 이후여야 합니다.');
         } else if (e && e.message === 'empty') {
           await appAlert('호실·환자명·메모 중 하나 이상 입력해 주세요.');
+        } else if (e && /작성 권한|로그인/i.test(String(e.message || ''))) {
+          await appAlert(e.message);
+          openOperatorLoginModal();
         } else {
           await appAlert('등록에 실패했습니다.');
         }
@@ -11326,7 +11347,7 @@
       }
 
       if (list.length === 0) {
-        body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">상단 <b>+ 빠른 등록</b>으로 외진·외출·외박 등을 추가하거나 필터를 바꿔 보세요.</span></div>';
+        body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
         return;
       }
 
