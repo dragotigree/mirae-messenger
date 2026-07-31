@@ -1566,19 +1566,15 @@
     .all-logs-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.65; }
     .log-card-item {
       width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e8edf2;
-      border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px;
+      border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 0;
       flex-shrink: 0; border-left-width: 3px;
     }
     .log-card-item.is-received { background: #fff; border-left-color: #94a3b8; }
     .log-card-item.is-sent {
       background: #f8fcff; border-color: #dbeafe; border-left-color: #0284c7;
     }
-    .log-card-avatar {
-      width: 36px; height: 36px; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 700;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
-    }
-    .log-card-item.is-received .log-card-avatar { background: linear-gradient(145deg, #94a3b8, #64748b); }
-    .log-card-item.is-sent .log-card-avatar { background: linear-gradient(145deg, #0ea5e9, #0369a1); }
+    /* 채팅창과 동일: 전체 대화 기록에서도 이름 이니셜 아바타 숨김 */
+    .log-card-avatar { display: none !important; }
     .log-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
     .log-card-top {
       display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; flex-wrap: nowrap;
@@ -6921,7 +6917,6 @@
         const dirLabel = isSent ? '보냄' : '받음';
 
         card.innerHTML = `
-          <div class="log-card-avatar">${escapeHtml(senderName.charAt(0))}</div>
           <div class="log-card-main">
             <div class="log-card-top">
               <span class="log-card-direction ${dirClass}">${dirLabel}</span>
