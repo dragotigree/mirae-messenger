@@ -480,6 +480,12 @@ async function readUpdateSourceBytes(relPath) {
   throw new Error('업데이트 소스가 설정되지 않았습니다.');
 }
 
+/** PowerShell Set-Content -Encoding utf8 등이 붙인 UTF-8 BOM 제거 후 JSON 파싱 */
+function parseUpdateJsonText(raw) {
+  const text = String(raw || '').replace(/^\uFEFF/, '').trim();
+  return JSON.parse(text);
+}
+
 async function writeBufferWithRetry(destPath, buffer, retries = 10) {
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
   let lastErr;
@@ -6156,7 +6162,7 @@ ipcMain.handle('check-for-update', async () => {
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
-    const remote = JSON.parse(raw);
+    const remote = parseUpdateJsonText(raw);
     const available = compareVersions(remote.version, APP_VERSION) > 0;
     const src = parseUpdateSource(updateSourcePath);
     return {
@@ -6204,7 +6210,7 @@ async function applyUpdateFiles() {
     const localPath = path.join(__dirname, f);
     if (f === 'package.json') {
       try {
-        const remotePkg = JSON.parse(remoteBuf.toString('utf8'));
+        const remotePkg = parseUpdateJsonText(remoteBuf.toString('utf8'));
         expectedVersion = remotePkg.version;
       } catch (e) {}
     }
@@ -6310,7 +6316,7 @@ async function autoCheckAndApplyUpdate() {
   let remote;
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
-    remote = JSON.parse(raw);
+    remote = parseUpdateJsonText(raw);
     if (compareVersions(remote.version, APP_VERSION) <= 0) return;
   } catch (e) {
     // GitHub 접근 실패·version.json 없음은 조용히 넘어간다
