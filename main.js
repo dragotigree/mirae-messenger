@@ -2042,7 +2042,7 @@ function buildTrayContextMenu() {
       }
     },
     { type: 'separator' },
-    { label: '종료', click: () => { isQuitting = true; app.quit(); } }
+    { label: '종료', click: () => { beginAppQuit(); } }
   ]);
 }
 
@@ -2374,9 +2374,22 @@ app.whenReady().then(async () => {
   startUpdateChecker();
 });
 
+app.on('before-quit', () => {
+  broadcastGoodbye();
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
+
+/** 트레이/강제종료 등 — GOODBYE 전송 후 종료 */
+function beginAppQuit() {
+  isQuitting = true;
+  broadcastGoodbye();
+  setTimeout(() => {
+    try { app.quit(); } catch (e) { /* ignore */ }
+  }, 120);
+}
 
 let globalUdpSocket = null;
 let udpStatus = 'starting';
@@ -2420,8 +2433,17 @@ function startUdpDiscovery() {
 
     try {
       const data = JSON.parse(msg.toString());
+      if (data.type === 'GOODBYE') {
+        const leftAt = Number(data.leftAt) || Date.now();
+        if (markPeerOffline(rinfo.address, leftAt)) {
+          notifyUserList();
+          writeToLogFile('info', `[네트워크] ${data.username || rinfo.address}(${rinfo.address}) 종료(GOODBYE) 처리`);
+        }
+        return;
+      }
       if (data.type === 'PING') {
         const previouslyKnown = allKnownUsers.get(rinfo.address);
+        const now = Date.now();
         const overlay = {
           ip: rinfo.address,
           username: data.username,
@@ -2433,12 +2455,16 @@ function startUdpDiscovery() {
           statusState: data.statusState || 'ONLINE',
           appVersion: data.appVersion || (previouslyKnown && previouslyKnown.appVersion) || '',
           photo: (previouslyKnown && previouslyKnown.photo) || persistedPhotos[rinfo.address] || '',
-          lastSeen: Date.now(),
+          lastPingAt: now,
           online: true,
           isMe: false
         };
         const userObj = mergeUserProfile(previouslyKnown, overlay, true);
-        userObj.lastSeen = Date.now();
+        // lastSeen = 마지막 '종료/오프라인' 시각. 접속 중에는 갱신하지 않는다.
+        userObj.lastPingAt = now;
+        if (previouslyKnown && Number(previouslyKnown.lastSeen) > 0) {
+          userObj.lastSeen = Number(previouslyKnown.lastSeen);
+        }
 
         const wasOffline = !onlineUsers.has(rinfo.address);
         const profileChanged = !previouslyKnown
@@ -2498,6 +2524,8 @@ function registerSelf() {
   // 등록하지 않는다 — 이걸 빠뜨리면 내 사이드바 카드에 "실장 정용범"이 잠깐 보였다가 몇 초 뒤
   // "물리치료실장 정용범"으로 바뀌는 현상이 생긴다.
   if (!profileLoaded) return;
+  const now = Date.now();
+  const prev = allKnownUsers.get(MY_IP);
   const me = {
     ip: MY_IP,
     username: myProfile.username,
@@ -2509,7 +2537,9 @@ function registerSelf() {
     statusState: myProfile.statusState,
     appVersion: APP_VERSION,
     photo: myProfile.photo || '',
-    lastSeen: Date.now(),
+    lastPingAt: now,
+    // 내 카드는 보통 숨기지만, lastSeen은 이전 종료 시각을 유지
+    lastSeen: (prev && Number(prev.lastSeen) > 0) ? Number(prev.lastSeen) : 0,
     online: true,
     isMe: true
   };
@@ -2537,8 +2567,68 @@ function broadcastPresence(socket) {
   socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
   // 다른 층 대역은 라우터의 브로드캐스트 차단 여부와 상관없이 전달되도록 호스트별 유니캐스트로 전송
   KNOWN_SUBNET_HOST_IPS.forEach(ip => {
-    socket.send(packet, 0, packet.length, UDP_PORT, ip, () => {});
+    try { socket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
+}
+
+function broadcastGoodbye() {
+  if (!globalUdpSocket) return;
+  const packet = Buffer.from(JSON.stringify({
+    type: 'GOODBYE',
+    username: (myProfile && myProfile.username) || '',
+    leftAt: Date.now()
+  }));
+  try {
+    globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
+  } catch (e) { /* ignore */ }
+  KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
+    try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
+  });
+}
+
+/**
+ * 상대를 오프라인으로 표시하고 lastSeen(=종료/이탈 시각)을 기록한다.
+ * @returns {boolean} 상태가 바뀌었으면 true
+ */
+function markPeerOffline(ip, leftAtHint) {
+  if (!ip || ip === MY_IP) return false;
+  const wasOnline = onlineUsers.has(ip);
+  const live = onlineUsers.get(ip);
+  if (wasOnline) onlineUsers.delete(ip);
+  const known = allKnownUsers.get(ip) || live;
+  if (!known) return false;
+  const pingAt = Number((live && live.lastPingAt) || known.lastPingAt || 0);
+  const leftAt = Number(leftAtHint) || pingAt || Date.now();
+  const prevSeen = Number(known.lastSeen) || 0;
+  // 종료 시각이 핵심. 예전에 잘못 저장된(접속 시작 등) 값보다 이번 이탈 시각을 우선한다.
+  const lastSeen = leftAtHint ? leftAt : Math.max(prevSeen, leftAt);
+  const alreadyOffline = !known.online && !wasOnline && prevSeen === lastSeen;
+  if (alreadyOffline) return false;
+  const offline = {
+    ...known,
+    online: false,
+    statusState: 'OFFLINE',
+    lastSeen,
+    lastPingAt: pingAt || leftAt,
+    presenceLastSeen: true
+  };
+  allKnownUsers.set(ip, offline);
+  persistKnownUserSnapshot(offline);
+  return true;
+}
+
+function touchPeerPresence(ip) {
+  if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+  if (!onlineUsers.has(ip)) return;
+  const now = Date.now();
+  const u = onlineUsers.get(ip);
+  if (!u) return;
+  const updated = { ...u, lastPingAt: now, online: true };
+  onlineUsers.set(ip, updated);
+  const known = allKnownUsers.get(ip);
+  if (known) {
+    allKnownUsers.set(ip, { ...known, lastPingAt: now, online: true });
+  }
 }
 
 function looksLikeIpv4(value) {
@@ -2707,11 +2797,15 @@ function mergeUserProfile(base, overlay, online) {
     merged[f] = o;
   });
   merged.lastSeen = merged.lastSeen || 0;
+  merged.lastPingAt = merged.lastPingAt || 0;
   if (online) {
-    merged.lastSeen = Date.now();
+    // 접속 중에는 lastSeen(종료 시각)을 건드리지 않고 하트비트만 갱신
+    const pingAt = Number(overlay.lastPingAt) || Date.now();
+    merged.lastPingAt = pingAt;
   } else if (overlay.presenceLastSeen && overlay.lastSeen) {
     merged.lastSeen = Math.max(merged.lastSeen, overlay.lastSeen);
   } else if (overlay.lastSeen && overlay.lastSeen > 0) {
+    // 메시지 시각 등으로 lastSeen을 덮어쓰지 않도록, 기존 값이 있으면 유지·최대만
     merged.lastSeen = Math.max(merged.lastSeen, overlay.lastSeen);
   }
   merged.ip = merged.ip || overlay.ip;
@@ -2751,7 +2845,11 @@ function persistKnownUserSnapshot(u) {
     const mergedForStore = applyStoredProfileOverride(merged);
     let lastSeen = mergedForStore.lastSeen || merged.lastSeen || 0;
     if (u.online) {
-      lastSeen = Date.now();
+      // 접속 중에는 DB의 last_seen_at(마지막 종료 시각)을 유지한다.
+      // (예전처럼 Date.now()로 덮으면 '프로그램 시작 시각'처럼 보일 수 있음)
+      if (existing && existing.lastSeen) {
+        lastSeen = Math.max(lastSeen, existing.lastSeen);
+      }
     } else if (!lastSeen && existing && existing.lastSeen) {
       lastSeen = existing.lastSeen;
     } else if (existing && existing.lastSeen) {
@@ -2847,7 +2945,8 @@ function supplementKnownUsersFromMessagePeers(callback) {
         if (!row || !row.ip || row.ip === MY_IP) return;
         if (isSyntheticReceiverKey(row.ip) || !looksLikeIpv4(row.ip)) return;
         const msgLastSeen = row.last_ts ? Math.floor(Number(row.last_ts) * 1000) : 0;
-        const lastSeen = msgLastSeen > 0 ? msgLastSeen : 0;
+        // 대화 시각은 '마지막 종료'가 아님 — lastSeen이 없을 때만 보조로 씀
+        const lastSeenFallback = msgLastSeen > 0 ? msgLastSeen : 0;
         const displayName = String(row.sender_name || '').trim();
         const stub = {
           ip: row.ip,
@@ -2860,13 +2959,16 @@ function supplementKnownUsersFromMessagePeers(callback) {
           statusState: 'OFFLINE',
           photo: persistedPhotos[row.ip] || '',
           appVersion: '',
-          lastSeen,
+          lastSeen: 0,
           online: false,
           isMe: false
         };
         if (allKnownUsers.has(row.ip)) {
           const existing = allKnownUsers.get(row.ip);
-          const merged = mergeUserProfile(existing, stub, false);
+          const merged = mergeUserProfile(existing, stub, !!onlineUsers.has(row.ip));
+          if (!(Number(merged.lastSeen) > 0) && lastSeenFallback > 0) {
+            merged.lastSeen = lastSeenFallback;
+          }
           if (looksLikeIpv4(merged.username) && displayName && !looksLikeIpv4(displayName)) {
             merged.username = displayName;
           }
@@ -2886,6 +2988,7 @@ function supplementKnownUsersFromMessagePeers(callback) {
           stub.username = parsedNew.username;
           // 신규 stub도 메시지에서 직급을 추정하지 않음 (빈 직급 유지)
         }
+        if (lastSeenFallback > 0) stub.lastSeen = lastSeenFallback;
         allKnownUsers.set(row.ip, applyStoredProfileOverride(stub));
         persistKnownUserSnapshot(stub);
       });
@@ -3175,23 +3278,12 @@ function startPresenceSweeper() {
 
     onlineUsers.forEach((u, ip) => {
       if (ip === MY_IP) return;
-      if (now - u.lastSeen > PRESENCE_STALE_MS) {
-        onlineUsers.delete(ip);
-        const known = allKnownUsers.get(ip);
-        if (known) {
-          const lastSeen = Math.max(known.lastSeen || 0, u.lastSeen || now);
-          const offline = {
-            ...known,
-            online: false,
-            statusState: 'OFFLINE',
-            lastSeen,
-            presenceLastSeen: true
-          };
-          allKnownUsers.set(ip, offline);
-          persistKnownUserSnapshot(offline);
+      const beat = Number(u.lastPingAt || u.lastSeen) || 0;
+      if (now - beat > PRESENCE_STALE_MS) {
+        if (markPeerOffline(ip, beat || now)) {
+          changed = true;
+          writeToLogFile('info', `[네트워크] ${u.username || ip}(${ip}) 오프라인 처리됨`);
         }
-        changed = true;
-        writeToLogFile('info', `[네트워크] ${u.username || ip}(${ip}) 오프라인 처리됨`);
       }
     });
 
@@ -3265,6 +3357,7 @@ function parseAndRoute(line, socket) {
 
 function routeIncomingPayload(payload, senderIP) {
   try {
+    touchPeerPresence(senderIP);
     const type = payload.type || 'CHAT';
     switch (type) {
     case 'CHAT': handleIncomingChat(payload, senderIP); break;
@@ -6585,7 +6678,7 @@ ipcMain.handle('apply-update', async () => {
   if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
   try {
     await applyUpdateFiles();
-    setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 600);
+    setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
@@ -6649,7 +6742,7 @@ async function handleForceUpdateCommand(payload, senderIP) {
         version: APP_VERSION
       });
     }
-    setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 1200);
+    setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 1200);
   } catch (e) {
     forceUpdateInFlight = false;
     safeWebContentsSend('force-update-failed', { msg: e.message || String(e) });
@@ -6688,7 +6781,7 @@ ipcMain.handle('master-force-update', async (event, payload) => {
       updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
       if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
       await applyUpdateFiles();
-      setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 800);
+      setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 800);
       return { success: true, local: true };
     } catch (e) {
       return { success: false, msg: e.message || String(e) };
@@ -6746,6 +6839,7 @@ async function autoCheckAndApplyUpdate() {
     });
     clearTimeout(pendingRestartTimer);
     pendingRestartTimer = setTimeout(() => {
+      broadcastGoodbye();
       isQuitting = true;
       app.relaunch();
       app.exit();
@@ -6768,12 +6862,13 @@ ipcMain.handle('snooze-pending-restart', async (event, minutes) => {
         countdownSeconds: 30
       });
     }
-    pendingRestartTimer = setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 30000);
+    pendingRestartTimer = setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 30000);
   }, snoozeMs);
   return true;
 });
 
 ipcMain.handle('restart-now-for-update', async () => {
+  broadcastGoodbye();
   isQuitting = true;
   app.relaunch();
   app.exit();

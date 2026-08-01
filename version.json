@@ -1,4 +1,4 @@
 {
-  "version": "1.0.282",
-  "notes": "manual-hotfix-update.ps1: param()을 try/chcp보다 앞으로 이동(ParserError 수정)"
+  "version": "1.0.283",
+  "notes": "마지막 접속=프로그램 종료 시각(GOODBYE) · 접속 중 lastSeen 갱신 중지 · 메시지시각으로 덮어쓰기 방지"
 }
