@@ -1096,7 +1096,32 @@
     .group-member-status.is-online { color: #16a34a; }
     .group-member-status.is-offline { color: #94a3b8; }
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
-
+    .sidebar-cal-header {
+      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+    }
+    .sidebar-cal-header .sidebar-section-title {
+      margin: 0; gap: 8px; min-width: 0;
+    }
+    .sidebar-cal-header .sidebar-section-title > span {
+      flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-cal-actions {
+      display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    }
+    .sidebar-cal-actions button {
+      flex: 0 0 auto; white-space: nowrap; line-height: 1.2;
+      padding: 4px 8px; border-radius: 9px; font-size: 10.5px; font-weight: 700;
+      cursor: pointer; box-sizing: border-box;
+    }
+    .sidebar-cal-actions #sidebar-cal-refresh-btn {
+      background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 4px 7px;
+    }
+    .sidebar-cal-actions #sidebar-cal-board-btn {
+      background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;
+    }
+    .sidebar-cal-actions #add-sch-btn {
+      background: var(--accent); color: #fff; border: none; font-size: 11px;
+    }
     .schedule-box { background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%); border: 1px solid #bae6fd; padding: 10px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-xs); min-height: 0; }
     .sidebar-calendar-day {
       background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
@@ -1115,14 +1140,14 @@
     .sidebar-cal-day-line:hover { background: transparent; color: #334155; }
     .sidebar-cal-day-empty { text-align: center; padding: 16px 12px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
     .sidebar-duty-block { padding: 8px 10px 6px; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; }
-    .sidebar-duty-line { font-size: 11.5px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; }
+    .sidebar-duty-line { font-size: 11.5px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; word-break: keep-all; }
     .sidebar-duty-line.is-duty { color: #1d4ed8; }
     .sidebar-duty-line.is-off { color: #64748b; font-weight: 600; }
     .mini-cal-day .duty-mark { position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: #6366f1; }
     .mini-cal-day.selected .duty-mark { background: #c7d2fe; }
     #sidebar-duty-edit-btn {
-      display: none; padding: 4px 8px; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;
-      border-radius: 9px; font-size: 10.5px; cursor: pointer; font-weight: 700;
+      display: none; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;
+      padding: 4px 8px;
     }
     #chat-pin-banner {
       display: none; flex-shrink: 0; align-items: flex-start; gap: 10px;
@@ -2434,13 +2459,15 @@
 
     <div class="detail-profile-card" id="detail-broadcast-section" style="display:none;"></div>
 
-    <div class="sidebar-section-title">
-      <span>📅 병원 달력</span>
-      <div style="display:flex; gap:4px; align-items:center;">
-        <button type="button" id="sidebar-duty-edit-btn" onclick="openDutyRosterModal()" title="당직의·의료진 OFF 등록">🩺 당직/OFF</button>
-        <button type="button" id="sidebar-cal-refresh-btn" style="padding:4px 8px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
-        <button type="button" style="padding:4px 8px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardModal()">📋 현황판</button>
-        <button id="add-sch-btn" style="display:none; padding:4px 8px; background:var(--accent); color:#fff; border:none; border-radius: 9px; font-size:11px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardForQuickAdd()">+ 일정 등록</button>
+    <div class="sidebar-cal-header">
+      <div class="sidebar-section-title">
+        <span>📅 병원 달력</span>
+      </div>
+      <div class="sidebar-cal-actions">
+        <button type="button" id="sidebar-duty-edit-btn" onclick="openDutyRosterModal()" title="당직의·의료진 OFF 등록">🩺 당직</button>
+        <button type="button" id="sidebar-cal-refresh-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
+        <button type="button" id="sidebar-cal-board-btn" onclick="openScheduleBoardModal()">📋 현황판</button>
+        <button type="button" id="add-sch-btn" style="display:none;" onclick="openScheduleBoardForQuickAdd()">+ 일정</button>
       </div>
     </div>
 
@@ -4577,9 +4604,9 @@
     function refreshNoticePermission() {
       canManageNotices = isMasterAuthenticated || isNoticeOperatorAuthenticated;
       const addSchBtn = document.getElementById('add-sch-btn');
-      if (addSchBtn) addSchBtn.style.display = canWriteScheduleBoard() ? 'block' : 'none';
+      if (addSchBtn) addSchBtn.style.display = canWriteScheduleBoard() ? 'inline-flex' : 'none';
       const dutyBtn = document.getElementById('sidebar-duty-edit-btn');
-      if (dutyBtn) dutyBtn.style.display = canManageDutyRoster() ? 'inline-block' : 'none';
+      if (dutyBtn) dutyBtn.style.display = canManageDutyRoster() ? 'inline-flex' : 'none';
       refreshScheduleBoardEntryUi();
       renderSchedules();
     }
@@ -13574,7 +13601,7 @@
         isMasterAuthenticated = true;
         closeMasterAuthModal();
         updateMasterAuthUi();
-        document.getElementById('add-sch-btn').style.display = 'block';
+        document.getElementById('add-sch-btn').style.display = 'inline-flex';
         renderSchedules();
         refreshNoticePermission();
         openMasterAdminModal();
@@ -13590,7 +13617,7 @@
       if (window.api.clearMasterSession) await window.api.clearMasterSession();
       closeMasterAdminModal();
       updateMasterAuthUi();
-      document.getElementById('add-sch-btn').style.display = isNoticeOperatorAuthenticated ? 'block' : 'none';
+      document.getElementById('add-sch-btn').style.display = isNoticeOperatorAuthenticated ? 'inline-flex' : 'none';
       refreshNoticePermission();
       await appAlert('마스터 계정에서 로그아웃 되었습니다.');
       return;
