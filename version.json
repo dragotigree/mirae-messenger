@@ -1,4 +1,4 @@
 {
-  "version": "1.0.280",
-  "notes": "마스터: 온라인 PC 강제 업데이트(개별/구버전 전체)"
+  "version": "1.0.281",
+  "notes": "수동업데이트.cmd UTF-8 깨짐 수정(ASCII) + hotfix ps1 UTF-8 BOM"
 }

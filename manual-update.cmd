@@ -1,5 +1,5 @@
 @echo off
-REM Mirae Messenger manual hotfix launcher (ASCII-only)
+REM Same as ??????.cmd ? English filename for safer double-click
 cd /d "%~dp0"
 echo.
 echo Mirae Messenger manual update
