@@ -7318,6 +7318,23 @@
       return Array.isArray(u.aliasIps) && u.aliasIps.includes(ip);
     }
 
+    /** 사이드바 1:1 사용자 카드가 현재 열린 채팅인지 */
+    function isSidebarDmCardActive(cardIp) {
+      if (!cardIp || !activeChatUser) return false;
+      if (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup) return false;
+      return isChatCurrentlyOpen(cardIp);
+    }
+
+    /** 채팅 전환 직후 사이드바 선택 하이라이트를 DOM에 반영 (목록 재구축 없이) */
+    function syncSidebarSelectionHighlight() {
+      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip]').forEach((card) => {
+        card.classList.toggle('active', isSidebarDmCardActive(card.dataset.userIp));
+      });
+      document.querySelectorAll('.compact-list-item-user[data-user-ip]').forEach((item) => {
+        item.classList.toggle('is-active', isSidebarDmCardActive(item.dataset.userIp));
+      });
+    }
+
     function isUserDragEvent(e) {
       const types = e.dataTransfer && e.dataTransfer.types ? [...e.dataTransfer.types] : [];
       return types.includes(USER_DRAG_MIME) || types.includes('text/plain');
@@ -7475,7 +7492,7 @@
 
     function buildUserCard(u) {
       const unread = getUnreadForUser(u);
-      const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && userMatchesIp(u, activeChatUser.ip);
+      const isActive = isSidebarDmCardActive(u.ip);
       const card = document.createElement('div');
       card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}`;
       card.dataset.userIp = u.ip;
@@ -7527,8 +7544,7 @@
           return;
         }
         const unread = getUnreadForUser(u);
-        const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && userMatchesIp(u, activeChatUser.ip);
-        card.classList.toggle('active', !!isActive);
+        card.classList.toggle('active', isSidebarDmCardActive(u.ip));
         card.classList.toggle('is-offline', !u.online);
         const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
         const badge = card.querySelector('.avatar-status-badge');
@@ -8397,6 +8413,7 @@
       pendingUnreadScrollCount = unreadCounts[user.ip] || 0;
       unreadCounts[user.ip] = 0;
       saveUnreadCounts();
+      syncSidebarSelectionHighlight();
       refreshUnreadBadges();
       updateMainPanelVisibility();
       closeChatSearchBar();
