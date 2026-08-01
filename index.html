@@ -1311,7 +1311,7 @@
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 56px 84px minmax(132px, 170px) max-content minmax(0, 1.2fr) minmax(56px, 88px) minmax(100px, 132px) minmax(100px, 124px) auto;
+      grid-template-columns: 56px 84px minmax(120px, 150px) max-content minmax(0, 1fr) minmax(140px, 1.45fr) minmax(96px, 120px) minmax(100px, 120px) auto;
       grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 10px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
@@ -1327,7 +1327,7 @@
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 56px 84px minmax(132px, 170px) max-content minmax(0, 1.2fr) minmax(56px, 88px) minmax(100px, 132px) minmax(100px, 124px) auto;
+      grid-template-columns: 56px 84px minmax(120px, 150px) max-content minmax(0, 1fr) minmax(140px, 1.45fr) minmax(96px, 120px) minmax(100px, 120px) auto;
       grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 10px; padding: 13px 14px; border-top: 1px solid #f1f5f9; font-size: 14px;
     }
@@ -1399,6 +1399,10 @@
     }
     .sb-main-entry .sb-main-l1 { font-weight: 700; color: #0f172a; }
     .sb-main-entry .sb-main-l2 { color: #1e293b; margin-top: 1px; word-break: keep-all; }
+    .sb-main-entry .sb-main-remark {
+      color: #64748b; white-space: pre-wrap; word-break: keep-all; line-height: 1.4;
+      max-height: 7.2em; overflow: hidden;
+    }
     .sb-main-entry .sb-main-time { color: #2563eb; font-weight: 600; font-size: 11px; margin-top: 3px; }
     .sb-main-row-rm4 td { background: #fff; }
     .sb-main-row-rm6 td { background: #fff9e1; }
@@ -1459,11 +1463,13 @@
       font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;
     }
     .schedule-board-remark {
-      font-size: 12.5px; color: #64748b; line-height: 1.35;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      display: block; min-height: 1.2em;
+      font-size: 12.5px; color: #475569; line-height: 1.4;
+      white-space: pre-wrap; word-break: keep-all; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+      min-height: 1.2em;
     }
-    .schedule-board-remark.is-empty { color: #cbd5e1; }
+    .schedule-board-remark.is-empty { color: #cbd5e1; white-space: nowrap; display: block; -webkit-line-clamp: unset; }
+    .schedule-board-remark.is-long { cursor: help; }
     .schedule-board-meals {
       display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0;
       font-size: 12px; font-weight: 700; line-height: 1.25;
@@ -1487,12 +1493,15 @@
     .schedule-board-row.has-modified { position: relative; }
     .sb-mod-tip {
       position: fixed; z-index: 10050; pointer-events: none;
-      max-width: min(360px, 90vw); padding: 8px 11px; border-radius: 10px;
+      max-width: min(420px, 92vw); max-height: min(50vh, 360px); overflow: auto;
+      padding: 8px 11px; border-radius: 10px;
       background: #0f172a; color: #f8fafc; font-size: 12px; font-weight: 600;
-      line-height: 1.4; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+      line-height: 1.45; white-space: pre-wrap; word-break: keep-all;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
       opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease;
     }
     .sb-mod-tip.is-visible { opacity: 1; transform: translateY(0); }
+    .sb-mod-tip.is-remark { font-weight: 500; }
     .sb-quick-cancel-edit-btn {
       margin-left: 6px; border: none; background: #f1f5f9; color: #475569; padding: 8px 12px;
       border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer;
@@ -1568,9 +1577,13 @@
     }
     .sb-quick-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .sb-quick-field label { font-size: 13px; font-weight: 700; color: #475569; white-space: nowrap; }
-    .sb-quick-field input, .sb-quick-field select {
+    .sb-quick-field input, .sb-quick-field select, .sb-quick-field textarea {
       width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid #cbd5e1;
-      border-radius: 9px; font-size: 13px; background: #fff;
+      border-radius: 9px; font-size: 13px; background: #fff; font-family: inherit;
+    }
+    .sb-quick-field textarea {
+      min-height: 78px; max-height: 240px; resize: vertical; line-height: 1.45;
+      padding: 9px 10px;
     }
     .sb-quick-field input[type="time"] {
       padding: 6px 4px;
@@ -1596,7 +1609,8 @@
     .sb-quick-meal-row .sb-quick-undecided { color: #c2410c; font-size: 12.5px; }
     .sb-quick-meal-row .sb-quick-undecided input { accent-color: #ea580c; }
     .sb-quick-field--meals { grid-column: 1 / -1; }
-    .sb-quick-field input:focus, .sb-quick-field select:focus { outline: none; border-color: #7dd3fc; }
+    .sb-quick-field--remark { grid-column: 1 / -1; align-self: stretch; }
+    .sb-quick-field input:focus, .sb-quick-field select:focus, .sb-quick-field textarea:focus { outline: none; border-color: #7dd3fc; }
     .sb-quick-save-btn {
       width: 100%; padding: 0 8px; border: none; border-radius: 9px; font-size: 11.5px; font-weight: 700;
       cursor: pointer; background: #0284c7; color: #fff; height: 32px;
@@ -2803,9 +2817,9 @@
             <label for="sb-quick-detail">목적</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
           </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-remark">비고</label>
-            <input type="text" id="sb-quick-remark" placeholder="기타 내용 (선택)" autocomplete="off">
+          <div class="sb-quick-field sb-quick-field--remark">
+            <label for="sb-quick-remark">비고 <span style="font-weight:600;color:#94a3b8;">(길게 입력 가능 · Enter 줄바꿈 · Ctrl+Enter 등록)</span></label>
+            <textarea id="sb-quick-remark" rows="3" placeholder="참고 사항, 전달 내용 등 자유롭게 입력 (선택)"></textarea>
           </div>
           <div class="sb-quick-field sb-quick-field--meals">
             <label>식사 취소 (영양실 식수)</label>
@@ -3740,7 +3754,7 @@
       applyUserListAvatarVisibility();
     }
 
-    const SPELLCHECK_INPUT_SELECTOR = '#chat-textarea, .board-form-textarea, #board-write-content, #sch-msg-content, .modal-card textarea, .reply-input-row textarea';
+    const SPELLCHECK_INPUT_SELECTOR = '#chat-textarea, .board-form-textarea, #board-write-content, #sch-msg-content, #sb-quick-remark, .modal-card textarea, .reply-input-row textarea';
 
     function applySpellcheckToInputs(enabled) {
       const on = !!enabled;
@@ -10770,7 +10784,7 @@
       return `<div class="sb-main-entry">`
         + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}</div>`
         + (dest ? `<div class="sb-main-l2">${escapeHtml(dest)}</div>` : '')
-        + (remark ? `<div class="sb-main-l2" style="color:#64748b;">${escapeHtml(remark)}</div>` : '')
+        + (remark ? `<div class="sb-main-l2 sb-main-remark">${escapeHtml(remark)}</div>` : '')
         + `<div class="sb-main-time">${escapeHtml(time)}</div>`
         + `</div>`;
     }
@@ -10886,6 +10900,22 @@
       tip.textContent = `수정: ${modMeta}`;
       document.body.appendChild(tip);
       scheduleBoardModTipEl = tip;
+      positionScheduleBoardTip(tip, clientX, clientY);
+      requestAnimationFrame(() => tip.classList.add('is-visible'));
+    }
+
+    function showScheduleBoardRemarkTip(text, clientX, clientY) {
+      hideScheduleBoardModTip();
+      const tip = document.createElement('div');
+      tip.className = 'sb-mod-tip is-remark';
+      tip.textContent = text;
+      document.body.appendChild(tip);
+      scheduleBoardModTipEl = tip;
+      positionScheduleBoardTip(tip, clientX, clientY);
+      requestAnimationFrame(() => tip.classList.add('is-visible'));
+    }
+
+    function positionScheduleBoardTip(tip, clientX, clientY) {
       const pad = 12;
       let left = clientX + 14;
       let top = clientY + 16;
@@ -10894,7 +10924,6 @@
       if (top + rect.height + pad > window.innerHeight) top = Math.max(pad, clientY - rect.height - 10);
       tip.style.left = `${Math.round(left)}px`;
       tip.style.top = `${Math.round(top)}px`;
-      requestAnimationFrame(() => tip.classList.add('is-visible'));
     }
 
     function bindScheduleBoardModifiedHover(row, modMeta) {
@@ -10903,6 +10932,7 @@
       let lastX = 0;
       let lastY = 0;
       row.addEventListener('mouseenter', (e) => {
+        if (e.target.closest?.('.schedule-board-remark.is-long')) return;
         lastX = e.clientX;
         lastY = e.clientY;
         if (scheduleBoardModTipTimer) clearTimeout(scheduleBoardModTipTimer);
@@ -10916,6 +10946,39 @@
         lastY = e.clientY;
       });
       row.addEventListener('mouseleave', () => hideScheduleBoardModTip());
+    }
+
+    function bindScheduleBoardRemarkHover(row) {
+      const el = row?.querySelector?.('.schedule-board-remark:not(.is-empty)');
+      if (!el) return;
+      const full = scheduleBoardRemarkText({ remark: el.textContent || '' });
+      const markLong = () => {
+        if (el.scrollHeight > el.clientHeight + 2 || full.length > 48 || full.includes('\n')) {
+          el.classList.add('is-long');
+        }
+      };
+      requestAnimationFrame(markLong);
+      let lastX = 0;
+      let lastY = 0;
+      el.addEventListener('mouseenter', (e) => {
+        e.stopPropagation();
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (scheduleBoardModTipTimer) clearTimeout(scheduleBoardModTipTimer);
+        scheduleBoardModTipTimer = setTimeout(() => {
+          scheduleBoardModTipTimer = null;
+          if (!el.classList.contains('is-long')) return;
+          showScheduleBoardRemarkTip(full, lastX, lastY);
+        }, 350);
+      });
+      el.addEventListener('mousemove', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+      });
+      el.addEventListener('mouseleave', (e) => {
+        e.stopPropagation();
+        hideScheduleBoardModTip();
+      });
     }
 
     function formatSidebarCalendarDayTime(sch) {
@@ -11133,7 +11196,7 @@
         mealCancelBreakfast: !!document.getElementById('sb-quick-meal-breakfast')?.checked,
         mealCancelLunch: !!document.getElementById('sb-quick-meal-lunch')?.checked,
         mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked,
-        remark: (document.getElementById('sb-quick-remark')?.value || '').trim()
+        remark: normalizeScheduleRemarkInput(document.getElementById('sb-quick-remark')?.value)
       };
     }
 
@@ -11216,8 +11279,7 @@
       'sb-quick-doctor',
       'sb-quick-time-start',
       'sb-quick-time-end',
-      'sb-quick-detail',
-      'sb-quick-remark'
+      'sb-quick-detail'
     ];
 
     function focusScheduleBoardQuickNextField(fromId) {
@@ -11961,14 +12023,19 @@
       };
     }
 
+    function normalizeScheduleRemarkInput(raw) {
+      return String(raw || '').replace(/\r\n/g, '\n').replace(/^\s+|\s+$/g, '');
+    }
+
     function scheduleBoardRemarkText(sch) {
-      return String(sch?.remark || '').trim();
+      return normalizeScheduleRemarkInput(sch?.remark);
     }
 
     function scheduleBoardRemarkCellHtml(sch) {
       const text = scheduleBoardRemarkText(sch);
       if (!text) return '<span class="schedule-board-remark sb-col-remark is-empty">—</span>';
-      return `<span class="schedule-board-remark sb-col-remark" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+      const longCls = (text.length > 48 || text.includes('\n')) ? ' is-long' : '';
+      return `<span class="schedule-board-remark sb-col-remark${longCls}">${escapeHtml(text)}</span>`;
     }
 
     function formatScheduleMealCancelLabels(sch) {
@@ -12204,6 +12271,7 @@
           row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
           row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
           bindScheduleBoardModifiedHover(row, modMeta);
+          bindScheduleBoardRemarkHover(row);
           sec.appendChild(row);
         });
         body.appendChild(sec);
