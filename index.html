@@ -2846,7 +2846,7 @@
           </div>
           <div class="sb-quick-field">
             <label for="sb-quick-room">호실</label>
-            <input type="text" id="sb-quick-room" placeholder="503호" oninput="syncScheduleBoardQuickWardFromRoom()" autocomplete="off">
+            <input type="text" id="sb-quick-room" placeholder="503" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onScheduleBoardQuickRoomInput()">
           </div>
           <div class="sb-quick-field">
             <label for="sb-quick-patient">환자명</label>
@@ -11515,7 +11515,7 @@
       const wardVal = (sch.ward || norm.ward || '').trim();
       if (wardSel && wardVal) wardSel.value = wardVal;
       const roomEl = document.getElementById('sb-quick-room');
-      if (roomEl) roomEl.value = norm.room_no || '';
+      if (roomEl) roomEl.value = scheduleBoardRoomLabel(norm.room_no);
       const patientEl = document.getElementById('sb-quick-patient');
       if (patientEl) patientEl.value = scheduleBoardPatientLabel(norm.patient_name);
       const detailEl = document.getElementById('sb-quick-detail');
@@ -11577,6 +11577,14 @@
       refreshScheduleBoardEntryUi();
       setScheduleBoardQuickAddPanelVisible(false);
       renderScheduleBoard();
+    }
+
+    function onScheduleBoardQuickRoomInput() {
+      const el = document.getElementById('sb-quick-room');
+      if (!el) return;
+      const digits = String(el.value || '').replace(/\D/g, '');
+      if (el.value !== digits) el.value = digits;
+      syncScheduleBoardQuickWardFromRoom();
     }
 
     function syncScheduleBoardQuickWardFromRoom() {
