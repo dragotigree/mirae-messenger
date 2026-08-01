@@ -1,4 +1,4 @@
 {
-  "version": "1.0.275",
-  "notes": "업데이트 확인 시 version.json UTF-8 BOM으로 JSON 파싱 실패하던 문제 수정"
+  "version": "1.0.276",
+  "notes": "채널·1:1 공지 고정 + 당직의/의료진 OFF(달력, 마스터 권한)"
 }

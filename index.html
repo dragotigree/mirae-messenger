@@ -1114,6 +1114,35 @@
     }
     .sidebar-cal-day-line:hover { background: transparent; color: #334155; }
     .sidebar-cal-day-empty { text-align: center; padding: 16px 12px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
+    .sidebar-duty-block { padding: 8px 10px 6px; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; }
+    .sidebar-duty-line { font-size: 11.5px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; }
+    .sidebar-duty-line.is-duty { color: #1d4ed8; }
+    .sidebar-duty-line.is-off { color: #64748b; font-weight: 600; }
+    .mini-cal-day .duty-mark { position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: #6366f1; }
+    .mini-cal-day.selected .duty-mark { background: #c7d2fe; }
+    #sidebar-duty-edit-btn {
+      display: none; padding: 4px 8px; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;
+      border-radius: 9px; font-size: 10.5px; cursor: pointer; font-weight: 700;
+    }
+    #chat-pin-banner {
+      display: none; flex-shrink: 0; align-items: flex-start; gap: 10px;
+      padding: 8px 14px; background: linear-gradient(90deg, #fffbeb, #fff7ed);
+      border-bottom: 1px solid #fde68a; cursor: pointer;
+    }
+    #chat-pin-banner.is-visible { display: flex; }
+    #chat-pin-banner .chat-pin-icon { font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+    #chat-pin-banner .chat-pin-body { flex: 1; min-width: 0; }
+    #chat-pin-banner .chat-pin-label { font-size: 10.5px; font-weight: 800; color: #b45309; letter-spacing: 0.02em; }
+    #chat-pin-banner .chat-pin-text {
+      font-size: 12.5px; font-weight: 600; color: #78350f; line-height: 1.4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #chat-pin-banner .chat-pin-unpin {
+      flex-shrink: 0; border: none; background: transparent; color: #92400e;
+      font-size: 11px; font-weight: 700; cursor: pointer; padding: 4px 6px; border-radius: 8px;
+    }
+    #chat-pin-banner .chat-pin-unpin:hover { background: rgba(245, 158, 11, 0.15); }
+    .chat-pin-msg-btn { font-size: 12px; }
 
     .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 14px; padding: 8px; }
     .mini-cal-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: var(--font-weight-bold); color: #0369a1; margin-bottom: 4px; }
@@ -2288,6 +2317,15 @@
         </div>
       </div>
 
+      <div id="chat-pin-banner" onclick="scrollToPinnedChatMessage()">
+        <div class="chat-pin-icon" aria-hidden="true">📌</div>
+        <div class="chat-pin-body">
+          <div class="chat-pin-label">공지 고정</div>
+          <div class="chat-pin-text" id="chat-pin-banner-text"></div>
+        </div>
+        <button type="button" class="chat-pin-unpin" title="고정 해제" onclick="event.stopPropagation(); clearActiveChatPin()">해제</button>
+      </div>
+
       <div id="chat-search-bar">
         <input type="text" id="chat-search-input" placeholder="이 대화에서 검색..." oninput="onChatSearchInput(this.value)">
         <span style="font-size:11px; color:#94a3b8; cursor:pointer;" onclick="closeChatSearchBar()">닫기</span>
@@ -2399,6 +2437,7 @@
     <div class="sidebar-section-title">
       <span>📅 병원 달력</span>
       <div style="display:flex; gap:4px; align-items:center;">
+        <button type="button" id="sidebar-duty-edit-btn" onclick="openDutyRosterModal()" title="당직의·의료진 OFF 등록">🩺 당직/OFF</button>
         <button type="button" id="sidebar-cal-refresh-btn" style="padding:4px 8px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
         <button type="button" style="padding:4px 8px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardModal()">📋 현황판</button>
         <button id="add-sch-btn" style="display:none; padding:4px 8px; background:var(--accent); color:#fff; border:none; border-radius: 9px; font-size:11px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardForQuickAdd()">+ 일정 등록</button>
@@ -2462,6 +2501,32 @@
     </div>
   </div>
 
+  <!-- 🩺 당직의 / 의료진 OFF 편집 -->
+  <div id="duty-roster-modal" class="modal-overlay">
+    <div class="modal-card" style="width:440px; gap:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #6366f1; padding-bottom:12px;">
+        <div>
+          <div style="font-size:16px; font-weight:800; color:#3730a3;">🩺 당직의 · 의료진 OFF</div>
+          <div id="duty-roster-date-label" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
+        </div>
+        <button type="button" style="padding:6px 10px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;" onclick="closeDutyRosterModal()">✖ 닫기</button>
+      </div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:6px;">
+        당직의 (쉼표로 여러 명)
+        <input type="text" id="duty-roster-duty-input" placeholder="예: 김의사, 이의사" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+      </label>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:6px;">
+        OFF 의료진 (쉼표로 여러 명)
+        <input type="text" id="duty-roster-off-input" placeholder="예: 박선생, 최선생" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+      </label>
+      <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">우측 달력에서 선택한 날짜에 반영됩니다. 비워 두고 저장하면 해당 날짜 기록이 삭제됩니다.</p>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="closeDutyRosterModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="saveDutyRosterModal()" style="padding:8px 18px; background:#4f46e5; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">저장</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🛡️ 마스터 관리자 전용 권한 설정 모달 -->
   <div id="master-admin-modal" class="modal-overlay">
     <div class="modal-card" style="width:720px; padding:28px; gap:20px;">
@@ -2491,6 +2556,10 @@
             <input type="password" id="master-op-password" placeholder="비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px; width:100%; box-sizing:border-box;">
           </label>
         </div>
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#334155; line-height:1.45; cursor:pointer;">
+          <input type="checkbox" id="master-op-can-duty" style="margin-top:2px;">
+          <span><b>당직의·의료진 OFF 관리</b> 권한도 함께 부여 (달력 옆 🩺 버튼 사용)</span>
+        </label>
         <button onclick="addMasterNoticeOperator()" style="padding:11px; background:#2563eb; color:#fff; border:none; border-radius: 15px; font-size:13px; font-weight:700; cursor:pointer; margin-top:4px;">💾 계정 발급 및 저장</button>
       </div>
 
@@ -3455,12 +3524,17 @@
     let isMasterAuthenticated = false;
     let isNoticeOperatorAuthenticated = false;
     let currentOperatorName = '';
+    let noticeOperatorCanManageDuty = false;
+    let dutyRosterCache = [];
+    let dutyRosterDates = new Set();
+    let activeChatPin = null;
     const NOTICE_OPERATOR_STORAGE_KEY = 'mirae_notice_operator_session';
 
     function saveNoticeOperatorSession() {
       if (isNoticeOperatorAuthenticated && currentOperatorName) {
         localStorage.setItem(NOTICE_OPERATOR_STORAGE_KEY, JSON.stringify({
           displayName: currentOperatorName,
+          canManageDuty: !!noticeOperatorCanManageDuty,
           at: Date.now()
         }));
       } else {
@@ -3481,6 +3555,7 @@
         if (!raw) {
           isNoticeOperatorAuthenticated = false;
           currentOperatorName = '';
+          noticeOperatorCanManageDuty = false;
           syncNoticeOperatorSessionToMain();
           return;
         }
@@ -3488,15 +3563,22 @@
         if (data && data.displayName) {
           isNoticeOperatorAuthenticated = true;
           currentOperatorName = String(data.displayName);
+          noticeOperatorCanManageDuty = !!data.canManageDuty;
         } else {
           isNoticeOperatorAuthenticated = false;
           currentOperatorName = '';
+          noticeOperatorCanManageDuty = false;
         }
       } catch (e) {
         isNoticeOperatorAuthenticated = false;
         currentOperatorName = '';
+        noticeOperatorCanManageDuty = false;
       }
       syncNoticeOperatorSessionToMain();
+    }
+
+    function canManageDutyRoster() {
+      return !!(isMasterAuthenticated || (isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty));
     }
 
     function isScheduleBoardContext() {
@@ -4496,6 +4578,8 @@
       canManageNotices = isMasterAuthenticated || isNoticeOperatorAuthenticated;
       const addSchBtn = document.getElementById('add-sch-btn');
       if (addSchBtn) addSchBtn.style.display = canWriteScheduleBoard() ? 'block' : 'none';
+      const dutyBtn = document.getElementById('sidebar-duty-edit-btn');
+      if (dutyBtn) dutyBtn.style.display = canManageDutyRoster() ? 'inline-block' : 'none';
       refreshScheduleBoardEntryUi();
       renderSchedules();
     }
@@ -4563,7 +4647,10 @@
 
     window.api.onNoticeOperatorsUpdate(() => {});
     window.api.onSchedulesUpdate(() => { refreshSchedulesFromServer(); });
+    window.api.onDutyRosterUpdate(() => { refreshDutyRosterFromServer(); });
+    window.api.onChatPinsUpdate(() => { refreshActiveChatPinBanner(); });
     refreshSchedulesFromServer();
+    refreshDutyRosterFromServer();
     window.api.onGroupChatsUpdate(() => { refreshGroupChats().catch((e) => console.error('그룹 갱신 실패:', e)); });
     refreshGroupChats().catch((e) => console.error('그룹 초기 로드 실패:', e));
     renderChannelsSection();
@@ -8315,24 +8402,43 @@
       container.innerHTML = '';
       list.forEach(o => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:13px; background:#fff; padding:10px 14px; border-radius: 15px; border:1px solid #e2e8f0;';
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: 15px; border:1px solid #e2e8f0;';
+        const dutyOn = !!(o.can_manage_duty);
+        const uname = String(o.username || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         row.innerHTML = `
-          <div><b>${o.display_name}</b> <span style="color:#94a3b8; font-size:12px;">(${o.username})</span></div>
-          <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px;" onclick="removeMasterNoticeOperator('${o.username}')">삭제</span>
+          <div style="min-width:0; flex:1;">
+            <div><b>${escapeHtml(o.display_name || '')}</b> <span style="color:#94a3b8; font-size:12px;">(${escapeHtml(o.username || '')})</span></div>
+            <label style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:11.5px; color:#475569; cursor:pointer;">
+              <input type="checkbox" ${dutyOn ? 'checked' : ''} onchange="toggleOperatorDutyPerm('${uname}', this.checked)">
+              당직의·OFF 관리
+            </label>
+          </div>
+          <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; flex-shrink:0;" onclick="removeMasterNoticeOperator('${uname}')">삭제</span>
         `;
         container.appendChild(row);
       });
+    }
+
+    async function toggleOperatorDutyPerm(username, enabled) {
+      if (!username) return;
+      const res = await window.api.setNoticeOperatorDutyPerm({ username, canManageDuty: !!enabled });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '권한 변경에 실패했습니다.');
+        loadMasterOperatorList();
+      }
     }
 
     async function addMasterNoticeOperator() {
       const displayName = document.getElementById('master-op-display-name').value.trim();
       const username = document.getElementById('master-op-username').value.trim();
       const password = document.getElementById('master-op-password').value;
+      const canManageDuty = !!(document.getElementById('master-op-can-duty') && document.getElementById('master-op-can-duty').checked);
       if (!displayName || !username || !password) { await appAlert('표시 이름, 아이디, 비밀번호를 모두 입력해 주세요.'); return; }
-      await window.api.addNoticeOperator({ username, password, displayName });
+      await window.api.addNoticeOperator({ username, password, displayName, canManageDuty });
       document.getElementById('master-op-display-name').value = '';
       document.getElementById('master-op-username').value = '';
       document.getElementById('master-op-password').value = '';
+      if (document.getElementById('master-op-can-duty')) document.getElementById('master-op-can-duty').checked = false;
       loadMasterOperatorList();
       await appAlert(`[${displayName}] 님의 관리자 계정이 발급되었습니다.`);
       return;
@@ -8368,6 +8474,7 @@
       if (res.success) {
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
+        noticeOperatorCanManageDuty = !!res.canManageDuty;
         saveNoticeOperatorSession();
         closeOperatorLoginModal();
         refreshNoticePermission();
@@ -8382,6 +8489,7 @@
     function logoutOperator() {
       isNoticeOperatorAuthenticated = false;
       currentOperatorName = '';
+      noticeOperatorCanManageDuty = false;
       saveNoticeOperatorSession();
       refreshNoticePermission();
       updateBoardAuthStatusText();
@@ -8461,6 +8569,7 @@
 
       loadChatHistory();
       refreshScheduledIndicator();
+      refreshActiveChatPinBanner();
     }
 
     function renderContactDetailPanel(user) {
@@ -10345,7 +10454,7 @@
                 <div class="chat-bubble">${displayMsg}</div>
                 ${bubbleMetaAfter}
               </div>
-              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button></span>
+              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button><button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌공지</button></span>
             </div>
             ${pendingNoticeHtml}
             ${reactionsHostHtml}
@@ -10378,6 +10487,7 @@
                 ${reactBtnHtml}
                 <button type="button" class="copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button>
                 <button type="button" class="share-btn" title="다른 사람에게 전달" onclick="shareThisMessage(this)">↪️</button>
+                <button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌공지</button>
                 <button type="button" class="pin-btn" title="기억하기" onclick="pinThisMessage(this, \`${encodeURIComponent(msg)}\`, \`${time}\`, \`${encodeURIComponent(displayName)}\`)">📌</button>
               </div>
             </div>
@@ -10740,6 +10850,171 @@
       pinnedMessages = pinnedMessages.filter(item => item.id !== id);
       localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
       renderPinnedMessages();
+    }
+
+    function getActiveChatChannelKey() {
+      return activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : '';
+    }
+
+    function stripHtmlToPreview(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = String(html || '');
+      const text = (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+      return text.slice(0, 200);
+    }
+
+    function renderChatPinBanner(pin) {
+      const banner = document.getElementById('chat-pin-banner');
+      const textEl = document.getElementById('chat-pin-banner-text');
+      if (!banner || !textEl) return;
+      activeChatPin = pin || null;
+      if (!pin) {
+        banner.classList.remove('is-visible');
+        textEl.textContent = '';
+        return;
+      }
+      const who = pin.sender_name ? `${pin.sender_name} · ` : '';
+      textEl.textContent = `${who}${pin.preview_text || stripHtmlToPreview(pin.message_html) || '(내용 없음)'}`;
+      banner.classList.add('is-visible');
+    }
+
+    async function refreshActiveChatPinBanner() {
+      const key = getActiveChatChannelKey();
+      if (!key || !window.api.getChatPin) {
+        renderChatPinBanner(null);
+        return;
+      }
+      try {
+        const pin = await window.api.getChatPin(key);
+        renderChatPinBanner(pin);
+      } catch (e) {
+        renderChatPinBanner(null);
+      }
+    }
+
+    async function pinMessageAsChatNotice(btn) {
+      const row = btn && btn.closest ? btn.closest('.msg-row, .msg-row-bubble') : null;
+      const key = getActiveChatChannelKey();
+      if (!row || !key) {
+        await appAlert('대화를 연 상태에서만 공지 고정할 수 있습니다.');
+        return;
+      }
+      const textEl = row.querySelector('.msg-text, .chat-bubble');
+      if (!textEl) return;
+      const html = textEl.innerHTML || '';
+      if (html.indexOf('deleted-msg-flag') !== -1 || html.indexOf('system-notice-flag') !== -1) {
+        await appAlert('삭제된 메시지/시스템 안내는 고정할 수 없습니다.');
+        return;
+      }
+      const senderEl = row.querySelector('.msg-sender-name, .bubble-sender');
+      let senderName = senderEl ? senderEl.textContent.replace(/\s*·\s*(보냄|읽음|오류)\s*$/, '').trim() : '';
+      if (!senderName && row.classList.contains('is-me')) senderName = profileDisplayName(myProfile);
+      const preview = stripHtmlToPreview(html);
+      if (!await appConfirm('이 메시지를 대화 상단 공지로 고정할까요?\n(기존 고정이 있으면 교체됩니다)', {
+        title: '공지 고정',
+        confirmText: '고정',
+        cancelText: '취소'
+      })) return;
+      const res = await window.api.setChatPin({
+        channelKey: key,
+        msgUid: row.getAttribute('data-msg-uid') || '',
+        messageHtml: html,
+        previewText: preview,
+        senderName: senderName || ''
+      });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '고정에 실패했습니다.');
+        return;
+      }
+      renderChatPinBanner(res.pin);
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = '✅';
+        setTimeout(() => { btn.textContent = prev || '📌공지'; }, 900);
+      }
+    }
+
+    async function clearActiveChatPin() {
+      const key = getActiveChatChannelKey();
+      if (!key) return;
+      if (!await appConfirm('이 대화의 공지 고정을 해제할까요?')) return;
+      await window.api.clearChatPin(key);
+      renderChatPinBanner(null);
+    }
+
+    function scrollToPinnedChatMessage() {
+      if (!activeChatPin || !activeChatPin.msg_uid) return;
+      const row = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(activeChatPin.msg_uid)}"]`);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.outline = '2px solid #f59e0b';
+      setTimeout(() => { row.style.outline = ''; }, 1400);
+    }
+
+    async function refreshDutyRosterFromServer() {
+      if (!window.api.getDutyRoster) return;
+      try {
+        dutyRosterCache = await window.api.getDutyRoster() || [];
+        dutyRosterDates = new Set(dutyRosterCache.map((r) => r.date_str).filter(Boolean));
+      } catch (e) {
+        dutyRosterCache = [];
+        dutyRosterDates = new Set();
+      }
+      renderSchedules();
+    }
+
+    function openDutyRosterModal() {
+      if (!canManageDutyRoster()) {
+        openOperatorLoginModal();
+        return;
+      }
+      const dateStr = selectedCalendarDateStr || formatDateStr(new Date());
+      const label = document.getElementById('duty-roster-date-label');
+      if (label) label.textContent = dateStr;
+      const dutyInput = document.getElementById('duty-roster-duty-input');
+      const offInput = document.getElementById('duty-roster-off-input');
+      const dutyNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'duty').map((r) => r.name);
+      const offNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'off').map((r) => r.name);
+      if (dutyInput) dutyInput.value = dutyNames.join(', ');
+      if (offInput) offInput.value = offNames.join(', ');
+      const modal = document.getElementById('duty-roster-modal');
+      if (modal) modal.style.display = 'flex';
+      setModalOpenState(true);
+    }
+
+    function closeDutyRosterModal() {
+      const modal = document.getElementById('duty-roster-modal');
+      if (modal) modal.style.display = 'none';
+      setModalOpenState(false);
+    }
+
+    function parseCommaNames(raw) {
+      return String(raw || '')
+        .split(/[,，、/\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    async function saveDutyRosterModal() {
+      if (!canManageDutyRoster()) {
+        await appAlert('당직·OFF 관리 권한이 없습니다.');
+        return;
+      }
+      const dateStr = (document.getElementById('duty-roster-date-label') || {}).textContent || selectedCalendarDateStr || formatDateStr(new Date());
+      const dutyNames = parseCommaNames((document.getElementById('duty-roster-duty-input') || {}).value);
+      const offNames = parseCommaNames((document.getElementById('duty-roster-off-input') || {}).value);
+      const res = await window.api.setDutyRosterForDate({
+        dateStr,
+        dutyNames,
+        offNames,
+        byName: currentOperatorName || profileDisplayName(myProfile) || ''
+      });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '저장에 실패했습니다.');
+        return;
+      }
+      closeDutyRosterModal();
+      await refreshDutyRosterFromServer();
     }
 
     function onAttendingPhysicianSelectChange(source) {
@@ -11511,13 +11786,42 @@
       if (!bodyEl || !dateStr) return;
 
       const list = getSchedulesForDate(dateStr);
+      const dutyNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'duty').map((r) => r.name);
+      const offNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'off').map((r) => r.name);
       bodyEl.onclick = null;
+      bodyEl.innerHTML = '';
+
+      if (dutyNames.length || offNames.length) {
+        const dutyBlock = document.createElement('div');
+        dutyBlock.className = 'sidebar-duty-block';
+        if (dutyNames.length) {
+          const dutyLine = document.createElement('div');
+          dutyLine.className = 'sidebar-duty-line is-duty';
+          dutyLine.textContent = `🩺 당직의 · ${dutyNames.join(', ')}`;
+          dutyBlock.appendChild(dutyLine);
+        }
+        if (offNames.length) {
+          const offLine = document.createElement('div');
+          offLine.className = 'sidebar-duty-line is-off';
+          offLine.textContent = `⚪ OFF · ${offNames.join(', ')}`;
+          dutyBlock.appendChild(offLine);
+        }
+        bodyEl.appendChild(dutyBlock);
+      }
+
       if (list.length === 0) {
-        bodyEl.innerHTML = `<div class="sidebar-cal-day-empty">일정 없음</div>`;
+        if (!dutyNames.length && !offNames.length) {
+          bodyEl.innerHTML = `<div class="sidebar-cal-day-empty">일정 없음</div>`;
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'sidebar-cal-day-empty';
+          empty.style.padding = '10px 12px';
+          empty.textContent = '등록된 일정 없음';
+          bodyEl.appendChild(empty);
+        }
         return;
       }
 
-      bodyEl.innerHTML = '';
       const sorted = [...list].sort((a, b) => String(a.time_str || '').localeCompare(String(b.time_str || '')));
       sorted.forEach((sch) => {
         const line = document.createElement('div');
@@ -12977,7 +13281,9 @@
         if (!cell.other && cell.dateStr === selectedCalendarDateStr) cls += ' selected';
         el.className = cls;
         const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
-        el.innerHTML = `${cell.dayNum}${hasSchedule ? '<span class="dot"></span>' : ''}`;
+        const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
+        const hasDuty = !cell.other && dutyRosterDates.has(cell.dateStr);
+        el.innerHTML = `${cell.dayNum}${hasSchedule ? '<span class="dot"></span>' : ''}${hasDuty ? '<span class="duty-mark"></span>' : ''}`;
         if (!cell.other) el.onclick = () => calendarSelectDate(cell.dateStr);
         grid.appendChild(el);
       });

@@ -1783,6 +1783,31 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS notice_operators (
     username TEXT PRIMARY KEY, password_hash TEXT, display_name TEXT, added_at TEXT
   )`, logDbErr);
+  db.run(`ALTER TABLE notice_operators ADD COLUMN can_manage_duty INTEGER DEFAULT 0`, () => {});
+
+  // 채널·1:1 대화 상단 공지 고정 (채널당 1개)
+  db.run(`CREATE TABLE IF NOT EXISTS chat_pins (
+    channel_key TEXT PRIMARY KEY,
+    msg_uid TEXT,
+    message_html TEXT,
+    preview_text TEXT,
+    sender_name TEXT,
+    pinned_at TEXT,
+    pinned_by_name TEXT,
+    pinned_by_ip TEXT
+  )`, logDbErr);
+
+  // 당직의 / 의료진 OFF (날짜별)
+  db.run(`CREATE TABLE IF NOT EXISTS duty_roster (
+    date_str TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    note TEXT DEFAULT '',
+    updated_at TEXT,
+    updated_by_name TEXT,
+    updated_by_ip TEXT,
+    PRIMARY KEY (date_str, kind, name)
+  )`, logDbErr);
 
   // 🚑 이동요청시스템(mirae-transport) 연동: 보낸 이동 요청 기록을 로컬에도 남겨둔다.
   db.run(`CREATE TABLE IF NOT EXISTS transport_requests (
@@ -3256,7 +3281,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'NOTICE_UPDATE': handleNoticeUpdate(payload.notice); break;
     case 'NOTICE_DELETE': handleNoticeDelete(payload.uid); break;
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
-    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides); break;
+    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
     case 'OPERATOR_DELETE': handleOperatorDelete(payload.username); break;
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
@@ -3270,6 +3295,9 @@ function routeIncomingPayload(payload, senderIP) {
     case 'GROUP_RENAME_NOTICE': handleGroupRenameNotice(payload); break;
     case 'GROUP_JOIN_NOTICE': handleGroupRenameNotice(payload); break;
     case 'CONFIG_SYNC': handleConfigSync(payload); break;
+    case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
+    case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
+    case 'OPERATOR_DUTY_PERM': handleOperatorDutyPerm(payload); break;
     case 'PROFILE_PHOTO_SYNC': handleProfilePhotoSync(payload.ip || senderIP, payload.photo); break;
     case 'PROFILE_PHOTO_REQUEST': handleProfilePhotoRequest(senderIP); break;
     case 'PROFILE_OVERRIDE_SYNC': handleProfileOverrideSync(payload); break;
@@ -3858,20 +3886,28 @@ function handleNoticeSyncRequest(senderIP) {
     db.all(`SELECT * FROM notice_operators`, [], (err2, operators) => {
       db.all(`SELECT * FROM hospital_schedules`, [], (err3, schedules) => {
         db.all(`SELECT * FROM user_profile_overrides`, [], (err4, profileOverridesRows) => {
-          const chunks = buildNoticeSyncPayloadChunks(
-            notices || [],
-            operators || [],
-            schedules || [],
-            profileOverridesRows || []
-          );
-          tcpWriteJsonLines(senderIP, chunks);
+          db.all(`SELECT * FROM chat_pins`, [], (err5, chatPins) => {
+            db.all(`SELECT * FROM duty_roster`, [], (err6, dutyRoster) => {
+              const chunks = buildNoticeSyncPayloadChunks(
+                notices || [],
+                operators || [],
+                schedules || [],
+                profileOverridesRows || []
+              );
+              if (chunks.length) {
+                chunks[0].chatPins = chatPins || [];
+                chunks[0].dutyRoster = dutyRoster || [];
+              }
+              tcpWriteJsonLines(senderIP, chunks);
+            });
+          });
         });
       });
     });
   });
 }
 
-function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides) {
+function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster) {
   if (Array.isArray(notices)) {
     notices.forEach(n => {
       if (!n || !n.uid) return;
@@ -3885,8 +3921,8 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   }
   if (Array.isArray(operators)) {
     operators.forEach(o => {
-      db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at) VALUES (?, ?, ?, ?)`,
-        [o.username, o.password_hash, o.display_name, o.added_at], logDbErr);
+      db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
+        [o.username, o.password_hash, o.display_name, o.added_at, o.can_manage_duty ? 1 : 0], logDbErr);
     });
     if (mainWindow) safeWebContentsSend('notice-operators-update');
   }
@@ -3913,6 +3949,14 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
       refreshUserAfterProfileOverride(ov.ip);
     });
   }
+  if (Array.isArray(chatPins)) {
+    chatPins.forEach((p) => upsertChatPinRow(p, false));
+    if (mainWindow) safeWebContentsSend('chat-pins-update');
+  }
+  if (Array.isArray(dutyRoster)) {
+    dutyRoster.forEach((row) => upsertDutyRosterRow(row, false));
+    if (mainWindow) safeWebContentsSend('duty-roster-update');
+  }
   if (remoteUpdateSourcePath && !updateSourcePath) {
     persistUpdateSourcePath(remoteUpdateSourcePath);
   }
@@ -3926,10 +3970,159 @@ function handleConfigSync(payload) {
 
 function handleOperatorAdd(o) {
   if (!o || !o.username) return;
-  db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at) VALUES (?, ?, ?, ?)`,
-    [o.username, o.password_hash, o.display_name, o.added_at], () => {
+  db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
+    [o.username, o.password_hash, o.display_name, o.added_at, o.can_manage_duty ? 1 : 0], () => {
       if (mainWindow) safeWebContentsSend('notice-operators-update');
     });
+}
+
+function handleOperatorDutyPerm(payload) {
+  if (!payload || !payload.username) return;
+  const flag = payload.canManageDuty ? 1 : 0;
+  db.run(`UPDATE notice_operators SET can_manage_duty = ? WHERE username = ?`, [flag, payload.username], () => {
+    if (mainWindow) safeWebContentsSend('notice-operators-update');
+  });
+}
+
+function upsertChatPinRow(pin, broadcast) {
+  if (!pin || !pin.channel_key) return;
+  if (pin._clear) {
+    db.run(`DELETE FROM chat_pins WHERE channel_key = ?`, [pin.channel_key], () => {
+      if (mainWindow) safeWebContentsSend('chat-pins-update');
+    });
+    if (broadcast) broadcastToOnlinePeers({ type: 'CHAT_PIN_SYNC', pin: { channel_key: pin.channel_key, _clear: true } });
+    return;
+  }
+  db.run(
+    `INSERT OR REPLACE INTO chat_pins (channel_key, msg_uid, message_html, preview_text, sender_name, pinned_at, pinned_by_name, pinned_by_ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      pin.channel_key,
+      pin.msg_uid || '',
+      pin.message_html || '',
+      pin.preview_text || '',
+      pin.sender_name || '',
+      pin.pinned_at || new Date().toISOString(),
+      pin.pinned_by_name || '',
+      pin.pinned_by_ip || ''
+    ],
+    () => {
+      if (mainWindow) safeWebContentsSend('chat-pins-update');
+    }
+  );
+  if (broadcast) broadcastToOnlinePeers({ type: 'CHAT_PIN_SYNC', pin });
+}
+
+function handleChatPinSync(payload) {
+  if (!payload || !payload.pin) return;
+  upsertChatPinRow(payload.pin, false);
+}
+
+function upsertDutyRosterRow(row, broadcast) {
+  if (!row || !row.date_str || !row.kind || !row.name) return;
+  if (row._clear) {
+    db.run(`DELETE FROM duty_roster WHERE date_str = ? AND kind = ? AND name = ?`, [row.date_str, row.kind, row.name], () => {
+      if (mainWindow) safeWebContentsSend('duty-roster-update');
+    });
+    if (broadcast) broadcastToOnlinePeers({ type: 'DUTY_ROSTER_SYNC', row: { ...row, _clear: true } });
+    return;
+  }
+  db.run(
+    `INSERT OR REPLACE INTO duty_roster (date_str, kind, name, note, updated_at, updated_by_name, updated_by_ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.date_str,
+      row.kind,
+      row.name,
+      row.note || '',
+      row.updated_at || new Date().toISOString(),
+      row.updated_by_name || '',
+      row.updated_by_ip || ''
+    ],
+    () => {
+      if (mainWindow) safeWebContentsSend('duty-roster-update');
+    }
+  );
+  if (broadcast) broadcastToOnlinePeers({ type: 'DUTY_ROSTER_SYNC', row });
+}
+
+function replaceDutyRosterForDate(dateStr, dutyNames, offNames, meta) {
+  return new Promise((resolve) => {
+    const date = String(dateStr || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      resolve({ success: false, msg: '날짜 형식이 올바르지 않습니다.' });
+      return;
+    }
+    const cleanedDuty = [...new Set((dutyNames || []).map((n) => String(n || '').trim()).filter(Boolean))];
+    const cleanedOff = [...new Set((offNames || []).map((n) => String(n || '').trim()).filter(Boolean))];
+    const updatedAt = new Date().toISOString();
+    const byName = (meta && meta.byName) || '';
+    const byIp = (meta && meta.byIp) || MY_IP;
+
+    db.run(`DELETE FROM duty_roster WHERE date_str = ?`, [date], (err) => {
+      if (err) {
+        resolve({ success: false, msg: err.message });
+        return;
+      }
+      broadcastToOnlinePeers({ type: 'DUTY_ROSTER_SYNC', replaceDate: date, dutyNames: cleanedDuty, offNames: cleanedOff, updated_at: updatedAt, updated_by_name: byName, updated_by_ip: byIp });
+
+      const rows = [
+        ...cleanedDuty.map((name) => ({ date_str: date, kind: 'duty', name, note: '', updated_at: updatedAt, updated_by_name: byName, updated_by_ip: byIp })),
+        ...cleanedOff.map((name) => ({ date_str: date, kind: 'off', name, note: '', updated_at: updatedAt, updated_by_name: byName, updated_by_ip: byIp }))
+      ];
+      let left = rows.length;
+      if (!left) {
+        if (mainWindow) safeWebContentsSend('duty-roster-update');
+        resolve({ success: true });
+        return;
+      }
+      rows.forEach((row) => {
+        db.run(
+          `INSERT OR REPLACE INTO duty_roster (date_str, kind, name, note, updated_at, updated_by_name, updated_by_ip) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [row.date_str, row.kind, row.name, row.note, row.updated_at, row.updated_by_name, row.updated_by_ip],
+          () => {
+            left -= 1;
+            if (left <= 0) {
+              if (mainWindow) safeWebContentsSend('duty-roster-update');
+              resolve({ success: true });
+            }
+          }
+        );
+      });
+    });
+  });
+}
+
+function handleDutyRosterSync(payload) {
+  if (!payload) return;
+  if (payload.replaceDate) {
+    const date = String(payload.replaceDate);
+    db.run(`DELETE FROM duty_roster WHERE date_str = ?`, [date], () => {
+      const dutyNames = payload.dutyNames || [];
+      const offNames = payload.offNames || [];
+      const updatedAt = payload.updated_at || new Date().toISOString();
+      const byName = payload.updated_by_name || '';
+      const byIp = payload.updated_by_ip || '';
+      const rows = [
+        ...dutyNames.map((name) => [date, 'duty', String(name), '', updatedAt, byName, byIp]),
+        ...offNames.map((name) => [date, 'off', String(name), '', updatedAt, byName, byIp])
+      ];
+      let left = rows.length;
+      const done = () => {
+        if (mainWindow) safeWebContentsSend('duty-roster-update');
+      };
+      if (!left) { done(); return; }
+      rows.forEach((params) => {
+        db.run(
+          `INSERT OR REPLACE INTO duty_roster (date_str, kind, name, note, updated_at, updated_by_name, updated_by_ip) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          params,
+          () => { left -= 1; if (left <= 0) done(); }
+        );
+      });
+    });
+    return;
+  }
+  if (payload.row) upsertDutyRosterRow(payload.row, false);
 }
 
 function handleOperatorDelete(username) {
@@ -5490,22 +5683,39 @@ ipcMain.handle('delete-notice', async (event, uid) => {
 
 ipcMain.handle('get-notice-operators', async () => {
   return new Promise((resolve) => {
-    db.all(`SELECT username, display_name, added_at FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => resolve(rows || []));
+    db.all(`SELECT username, display_name, added_at, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => resolve(rows || []));
   });
 });
 
-ipcMain.handle('add-notice-operator', async (event, { username, password, displayName }) => {
+ipcMain.handle('add-notice-operator', async (event, { username, password, displayName, canManageDuty }) => {
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
     const password_hash = hashPassword(password);
+    const dutyFlag = canManageDuty ? 1 : 0;
     db.run(
-      `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at) VALUES (?, ?, ?, ?)`,
-      [username, password_hash, displayName, added_at],
+      `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
+      [username, password_hash, displayName, added_at, dutyFlag],
       (err) => {
-        if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_ADD', operator: { username, password_hash, display_name: displayName, added_at } });
+        if (!err) {
+          broadcastToOnlinePeers({
+            type: 'OPERATOR_ADD',
+            operator: { username, password_hash, display_name: displayName, added_at, can_manage_duty: dutyFlag }
+          });
+        }
         resolve({ success: !err });
       }
     );
+  });
+});
+
+ipcMain.handle('set-notice-operator-duty-perm', async (event, { username, canManageDuty }) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
+  return new Promise((resolve) => {
+    const flag = canManageDuty ? 1 : 0;
+    db.run(`UPDATE notice_operators SET can_manage_duty = ? WHERE username = ?`, [flag, username], (err) => {
+      if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DUTY_PERM', username, canManageDuty: !!flag });
+      resolve({ success: !err });
+    });
   });
 });
 
@@ -5525,8 +5735,68 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
       }
-      resolve({ success: true, displayName: row.display_name });
+      resolve({
+        success: true,
+        displayName: row.display_name,
+        canManageDuty: !!(row.can_manage_duty)
+      });
     });
+  });
+});
+
+ipcMain.handle('get-chat-pin', async (event, channelKey) => {
+  const key = String(channelKey || '').trim();
+  if (!key) return null;
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM chat_pins WHERE channel_key = ?`, [key], (err, row) => resolve(row || null));
+  });
+});
+
+ipcMain.handle('set-chat-pin', async (event, payload) => {
+  const pin = payload || {};
+  const channel_key = String(pin.channelKey || pin.channel_key || '').trim();
+  if (!channel_key) return { success: false, msg: '채널을 찾을 수 없습니다.' };
+  const row = {
+    channel_key,
+    msg_uid: String(pin.msgUid || pin.msg_uid || ''),
+    message_html: String(pin.messageHtml || pin.message_html || ''),
+    preview_text: String(pin.previewText || pin.preview_text || '').slice(0, 240),
+    sender_name: String(pin.senderName || pin.sender_name || ''),
+    pinned_at: new Date().toISOString(),
+    pinned_by_name: String(pin.pinnedByName || pin.pinned_by_name || myProfile.username || ''),
+    pinned_by_ip: MY_IP
+  };
+  upsertChatPinRow(row, true);
+  return { success: true, pin: row };
+});
+
+ipcMain.handle('clear-chat-pin', async (event, channelKey) => {
+  const key = String(channelKey || '').trim();
+  if (!key) return { success: false };
+  upsertChatPinRow({ channel_key: key, _clear: true }, true);
+  return { success: true };
+});
+
+ipcMain.handle('get-duty-roster', async (event, dateStr) => {
+  const date = String(dateStr || '').trim();
+  return new Promise((resolve) => {
+    if (date) {
+      db.all(`SELECT * FROM duty_roster WHERE date_str = ? ORDER BY kind ASC, name ASC`, [date], (err, rows) => {
+        resolve(rows || []);
+      });
+      return;
+    }
+    db.all(`SELECT * FROM duty_roster ORDER BY date_str DESC, kind ASC, name ASC`, [], (err, rows) => {
+      resolve(rows || []);
+    });
+  });
+});
+
+ipcMain.handle('set-duty-roster-for-date', async (event, payload) => {
+  const p = payload || {};
+  return replaceDutyRosterForDate(p.dateStr, p.dutyNames || [], p.offNames || [], {
+    byName: p.byName || myProfile.username || '',
+    byIp: MY_IP
   });
 });
 

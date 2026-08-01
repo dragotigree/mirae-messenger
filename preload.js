@@ -78,8 +78,20 @@ contextBridge.exposeInMainWorld('api', {
   getNoticeOperators: () => ipcRenderer.invoke('get-notice-operators'),
   addNoticeOperator: (data) => ipcRenderer.invoke('add-notice-operator', data),
   deleteNoticeOperator: (username) => ipcRenderer.invoke('delete-notice-operator', username),
+  setNoticeOperatorDutyPerm: (data) => ipcRenderer.invoke('set-notice-operator-duty-perm', data),
   noticeOperatorLogin: (data) => ipcRenderer.invoke('notice-operator-login', data),
   setNoticeOperatorSession: (active) => ipcRenderer.invoke('set-notice-operator-session', active),
+
+  // 📌 채널·1:1 공지 고정
+  getChatPin: (channelKey) => ipcRenderer.invoke('get-chat-pin', channelKey),
+  setChatPin: (payload) => ipcRenderer.invoke('set-chat-pin', payload),
+  clearChatPin: (channelKey) => ipcRenderer.invoke('clear-chat-pin', channelKey),
+  onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
+
+  // 🩺 당직의 / 의료진 OFF
+  getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),
+  setDutyRosterForDate: (payload) => ipcRenderer.invoke('set-duty-roster-for-date', payload),
+  onDutyRosterUpdate: (callback) => ipcRenderer.on('duty-roster-update', (e) => callback()),
 
   // 💻 시스템 설정 (자동 부팅, 창 뷰모드, DB 백업)
   setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable),
