@@ -2100,6 +2100,13 @@ function buildTrayContextMenu() {
         safeWebContentsSend('trigger-open-all-logs');
       }
     },
+    {
+      label: '⚙️ 환경 설정',
+      click: () => {
+        openMainWindowWithViewMode(trayLaunchViewMode);
+        safeWebContentsSend('trigger-open-settings');
+      }
+    },
     { type: 'separator' },
     {
       label: '🖥️ 기본 화면으로 열기',
