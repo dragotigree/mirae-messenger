@@ -1601,12 +1601,19 @@
       padding: 0 0 2px;
       -webkit-overflow-scrolling: touch;
     }
+    /* 3줄: ①구분~주치의 ②출발~동행+등록 ③비고 */
     .sb-quick-grid {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px 8px;
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+      min-width: 640px;
+    }
+    .sb-quick-row {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px 10px;
       align-items: flex-end;
-      min-width: 1120px;
     }
     .sb-quick-field { display: flex; flex-direction: column; gap: 3px; flex: 0 0 auto; }
     .sb-quick-field label { font-size: 10.5px; font-weight: 700; color: #64748b; white-space: nowrap; line-height: 1.2; }
@@ -1617,31 +1624,37 @@
     }
     .sb-quick-field select {
       min-width: 0;
-      text-overflow: ellipsis;
-      overflow: hidden;
-      white-space: nowrap;
     }
     .sb-quick-field textarea {
       min-height: 36px; max-height: 100px; resize: vertical; line-height: 1.35;
       padding: 5px 7px;
     }
     .sb-quick-field input[type="time"] {
-      padding: 2px 2px;
+      padding: 2px 4px;
       font-size: 11px;
       min-height: 28px;
     }
-    /* 한 줄: 구분·병동·실·환자명·주치의·출발·귀원 — 최소 너비로 깨짐 방지 */
-    .sb-quick-grid > .sb-quick-field:nth-child(1) { width: 52px; }    /* 구분 */
-    .sb-quick-grid > .sb-quick-field:nth-child(2) { width: 56px; }    /* 병동 */
-    .sb-quick-grid > .sb-quick-field:nth-child(3) { width: 44px; }    /* 호실 */
-    .sb-quick-grid > .sb-quick-field:nth-child(4) { width: 72px; }    /* 환자명 */
-    .sb-quick-grid > .sb-quick-field:nth-child(5) { width: 122px; }   /* 주치의 */
-    .sb-quick-grid > .sb-quick-field:nth-child(6) { width: 122px; }   /* 출발+미정 */
-    .sb-quick-grid > .sb-quick-field:nth-child(7) { width: 122px; }   /* 귀원+미정 */
+    /* Row 1: 구분 · 병동 · 호실 · 환자명 · 주치의 */
+    .sb-quick-field--type { width: 72px; }
+    .sb-quick-field--ward { width: 86px; }
+    .sb-quick-field--room { width: 56px; }
+    .sb-quick-field--patient { width: 96px; }
+    .sb-quick-field--doctor { width: 150px; flex: 1 1 150px; min-width: 140px; max-width: 220px; }
+    /* Row 2: 출발 · 귀원 · 목적 · 식사 취소 · 동행 · 등록 */
+    .sb-quick-field--time { width: 138px; }
+    .sb-quick-field--detail { flex: 1 1 160px; min-width: 140px; max-width: 280px; }
+    .sb-quick-field--meals { flex: 0 0 auto; min-width: 148px; width: auto; }
+    .sb-quick-field--guardian { flex: 0 0 auto; min-width: 72px; width: auto; }
+    .sb-quick-field--actions {
+      display: flex; flex-direction: row; align-items: flex-end; gap: 6px;
+      flex: 0 0 auto; margin-left: auto;
+    }
+    .sb-quick-field--remark { width: 100%; align-self: stretch; }
+    .sb-quick-field--actions > label { display: none; }
     .sb-quick-time-row {
       display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; min-width: 0;
     }
-    .sb-quick-time-row input[type="time"] { flex: 1 1 auto; min-width: 72px; width: auto; }
+    .sb-quick-time-row input[type="time"] { flex: 1 1 auto; min-width: 78px; width: auto; }
     .sb-quick-time-row input[type="time"]:disabled {
       background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
     }
@@ -1657,15 +1670,6 @@
     }
     .sb-quick-meal-row .sb-quick-undecided { color: #c2410c; font-size: 10.5px; }
     .sb-quick-meal-row .sb-quick-undecided input { accent-color: #ea580c; }
-    .sb-quick-field--detail { flex: 1 1 120px; min-width: 120px; max-width: 180px; }
-    .sb-quick-field--meals { flex: 0 0 auto; min-width: 118px; width: auto; }
-    .sb-quick-field--guardian { flex: 0 0 auto; min-width: 64px; width: auto; }
-    .sb-quick-field--actions {
-      display: flex; flex-direction: row; align-items: flex-end; gap: 6px;
-      flex: 0 0 auto; margin-left: 4px;
-    }
-    .sb-quick-field--remark { flex: 1 1 100%; width: 100%; align-self: stretch; }
-    .sb-quick-field--actions > label { display: none; }
     .sb-quick-guardian { color: #7c3aed; font-size: 10.5px; min-height: 26px; align-items: center; }
     .sb-quick-guardian input { accent-color: #7c3aed; }
     .sb-quick-field input:focus, .sb-quick-field select:focus, .sb-quick-field textarea:focus { outline: none; border-color: #7dd3fc; }
@@ -2835,79 +2839,83 @@
             <div class="sb-quick-add-body" id="sb-quick-add-body">
         <div class="sb-quick-grid-wrap">
         <div class="sb-quick-grid">
-          <div class="sb-quick-field">
-            <label for="sb-quick-type">구분</label>
-            <select id="sb-quick-type" onchange="updateScheduleBoardQuickAddUi()"></select>
-          </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-ward">병동</label>
-            <select id="sb-quick-ward">
-              <option value="">(자동)</option>
-              <option value="4">4병동</option>
-              <option value="5">5병동</option>
-              <option value="7">7병동</option>
-              <option value="8">8병동</option>
-              <option value="9">9병동</option>
-            </select>
-          </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-room">호실</label>
-            <input type="text" id="sb-quick-room" placeholder="503" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onScheduleBoardQuickRoomInput()">
-          </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-patient">환자명</label>
-            <input type="text" id="sb-quick-patient" placeholder="김OO" autocomplete="off">
-          </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-doctor">주치의</label>
-            <select id="sb-quick-doctor" onchange="onAttendingPhysicianSelectChange('quick')"></select>
-          </div>
-          <div class="sb-quick-field">
-            <label for="sb-quick-time-start" id="sb-quick-time-start-label">출발</label>
-            <div class="sb-quick-time-row">
-              <input type="time" id="sb-quick-time-start" value="09:00">
-              <label class="sb-quick-undecided" title="출발 시간 미정">
-                <input type="checkbox" id="sb-quick-time-start-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
-              </label>
+          <div class="sb-quick-row sb-quick-row--1">
+            <div class="sb-quick-field sb-quick-field--type">
+              <label for="sb-quick-type">구분</label>
+              <select id="sb-quick-type" onchange="updateScheduleBoardQuickAddUi()"></select>
+            </div>
+            <div class="sb-quick-field sb-quick-field--ward">
+              <label for="sb-quick-ward">병동</label>
+              <select id="sb-quick-ward">
+                <option value="">(자동)</option>
+                <option value="4">4병동</option>
+                <option value="5">5병동</option>
+                <option value="7">7병동</option>
+                <option value="8">8병동</option>
+                <option value="9">9병동</option>
+              </select>
+            </div>
+            <div class="sb-quick-field sb-quick-field--room">
+              <label for="sb-quick-room">호실</label>
+              <input type="text" id="sb-quick-room" placeholder="503" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onScheduleBoardQuickRoomInput()">
+            </div>
+            <div class="sb-quick-field sb-quick-field--patient">
+              <label for="sb-quick-patient">환자명</label>
+              <input type="text" id="sb-quick-patient" placeholder="김OO" autocomplete="off">
+            </div>
+            <div class="sb-quick-field sb-quick-field--doctor">
+              <label for="sb-quick-doctor">주치의</label>
+              <select id="sb-quick-doctor" onchange="onAttendingPhysicianSelectChange('quick')"></select>
             </div>
           </div>
-          <div class="sb-quick-field" id="sb-quick-time-end-wrap">
-            <label for="sb-quick-time-end">귀원</label>
-            <div class="sb-quick-time-row">
-              <input type="time" id="sb-quick-time-end" value="12:00">
-              <label class="sb-quick-undecided" title="귀원 시간 미정">
-                <input type="checkbox" id="sb-quick-time-end-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
+          <div class="sb-quick-row sb-quick-row--2">
+            <div class="sb-quick-field sb-quick-field--time">
+              <label for="sb-quick-time-start" id="sb-quick-time-start-label">출발</label>
+              <div class="sb-quick-time-row">
+                <input type="time" id="sb-quick-time-start" value="09:00">
+                <label class="sb-quick-undecided" title="출발 시간 미정">
+                  <input type="checkbox" id="sb-quick-time-start-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
+                </label>
+              </div>
+            </div>
+            <div class="sb-quick-field sb-quick-field--time" id="sb-quick-time-end-wrap">
+              <label for="sb-quick-time-end">귀원</label>
+              <div class="sb-quick-time-row">
+                <input type="time" id="sb-quick-time-end" value="12:00">
+                <label class="sb-quick-undecided" title="귀원 시간 미정">
+                  <input type="checkbox" id="sb-quick-time-end-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
+                </label>
+              </div>
+            </div>
+            <div class="sb-quick-field sb-quick-field--detail">
+              <label for="sb-quick-detail">목적</label>
+              <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI" autocomplete="off">
+            </div>
+            <div class="sb-quick-field sb-quick-field--meals">
+              <label>식사 취소</label>
+              <div class="sb-quick-meal-row">
+                <label class="sb-quick-undecided" title="아침 식사 취소">
+                  <input type="checkbox" id="sb-quick-meal-breakfast">아침
+                </label>
+                <label class="sb-quick-undecided" title="점심 식사 취소">
+                  <input type="checkbox" id="sb-quick-meal-lunch">점심
+                </label>
+                <label class="sb-quick-undecided" title="저녁 식사 취소">
+                  <input type="checkbox" id="sb-quick-meal-dinner">저녁
+                </label>
+              </div>
+            </div>
+            <div class="sb-quick-field sb-quick-field--guardian" id="sb-quick-guardian-wrap" style="display:none;">
+              <label>동행</label>
+              <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진하는 경우">
+                <input type="checkbox" id="sb-quick-guardian-only">보호자만
               </label>
             </div>
-          </div>
-          <div class="sb-quick-field sb-quick-field--detail">
-            <label for="sb-quick-detail">목적</label>
-            <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI" autocomplete="off">
-          </div>
-          <div class="sb-quick-field sb-quick-field--meals">
-            <label>식사 취소</label>
-            <div class="sb-quick-meal-row">
-              <label class="sb-quick-undecided" title="아침 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-breakfast">아침
-              </label>
-              <label class="sb-quick-undecided" title="점심 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-lunch">점심
-              </label>
-              <label class="sb-quick-undecided" title="저녁 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-dinner">저녁
-              </label>
+            <div class="sb-quick-field sb-quick-field--actions">
+              <label aria-hidden="true">&nbsp;</label>
+              <button type="button" class="sb-quick-save-btn" id="sb-quick-save-btn" onclick="saveScheduleBoardQuickAdd()">등록</button>
+              <button type="button" class="sb-quick-cancel-edit-btn" id="sb-quick-cancel-edit" style="display:none;" onclick="cancelScheduleBoardQuickEdit()">취소</button>
             </div>
-          </div>
-          <div class="sb-quick-field sb-quick-field--guardian" id="sb-quick-guardian-wrap" style="display:none;">
-            <label>동행</label>
-            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진하는 경우">
-              <input type="checkbox" id="sb-quick-guardian-only">보호자만
-            </label>
-          </div>
-          <div class="sb-quick-field sb-quick-field--actions">
-            <label aria-hidden="true">&nbsp;</label>
-            <button type="button" class="sb-quick-save-btn" id="sb-quick-save-btn" onclick="saveScheduleBoardQuickAdd()">등록</button>
-            <button type="button" class="sb-quick-cancel-edit-btn" id="sb-quick-cancel-edit" style="display:none;" onclick="cancelScheduleBoardQuickEdit()">취소</button>
           </div>
           <div class="sb-quick-field sb-quick-field--remark">
             <label for="sb-quick-remark">비고</label>
