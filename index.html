@@ -1311,10 +1311,11 @@
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) 110px 92px auto;
+      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) minmax(108px, 130px) 92px auto;
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
     }
+    .schedule-board-col-head > span { min-width: 0; }
     .schedule-board-col-head.sb-referral-head {
       grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
       position: sticky; top: 0; z-index: 2; background: #eef2f7; padding-top: 10px; padding-bottom: 8px;
@@ -1324,9 +1325,10 @@
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) 110px 92px auto;
+      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) minmax(108px, 130px) 92px auto;
       align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #f1f5f9; font-size: 13.5px;
     }
+    .schedule-board-row > * { min-width: 0; }
     .schedule-board-row.sb-referral-row {
       grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
       font-size: 13.5px; padding: 12px 14px;
@@ -1422,6 +1424,7 @@
     .schedule-board-meals {
       display: flex; flex-wrap: wrap; gap: 3px; align-items: center; min-width: 0;
       font-size: 11.5px; font-weight: 700; line-height: 1.25;
+      max-width: 100%; overflow: hidden;
     }
     .schedule-board-meals .sb-meal-chip {
       display: inline-block; padding: 2px 7px; border-radius: 999px;
@@ -12013,35 +12016,35 @@
             const wardLbl = scheduleBoardWardShortLabel(norm) || '-';
             const startT = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '-');
             const endT = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-');
-            row.innerHTML = `
-              <span class="schedule-board-ward-col">${escapeHtml(wardLbl)}</span>
-              <span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>
-              <span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>
-              ${badge}
-              <span class="schedule-board-detail">${escapeHtml(detail || '')}</span>
-              <span class="schedule-board-time-cell">${escapeHtml(startT)}</span>
-              <span class="schedule-board-time-cell">${escapeHtml(endT)}</span>
-              <span class="schedule-board-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>
-              <div class="schedule-board-row-btns">${manageHtml}</div>
-              ${modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''}
-            `;
+            row.innerHTML = [
+              `<span class="schedule-board-ward-col">${escapeHtml(wardLbl)}</span>`,
+              `<span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>`,
+              `<span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>`,
+              badge,
+              `<span class="schedule-board-detail">${escapeHtml(detail || '')}</span>`,
+              `<span class="schedule-board-time-cell">${escapeHtml(startT)}</span>`,
+              `<span class="schedule-board-time-cell">${escapeHtml(endT)}</span>`,
+              `<span class="schedule-board-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
+              `<div class="schedule-board-row-btns">${manageHtml}</div>`,
+              modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''
+            ].join('');
           } else {
             const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
             const endLabel = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
             const timeHtml = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch))
               ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
               : `<span>${escapeHtml(startLabel)}</span>`;
-            row.innerHTML = `
-              <span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>
-              <span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>
-              ${attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>'}
-              ${badge}
-              <span class="schedule-board-detail">${escapeHtml(detail || '')}</span>
-              ${scheduleBoardMealCellHtml(sch)}
-              <div class="schedule-board-times">${timeHtml}</div>
-              <div class="schedule-board-row-btns">${manageHtml}</div>
-              ${modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''}
-            `;
+            row.innerHTML = [
+              `<span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>`,
+              `<span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>`,
+              attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>',
+              badge,
+              `<span class="schedule-board-detail">${escapeHtml(detail || '')}</span>`,
+              scheduleBoardMealCellHtml(sch),
+              `<div class="schedule-board-times">${timeHtml}</div>`,
+              `<div class="schedule-board-row-btns">${manageHtml}</div>`,
+              modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''
+            ].join('');
           }
           row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
           row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
