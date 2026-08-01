@@ -2411,7 +2411,7 @@ function notifyUserList() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const combinedList = dedupeUsersByPersonIdentity(
     Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
-  ).filter((u) => !u.isMe);
+  );
   safeWebContentsSend('user-list-update', combinedList);
 }
 

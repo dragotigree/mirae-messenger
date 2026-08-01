@@ -5452,10 +5452,12 @@
     }
 
     function formatDmListDisplayName(u) {
-      const starMark = favoriteIps.has(u.ip) ? '⭐ ' : '';
+      const starMark = favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip)) ? '⭐ ' : '';
+      const meMark = u.isMe ? ' <span style="color:var(--accent); font-size:11px; font-weight:700;">(나)</span>' : '';
       const base = `${starMark}${profileDisplayName(u)}`.trim();
       const emoji = getChannelTitleEmoji(`DM:${u.ip}`);
-      return emoji ? `${emoji} ${base}` : base;
+      const named = emoji ? `${emoji} ${base}` : base;
+      return `${named}${meMark}`;
     }
 
     function refreshAllTitleDisplays() {
