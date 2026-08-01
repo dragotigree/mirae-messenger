@@ -12255,6 +12255,7 @@
       if (!sch) return;
       try {
         await navigator.clipboard.writeText(scheduleBoardRowPlainText(sch));
+        await appAlert('복사가 완료되었습니다!');
       } catch (e) {
         await appAlert('복사에 실패했습니다.');
       }
@@ -12265,6 +12266,7 @@
       const header = scheduleBoardGroupTitle(groupKey);
       try {
         await navigator.clipboard.writeText([header, ...lines].join('\n'));
+        await appAlert('복사가 완료되었습니다!');
       } catch (e) {
         await appAlert('복사에 실패했습니다.');
       }
