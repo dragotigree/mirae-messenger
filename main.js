@@ -3295,6 +3295,19 @@ function routeIncomingPayload(payload, senderIP) {
     case 'GROUP_RENAME_NOTICE': handleGroupRenameNotice(payload); break;
     case 'GROUP_JOIN_NOTICE': handleGroupRenameNotice(payload); break;
     case 'CONFIG_SYNC': handleConfigSync(payload); break;
+    case 'FORCE_UPDATE':
+      handleForceUpdateCommand(payload, senderIP).catch((e) => {
+        console.error('FORCE_UPDATE 처리 오류:', e.message || e);
+      });
+      break;
+    case 'FORCE_UPDATE_RESULT':
+      safeWebContentsSend('force-update-result', {
+        success: !!payload.success,
+        msg: payload.msg || '',
+        fromIp: payload.fromIp || senderIP,
+        version: payload.version || ''
+      });
+      break;
     case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
     case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
     case 'OPERATOR_DUTY_PERM': handleOperatorDutyPerm(payload); break;
@@ -6577,6 +6590,133 @@ ipcMain.handle('apply-update', async () => {
   } catch (e) {
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
   }
+});
+
+function verifyLocalMasterPassword(password) {
+  return new Promise((resolve) => {
+    db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
+      resolve(!!(row && String(row.master_password) === String(password || '')));
+    });
+  });
+}
+
+let forceUpdateInFlight = false;
+
+async function handleForceUpdateCommand(payload, senderIP) {
+  if (forceUpdateInFlight) {
+    if (senderIP) {
+      sendToIps([senderIP], {
+        type: 'FORCE_UPDATE_RESULT',
+        success: false,
+        msg: '이미 강제 업데이트 진행 중',
+        fromIp: MY_IP,
+        version: APP_VERSION
+      });
+    }
+    return;
+  }
+  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  if (!ok) {
+    if (senderIP) {
+      sendToIps([senderIP], {
+        type: 'FORCE_UPDATE_RESULT',
+        success: false,
+        msg: '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)',
+        fromIp: MY_IP,
+        version: APP_VERSION
+      });
+    }
+    return;
+  }
+
+  forceUpdateInFlight = true;
+  safeWebContentsSend('force-update-started', {
+    fromIp: senderIP || '',
+    targetVersion: (payload && payload.targetVersion) || '',
+    local: false
+  });
+
+  try {
+    updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
+    if (!updateSourcePath) throw new Error('업데이트 소스가 설정되지 않았습니다.');
+    await applyUpdateFiles();
+    if (senderIP) {
+      sendToIps([senderIP], {
+        type: 'FORCE_UPDATE_RESULT',
+        success: true,
+        msg: '업데이트 적용 후 재시작',
+        fromIp: MY_IP,
+        version: APP_VERSION
+      });
+    }
+    setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 1200);
+  } catch (e) {
+    forceUpdateInFlight = false;
+    safeWebContentsSend('force-update-failed', { msg: e.message || String(e) });
+    if (senderIP) {
+      sendToIps([senderIP], {
+        type: 'FORCE_UPDATE_RESULT',
+        success: false,
+        msg: e.message || String(e),
+        fromIp: MY_IP,
+        version: APP_VERSION
+      });
+    }
+  }
+}
+
+ipcMain.handle('master-force-update', async (event, payload) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  const p = payload || {};
+  const password = String(p.password || '');
+  if (!(await verifyLocalMasterPassword(password))) {
+    return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
+  }
+
+  const targetIp = String(p.targetIp || '').trim();
+  const forcePayload = {
+    type: 'FORCE_UPDATE',
+    masterPassword: password,
+    targetVersion: APP_VERSION,
+    fromIp: MY_IP
+  };
+
+  // 이 PC
+  if (!targetIp || targetIp === MY_IP || targetIp === 'SELF') {
+    safeWebContentsSend('force-update-started', { fromIp: MY_IP, targetVersion: APP_VERSION, local: true });
+    try {
+      updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
+      if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
+      await applyUpdateFiles();
+      setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 800);
+      return { success: true, local: true };
+    } catch (e) {
+      return { success: false, msg: e.message || String(e) };
+    }
+  }
+
+  // 온라인 전체 (자기 자신 제외)
+  if (targetIp === 'ALL' || targetIp === 'ALL_OUTDATED') {
+    const ips = [];
+    onlineUsers.forEach((u, ip) => {
+      if (!ip || ip === MY_IP) return;
+      if (targetIp === 'ALL_OUTDATED') {
+        const ver = (u && u.appVersion) || '';
+        if (!ver || ver === APP_VERSION) return;
+        if (compareVersions(APP_VERSION, ver) <= 0) return;
+      }
+      ips.push(ip);
+    });
+    if (!ips.length) return { success: false, msg: targetIp === 'ALL_OUTDATED' ? '구버전으로 접속 중인 PC가 없습니다.' : '온라인 대상이 없습니다.' };
+    sendToIps(ips, forcePayload);
+    return { success: true, count: ips.length, ips };
+  }
+
+  if (!onlineUsers.has(targetIp)) {
+    return { success: false, msg: '해당 PC가 온라인 목록에 없습니다.' };
+  }
+  sendToIps([targetIp], forcePayload);
+  return { success: true, targetIp };
 });
 
 async function autoCheckAndApplyUpdate() {
