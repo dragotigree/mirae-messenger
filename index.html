@@ -1097,16 +1097,18 @@
     .group-member-status.is-offline { color: #94a3b8; }
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
     .sidebar-cal-header {
-      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+      display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+      gap: 8px; flex-shrink: 0; min-width: 0;
     }
     .sidebar-cal-header .sidebar-section-title {
-      margin: 0; gap: 8px; min-width: 0;
+      margin: 0; gap: 8px; min-width: 0; flex: 1;
     }
     .sidebar-cal-header .sidebar-section-title > span {
       flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .sidebar-cal-actions {
-      display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+      display: flex; flex-wrap: nowrap; gap: 4px; align-items: center;
+      flex-shrink: 0; margin-left: auto;
     }
     .sidebar-cal-actions button {
       flex: 0 0 auto; white-space: nowrap; line-height: 1.2;
@@ -1120,7 +1122,7 @@
       background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;
     }
     .sidebar-cal-actions #add-sch-btn {
-      display: none; background: var(--accent); color: #fff; border: none; font-size: 11px;
+      display: inline-flex; background: var(--accent); color: #fff; border: none; font-size: 11px;
     }
     .schedule-box { background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%); border: 1px solid #bae6fd; padding: 10px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-xs); min-height: 0; }
     .sidebar-calendar-day {
@@ -2466,7 +2468,7 @@
       <div class="sidebar-cal-actions">
         <button type="button" id="sidebar-cal-refresh-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
         <button type="button" id="sidebar-cal-board-btn" onclick="openScheduleBoardModal()">📋 현황판</button>
-        <button type="button" id="add-sch-btn" style="display:none;" onclick="openDutyRosterModal()" title="주치의 OFF · 당직의 등록">일정등록</button>
+        <button type="button" id="add-sch-btn" onclick="openDutyRosterModal()" title="주치의 OFF · 당직의 등록">일정등록</button>
       </div>
     </div>
 
@@ -4632,7 +4634,7 @@
     function refreshNoticePermission() {
       canManageNotices = isMasterAuthenticated || isNoticeOperatorAuthenticated;
       const addSchBtn = document.getElementById('add-sch-btn');
-      if (addSchBtn) addSchBtn.style.display = canManageDutyRoster() ? 'inline-flex' : 'none';
+      if (addSchBtn) addSchBtn.style.display = 'inline-flex';
       refreshScheduleBoardEntryUi();
       renderSchedules();
     }
@@ -8623,6 +8625,7 @@
       focusModalInput('#operator-login-id');
     }
     function closeOperatorLoginModal() {
+      pendingOpenDutyRosterAfterLogin = false;
       document.getElementById('operator-login-modal').style.display = 'none';
       if (!document.body.classList.contains('schedule-board-standalone')) {
         setModalOpenState(false);
@@ -8635,6 +8638,8 @@
       if (!username || !password) { await appAlert('아이디와 비밀번호를 입력해 주세요.'); return; }
       const res = await window.api.noticeOperatorLogin({ username, password });
       if (res.success) {
+        const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
+        pendingOpenDutyRosterAfterLogin = false;
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
         noticeOperatorCanManageDuty = !!res.canManageDuty;
@@ -8643,6 +8648,13 @@
         refreshNoticePermission();
         updateBoardAuthStatusText();
         refreshScheduleBoardEntryUi();
+        if (shouldOpenDuty) {
+          if (canManageDutyRoster()) {
+            openDutyRosterModal();
+          } else {
+            await appAlert('로그인되었습니다. 다만 주치의 OFF·당직의 등록 권한이 없습니다.\n마스터에게 권한 부여를 요청해 주세요.');
+          }
+        }
       } else {
         await appAlert(res.msg || '로그인에 실패했습니다.');
         return;
@@ -11126,11 +11138,15 @@
       renderSchedules();
     }
 
+    let pendingOpenDutyRosterAfterLogin = false;
+
     function openDutyRosterModal() {
       if (!canManageDutyRoster()) {
+        pendingOpenDutyRosterAfterLogin = true;
         openOperatorLoginModal();
         return;
       }
+      pendingOpenDutyRosterAfterLogin = false;
       const dateStr = selectedCalendarDateStr || formatDateStr(new Date());
       const label = document.getElementById('duty-roster-date-label');
       if (label) label.textContent = dateStr;
@@ -13737,7 +13753,7 @@
         isMasterAuthenticated = true;
         closeMasterAuthModal();
         updateMasterAuthUi();
-        document.getElementById('add-sch-btn').style.display = canManageDutyRoster() ? 'inline-flex' : 'none';
+        document.getElementById('add-sch-btn').style.display = 'inline-flex';
         renderSchedules();
         refreshNoticePermission();
         openMasterAdminModal();
@@ -13753,7 +13769,7 @@
       if (window.api.clearMasterSession) await window.api.clearMasterSession();
       closeMasterAdminModal();
       updateMasterAuthUi();
-      document.getElementById('add-sch-btn').style.display = canManageDutyRoster() ? 'inline-flex' : 'none';
+      document.getElementById('add-sch-btn').style.display = 'inline-flex';
       refreshNoticePermission();
       await appAlert('마스터 계정에서 로그아웃 되었습니다.');
       return;
