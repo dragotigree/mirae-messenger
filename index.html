@@ -11901,12 +11901,24 @@
       return sortScheduleBoardDoctorNames([...new Set([...fixed, ...fromList, '미지정'])]);
     }
 
+    function scheduleBoardDoctorChipLabel(doctorKey) {
+      if (!doctorKey || doctorKey === 'all') return '전체';
+      if (doctorKey === '미지정') return '미지정';
+      const opt = ATTENDING_PHYSICIAN_OPTIONS.find((o) => o.value === doctorKey);
+      if (opt) return opt.rm;
+      const rmM = String(doctorKey).match(/RM\s*\d+/i);
+      if (rmM) return rmM[0].replace(/\s/g, '').toUpperCase();
+      return doctorKey;
+    }
+
     function renderScheduleBoardDoctorChips(docs) {
       const host = document.getElementById('schedule-board-doctor-chips');
       if (!host) return;
-      const chips = [{ key: 'all', label: '전체' }].concat(docs.map((d) => ({ key: d, label: d })));
+      const chips = [{ key: 'all', label: '전체' }].concat(
+        docs.map((d) => ({ key: d, label: scheduleBoardDoctorChipLabel(d) }))
+      );
       host.innerHTML = chips.map((c) =>
-        `<button type="button" class="schedule-board-chip${c.key === scheduleBoardDoctorFilter ? ' active' : ''}" data-doctor="${escapeMsgUidAttr(c.key)}">${escapeHtml(c.label)}</button>`
+        `<button type="button" class="schedule-board-chip${c.key === scheduleBoardDoctorFilter ? ' active' : ''}" data-doctor="${escapeMsgUidAttr(c.key)}" title="${escapeHtml(c.key === 'all' ? '전체' : c.key)}">${escapeHtml(c.label)}</button>`
       ).join('');
       host.querySelectorAll('.schedule-board-chip[data-doctor]').forEach((btn) => {
         btn.addEventListener('click', () => setScheduleBoardDoctorFilter(btn.getAttribute('data-doctor')));
