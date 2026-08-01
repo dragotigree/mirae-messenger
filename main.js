@@ -1116,6 +1116,21 @@ function compactMessageRowById(rowId, msgUid, messageHtml) {
   }
 }
 
+/** 메시지 큐/채널용 가상 receiver 키 — 실제 사용자 IP가 아님 */
+function isSyntheticReceiverKey(ip) {
+  const s = String(ip || '').trim();
+  if (!s) return true;
+  if (s === 'BROADCAST') return true;
+  return (
+    s.startsWith('BCAST:') ||
+    s.startsWith('DEPT:') ||
+    s.startsWith('FLOOR:') ||
+    s.startsWith('GROUP:') ||
+    s.startsWith('DEPTPEER:') ||
+    s.startsWith('FLOORPEER:')
+  );
+}
+
 function encodeDeptPeerKey(ip, dept) {
   return `DEPTPEER:${ip}|${String(dept || '')}`;
 }
@@ -1687,6 +1702,12 @@ db.serialize(() => {
   )`, logDbErr);
   db.run(`ALTER TABLE known_users ADD COLUMN photo TEXT`, () => {});
   db.run(`ALTER TABLE known_users ADD COLUMN last_seen_at INTEGER`, () => {});
+  // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
+  db.run(
+    `DELETE FROM known_users WHERE ip LIKE 'BCAST:%' OR ip LIKE 'DEPTPEER:%' OR ip LIKE 'FLOORPEER:%'
+      OR ip LIKE 'DEPT:%' OR ip LIKE 'FLOOR:%' OR ip LIKE 'GROUP:%' OR ip = 'BROADCAST'`,
+    logDbErr
+  );
   db.run(`CREATE TABLE IF NOT EXISTS user_profile_overrides (
     ip TEXT PRIMARY KEY,
     username TEXT DEFAULT '',
@@ -1698,7 +1719,10 @@ db.serialize(() => {
     updated_at TEXT
   )`, logDbErr);
   db.all(`SELECT ip, photo FROM known_users WHERE photo IS NOT NULL AND photo != ''`, [], (err, rows) => {
-    if (!err && rows) rows.forEach(r => { persistedPhotos[r.ip] = r.photo; });
+    if (!err && rows) rows.forEach(r => {
+      if (isSyntheticReceiverKey(r.ip)) return;
+      persistedPhotos[r.ip] = r.photo;
+    });
   });
 
   db.run(`CREATE TABLE IF NOT EXISTS notices (
@@ -2656,6 +2680,7 @@ function userObjFromKnownUsersRow(row) {
 
 function persistKnownUserSnapshot(u) {
   if (!u || !u.ip) return;
+  if (isSyntheticReceiverKey(u.ip)) return;
   db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
     if (err) logDbErr(err);
     const existing = row ? userObjFromKnownUsersRow(row) : null;
@@ -2711,6 +2736,7 @@ function loadPersistedKnownUsers(callback) {
       }
       (rows || []).forEach((row) => {
         if (!row || !row.ip || row.ip === MY_IP) return;
+        if (isSyntheticReceiverKey(row.ip)) return;
         const fromDb = userObjFromKnownUsersRow(row);
         const live = allKnownUsers.get(row.ip);
         if (live && onlineUsers.has(row.ip)) return;
@@ -2737,11 +2763,13 @@ function supplementKnownUsersFromMessagePeers(callback) {
          SELECT sender_ip AS ip, strftime('%s', created_at) AS last_ts FROM messages
          WHERE sender_ip != ? AND sender_ip != 'BROADCAST'
            AND sender_ip NOT LIKE 'DEPT:%' AND sender_ip NOT LIKE 'FLOOR:%' AND sender_ip NOT LIKE 'GROUP:%'
+           AND sender_ip NOT LIKE 'BCAST:%' AND sender_ip NOT LIKE 'DEPTPEER:%' AND sender_ip NOT LIKE 'FLOORPEER:%'
            AND datetime(created_at) >= datetime('now', '-180 days')
          UNION ALL
          SELECT receiver_ip AS ip, strftime('%s', created_at) AS last_ts FROM messages
          WHERE receiver_ip != ? AND receiver_ip != 'BROADCAST'
            AND receiver_ip NOT LIKE 'DEPT:%' AND receiver_ip NOT LIKE 'FLOOR:%' AND receiver_ip NOT LIKE 'GROUP:%'
+           AND receiver_ip NOT LIKE 'BCAST:%' AND receiver_ip NOT LIKE 'DEPTPEER:%' AND receiver_ip NOT LIKE 'FLOORPEER:%'
            AND datetime(created_at) >= datetime('now', '-180 days')
        ) GROUP BY ip
      ) m`,
@@ -2754,6 +2782,7 @@ function supplementKnownUsersFromMessagePeers(callback) {
       }
       (rows || []).forEach((row) => {
         if (!row || !row.ip || row.ip === MY_IP) return;
+        if (isSyntheticReceiverKey(row.ip) || !looksLikeIpv4(row.ip)) return;
         const msgLastSeen = row.last_ts ? Math.floor(Number(row.last_ts) * 1000) : 0;
         const lastSeen = msgLastSeen > 0 ? msgLastSeen : 0;
         const displayName = String(row.sender_name || '').trim();
@@ -2824,6 +2853,7 @@ function repairKnownUsersProfiles(callback) {
       try { members = JSON.parse(row.members || '[]'); } catch (e) {}
       members.forEach((m) => {
         if (!m || !m.ip || m.ip === MY_IP) return;
+        if (isSyntheticReceiverKey(m.ip) || !looksLikeIpv4(m.ip)) return;
         const snap = {
           ip: m.ip,
           username: m.username || '',
@@ -2843,7 +2873,7 @@ function repairKnownUsersProfiles(callback) {
         if (callback) callback();
         return;
       }
-      const list = rows || [];
+      const list = (rows || []).filter((r) => r && r.ip && !isSyntheticReceiverKey(r.ip));
       if (!list.length) {
         if (callback) callback();
         return;
@@ -2900,7 +2930,7 @@ function repairKnownUsersFromMessages(callback) {
       if (callback) callback();
       return;
     }
-    const targets = (rows || []).filter((r) => r && r.ip && looksLikeIpv4(r.username));
+    const targets = (rows || []).filter((r) => r && r.ip && !isSyntheticReceiverKey(r.ip) && looksLikeIpv4(r.username));
     if (!targets.length) {
       repairKnownUsersProfiles(callback);
       return;
@@ -3033,7 +3063,9 @@ function notifyUserList(force) {
     notifyUserListForce = false;
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const combinedList = dedupeUsersByPersonIdentity(
-      Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
+      Array.from(allKnownUsers.values())
+        .filter((u) => u && u.ip && !isSyntheticReceiverKey(u.ip))
+        .map(userListEntryForRenderer)
     );
     safeWebContentsSend('user-list-update', combinedList);
     if (forced) { /* keep API compatible */ }
@@ -3048,7 +3080,9 @@ function notifyUserListNow() {
   notifyUserListForce = false;
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const combinedList = dedupeUsersByPersonIdentity(
-    Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
+    Array.from(allKnownUsers.values())
+      .filter((u) => u && u.ip && !isSyntheticReceiverKey(u.ip))
+      .map(userListEntryForRenderer)
   );
   safeWebContentsSend('user-list-update', combinedList);
 }
@@ -3491,21 +3525,27 @@ function getAudienceIpsForChannel(channelKey) {
     }
     if (channelKey === 'BROADCAST') {
       const ips = [];
-      allKnownUsers.forEach((u, ip) => { if (ip !== MY_IP) ips.push(ip); });
+      allKnownUsers.forEach((u, ip) => {
+        if (ip !== MY_IP && !isSyntheticReceiverKey(ip) && looksLikeIpv4(ip)) ips.push(ip);
+      });
       resolve(ips);
       return;
     }
     if (channelKey.startsWith('DEPT:')) {
       const dept = channelKey.slice(5);
       const ips = [];
-      allKnownUsers.forEach((u, ip) => { if (ip !== MY_IP && u.dept === dept) ips.push(ip); });
+      allKnownUsers.forEach((u, ip) => {
+        if (ip !== MY_IP && !isSyntheticReceiverKey(ip) && looksLikeIpv4(ip) && u.dept === dept) ips.push(ip);
+      });
       resolve(ips);
       return;
     }
     if (channelKey.startsWith('FLOOR:')) {
       const floor = channelKey.slice(6);
       const ips = [];
-      allKnownUsers.forEach((u, ip) => { if (ip !== MY_IP && u.floor === floor) ips.push(ip); });
+      allKnownUsers.forEach((u, ip) => {
+        if (ip !== MY_IP && !isSyntheticReceiverKey(ip) && looksLikeIpv4(ip) && u.floor === floor) ips.push(ip);
+      });
       resolve(ips);
       return;
     }
@@ -4311,6 +4351,7 @@ ipcMain.handle('send-broadcast-message', async (event, message) => {
   broadcastToOnlinePeers({ type: 'BROADCAST', sender: myProfile.username, message, msgUid });
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
+    if (isSyntheticReceiverKey(ip) || !looksLikeIpv4(ip)) return;
     if (onlineUsers.has(ip)) return;
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
@@ -4369,6 +4410,7 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
   // 오프라인 동료: 전체공지와 같이 PENDING 큐 (켜지면 재전송)
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
+    if (isSyntheticReceiverKey(ip) || !looksLikeIpv4(ip)) return;
     if ((u.dept || '') !== dept) return;
     if (onlineUsers.has(ip)) return;
     enqueuePendingPeerMessage(encodeDeptPeerKey(ip, dept), message, msgUid);
@@ -4423,6 +4465,7 @@ ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
   });
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
+    if (isSyntheticReceiverKey(ip) || !looksLikeIpv4(ip)) return;
     if ((u.floor || '') !== floor) return;
     if (onlineUsers.has(ip)) return;
     enqueuePendingPeerMessage(encodeFloorPeerKey(ip, floor), message, msgUid);
