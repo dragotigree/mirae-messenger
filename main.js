@@ -652,7 +652,7 @@ function getReceivedFilesDir() {
 
 // 💬 채팅 메시지 안에 첨부된 이미지/파일(base64 data URL)을 찾아서 실제 파일로 저장한다.
 // compact=true 이면 DB 저장용으로 data URL을 mirae-file:// 로 바꿔 용량을 줄인다.
-// (재전송이 필요할 수 있는 PENDING/SENT 행에는 compact 하지 말 것 — wire에는 원본 data URL 유지)
+// 재전송 시에는 expandMiraeFileUrlsToDataUrls()로 파일에서 다시 data URL을 만든다.
 function extractAndSaveAttachments(messageHtml, options) {
   const opts = options || {};
   const compact = !!opts.compact;
@@ -662,6 +662,7 @@ function extractAndSaveAttachments(messageHtml, options) {
   const regex = /((?:src|href)=")(data:([^;]+);base64,([^"]+))(")/gi;
   const replacements = [];
   let match;
+  let fileIndex = 0;
   while ((match = regex.exec(messageHtml)) !== null) {
     const full = match[0];
     const prefix = match[1];
@@ -681,7 +682,9 @@ function extractAndSaveAttachments(messageHtml, options) {
       const safeName = sanitizeFileName(fileName);
       const finalName = safeName.includes('.') ? safeName : `${safeName}.${ext}`;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const storedName = `${timestamp}_${finalName}`;
+      const uidPart = opts.msgUid ? `${sanitizeFileName(String(opts.msgUid).slice(0, 40))}_` : '';
+      const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
+      fileIndex += 1;
       const filePath = path.join(dir, storedName);
       fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
       if (compact) {
@@ -700,8 +703,37 @@ function extractAndSaveAttachments(messageHtml, options) {
   return out;
 }
 
-function compactStoredMessageHtml(messageHtml) {
-  return extractAndSaveAttachments(messageHtml, { compact: true });
+function compactStoredMessageHtml(messageHtml, msgUid) {
+  return extractAndSaveAttachments(messageHtml, { compact: true, msgUid: msgUid || '' });
+}
+
+/** 재전송용: mirae-file:// → data URL (파일이 없으면 원문 유지) */
+function expandMiraeFileUrlsToDataUrls(messageHtml) {
+  if (typeof messageHtml !== 'string' || messageHtml.indexOf('mirae-file://') === -1) return messageHtml;
+  const dir = getReceivedFilesDir();
+  return messageHtml.replace(/((?:src|href)=")mirae-file:\/\/([^"]+)(")/gi, (full, prefix, encName, suffix) => {
+    try {
+      const name = path.basename(decodeURIComponent(encName.split(/[?#]/)[0]));
+      const filePath = path.join(dir, name);
+      if (!fs.existsSync(filePath)) return full;
+      const buf = fs.readFileSync(filePath);
+      const ext = (path.extname(name) || '').replace('.', '').toLowerCase() || 'bin';
+      const mime =
+        ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+          : ext === 'png' ? 'image/png'
+            : ext === 'gif' ? 'image/gif'
+              : ext === 'webp' ? 'image/webp'
+                : ext === 'pdf' ? 'application/pdf'
+                  : 'application/octet-stream';
+      return `${prefix}data:${mime};base64,${buf.toString('base64')}${suffix}`;
+    } catch (e) {
+      return full;
+    }
+  });
+}
+
+function messageHtmlForWire(messageHtml) {
+  return expandMiraeFileUrlsToDataUrls(messageHtml);
 }
 
 function maybeCompactMessageRowByUid(msgUid) {
@@ -714,12 +746,47 @@ function maybeCompactMessageRowByUid(msgUid) {
       if (err || !row || !row.message) return;
       if (row.status === 'PENDING') return;
       if (typeof row.message !== 'string' || row.message.indexOf('data:') === -1) return;
-      const compacted = compactStoredMessageHtml(row.message);
+      const compacted = compactStoredMessageHtml(row.message, uid);
       if (compacted && compacted !== row.message) {
         db.run(`UPDATE messages SET message = ? WHERE id = ?`, [compacted, row.id], logDbErr);
       }
     }
   );
+}
+
+function compactMessageRowById(rowId, msgUid, messageHtml) {
+  if (!rowId || typeof messageHtml !== 'string' || messageHtml.indexOf('data:') === -1) return;
+  try {
+    const compacted = compactStoredMessageHtml(messageHtml, msgUid);
+    if (compacted && compacted !== messageHtml) {
+      db.run(`UPDATE messages SET message = ? WHERE id = ?`, [compacted, rowId], logDbErr);
+    }
+  } catch (e) {
+    console.error('메시지 compact 오류:', e.message);
+  }
+}
+
+function encodeDeptPeerKey(ip, dept) {
+  return `DEPTPEER:${ip}|${String(dept || '')}`;
+}
+function encodeFloorPeerKey(ip, floor) {
+  return `FLOORPEER:${ip}|${String(floor || '')}`;
+}
+function parseDeptPeerKey(key) {
+  const s = String(key || '');
+  if (!s.startsWith('DEPTPEER:')) return null;
+  const rest = s.slice('DEPTPEER:'.length);
+  const idx = rest.indexOf('|');
+  if (idx < 0) return { ip: rest, dept: '' };
+  return { ip: rest.slice(0, idx), dept: rest.slice(idx + 1) };
+}
+function parseFloorPeerKey(key) {
+  const s = String(key || '');
+  if (!s.startsWith('FLOORPEER:')) return null;
+  const rest = s.slice('FLOORPEER:'.length);
+  const idx = rest.indexOf('|');
+  if (idx < 0) return { ip: rest, floor: '' };
+  return { ip: rest.slice(0, idx), floor: rest.slice(idx + 1) };
 }
 
 function registerMiraeFileProtocol() {
@@ -3620,7 +3687,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
     };
 
     const startTcpSend = (localRowId) => {
-      extractAndSaveAttachments(message);
+      extractAndSaveAttachments(message, { msgUid });
       appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
 
       client.connect(TCP_PORT, targetIP, () => {
@@ -3629,6 +3696,8 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
           client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message, urgent: !!urgent, uid: msgUid }) + '\n');
           client.end();
           armDmReadReceiptNotify(targetIP);
+          // wire는 원본 전송. DB는 바로 compact 가능(재전송 시 파일→data 복원)
+          compactMessageRowById(localRowId, msgUid, message);
           finish({ status: 'SENT', createdAt, uid: msgUid, id: localRowId });
         } catch (writeErr) {
           console.error('DM write 오류:', writeErr.message);
@@ -3707,6 +3776,7 @@ ipcMain.handle('send-broadcast-message', async (event, message) => {
       function (err) {
         logDbErr(err);
         appendChatLog('BROADCAST', '전체공지', myProfile.username, message);
+        if (!err) compactMessageRowById(this.lastID, msgUid, message);
         resolve({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
       }
     );
@@ -3726,6 +3796,17 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
     client.on('error', () => {});
     client.on('timeout', () => client.destroy());
   });
+  // 오프라인 동료: 전체공지와 같이 PENDING 큐 (켜지면 재전송)
+  allKnownUsers.forEach((u, ip) => {
+    if (ip === MY_IP) return;
+    if ((u.dept || '') !== dept) return;
+    if (onlineUsers.has(ip)) return;
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+      [senderLabelForMe(), MY_IP, encodeDeptPeerKey(ip, dept), message, msgUid],
+      logDbErr
+    );
+  });
   return new Promise((resolve) => {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
@@ -3733,6 +3814,7 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
       function (err) {
         logDbErr(err);
         appendChatLog(`DEPT:${dept}`, `부서_${dept}`, myProfile.username, message);
+        if (!err) compactMessageRowById(this.lastID, msgUid, message);
         resolve({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
       }
     );
@@ -3752,6 +3834,16 @@ ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
     client.on('error', () => {});
     client.on('timeout', () => client.destroy());
   });
+  allKnownUsers.forEach((u, ip) => {
+    if (ip === MY_IP) return;
+    if ((u.floor || '') !== floor) return;
+    if (onlineUsers.has(ip)) return;
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+      [senderLabelForMe(), MY_IP, encodeFloorPeerKey(ip, floor), message, msgUid],
+      logDbErr
+    );
+  });
   return new Promise((resolve) => {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
@@ -3759,6 +3851,7 @@ ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
       function (err) {
         logDbErr(err);
         appendChatLog(`FLOOR:${floor}`, `${floor}`, myProfile.username, message);
+        if (!err) compactMessageRowById(this.lastID, msgUid, message);
         resolve({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
       }
     );
@@ -4091,6 +4184,7 @@ function deliverPendingChatRow(row, targetIP) {
     sentAckRetryCount.set(String(row.msg_uid), tries + 1);
   }
 
+  const wireMessage = messageHtmlForWire(row.message);
   const client = new net.Socket();
   client.setTimeout(2500);
   const senderLogin = (myProfile && myProfile.username) ? myProfile.username : row.sender_name;
@@ -4098,7 +4192,7 @@ function deliverPendingChatRow(row, targetIP) {
     client.write(JSON.stringify({
       type: 'CHAT',
       sender: senderLogin,
-      message: row.message,
+      message: wireMessage,
       urgent: false,
       uid: row.msg_uid || undefined
     }) + '\n');
@@ -4119,17 +4213,85 @@ function deliverPendingBroadcastRow(row, targetIP) {
   const releaseInflight = () => pendingResendInflight.delete(inflightKey);
   setTimeout(releaseInflight, 15000);
 
+  const wireMessage = messageHtmlForWire(row.message);
   const client = new net.Socket();
   client.setTimeout(2500);
   client.connect(TCP_PORT, targetIP, () => {
     client.write(JSON.stringify({
       type: 'BROADCAST',
-      sender: row.sender_name,
-      message: row.message,
+      sender: myProfile.username || row.sender_name,
+      message: wireMessage,
       msgUid: row.msg_uid || undefined
     }) + '\n');
     client.end();
-    db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], logDbErr);
+    db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
+      logDbErr(err);
+      if (!err) compactMessageRowById(row.id, row.msg_uid, wireMessage);
+    });
+  });
+  client.on('error', releaseInflight);
+  client.on('timeout', () => {
+    client.destroy();
+    releaseInflight();
+  });
+}
+
+function deliverPendingDeptPeerRow(row, targetIP, dept) {
+  if (!row || !targetIP || !dept) return;
+  const inflightKey = row.msg_uid ? `dp:${row.msg_uid}:${targetIP}` : `dpid:${row.id}:${targetIP}`;
+  if (pendingResendInflight.has(inflightKey)) return;
+  pendingResendInflight.add(inflightKey);
+  const releaseInflight = () => pendingResendInflight.delete(inflightKey);
+  setTimeout(releaseInflight, 15000);
+
+  const wireMessage = messageHtmlForWire(row.message);
+  const client = new net.Socket();
+  client.setTimeout(2500);
+  client.connect(TCP_PORT, targetIP, () => {
+    client.write(JSON.stringify({
+      type: 'DEPT_MESSAGE',
+      dept,
+      sender: myProfile.username || row.sender_name,
+      message: wireMessage,
+      msgUid: row.msg_uid || undefined
+    }) + '\n');
+    client.end();
+    db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
+      logDbErr(err);
+      if (!err) compactMessageRowById(row.id, row.msg_uid, wireMessage);
+    });
+  });
+  client.on('error', releaseInflight);
+  client.on('timeout', () => {
+    client.destroy();
+    releaseInflight();
+  });
+}
+
+function deliverPendingFloorPeerRow(row, targetIP, floor) {
+  if (!row || !targetIP || !floor) return;
+  const inflightKey = row.msg_uid ? `fp:${row.msg_uid}:${targetIP}` : `fpid:${row.id}:${targetIP}`;
+  if (pendingResendInflight.has(inflightKey)) return;
+  pendingResendInflight.add(inflightKey);
+  const releaseInflight = () => pendingResendInflight.delete(inflightKey);
+  setTimeout(releaseInflight, 15000);
+
+  const wireMessage = messageHtmlForWire(row.message);
+  const client = new net.Socket();
+  client.setTimeout(2500);
+  client.connect(TCP_PORT, targetIP, () => {
+    client.write(JSON.stringify({
+      type: 'FLOOR_MESSAGE',
+      floor,
+      sender: myProfile.username || row.sender_name,
+      message: wireMessage,
+      msgUid: row.msg_uid || undefined
+    }) + '\n');
+    client.end();
+    db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
+      logDbErr(err);
+      if (!err) compactMessageRowById(row.id, row.msg_uid, wireMessage);
+    });
   });
   client.on('error', releaseInflight);
   client.on('timeout', () => {
@@ -4159,13 +4321,7 @@ function resendPendingMessages(targetIP) {
         logDbErr(err);
         return;
       }
-      (rows || []).forEach((row) => {
-        if (row.status === 'SENT' && row.message && String(row.message).indexOf('mirae-file://') !== -1) {
-          // compact 된 행은 wire 재전송 불가 — ACK만 기다리거나 스킵
-          return;
-        }
-        deliverPendingChatRow(row, targetIP);
-      });
+      (rows || []).forEach((row) => deliverPendingChatRow(row, targetIP));
     }
   );
 
@@ -4179,6 +4335,40 @@ function resendPendingMessages(targetIP) {
         return;
       }
       (rows || []).forEach((row) => deliverPendingBroadcastRow(row, targetIP));
+    }
+  );
+
+  db.all(
+    `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
+     WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
+     ORDER BY id ASC`,
+    [MY_IP, `DEPTPEER:${targetIP}|%`],
+    (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      (rows || []).forEach((row) => {
+        const parsed = parseDeptPeerKey(row.receiver_ip);
+        if (parsed && parsed.dept) deliverPendingDeptPeerRow(row, targetIP, parsed.dept);
+      });
+    }
+  );
+
+  db.all(
+    `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
+     WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
+     ORDER BY id ASC`,
+    [MY_IP, `FLOORPEER:${targetIP}|%`],
+    (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      (rows || []).forEach((row) => {
+        const parsed = parseFloorPeerKey(row.receiver_ip);
+        if (parsed && parsed.floor) deliverPendingFloorPeerRow(row, targetIP, parsed.floor);
+      });
     }
   );
 }
@@ -4198,6 +4388,8 @@ function flushAllPendingOutboundMessages() {
            AND receiver_ip NOT LIKE 'FLOOR:%'
            AND receiver_ip NOT LIKE 'GROUP:%'
            AND receiver_ip NOT LIKE 'BCAST:%'
+           AND receiver_ip NOT LIKE 'DEPTPEER:%'
+           AND receiver_ip NOT LIKE 'FLOORPEER:%'
            AND created_at <= datetime('now', '-8 seconds')
          )
        )
@@ -4217,6 +4409,16 @@ function flushAllPendingOutboundMessages() {
         if (key.startsWith('BCAST:')) {
           const peerIp = key.slice('BCAST:'.length);
           if (peerIp && onlineUsers.has(peerIp)) resendPendingMessages(peerIp);
+          return;
+        }
+        if (key.startsWith('DEPTPEER:')) {
+          const parsed = parseDeptPeerKey(key);
+          if (parsed && parsed.ip && onlineUsers.has(parsed.ip)) resendPendingMessages(parsed.ip);
+          return;
+        }
+        if (key.startsWith('FLOORPEER:')) {
+          const parsed = parseFloorPeerKey(key);
+          if (parsed && parsed.ip && onlineUsers.has(parsed.ip)) resendPendingMessages(parsed.ip);
           return;
         }
         if (onlineUsers.has(key)) resendPendingMessages(key);

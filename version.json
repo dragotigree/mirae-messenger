@@ -1,4 +1,4 @@
 {
-  "version": "1.0.256",
-  "notes": "속도·안정성: DM ACK 재전송, 채널 멱등, presence debounce, NOTICE_SYNC 청크, 첨부 compact, bind 재시도"
+  "version": "1.0.257",
+  "notes": "부서·층 오프라인 재전송, 사이드바 부분갱신, 첨부 compact 후 재전송 시 파일 복원"
 }

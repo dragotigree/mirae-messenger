@@ -4670,7 +4670,13 @@
 
     function isDirectMessagePeerKey(key) {
       if (!key || typeof key !== 'string') return false;
-      return key !== 'BROADCAST' && !key.startsWith('DEPT:') && !key.startsWith('FLOOR:') && !key.startsWith('GROUP:') && !key.startsWith('BCAST:');
+      return key !== 'BROADCAST'
+        && !key.startsWith('DEPT:')
+        && !key.startsWith('FLOOR:')
+        && !key.startsWith('GROUP:')
+        && !key.startsWith('BCAST:')
+        && !key.startsWith('DEPTPEER:')
+        && !key.startsWith('FLOORPEER:');
     }
 
     function bumpUnread(key) {
@@ -7379,10 +7385,100 @@
       return card;
     }
 
-    function renderUserListTree() {
+    let lastUserListStructureKey = '';
+
+    function buildUserListStructureKey(favorites, sortedGroupKeys, groups, groupingKey) {
+      const favIps = favorites.map((u) => u.ip).join(',');
+      const parts = sortedGroupKeys.map((g) => {
+        const collapseKey = `${groupingKey}:${g}`;
+        const ips = (groups[g] || []).map((u) => u.ip).join(',');
+        return `${g}|${collapsedGroups.has(collapseKey) ? 1 : 0}|${ips}`;
+      });
+      return [String(userFilterKeyword || ''), groupingKey, favIps, parts.join(';')].join('::');
+    }
+
+    function patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey) {
+      const treeEl = document.getElementById('user-list-tree');
+      if (!treeEl || !treeEl.querySelector('.user-card-item[data-user-ip]')) return false;
+
+      let ok = true;
+      treeEl.querySelectorAll('.user-card-item[data-user-ip]').forEach((card) => {
+        const u = findUserByIp(card.dataset.userIp);
+        if (!u) {
+          ok = false;
+          return;
+        }
+        const unread = getUnreadForUser(u);
+        const isActive = activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup && userMatchesIp(u, activeChatUser.ip);
+        card.classList.toggle('active', !!isActive);
+        card.classList.toggle('is-offline', !u.online);
+        const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
+        const badge = card.querySelector('.avatar-status-badge');
+        if (badge) badge.className = `avatar-status-badge status-${userStatus}`;
+        const nameEl = card.querySelector('.user-name-text');
+        if (nameEl) {
+          const displayName = formatDmListDisplayName(u);
+          if (nameEl.innerHTML !== displayName) nameEl.innerHTML = displayName;
+        }
+        const subEl = card.querySelector('.user-sub-text');
+        const subHtml = formatUserSubLineSidebarHtml(u);
+        if (subEl && subHtml) subEl.innerHTML = subHtml;
+        const host = card.querySelector('.user-card-unread');
+        if (host) host.innerHTML = unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : '';
+      });
+      if (!ok) return false;
+
+      treeEl.querySelectorAll('.user-group-block[data-group-name]').forEach((block) => {
+        const groupName = block.dataset.groupName;
+        const groupUsers = groups[groupName] || [];
+        const onlineCount = groupUsers.filter((u) => u.online).length;
+        const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
+        const countBadge = block.querySelector('.group-count-badge');
+        if (countBadge) countBadge.textContent = `${onlineCount}/${groupUsers.length}`;
+        const trail = block.querySelector('.subsection-label > span:last-child');
+        if (!trail) return;
+        let unreadEl = trail.querySelector('.unread-badge');
+        if (groupUnread > 0) {
+          if (!unreadEl) {
+            unreadEl = document.createElement('span');
+            unreadEl.className = 'unread-badge';
+            trail.appendChild(unreadEl);
+          }
+          unreadEl.textContent = formatUnreadBadge(groupUnread);
+        } else if (unreadEl) {
+          unreadEl.remove();
+        }
+      });
+
+      const favTrail = treeEl.querySelector('[data-fav-section="1"] > span:last-child');
+      if (favTrail && favorites.length) {
+        const favUnread = sumUnreadForUsers(favorites);
+        const countBadge = favTrail.querySelector('.group-count-badge');
+        if (countBadge) countBadge.textContent = String(favorites.length);
+        let unreadEl = favTrail.querySelector('.unread-badge');
+        if (favUnread > 0) {
+          if (!unreadEl) {
+            unreadEl = document.createElement('span');
+            unreadEl.className = 'unread-badge';
+            favTrail.appendChild(unreadEl);
+          }
+          unreadEl.textContent = formatUnreadBadge(favUnread);
+        } else if (unreadEl) {
+          unreadEl.remove();
+        }
+      }
+
+      highlightBroadcastChannel();
+      updateBroadcastUnreadBadge();
+      setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
+      setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
+      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      return true;
+    }
+
+    function renderUserListTree(forceFull) {
       const treeEl = document.getElementById('user-list-tree');
       if (!treeEl) return;
-      treeEl.innerHTML = '';
 
       const filtered = allUsers.filter(u =>
         !userFilterKeyword ||
@@ -7396,18 +7492,8 @@
       favorites.sort(compareUsersSidebarOrder);
       const rest = filtered.filter(u => !isFavoriteUser(u));
 
-      if (favorites.length > 0) {
-        const favUnread = sumUnreadForUsers(favorites);
-        const label = document.createElement('div');
-        label.className = 'subsection-label';
-        label.innerHTML = `<span>⭐ 즐겨찾기</span><span style="display:flex; align-items:center; gap:6px;"><span class="group-count-badge">${favorites.length}</span>${favUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(favUnread)}</span>` : ''}</span>`;
-        treeEl.appendChild(label);
-        favorites.forEach(u => treeEl.appendChild(buildUserCard(u)));
-      }
-
       const groupingKey = appSettings.userGrouping || 'floor';
       const groups = {};
-
       rest.forEach(u => {
         let groupName = (groupingKey === 'floor') ? (u.floor || '기타 층') : (u.dept || '기타 부서');
         if (!groups[groupName]) groups[groupName] = [];
@@ -7417,9 +7503,28 @@
       const restAll = (allUsers || []).filter((u) => !favoriteIps.has(u.ip));
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
+      const structureKey = buildUserListStructureKey(favorites, sortedGroupKeys, groups, groupingKey);
+
+      if (!forceFull && structureKey === lastUserListStructureKey && patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey)) {
+        return;
+      }
+
+      lastUserListStructureKey = structureKey;
+      treeEl.innerHTML = '';
+
+      if (favorites.length > 0) {
+        const favUnread = sumUnreadForUsers(favorites);
+        const label = document.createElement('div');
+        label.className = 'subsection-label';
+        label.setAttribute('data-fav-section', '1');
+        label.innerHTML = `<span>⭐ 즐겨찾기</span><span style="display:flex; align-items:center; gap:6px;"><span class="group-count-badge">${favorites.length}</span>${favUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(favUnread)}</span>` : ''}</span>`;
+        treeEl.appendChild(label);
+        favorites.forEach(u => treeEl.appendChild(buildUserCard(u)));
+      }
 
       if (sortedGroupKeys.length === 0 && favorites.length === 0) {
         treeEl.innerHTML = `<div style="text-align:center; color:var(--sidebar-text-dim); font-size:12px; padding:20px 0;">표시할 사용자가 없습니다.</div>`;
+        lastUserListStructureKey = structureKey + '|empty';
         return;
       }
 
