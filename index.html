@@ -1450,15 +1450,15 @@
       white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       word-break: keep-all;
     }
-    .schedule-board-row .sb-col-type.badge-admission,
-    .schedule-board-row .sb-col-type.badge-discharge,
-    .schedule-board-row .sb-col-type.badge-outpatient,
-    .schedule-board-row .sb-col-type.badge-outing,
-    .schedule-board-row .sb-col-type.badge-overnight,
-    .schedule-board-row .sb-col-type.badge-transfer,
-    .schedule-board-row .sb-col-type.badge-exam,
-    .schedule-board-row .sb-col-type.badge-leave,
-    .schedule-board-row .sb-col-type.badge-general {
+    .schedule-board-row .sb-type-cell .badge-admission,
+    .schedule-board-row .sb-type-cell .badge-discharge,
+    .schedule-board-row .sb-type-cell .badge-outpatient,
+    .schedule-board-row .sb-type-cell .badge-outing,
+    .schedule-board-row .sb-type-cell .badge-overnight,
+    .schedule-board-row .sb-type-cell .badge-transfer,
+    .schedule-board-row .sb-type-cell .badge-exam,
+    .schedule-board-row .sb-type-cell .badge-leave,
+    .schedule-board-row .sb-type-cell .badge-general {
       display: inline-block; width: max-content; padding: 4px 9px; border-radius: 8px;
       font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;
     }
@@ -1610,6 +1610,18 @@
     .sb-quick-meal-row .sb-quick-undecided input { accent-color: #ea580c; }
     .sb-quick-field--meals { grid-column: 1 / -1; }
     .sb-quick-field--remark { grid-column: 1 / -1; align-self: stretch; }
+    .sb-quick-field--guardian { justify-content: flex-end; }
+    .sb-quick-guardian { color: #7c3aed; font-size: 12.5px; min-height: 34px; align-items: center; }
+    .sb-quick-guardian input { accent-color: #7c3aed; }
+    .sb-type-cell {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+      width: max-content; max-width: 100%;
+    }
+    .badge-guardian-only {
+      display: inline-block; padding: 3px 8px; border-radius: 8px;
+      background: #f3e8ff; color: #6d28d9; font-size: 11.5px; font-weight: 800;
+      letter-spacing: -0.02em; line-height: 1.2; white-space: nowrap;
+    }
     .sb-quick-field input:focus, .sb-quick-field select:focus, .sb-quick-field textarea:focus { outline: none; border-color: #7dd3fc; }
     .sb-quick-save-btn {
       width: 100%; padding: 0 8px; border: none; border-radius: 9px; font-size: 11.5px; font-weight: 700;
@@ -2816,6 +2828,12 @@
           <div class="sb-quick-field">
             <label for="sb-quick-detail">목적</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
+          </div>
+          <div class="sb-quick-field sb-quick-field--guardian">
+            <label>동행</label>
+            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진·외출하는 경우">
+              <input type="checkbox" id="sb-quick-guardian-only">보호자만
+            </label>
           </div>
           <div class="sb-quick-field sb-quick-field--remark">
             <label for="sb-quick-remark">비고 <span style="font-weight:600;color:#94a3b8;">(길게 입력 가능 · Enter 줄바꿈 · Ctrl+Enter 등록)</span></label>
@@ -10513,6 +10531,7 @@
 
     function scheduleAlarmBody(sch) {
       const parts = [sch.title || ''];
+      if (isScheduleGuardianOnly(sch)) parts.push('보호자만');
       const doctor = formatScheduleExtraMeta(sch);
       if (doctor) parts.push(doctor);
       if (sch.time_end_str) parts.push(`⏰ ${formatScheduleTimeRange(sch)}`);
@@ -10531,6 +10550,18 @@
         LEAVE: '<span class="badge-leave">연차</span>',
       };
       return map[type] || '<span class="badge-general">업무</span>';
+    }
+
+    function isScheduleGuardianOnly(sch) {
+      return !!(sch && (Number(sch.guardian_only) || sch.guardian_only === true));
+    }
+
+    function scheduleTypeCellHtml(sch) {
+      const badge = scheduleBadgeHtml(sch?.type);
+      const g = isScheduleGuardianOnly(sch)
+        ? '<span class="badge-guardian-only">보호자만</span>'
+        : '';
+      return `<div class="sb-col-type sb-type-cell">${badge}${g}</div>`;
     }
 
     function attendingFromPhysicianSelect(value) {
@@ -10781,8 +10812,9 @@
       const remark = scheduleBoardRemarkText(sch);
       const time = formatMainBoardTimeLabel(sch);
       const line1 = [room, name].filter(Boolean).join(' ') || (sch.title || '').trim();
+      const guardianNote = isScheduleGuardianOnly(sch) ? '보호자만' : '';
       return `<div class="sb-main-entry">`
-        + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}</div>`
+        + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}${guardianNote ? ` <span class="badge-guardian-only">${escapeHtml(guardianNote)}</span>` : ''}</div>`
         + (dest ? `<div class="sb-main-l2">${escapeHtml(dest)}</div>` : '')
         + (remark ? `<div class="sb-main-l2 sb-main-remark">${escapeHtml(remark)}</div>` : '')
         + `<div class="sb-main-time">${escapeHtml(time)}</div>`
@@ -11196,6 +11228,7 @@
         mealCancelBreakfast: !!document.getElementById('sb-quick-meal-breakfast')?.checked,
         mealCancelLunch: !!document.getElementById('sb-quick-meal-lunch')?.checked,
         mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked,
+        guardianOnly: !!document.getElementById('sb-quick-guardian-only')?.checked,
         remark: normalizeScheduleRemarkInput(document.getElementById('sb-quick-remark')?.value)
       };
     }
@@ -11231,6 +11264,7 @@
         mealCancelBreakfast: !!shared.mealCancelBreakfast,
         mealCancelLunch: !!shared.mealCancelLunch,
         mealCancelDinner: !!shared.mealCancelDinner,
+        guardianOnly: !!shared.guardianOnly,
         remark: shared.remark || '',
         ward: entry.ward != null ? entry.ward : shared.ward,
         rmTeam: shared.rmTeam,
@@ -11261,6 +11295,8 @@
       document.getElementById('sb-quick-detail').value = '';
       const remarkEl = document.getElementById('sb-quick-remark');
       if (remarkEl) remarkEl.value = '';
+      const guardianEl = document.getElementById('sb-quick-guardian-only');
+      if (guardianEl) guardianEl.checked = false;
     }
 
     function focusScheduleBoardQuickRoom() {
@@ -11387,6 +11423,8 @@
       if (detailEl) detailEl.value = scheduleBoardDetailText(sch, norm) || '';
       const remarkEl = document.getElementById('sb-quick-remark');
       if (remarkEl) remarkEl.value = String(sch.remark || '').trim();
+      const guardianEl = document.getElementById('sb-quick-guardian-only');
+      if (guardianEl) guardianEl.checked = isScheduleGuardianOnly(sch);
       if (sch.time_str) {
         const d = new Date(sch.time_str);
         const startEl = document.getElementById('sb-quick-time-start');
@@ -11504,6 +11542,7 @@
             mealCancelBreakfast: !!shared.mealCancelBreakfast,
             mealCancelLunch: !!shared.mealCancelLunch,
             mealCancelDinner: !!shared.mealCancelDinner,
+            guardianOnly: !!shared.guardianOnly,
             remark: shared.remark || '',
             ward: shared.ward,
             rmTeam: shared.rmTeam,
@@ -11870,6 +11909,9 @@
     function scheduleToExcelRow(sch) {
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
+      const typeOut = typeLabel
+        ? (isScheduleGuardianOnly(sch) ? `${typeLabel}·보호자만` : typeLabel)
+        : (isScheduleGuardianOnly(sch) ? '보호자만' : '');
       const wardLabel = norm.ward
         ? (SCHEDULE_BOARD_WARD_LABELS[norm.ward] || `${norm.ward}병동`)
         : '';
@@ -11884,13 +11926,14 @@
         '병동': wardLabel,
         '호실': room,
         '환자명': norm.patient_name || '',
-        '구분': typeLabel,
+        '구분': typeOut,
         '목적': detail,
         '비고': remarkParts.join('\n'),
         '출발시간': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
         '귀원시간': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
         '등록자': sch.author_name || '',
         __wardKey: norm.ward || 'other',
+        __rmKey: (norm.rm_team || '').trim() || 'other',
         __doctorKey: doctorLabel
       };
     }
@@ -12040,6 +12083,9 @@
       if (scheduleBoardView === 'main') return scheduleBoardReferralLineText(sch);
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
+      const typeOut = typeLabel
+        ? (isScheduleGuardianOnly(sch) ? `${typeLabel}·보호자만` : typeLabel)
+        : (isScheduleGuardianOnly(sch) ? '보호자만' : '');
       const startL = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '');
       const endL = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
       const times = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || endL)
@@ -12047,7 +12093,7 @@
         : (startL || '');
       const mealTxt = formatScheduleMealCancelText(sch);
       const remarkTxt = scheduleBoardRemarkText(sch);
-      return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), remarkTxt, mealTxt, times].filter(Boolean).join('\t');
+      return [norm.room_no, norm.patient_name || sch.title, typeOut, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), remarkTxt, mealTxt, times].filter(Boolean).join('\t');
     }
 
     function printScheduleBoardReferral() {
@@ -12262,7 +12308,7 @@
           const row = document.createElement('div');
           const modMeta = formatScheduleModifiedMeta(sch);
           row.className = 'schedule-board-row' + (isReferral ? ' sb-referral-row' : '') + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
-          const badge = scheduleBadgeHtml(sch.type);
+          const typeCell = scheduleTypeCellHtml(sch);
           const detail = scheduleBoardDetailText(sch, norm);
           const canRowManage = canModifySchedule(sch);
           const copyLabel = isReferral ? '의뢰복사' : '복사';
@@ -12282,7 +12328,7 @@
               `<span class="schedule-board-ward-col sb-col-ward">${escapeHtml(wardLbl)}</span>`,
               `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
               `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
-              badge.replace('class="', 'class="sb-col-type '),
+              typeCell,
               `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
               `<span class="schedule-board-time-cell sb-col-tstart">${escapeHtml(startT)}</span>`,
               `<span class="schedule-board-time-cell sb-col-tend">${escapeHtml(endT)}</span>`,
@@ -12302,7 +12348,7 @@
               `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
               `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
               doctorHtml,
-              badge.replace('class="', 'class="sb-col-type '),
+              typeCell,
               `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
               scheduleBoardRemarkCellHtml(sch),
               scheduleBoardMealCellHtml(sch),
