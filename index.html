@@ -10717,11 +10717,13 @@
       const name = (norm.patient_name || '').trim();
       // title 잔여분 = 병원명·진료과(메모)
       const dest = (scheduleBoardDetailText(sch, norm) || '').trim();
+      const remark = scheduleBoardRemarkText(sch);
       const time = formatMainBoardTimeLabel(sch);
       const line1 = [room, name].filter(Boolean).join(' ') || (sch.title || '').trim();
       return `<div class="sb-main-entry">`
         + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}</div>`
         + (dest ? `<div class="sb-main-l2">${escapeHtml(dest)}</div>` : '')
+        + (remark ? `<div class="sb-main-l2" style="color:#64748b;">${escapeHtml(remark)}</div>` : '')
         + `<div class="sb-main-time">${escapeHtml(time)}</div>`
         + `</div>`;
     }
@@ -11683,6 +11685,7 @@
         '구분': typeLabel,
         '주치의': (sch.attending_physician || '').trim(),
         '상세내용': detail,
+        '비고': scheduleBoardRemarkText(sch),
         '출발': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
         '귀원': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
         '아침취소': getScheduleMealCancelFlags(sch).breakfast ? 'Y' : '',
@@ -11837,7 +11840,8 @@
         ? `출발 ${startL || '미정'} 귀원 ${endL || '미정'}`
         : (startL || '');
       const mealTxt = formatScheduleMealCancelText(sch);
-      return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), mealTxt, times].filter(Boolean).join('\t');
+      const remarkTxt = scheduleBoardRemarkText(sch);
+      return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), remarkTxt, mealTxt, times].filter(Boolean).join('\t');
     }
 
     function printScheduleBoardReferral() {
@@ -11854,6 +11858,16 @@
         lunch: !!(sch && (Number(sch.meal_cancel_lunch) || sch.meal_cancel_lunch === true)),
         dinner: !!(sch && (Number(sch.meal_cancel_dinner) || sch.meal_cancel_dinner === true))
       };
+    }
+
+    function scheduleBoardRemarkText(sch) {
+      return String(sch?.remark || '').trim();
+    }
+
+    function scheduleBoardRemarkCellHtml(sch) {
+      const text = scheduleBoardRemarkText(sch);
+      if (!text) return '<span class="schedule-board-remark is-empty"></span>';
+      return `<span class="schedule-board-remark" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
     }
 
     function formatScheduleMealCancelLabels(sch) {
@@ -11897,7 +11911,7 @@
       if (isReferral) {
         head.innerHTML = '<span>병동</span><span>호실</span><span>환자명</span><span>구분</span><span>목적·검사</span><span>출발</span><span>귀원</span><span>RM·주치의</span><span></span>';
       } else {
-        head.innerHTML = '<span>호실</span><span>환자명</span><span>주치의</span><span>구분</span><span>목적·검사</span><span>식사취소</span><span>시간</span><span></span>';
+        head.innerHTML = '<span>호실</span><span>환자명</span><span>주치의</span><span>구분</span><span>목적·검사</span><span>비고</span><span>식사취소</span><span>시간</span><span></span>';
       }
       parent.appendChild(head);
     }
@@ -12057,6 +12071,7 @@
               attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>',
               badge,
               `<span class="schedule-board-detail">${escapeHtml(detail || '')}</span>`,
+              scheduleBoardRemarkCellHtml(sch),
               scheduleBoardMealCellHtml(sch),
               `<div class="schedule-board-times">${timeHtml}</div>`,
               `<div class="schedule-board-row-btns">${manageHtml}</div>`,
