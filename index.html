@@ -3856,12 +3856,12 @@
     let selectedCalendarDateStr = formatDateStr(new Date());
     const SCHEDULE_TYPE_ORDER = [
       { key: 'OUTPATIENT', label: '외진', icon: '🟠', chipClass: 'type-outpatient' },
-      { key: 'EXAM', label: '검사', icon: '🩺', chipClass: 'type-exam' },
       { key: 'OUTING', label: '외출', icon: '🟡', chipClass: 'type-outing' },
       { key: 'OVERNIGHT', label: '외박', icon: '🟣', chipClass: 'type-overnight' },
       { key: 'ADMISSION', label: '입원', icon: '🟢', chipClass: 'type-admission' },
       { key: 'DISCHARGE', label: '퇴원', icon: '🔴', chipClass: 'type-discharge' },
       { key: 'TRANSFER', label: '전원', icon: '🔵', chipClass: 'type-transfer' },
+      { key: 'EXAM', label: '검사', icon: '🩺', chipClass: 'type-exam' },
       { key: 'GENERAL', label: '병원 업무', icon: '🏥', chipClass: 'type-general' },
       { key: 'LEAVE', label: '연차', icon: '🟣', chipClass: 'type-leave' },
     ];
@@ -3878,7 +3878,7 @@
     ];
     const SCHEDULE_BOARD_RM_ROWS = ['4', '6', '7', '8', '9'];
     const SCHEDULE_BOARD_RM_ROW_BG = { '4': 'rm4', '6': 'rm6', '7': 'rm7', '8': 'rm8', '9': 'rm9' };
-    const SCHEDULE_BOARD_TYPE_CHIP_KEYS = ['OUTPATIENT', 'OUTING', 'DISCHARGE', 'TRANSFER', 'ADMISSION', 'OVERNIGHT'];
+    const SCHEDULE_BOARD_TYPE_CHIP_KEYS = ['OUTPATIENT', 'OUTING', 'OVERNIGHT', 'ADMISSION', 'DISCHARGE', 'TRANSFER'];
     let scheduleBoardDateStr = '';
     let scheduleBoardEditingUid = null;
     let scheduleBoardQuickPanelOpen = false;
