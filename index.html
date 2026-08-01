@@ -3759,15 +3759,21 @@
     function updateMineOutboundStatusLabels() {
       if (!isDmOutboundStatusContext()) return;
       const peerRead = isPeerMarkedRead(activeChatUser.ip);
-      const rows = document.querySelectorAll('#chat-messages-area .is-mine-msg');
-      rows.forEach((row) => {
+      // 1:1은 내가 보낸 「마지막」 메시지에만 보냄/읽음 표시
+      const rows = [...document.querySelectorAll('#chat-messages-area .is-mine-msg')];
+      const lastIdx = rows.length - 1;
+      rows.forEach((row, idx) => {
+        const existing = row.querySelector('.msg-send-status');
+        if (idx !== lastIdx) {
+          if (existing) existing.remove();
+          return;
+        }
         const span = ensureOutboundStatusSpan(row);
         if (!span) return;
         const st = row.getAttribute('data-outbound-status') || '';
         if (st === 'PENDING' || messageRowIsOutboundPending(row)) {
           paintSendStatusSpan(span, 'error');
         } else if (peerRead) {
-          // 상대가 읽으면 보낸 메시지 전체에 읽음 표시
           paintSendStatusSpan(span, 'read');
         } else {
           paintSendStatusSpan(span, 'sent');
@@ -4694,8 +4700,8 @@
     function applyReadReceiptUi(data) {
       if (!data || !data.readerIP) return;
       markPeerMessagesRead(data.readerIP);
-      // 대화방을 보고 있으면 즉시 보냄 → 읽음 반영
-      if (isDmChatWithPeer(data.readerIP) || (activeChatUser && userMatchesIp(activeChatUser, data.readerIP))) {
+      // 같은 1:1 방을 보고 있으면 마지막 보낸 메시지에 즉시 읽음 반영
+      if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) && userMatchesIp(activeChatUser, data.readerIP)) {
         updateMineOutboundStatusLabels();
       }
     }
@@ -9597,7 +9603,6 @@
         if (existing) return existing;
         row.setAttribute('data-msg-uid', msgUid);
       }
-      if (isMe) row.classList.add('is-mine-msg');
       if (messageId) row.setAttribute('data-msg-id', String(messageId));
       const isGroupChannel = activeChatUser && (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup);
       if (isMe && !isGroupChannel) {
@@ -9608,9 +9613,8 @@
       const displayName = resolveMessageSenderDisplay(senderName, isMe, senderIP) || (isMe ? '나' : '상대방');
       const compact = document.body.classList.contains('compact-mode');
       const urgentBadgeHtml = urgent ? `<div class="urgent-badge">🚨 긴급</div>` : '';
-      const peerAlreadyRead = isMe && !isGroupChannel && activeChatUser && !!getDmReadReceiptFlags()[activeChatUser.ip];
-      const sendStatusHtml = (isMe && !isGroupChannel)
-        ? `<span class="msg-send-status ${peerAlreadyRead ? 'is-read' : 'is-sent'}">${peerAlreadyRead ? ' · 읽음' : ' · 보냄'}</span>` : '';
+      // 보냄/읽음은 append 후 updateMineOutboundStatusLabels가 「마지막」 보낸 메시지에만 붙임
+      const sendStatusHtml = '';
       // 텍스트는 수정·삭제, 사진·파일은 삭제만 (msg_uid 필요)
       const isDeletedAlready = typeof msg === 'string' && msg.indexOf('class="deleted-msg-flag"') !== -1;
       const isSystemNotice = typeof msg === 'string' && msg.indexOf('class="system-notice-flag"') !== -1;
@@ -9647,7 +9651,7 @@
         : `<span class="msg-time">${time}</span>`;
 
       if (useBubbleLayout) {
-        row.className = `msg-row-bubble ${isMe ? 'is-me' : 'is-other'} ${urgent ? 'is-urgent' : ''}`;
+        row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${urgent ? 'is-urgent' : ''}`.trim();
         const showName = !isMe && isGroupChannel;
         row.innerHTML = `
           ${showName ? `<div class="bubble-sender">${displayName}</div>` : ''}
@@ -9666,7 +9670,7 @@
           </div>
         `;
       } else {
-        row.className = `msg-row ${isMe ? 'is-me' : 'is-other'} ${urgent ? 'is-urgent' : ''}`;
+        row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${urgent ? 'is-urgent' : ''}`.trim();
         const avatarClass = isMe ? 'avatar-me' : (isGroupChannel ? 'avatar-broadcast' : 'avatar-other');
         const avCtx = avatarContextForSender(isMe, displayName);
         const avPhotoOk = isUsableProfilePhoto(avCtx.photo);

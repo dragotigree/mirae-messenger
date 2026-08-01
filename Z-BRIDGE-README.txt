@@ -1,6 +1,6 @@
 ﻿Mirae Messenger - Z bridge deploy
-version: 1.0.210
-time: 2026-08-01 09:41:38
+version: 1.0.211
+time: 2026-08-01 09:45:15
 
 1) Old PC: connect Z: drive
 2) Run messenger (or Settings > Check update)
