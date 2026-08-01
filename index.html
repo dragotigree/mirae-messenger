@@ -1311,7 +1311,7 @@
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) minmax(108px, 130px) 92px auto;
+      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(72px, 120px) minmax(96px, 120px) 88px auto;
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
     }
@@ -1325,7 +1325,7 @@
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) minmax(108px, 130px) 92px auto;
+      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(72px, 120px) minmax(96px, 120px) 88px auto;
       align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #f1f5f9; font-size: 13.5px;
     }
     .schedule-board-row > * { min-width: 0; }
@@ -1421,6 +1421,11 @@
     .schedule-board-name { font-weight: 600; color: #1e293b; min-width: 64px; flex-shrink: 0; font-size: 13.5px; }
     .schedule-board-doctor { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #e0f2fe; color: #0369a1; flex-shrink: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .schedule-board-detail { flex: 1; min-width: 0; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+    .schedule-board-remark {
+      font-size: 12.5px; color: #64748b; line-height: 1.35;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .schedule-board-remark.is-empty { color: #cbd5e1; }
     .schedule-board-meals {
       display: flex; flex-wrap: wrap; gap: 3px; align-items: center; min-width: 0;
       font-size: 11.5px; font-weight: 700; line-height: 1.25;
@@ -2750,6 +2755,10 @@
           <div class="sb-quick-field">
             <label for="sb-quick-detail">목적지·검사명</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
+          </div>
+          <div class="sb-quick-field">
+            <label for="sb-quick-remark">비고</label>
+            <input type="text" id="sb-quick-remark" placeholder="기타 내용 (선택)" autocomplete="off">
           </div>
           <div class="sb-quick-field sb-quick-field--meals">
             <label>식사 취소 (영양실 식수)</label>
@@ -11020,7 +11029,8 @@
         timeEndUndecided,
         mealCancelBreakfast: !!document.getElementById('sb-quick-meal-breakfast')?.checked,
         mealCancelLunch: !!document.getElementById('sb-quick-meal-lunch')?.checked,
-        mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked
+        mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked,
+        remark: (document.getElementById('sb-quick-remark')?.value || '').trim()
       };
     }
 
@@ -11055,6 +11065,7 @@
         mealCancelBreakfast: !!shared.mealCancelBreakfast,
         mealCancelLunch: !!shared.mealCancelLunch,
         mealCancelDinner: !!shared.mealCancelDinner,
+        remark: shared.remark || '',
         ward: entry.ward != null ? entry.ward : shared.ward,
         rmTeam: shared.rmTeam,
         roomNo,
@@ -11082,6 +11093,8 @@
       document.getElementById('sb-quick-patient').value = '';
       document.getElementById('sb-quick-room').value = '';
       document.getElementById('sb-quick-detail').value = '';
+      const remarkEl = document.getElementById('sb-quick-remark');
+      if (remarkEl) remarkEl.value = '';
     }
 
     function focusScheduleBoardQuickRoom() {
@@ -11100,7 +11113,8 @@
       'sb-quick-doctor',
       'sb-quick-time-start',
       'sb-quick-time-end',
-      'sb-quick-detail'
+      'sb-quick-detail',
+      'sb-quick-remark'
     ];
 
     function focusScheduleBoardQuickNextField(fromId) {
@@ -11206,6 +11220,8 @@
       if (patientEl) patientEl.value = norm.patient_name || '';
       const detailEl = document.getElementById('sb-quick-detail');
       if (detailEl) detailEl.value = scheduleBoardDetailText(sch, norm) || '';
+      const remarkEl = document.getElementById('sb-quick-remark');
+      if (remarkEl) remarkEl.value = String(sch.remark || '').trim();
       if (sch.time_str) {
         const d = new Date(sch.time_str);
         const startEl = document.getElementById('sb-quick-time-start');
@@ -11323,6 +11339,7 @@
             mealCancelBreakfast: !!shared.mealCancelBreakfast,
             mealCancelLunch: !!shared.mealCancelLunch,
             mealCancelDinner: !!shared.mealCancelDinner,
+            remark: shared.remark || '',
             ward: shared.ward,
             rmTeam: shared.rmTeam,
             roomNo: normalizeQuickRoomNo(roomNo),
