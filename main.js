@@ -4362,7 +4362,7 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
     }
     const buf = buildXlsxBuffer(sheets, SCHEDULE_EXCEL_HEADERS, {
       boardDate: boardDate || '',
-      includeSampleSheets: includeSampleSheets !== false
+      includeSampleSheets: includeSampleSheets === true
     });
     await fs.promises.writeFile(outPath, buf);
     return { success: true, path: outPath, format: 'xlsx' };

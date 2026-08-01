@@ -1465,7 +1465,7 @@
     .schedule-board-remark {
       font-size: 12.5px; color: #475569; line-height: 1.4;
       white-space: pre-wrap; word-break: keep-all; overflow: hidden;
-      display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+      display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical;
       min-height: 1.2em;
     }
     .schedule-board-remark.is-empty { color: #cbd5e1; white-space: nowrap; display: block; -webkit-line-clamp: unset; }
@@ -11963,7 +11963,7 @@
         const res = await window.api.exportScheduleBoardExcel({
           dateFileLabel: (scheduleBoardDateStr || '').replace(/-/g, ''),
           boardDate: scheduleBoardDateStr || '',
-          includeSampleSheets: true,
+          includeSampleSheets: false,
           sheets
         });
         if (!res) {
@@ -11976,7 +11976,7 @@
           return;
         }
         const filterNote = res.format === 'xlsx'
-          ? '데이터 시트는 파란 제목·초록 헤더·병동 색으로 현황판 느낌으로 저장됩니다.\n맨 앞 「입력샘플」 시트는 여러 명 붙여넣기용입니다.'
+          ? '데이터 시트는 파란 제목·초록 헤더·병동 색(RM·병동)으로 저장됩니다.'
           : 'CSV는 엑셀에서 연 뒤 [데이터] → [필터]를 사용해 주세요.';
         await appAlert(`저장되었습니다.\n${res.path}\n\n${filterNote}`);
       } catch (err) {
