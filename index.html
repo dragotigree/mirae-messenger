@@ -1310,10 +1310,10 @@
     .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-table {
-      width: 100%; min-width: 980px; border-collapse: collapse; table-layout: fixed; background: #fff;
+      width: 100%; min-width: 1020px; border-collapse: collapse; table-layout: fixed; background: #fff;
     }
     .schedule-board-table col.sb-c-room { width: 52px; }
-    .schedule-board-table col.sb-c-name { width: 72px; }
+    .schedule-board-table col.sb-c-name { width: 108px; }
     .schedule-board-table col.sb-c-doctor { width: 118px; }
     .schedule-board-table col.sb-c-type { width: 72px; }
     .schedule-board-table col.sb-c-detail { width: 22%; }
@@ -10882,10 +10882,14 @@
       return raw.replace(/호/g, '').trim();
     }
 
+    function scheduleBoardPatientLabel(name) {
+      return String(name || '').trim().replace(/[a-z]/g, (ch) => ch.toUpperCase());
+    }
+
     function scheduleBoardMainEntryHtml(sch) {
       const norm = normalizeSchedulePatient(sch);
       const room = scheduleBoardRoomLabel(norm.room_no);
-      const name = (norm.patient_name || '').trim();
+      const name = scheduleBoardPatientLabel(norm.patient_name);
       // title 잔여분 = 병원명·진료과(메모)
       const dest = (scheduleBoardDetailText(sch, norm) || '').trim();
       const remark = scheduleBoardRemarkText(sch);
@@ -11107,7 +11111,7 @@
     function formatSidebarCalendarDayLine(sch) {
       const norm = normalizeSchedulePatient(sch);
       const roomDigits = String(norm.room_no || '').replace(/\D/g, '');
-      const name = (norm.patient_name || '').trim();
+      const name = scheduleBoardPatientLabel(norm.patient_name);
       const typeMeta = SCHEDULE_TYPE_ORDER.find((m) => m.key === (sch.type || 'GENERAL'));
       const typeLabel = typeMeta ? typeMeta.label : '';
       const timeLabel = formatSidebarCalendarDayTime(sch);
@@ -11339,7 +11343,7 @@
     async function submitScheduleBoardQuickEntry(entry) {
       const shared = entry.shared || collectScheduleBoardQuickSharedFields();
       let roomNo = normalizeQuickRoomNo(entry.roomNo);
-      const patientName = (entry.patientName || '').trim();
+      const patientName = scheduleBoardPatientLabel(entry.patientName);
       const detail = (entry.detail || '').trim();
       const title = buildQuickScheduleTitle(roomNo, patientName, detail);
       if (!title) {
@@ -11519,7 +11523,7 @@
       const roomEl = document.getElementById('sb-quick-room');
       if (roomEl) roomEl.value = norm.room_no || '';
       const patientEl = document.getElementById('sb-quick-patient');
-      if (patientEl) patientEl.value = norm.patient_name || '';
+      if (patientEl) patientEl.value = scheduleBoardPatientLabel(norm.patient_name);
       const detailEl = document.getElementById('sb-quick-detail');
       if (detailEl) detailEl.value = scheduleBoardDetailText(sch, norm) || '';
       const remarkEl = document.getElementById('sb-quick-remark');
