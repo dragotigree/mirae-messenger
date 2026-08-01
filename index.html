@@ -12289,7 +12289,7 @@
         sec.className = 'schedule-board-section ' + scheduleBoardSectionClass(groupKey);
         const head = document.createElement('div');
         head.className = 'schedule-board-section-head';
-        const mealSummary = summarizeScheduleMealCancels(items);
+        const mealSummary = scheduleBoardView === 'doctor' ? '' : summarizeScheduleMealCancels(items);
         head.innerHTML = `<span>${escapeHtml(scheduleBoardGroupTitle(groupKey))}<span class="sb-count">${items.length}건</span>${mealSummary ? `<span class="sb-meal-summary">${escapeHtml(mealSummary)}</span>` : ''}</span>
           <div class="schedule-board-section-actions">
             <button type="button" class="sb-copy-section">${isReferral ? '의뢰복사' : '복사'}</button>
