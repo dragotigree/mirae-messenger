@@ -3573,7 +3573,7 @@ ipcMain.handle('notify-read', async (event, targetIP) => {
       try { client.destroy(); } catch (e) {}
       resolve({ success: !!ok });
     };
-    client.setTimeout(2500);
+    client.setTimeout(1200);
     client.connect(TCP_PORT, targetIP, () => {
       try {
         client.write(JSON.stringify({ type: 'READ_RECEIPT', readerName: senderLabelForMe() }) + '\n', () => {
