@@ -8623,21 +8623,20 @@
     }
 
     async function dispatchOutgoing(contentHtml) {
+      let res;
       if (activeChatUser && activeChatUser.isBroadcast) {
-        return window.api.sendBroadcastMessage(contentHtml);
+        res = await window.api.sendBroadcastMessage(contentHtml);
+      } else if (activeChatUser && activeChatUser.isDept) {
+        res = await window.api.sendDeptMessage(activeChatUser.deptName, contentHtml);
+      } else if (activeChatUser && activeChatUser.isFloor) {
+        res = await window.api.sendFloorMessage(activeChatUser.floorName, contentHtml);
+      } else if (activeChatUser && activeChatUser.isGroup) {
+        res = await window.api.sendGroupMessage(activeChatUser.groupUid, activeChatUser.groupName, contentHtml);
+      } else {
+        res = await window.api.sendMessage(activeChatUser.ip, contentHtml, isUrgentMode);
       }
-      if (activeChatUser && activeChatUser.isDept) {
-        return window.api.sendDeptMessage(activeChatUser.deptName, contentHtml);
-      }
-      if (activeChatUser && activeChatUser.isFloor) {
-        return window.api.sendFloorMessage(activeChatUser.floorName, contentHtml);
-      }
-      if (activeChatUser && activeChatUser.isGroup) {
-        return window.api.sendGroupMessage(activeChatUser.groupUid, activeChatUser.groupName, contentHtml);
-      }
-      const res = await window.api.sendMessage(activeChatUser.ip, contentHtml, isUrgentMode);
       if (res && res.status === 'ERROR') {
-        await appAlert('메시지를 저장하지 못했습니다.\n잠시 후 다시 보내 주세요.');
+        await appAlert(res.error || '메시지를 저장하지 못했습니다.\n잠시 후 다시 보내 주세요.');
       }
       return res;
     }
@@ -8790,6 +8789,7 @@
       const contentHtml = urgent ? `<span class="urgent-flag" style="display:none"></span>${bodyHtml}` : bodyHtml;
 
       const res = await dispatchOutgoing(contentHtml);
+      if (res && res.status === 'ERROR') return;
       const dmPending = res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip);
       appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, urgent, res.uid, res.id, myProfile && myProfile.ip, dmPending ? 'PENDING' : null, res.createdAtFull || res.createdAt);
       if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
@@ -9241,6 +9241,10 @@
       return Math.floor((dataUrl.length - i - 1) * 3 / 4);
     }
 
+    // TCP 단일 라인 버퍼(~512KB) 여유: base64 팽창 고려해 원본 파일 약 250KB 한도
+    const MAX_ATTACHMENT_BYTES = 250 * 1024;
+    const MAX_ATTACHMENT_LABEL = '250KB';
+
     async function processAndSendImageDataUrl(dataUrl, fileName) {
       if (!activeChatUser) {
         await appAlert('대화 상대를 먼저 선택하세요.');
@@ -9248,14 +9252,15 @@
         return;
       }
       const bytes = estimateDataUrlBytes(dataUrl);
-      if (bytes > MAX_ATTACHMENT_MB * 1024 * 1024) {
-        await appAlert(`캡처 이미지가 너무 큽니다 (${(bytes / 1024 / 1024).toFixed(1)}MB).\n${MAX_ATTACHMENT_MB}MB 이하만 보낼 수 있습니다.`);
+      if (bytes > MAX_ATTACHMENT_BYTES) {
+        await appAlert(`캡처 이미지가 너무 큽니다 (${(bytes / 1024).toFixed(0)}KB).\n첨부 파일은 최대 ${MAX_ATTACHMENT_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
         return;
         return;
       }
       const safeName = escapeHtmlText(fileName || 'screenshot.jpg');
       const contentHtml = `<img src="${dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
       dispatchOutgoing(contentHtml).then((res) => {
+        if (res && res.status === 'ERROR') return;
         appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
           res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
           res.createdAtFull || res.createdAt);
@@ -12924,10 +12929,9 @@
 
     initAttendingPhysicianSelects();
 
-    const MAX_ATTACHMENT_MB = 15;
     async function processAndSendFile(file) {
-      if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-        await appAlert(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB).\n${MAX_ATTACHMENT_MB}MB 이하 파일만 보낼 수 있습니다. 큰 파일은 공유 폴더 등을 이용해 주세요.`);
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        await appAlert(`파일이 너무 큽니다 (${(file.size / 1024).toFixed(0)}KB).\n첨부 파일은 최대 ${MAX_ATTACHMENT_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
         return;
         return;
       }
@@ -12941,6 +12945,7 @@
           `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${file.name}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
 
         dispatchOutgoing(contentHtml).then(res => {
+          if (res && res.status === 'ERROR') return;
           appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
             res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
             res.createdAtFull || res.createdAt);

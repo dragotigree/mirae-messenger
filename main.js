@@ -240,6 +240,8 @@ const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
 /** NOTICE_SYNC 한 줄이 이 값을 넘지 않도록 청크로 나눔 (구버전도 RESPONSE 병합 가능) */
 const NOTICE_SYNC_SAFE_LINE_BYTES = 400 * 1024;
+/** CHAT 등 단일 TCP 라인 안전 상한 (수신 버퍼 512KB 미만 여유) */
+const MAX_CHAT_WIRE_BYTES = 400 * 1024;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
@@ -787,6 +789,37 @@ function parseFloorPeerKey(key) {
   const idx = rest.indexOf('|');
   if (idx < 0) return { ip: rest, floor: '' };
   return { ip: rest.slice(0, idx), floor: rest.slice(idx + 1) };
+}
+
+function isChatWireTooLarge(payloadObj) {
+  try {
+    return Buffer.byteLength(JSON.stringify(payloadObj) + '\n', 'utf8') > MAX_CHAT_WIRE_BYTES;
+  } catch (e) {
+    return true;
+  }
+}
+
+/** 동일 msg_uid+peer PENDING 중복 없이 큐에 넣음 (온라인 전송 실패·오프라인 공용) */
+function enqueuePendingPeerMessage(peerKey, message, msgUid) {
+  const key = String(peerKey || '').trim();
+  const uid = String(msgUid || '').trim();
+  if (!key || !uid) return;
+  db.get(
+    `SELECT id FROM messages WHERE msg_uid = ? AND receiver_ip = ? AND sender_ip = ? LIMIT 1`,
+    [uid, key, MY_IP],
+    (err, row) => {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      if (row) return;
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+        [senderLabelForMe(), MY_IP, key, message, uid],
+        logDbErr
+      );
+    }
+  );
 }
 
 function registerMiraeFileProtocol() {
@@ -2855,66 +2888,84 @@ function handleProfilePhotoRequest(fromIP) {
 function handleIncomingChat(payload, senderIP) {
   if (senderIP === MY_IP) return;
 
-  if (payload.uid && rememberIncomingChatUid(payload.uid)) {
-    sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: payload.uid });
-    return;
-  }
+  const uid = payload.uid || null;
 
-  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const uiPayload = {
-    senderName: formatSenderDisplay(payload.sender, senderIP),
-    senderIP: senderIP,
-    message: payload.message,
-    urgent: !!payload.urgent,
-    createdAt: currentTime,
-    uid: payload.uid
+  const ackIfUid = () => {
+    if (uid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: uid });
   };
 
-  // DB 저장을 기다리지 않고 바로 채팅창·토스트에 반영
-  if (mainWindow) {
-    safeWebContentsSend('receive-message', uiPayload);
-    notifyIncomingMessageNotification({
-      title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
-      body: previewBody(payload.message),
-      urgent: !!payload.urgent,
-      channelKey: senderIP
-    });
-  }
-  appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
+  // DB INSERT 성공 후에만 UID 기억 + ACK (조기 remember로 유실되면 재전송도 막힘)
+  const persist = ({ showUi }) => {
+    if (showUi) {
+      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const uiPayload = {
+        senderName: formatSenderDisplay(payload.sender, senderIP),
+        senderIP: senderIP,
+        message: payload.message,
+        urgent: !!payload.urgent,
+        createdAt: currentTime,
+        uid
+      };
+      if (mainWindow) {
+        safeWebContentsSend('receive-message', uiPayload);
+        notifyIncomingMessageNotification({
+          title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
+          body: previewBody(payload.message),
+          urgent: !!payload.urgent,
+          channelKey: senderIP
+        });
+      }
+      appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
+    }
 
-  // 디스크 저장은 persist에서 compact 와 함께 수행 (즉시 UI는 원본 data URL 유지)
-
-  const persist = () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, payload.uid || null],
+      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, uid],
       (err) => {
         logDbErr(err);
-        if (!err && payload.uid) {
-          sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: payload.uid });
-        }
+        if (err) return;
+        if (uid) markIncomingChatUid(uid);
+        ackIfUid();
       }
     );
   };
 
-  if (payload.uid) {
-    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [payload.uid], (err, row) => {
+  if (uid && hasRememberedIncomingChatUid(uid)) {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
-        persist();
+        persist({ showUi: false });
         return;
       }
       if (row) {
-        sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: payload.uid });
+        ackIfUid();
         return;
       }
-      persist();
+      // 메모리는 있으나 DB 행 없음 → 재저장 후 ACK
+      persist({ showUi: false });
     });
     return;
   }
 
-  persist();
+  if (uid) {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
+      if (err) {
+        logDbErr(err);
+        persist({ showUi: true });
+        return;
+      }
+      if (row) {
+        markIncomingChatUid(uid);
+        ackIfUid();
+        return;
+      }
+      persist({ showUi: true });
+    });
+    return;
+  }
+
+  persist({ showUi: true });
 }
 
 function handleIncomingDeptMessage(payload, senderIP) {
@@ -2947,7 +2998,10 @@ function handleIncomingDeptMessage(payload, senderIP) {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
-      logDbErr
+      (err) => {
+        logDbErr(err);
+        if (!err && msgUid) markIncomingChatUid(msgUid);
+      }
     );
     appendChatLog(receiverKey, `부서_${payload.dept}`, payload.sender, payload.message);
   });
@@ -2983,7 +3037,10 @@ function handleIncomingFloorMessage(payload, senderIP) {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
-      logDbErr
+      (err) => {
+        logDbErr(err);
+        if (!err && msgUid) markIncomingChatUid(msgUid);
+      }
     );
     appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
   });
@@ -2992,27 +3049,29 @@ function handleIncomingFloorMessage(payload, senderIP) {
 /** 1:1 읽음 데스크탑 알림은 상대당 앱 실행 중 딱 1회만 */
 const dmAwaitingReadReceiptNotify = new Map();
 const dmReadReceiptDesktopShown = new Set();
-/** 세션 내 동일 CHAT 재전송 즉시 차단 (DB 조회 대기 없이) */
+/** 세션 내 동일 수신 msg_uid — DB INSERT 성공 후에만 기록 */
 const recentIncomingChatUids = new Map();
 const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
 
-function rememberIncomingChatUid(uid) {
-  const key = String(uid || '').trim();
-  if (!key) return false;
-  const now = Date.now();
-  if (recentIncomingChatUids.size > 800) {
-    recentIncomingChatUids.forEach((t, k) => {
-      if (now - t > RECENT_CHAT_UID_TTL_MS) recentIncomingChatUids.delete(k);
-    });
-  }
-  if (recentIncomingChatUids.has(key)) return true;
-  recentIncomingChatUids.set(key, now);
-  return false;
+function pruneRecentIncomingChatUids(now = Date.now()) {
+  if (recentIncomingChatUids.size <= 800) return;
+  recentIncomingChatUids.forEach((t, k) => {
+    if (now - t > RECENT_CHAT_UID_TTL_MS) recentIncomingChatUids.delete(k);
+  });
 }
 
-/** 채널(전체/부서/층/그룹) 수신 멱등 — 1:1과 동일 TTL 맵 공유 */
-function rememberIncomingChannelUid(uid) {
-  return rememberIncomingChatUid(uid);
+function hasRememberedIncomingChatUid(uid) {
+  const key = String(uid || '').trim();
+  if (!key) return false;
+  pruneRecentIncomingChatUids();
+  return recentIncomingChatUids.has(key);
+}
+
+function markIncomingChatUid(uid) {
+  const key = String(uid || '').trim();
+  if (!key) return;
+  pruneRecentIncomingChatUids();
+  recentIncomingChatUids.set(key, Date.now());
 }
 
 function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
@@ -3021,14 +3080,17 @@ function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
     onUnique();
     return;
   }
-  if (rememberIncomingChannelUid(uid)) return;
+  // 메모리 hit이어도 DB에 없으면 재저장 (조기 remember로 유실된 경우 복구)
   db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
     if (err) {
       logDbErr(err);
       onUnique();
       return;
     }
-    if (row) return;
+    if (row) {
+      markIncomingChatUid(uid);
+      return;
+    }
     onUnique();
   });
 }
@@ -3229,7 +3291,10 @@ function handleIncomingBroadcast(payload, senderIP) {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
       [senderName, senderIP, storedMessage, msgUid],
-      logDbErr
+      (err) => {
+        logDbErr(err);
+        if (!err && msgUid) markIncomingChatUid(msgUid);
+      }
     );
     appendChatLog('BROADCAST', '전체공지', payload.sender, payload.message);
   });
@@ -3566,7 +3631,10 @@ function handleIncomingGroupMessage(payload, senderIP) {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
-      logDbErr
+      (err) => {
+        logDbErr(err);
+        if (!err && msgUid) markIncomingChatUid(msgUid);
+      }
     );
     appendChatLog(receiverKey, payload.groupName || '그룹', payload.sender, payload.message);
   });
@@ -3686,6 +3754,22 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       resolve({ ...result, createdAt, createdAtFull });
     };
 
+    const chatPayload = {
+      type: 'CHAT',
+      sender: myProfile.username,
+      message,
+      urgent: !!urgent,
+      uid: msgUid
+    };
+    if (isChatWireTooLarge(chatPayload)) {
+      finish({
+        status: 'ERROR',
+        error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+        uid: msgUid
+      });
+      return;
+    }
+
     const startTcpSend = (localRowId) => {
       extractAndSaveAttachments(message, { msgUid });
       appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
@@ -3693,7 +3777,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       client.connect(TCP_PORT, targetIP, () => {
         isConnected = true;
         try {
-          client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message, urgent: !!urgent, uid: msgUid }) + '\n');
+          client.write(JSON.stringify(chatPayload) + '\n');
           client.end();
           armDmReadReceiptNotify(targetIP);
           // wire는 원본 전송. DB는 바로 compact 가능(재전송 시 파일→data 복원)
@@ -3786,26 +3870,43 @@ ipcMain.handle('send-broadcast-message', async (event, message) => {
 ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
-  const wireData = JSON.stringify({ type: 'DEPT_MESSAGE', dept, sender: myProfile.username, message, msgUid }) + '\n';
+  const deptPayload = { type: 'DEPT_MESSAGE', dept, sender: myProfile.username, message, msgUid };
+  if (isChatWireTooLarge(deptPayload)) {
+    return {
+      status: 'ERROR',
+      error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+      createdAt,
+      uid: msgUid
+    };
+  }
+  const wireData = JSON.stringify(deptPayload) + '\n';
   onlineUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
     if (u.dept !== dept) return;
     const client = new net.Socket();
+    let delivered = false;
     client.setTimeout(1200);
-    client.connect(TCP_PORT, ip, () => { client.write(wireData); client.end(); });
-    client.on('error', () => {});
-    client.on('timeout', () => client.destroy());
+    client.connect(TCP_PORT, ip, () => {
+      delivered = true;
+      client.write(wireData);
+      client.end();
+    });
+    const queueIfFailed = () => {
+      if (delivered) return;
+      enqueuePendingPeerMessage(encodeDeptPeerKey(ip, dept), message, msgUid);
+    };
+    client.on('error', queueIfFailed);
+    client.on('timeout', () => {
+      client.destroy();
+      queueIfFailed();
+    });
   });
   // 오프라인 동료: 전체공지와 같이 PENDING 큐 (켜지면 재전송)
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
     if ((u.dept || '') !== dept) return;
     if (onlineUsers.has(ip)) return;
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
-      [senderLabelForMe(), MY_IP, encodeDeptPeerKey(ip, dept), message, msgUid],
-      logDbErr
-    );
+    enqueuePendingPeerMessage(encodeDeptPeerKey(ip, dept), message, msgUid);
   });
   return new Promise((resolve) => {
     db.run(
@@ -3824,25 +3925,42 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
 ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
-  const wireData = JSON.stringify({ type: 'FLOOR_MESSAGE', floor, sender: myProfile.username, message, msgUid }) + '\n';
+  const floorPayload = { type: 'FLOOR_MESSAGE', floor, sender: myProfile.username, message, msgUid };
+  if (isChatWireTooLarge(floorPayload)) {
+    return {
+      status: 'ERROR',
+      error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+      createdAt,
+      uid: msgUid
+    };
+  }
+  const wireData = JSON.stringify(floorPayload) + '\n';
   onlineUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
     if (u.floor !== floor) return;
     const client = new net.Socket();
+    let delivered = false;
     client.setTimeout(1200);
-    client.connect(TCP_PORT, ip, () => { client.write(wireData); client.end(); });
-    client.on('error', () => {});
-    client.on('timeout', () => client.destroy());
+    client.connect(TCP_PORT, ip, () => {
+      delivered = true;
+      client.write(wireData);
+      client.end();
+    });
+    const queueIfFailed = () => {
+      if (delivered) return;
+      enqueuePendingPeerMessage(encodeFloorPeerKey(ip, floor), message, msgUid);
+    };
+    client.on('error', queueIfFailed);
+    client.on('timeout', () => {
+      client.destroy();
+      queueIfFailed();
+    });
   });
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
     if ((u.floor || '') !== floor) return;
     if (onlineUsers.has(ip)) return;
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
-      [senderLabelForMe(), MY_IP, encodeFloorPeerKey(ip, floor), message, msgUid],
-      logDbErr
-    );
+    enqueuePendingPeerMessage(encodeFloorPeerKey(ip, floor), message, msgUid);
   });
   return new Promise((resolve) => {
     db.run(
