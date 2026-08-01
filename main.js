@@ -242,6 +242,14 @@ const MAX_TCP_LINE_BUFFER = 512 * 1024;
 const NOTICE_SYNC_SAFE_LINE_BYTES = 400 * 1024;
 /** CHAT 등 단일 TCP 라인 안전 상한 (수신 버퍼 512KB 미만 여유) */
 const MAX_CHAT_WIRE_BYTES = 400 * 1024;
+/** 분할 파일 전송 최대 크기 (이보다 크면 공유 폴더 안내) */
+const MAX_FILE_XFER_BYTES = 10 * 1024 * 1024;
+/** 청크 원본 바이트 — base64(~373KB)+JSON 이 MAX_TCP_LINE_BUFFER(512KB) 아래 */
+const FILE_XFER_CHUNK_RAW_BYTES = 280 * 1024;
+/** 수신 조립 타임아웃 */
+const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 3 * 60 * 1000;
+/** 전송 TCP 타임아웃 (피어당) */
+const FILE_XFER_SEND_TIMEOUT_MS = 90 * 1000;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
@@ -650,6 +658,346 @@ function getReceivedFilesDir() {
     console.error('파일 저장 폴더 생성 오류:', e.message);
   }
   return dir;
+}
+
+/** xferUid → { meta, chunks: Map<index, Buffer>, timer, senderIP } */
+const pendingFileXfers = new Map();
+
+function formatFileSizeLabel(sizeBytes) {
+  const n = Number(sizeBytes) || 0;
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / 1024).toFixed(1)} KB`;
+}
+
+function buildChatFileBoxHtml(fileName, sizeBytes, storedName) {
+  const safeName = String(fileName || 'file').replace(/[<>&"]/g, (ch) => (
+    ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
+  ));
+  const href = `mirae-file://${encodeURIComponent(storedName)}`;
+  const sizeLabel = formatFileSizeLabel(sizeBytes);
+  return `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${safeName}</div><div style="font-size: 11px; color: #64748b;">${sizeLabel}</div></div><a href="${href}" download="${safeName}" style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+}
+
+function clearPendingFileXfer(xferUid) {
+  const entry = pendingFileXfers.get(xferUid);
+  if (!entry) return;
+  if (entry.timer) clearTimeout(entry.timer);
+  pendingFileXfers.delete(xferUid);
+}
+
+function makeStoredFileName(fileName, msgUid) {
+  const safeName = sanitizeFileName(fileName || 'file');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const uidPart = msgUid ? `${sanitizeFileName(String(msgUid).slice(0, 40))}_` : '';
+  return `${uidPart}${timestamp}_${safeName}`;
+}
+
+async function writeReceivedFileAsync(storedName, buffer) {
+  const dir = getReceivedFilesDir();
+  await fs.promises.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, storedName);
+  await fs.promises.writeFile(filePath, buffer);
+  return filePath;
+}
+
+function writeJsonLinesToIp(ip, payloads, timeoutMs) {
+  return new Promise((resolve) => {
+    if (!ip || ip === MY_IP) {
+      resolve(false);
+      return;
+    }
+    const client = new net.Socket();
+    let settled = false;
+    let success = false;
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      try { client.destroy(); } catch (e) { /* ignore */ }
+      resolve(!!ok);
+    };
+    client.setTimeout(timeoutMs || FILE_XFER_SEND_TIMEOUT_MS);
+    client.connect(TCP_PORT, ip, () => {
+      let i = 0;
+      const writeNext = () => {
+        if (settled) return;
+        if (i >= payloads.length) {
+          success = true;
+          client.end();
+          return;
+        }
+        const line = JSON.stringify(payloads[i++]) + '\n';
+        if (Buffer.byteLength(line, 'utf8') > MAX_TCP_LINE_BUFFER - 2048) {
+          console.error('FILE_XFER 청크가 너무 큼 — 중단');
+          done(false);
+          return;
+        }
+        const ok = client.write(line);
+        if (!ok) client.once('drain', () => setImmediate(writeNext));
+        else setImmediate(writeNext);
+      };
+      writeNext();
+    });
+    client.on('close', () => done(success));
+    client.on('error', () => done(false));
+    client.on('timeout', () => done(false));
+  });
+}
+
+function resolveFileXferTargets(chatTarget) {
+  return new Promise((resolve) => {
+    const kind = chatTarget && chatTarget.kind;
+    if (kind === 'dm') {
+      const peerIp = String((chatTarget && chatTarget.peerIp) || '').trim();
+      if (!peerIp) {
+        resolve({ error: '대화 상대를 찾을 수 없습니다.' });
+        return;
+      }
+      if (!onlineUsers.has(peerIp)) {
+        resolve({ error: '상대가 오프라인이라 큰 파일을 보낼 수 없습니다.' });
+        return;
+      }
+      resolve({
+        ips: [peerIp],
+        receiverKey: peerIp,
+        partnerName: (allKnownUsers.get(peerIp) || {}).username || peerIp
+      });
+      return;
+    }
+    if (kind === 'group') {
+      const groupUid = chatTarget && chatTarget.groupUid;
+      if (!groupUid) {
+        resolve({ error: '그룹을 찾을 수 없습니다.' });
+        return;
+      }
+      db.get(`SELECT * FROM group_chats WHERE uid = ?`, [groupUid], (err, row) => {
+        if (err || !row) {
+          resolve({ error: '그룹을 찾을 수 없습니다.' });
+          return;
+        }
+        let members = [];
+        try { members = JSON.parse(row.members); } catch (e) { members = []; }
+        const ips = members
+          .map((m) => m && m.ip)
+          .filter((ip) => ip && ip !== MY_IP && onlineUsers.has(ip));
+        if (!ips.length) {
+          resolve({ error: '온라인인 그룹 멤버가 없어 파일을 보낼 수 없습니다.' });
+          return;
+        }
+        resolve({
+          ips,
+          receiverKey: `GROUP:${groupUid}`,
+          partnerName: row.name || chatTarget.groupName || '그룹',
+          groupName: row.name || chatTarget.groupName || '그룹'
+        });
+      });
+      return;
+    }
+    resolve({ error: '큰 파일은 1:1 또는 그룹에서 보내 주세요.' });
+  });
+}
+
+function buildFileXferPayloads(buf, meta) {
+  const totalChunks = Math.max(1, Math.ceil(buf.length / FILE_XFER_CHUNK_RAW_BYTES));
+  const payloads = [];
+  payloads.push({
+    type: 'FILE_XFER_START',
+    xferUid: meta.xferUid,
+    fileName: meta.fileName,
+    mime: meta.mime || 'application/octet-stream',
+    size: buf.length,
+    totalChunks,
+    chatTarget: meta.chatTarget,
+    sender: meta.sender,
+    msgUid: meta.msgUid
+  });
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * FILE_XFER_CHUNK_RAW_BYTES;
+    const slice = buf.subarray(start, Math.min(start + FILE_XFER_CHUNK_RAW_BYTES, buf.length));
+    payloads.push({
+      type: 'FILE_XFER_CHUNK',
+      xferUid: meta.xferUid,
+      index: i,
+      data: slice.toString('base64')
+    });
+  }
+  payloads.push({ type: 'FILE_XFER_END', xferUid: meta.xferUid });
+  return payloads;
+}
+
+function handleFileXferStart(payload, senderIP) {
+  const xferUid = payload && payload.xferUid;
+  if (!xferUid || !senderIP) return;
+  const size = Number(payload.size) || 0;
+  const totalChunks = Number(payload.totalChunks) || 0;
+  if (size <= 0 || size > MAX_FILE_XFER_BYTES || totalChunks <= 0 || totalChunks > 512) {
+    sendToIpDirect(senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'size_or_chunks' });
+    return;
+  }
+  clearPendingFileXfer(xferUid);
+  const entry = {
+    senderIP,
+    fileName: String(payload.fileName || 'file'),
+    mime: String(payload.mime || 'application/octet-stream'),
+    size,
+    totalChunks,
+    chatTarget: payload.chatTarget || { kind: 'dm' },
+    sender: payload.sender || (allKnownUsers.get(senderIP) || {}).username || senderIP,
+    msgUid: payload.msgUid || null,
+    chunks: new Map(),
+    timer: null
+  };
+  entry.timer = setTimeout(() => {
+    console.error('FILE_XFER 조립 타임아웃:', xferUid);
+    clearPendingFileXfer(xferUid);
+  }, FILE_XFER_ASSEMBLE_TIMEOUT_MS);
+  pendingFileXfers.set(xferUid, entry);
+}
+
+function handleFileXferChunk(payload, senderIP) {
+  const xferUid = payload && payload.xferUid;
+  const entry = pendingFileXfers.get(xferUid);
+  if (!entry || entry.senderIP !== senderIP) return;
+  const index = Number(payload.index);
+  if (!Number.isInteger(index) || index < 0 || index >= entry.totalChunks) return;
+  if (typeof payload.data !== 'string' || !payload.data) return;
+  try {
+    const buf = Buffer.from(payload.data, 'base64');
+    if (buf.length > FILE_XFER_CHUNK_RAW_BYTES + 4096) return;
+    entry.chunks.set(index, buf);
+  } catch (e) {
+    console.error('FILE_XFER 청크 디코드 오류:', e.message);
+  }
+}
+
+function handleFileXferAbort(payload) {
+  if (payload && payload.xferUid) clearPendingFileXfer(payload.xferUid);
+}
+
+async function handleFileXferEnd(payload, senderIP) {
+  const xferUid = payload && payload.xferUid;
+  const entry = pendingFileXfers.get(xferUid);
+  if (!entry || entry.senderIP !== senderIP) return;
+  try {
+    if (entry.chunks.size !== entry.totalChunks) {
+      console.error('FILE_XFER 청크 누락:', entry.chunks.size, '/', entry.totalChunks);
+      clearPendingFileXfer(xferUid);
+      return;
+    }
+    const parts = [];
+    for (let i = 0; i < entry.totalChunks; i++) {
+      const part = entry.chunks.get(i);
+      if (!part) {
+        clearPendingFileXfer(xferUid);
+        return;
+      }
+      parts.push(part);
+    }
+    const buf = Buffer.concat(parts);
+    if (buf.length !== entry.size || buf.length > MAX_FILE_XFER_BYTES) {
+      clearPendingFileXfer(xferUid);
+      return;
+    }
+    clearPendingFileXfer(xferUid);
+
+    const storedName = makeStoredFileName(entry.fileName, entry.msgUid || xferUid);
+    await writeReceivedFileAsync(storedName, buf);
+    const messageHtml = buildChatFileBoxHtml(entry.fileName, entry.size, storedName);
+    const msgUid = entry.msgUid || generateMsgUid();
+    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const senderName = formatSenderDisplay(entry.sender, senderIP);
+    const kind = entry.chatTarget && entry.chatTarget.kind;
+
+    if (kind === 'group' && entry.chatTarget.groupUid) {
+      const receiverKey = `GROUP:${entry.chatTarget.groupUid}`;
+      const groupName = entry.chatTarget.groupName || '그룹';
+      shouldSkipDuplicateChannelMessage(msgUid, () => {
+        if (mainWindow) {
+          safeWebContentsSend('receive-group-message', {
+            uid: entry.chatTarget.groupUid,
+            senderName,
+            senderIP,
+            message: messageHtml,
+            createdAt: currentTime,
+            msgUid,
+            messageId: null
+          });
+          notifyIncomingMessageNotification({
+            title: `👥 [${groupName}] ${senderName}님의 파일`,
+            body: `📎 ${entry.fileName}`,
+            channelKey: receiverKey
+          });
+        }
+        db.run(
+          `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+          [senderName, senderIP, receiverKey, messageHtml, msgUid],
+          (err) => {
+            logDbErr(err);
+            if (!err && msgUid) markIncomingChatUid(msgUid);
+          }
+        );
+        appendChatLog(receiverKey, groupName, entry.sender, messageHtml);
+      });
+      return;
+    }
+
+    // DM (기본)
+    if (senderIP === MY_IP) return;
+    const persistDm = ({ showUi }) => {
+      if (showUi && mainWindow) {
+        safeWebContentsSend('receive-message', {
+          senderName,
+          senderIP,
+          message: messageHtml,
+          urgent: false,
+          createdAt: currentTime,
+          uid: msgUid
+        });
+        notifyIncomingMessageNotification({
+          title: `💬 ${entry.sender}님의 파일`,
+          body: `📎 ${entry.fileName}`,
+          channelKey: senderIP
+        });
+        appendChatLog(`DM_${senderIP}`, entry.sender, entry.sender, messageHtml);
+      }
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+        [senderName, senderIP, MY_IP, messageHtml, msgUid],
+        (err) => {
+          logDbErr(err);
+          if (err) return;
+          if (msgUid) markIncomingChatUid(msgUid);
+          if (msgUid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
+        }
+      );
+    };
+    if (msgUid && hasRememberedIncomingChatUid(msgUid)) {
+      db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [msgUid], (err, row) => {
+        if (err) { logDbErr(err); persistDm({ showUi: false }); return; }
+        if (row) {
+          sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
+          return;
+        }
+        persistDm({ showUi: false });
+      });
+      return;
+    }
+    if (msgUid) {
+      db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [msgUid], (err, row) => {
+        if (err) { logDbErr(err); persistDm({ showUi: true }); return; }
+        if (row) {
+          markIncomingChatUid(msgUid);
+          sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
+          return;
+        }
+        persistDm({ showUi: true });
+      });
+      return;
+    }
+    persistDm({ showUi: true });
+  } catch (e) {
+    console.error('FILE_XFER 완료 처리 오류:', e.message || e);
+    clearPendingFileXfer(xferUid);
+  }
 }
 
 // 💬 채팅 메시지 안에 첨부된 이미지/파일(base64 data URL)을 찾아서 실제 파일로 저장한다.
@@ -2853,6 +3201,14 @@ function routeIncomingPayload(payload, senderIP) {
     case 'PROFILE_PHOTO_SYNC': handleProfilePhotoSync(payload.ip || senderIP, payload.photo); break;
     case 'PROFILE_PHOTO_REQUEST': handleProfilePhotoRequest(senderIP); break;
     case 'PROFILE_OVERRIDE_SYNC': handleProfileOverrideSync(payload); break;
+    case 'FILE_XFER_START': handleFileXferStart(payload, senderIP); break;
+    case 'FILE_XFER_CHUNK': handleFileXferChunk(payload, senderIP); break;
+    case 'FILE_XFER_END':
+      handleFileXferEnd(payload, senderIP).catch((e) => {
+        console.error('FILE_XFER_END 처리 오류:', e.message || e);
+      });
+      break;
+    case 'FILE_XFER_ABORT': handleFileXferAbort(payload); break;
     default: break;
     }
   } catch (e) {
@@ -3732,6 +4088,115 @@ function syncGroupsWithPeer(peerIP) {
     });
   });
 }
+
+ipcMain.handle('send-file-transfer', async (event, opts) => {
+  try {
+    const o = opts || {};
+    const fileName = String(o.fileName || 'file').trim() || 'file';
+    const mime = String(o.mime || 'application/octet-stream');
+    const chatTarget = o.chatTarget || null;
+    const sizeHint = Number(o.size) || 0;
+
+    if (!chatTarget || (chatTarget.kind !== 'dm' && chatTarget.kind !== 'group')) {
+      return { status: 'ERROR', error: '큰 파일은 1:1 또는 그룹에서 보내 주세요.' };
+    }
+
+    let buf;
+    try {
+      if (Buffer.isBuffer(o.data)) buf = o.data;
+      else if (o.data instanceof Uint8Array) buf = Buffer.from(o.data.buffer, o.data.byteOffset, o.data.byteLength);
+      else if (o.data && (o.data instanceof ArrayBuffer || ArrayBuffer.isView(o.data))) {
+        buf = Buffer.from(o.data);
+      } else {
+        return { status: 'ERROR', error: '파일 데이터가 없습니다.' };
+      }
+    } catch (e) {
+      return { status: 'ERROR', error: '파일을 읽지 못했습니다.' };
+    }
+
+    if (!buf.length) return { status: 'ERROR', error: '빈 파일은 보낼 수 없습니다.' };
+    if (buf.length > MAX_FILE_XFER_BYTES || sizeHint > MAX_FILE_XFER_BYTES) {
+      return {
+        status: 'ERROR',
+        error: '파일이 너무 커서 전송할 수 없습니다.\n공유 폴더를 이용해 주세요.'
+      };
+    }
+
+    const targets = await resolveFileXferTargets(chatTarget);
+    if (targets.error) return { status: 'ERROR', error: targets.error };
+
+    const msgUid = generateMsgUid();
+    const xferUid = `${MY_IP}_xf_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const storedName = makeStoredFileName(fileName, msgUid);
+    await writeReceivedFileAsync(storedName, buf);
+    const messageHtml = buildChatFileBoxHtml(fileName, buf.length, storedName);
+
+    const wireChatTarget = chatTarget.kind === 'group'
+      ? { kind: 'group', groupUid: chatTarget.groupUid, groupName: targets.groupName || chatTarget.groupName || '그룹' }
+      : { kind: 'dm' };
+
+    const payloads = buildFileXferPayloads(buf, {
+      xferUid,
+      fileName,
+      mime,
+      chatTarget: wireChatTarget,
+      sender: myProfile.username,
+      msgUid
+    });
+
+    let okCount = 0;
+    for (const ip of targets.ips) {
+      const ok = await writeJsonLinesToIp(ip, payloads, FILE_XFER_SEND_TIMEOUT_MS);
+      if (ok) okCount += 1;
+      await new Promise((r) => setImmediate(r));
+    }
+
+    if (okCount === 0) {
+      return { status: 'ERROR', error: '파일 전송에 실패했습니다. 상대가 오프라인이거나 연결할 수 없습니다.' };
+    }
+
+    const sentAt = new Date();
+    const createdAt = sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const createdAtFull = sentAt.toLocaleString('ko-KR', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+
+    const receiverKey = targets.receiverKey;
+    const partnerName = targets.partnerName || receiverKey;
+
+    const localId = await new Promise((resolve) => {
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+        [senderLabelForMe(), MY_IP, receiverKey, messageHtml, msgUid],
+        function (err) {
+          logDbErr(err);
+          if (chatTarget.kind === 'dm') {
+            appendChatLog(`DM_${receiverKey}`, partnerName, myProfile.username, messageHtml);
+            armDmReadReceiptNotify(receiverKey);
+          } else {
+            appendChatLog(receiverKey, partnerName, myProfile.username, messageHtml);
+          }
+          resolve(err ? null : this.lastID);
+        }
+      );
+    });
+
+    return {
+      status: 'SENT',
+      messageHtml,
+      uid: msgUid,
+      id: localId,
+      createdAt,
+      createdAtFull,
+      deliveredPeers: okCount,
+      totalPeers: targets.ips.length
+    };
+  } catch (e) {
+    console.error('send-file-transfer 오류:', e.message || e);
+    return { status: 'ERROR', error: e.message || '파일 전송에 실패했습니다.' };
+  }
+});
 
 ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
   return new Promise((resolve) => {

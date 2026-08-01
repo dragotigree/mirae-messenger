@@ -9246,6 +9246,8 @@
     const MAX_COMPRESSED_IMAGE_BYTES = 280 * 1024;
     const MAX_NON_IMAGE_BYTES = 250 * 1024;
     const MAX_NON_IMAGE_LABEL = '250KB';
+    /** 분할 TCP 전송 허용 최대 (main.js MAX_FILE_XFER_BYTES 와 동일) */
+    const MAX_FILE_XFER_BYTES = 10 * 1024 * 1024;
     const MAX_IMAGE_LONG_EDGE = 1920;
     const JPEG_QUALITY_START = 0.82;
     const JPEG_QUALITY_MIN = 0.45;
@@ -13028,26 +13030,95 @@
       const isImage = !!(file.type && file.type.startsWith('image/'));
 
       if (!isImage) {
-        if (file.size > MAX_NON_IMAGE_BYTES) {
-          await appAlert(`파일이 너무 큽니다 (${(file.size / 1024).toFixed(0)}KB).\n일반 첨부 파일은 최대 ${MAX_NON_IMAGE_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
+        if (file.size > MAX_FILE_XFER_BYTES) {
+          await appAlert('파일이 너무 커서 전송할 수 없습니다.\n공유 폴더를 이용해 주세요.');
           return;
         }
+
+        const isChannelBroadcast =
+          !!(activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor);
+
+        // 작은 파일: 기존 data URL 임베드 경로 유지
+        if (file.size <= MAX_NON_IMAGE_BYTES) {
+          try {
+            const fileDataUrl = await readFileAsDataUrl(file);
+            const downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${escapeHtmlText(file.name)}"`;
+            const contentHtml =
+              `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${escapeHtmlText(file.name)}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+            dispatchOutgoing(contentHtml).then((res) => {
+              if (res && res.status === 'ERROR') return;
+              appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
+                res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
+                res.createdAtFull || res.createdAt);
+              noteDmOutboundJustSent();
+              if (res.uid) refreshChannelMessageUnreadCounts();
+            });
+          } catch (err) {
+            console.error('첨부 읽기 실패:', err);
+            await appAlert('파일을 읽지 못했습니다.');
+          }
+          return;
+        }
+
+        // 큰 파일(250KB~10MB): 1:1·그룹만 분할 전송. 전체/부서/층은 안내.
+        if (isChannelBroadcast) {
+          await appAlert('큰 파일은 1:1 또는 그룹에서 보내 주세요.');
+          return;
+        }
+
+        let chatTarget = null;
+        if (activeChatUser.isGroup) {
+          let groupUid = activeChatUser.groupUid;
+          if (groupUid == null && activeChatUser.ip && String(activeChatUser.ip).startsWith('GROUP:')) {
+            groupUid = String(activeChatUser.ip).slice(6);
+          }
+          chatTarget = {
+            kind: 'group',
+            groupUid,
+            groupName: activeChatUser.groupName || '그룹'
+          };
+        } else if (isDirectMessagePeerKey(activeChatUser.ip)) {
+          chatTarget = { kind: 'dm', peerIp: activeChatUser.ip };
+        } else {
+          await appAlert('큰 파일은 1:1 또는 그룹에서 보내 주세요.');
+          return;
+        }
+
+        if (!window.api || typeof window.api.sendFileTransfer !== 'function') {
+          await appAlert('이 버전에서는 큰 파일 전송을 지원하지 않습니다. 업데이트 후 다시 시도해 주세요.');
+          return;
+        }
+
         try {
-          const fileDataUrl = await readFileAsDataUrl(file);
-          const downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${escapeHtmlText(file.name)}"`;
-          const contentHtml =
-            `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${escapeHtmlText(file.name)}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
-          dispatchOutgoing(contentHtml).then((res) => {
-            if (res && res.status === 'ERROR') return;
-            appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
-              res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
-              res.createdAtFull || res.createdAt);
-            noteDmOutboundJustSent();
-            if (res.uid) refreshChannelMessageUnreadCounts();
+          const data = await file.arrayBuffer();
+          const res = await window.api.sendFileTransfer({
+            fileName: file.name,
+            mime: file.type || 'application/octet-stream',
+            size: file.size,
+            data,
+            chatTarget
           });
+          if (!res || res.status === 'ERROR') {
+            await appAlert((res && res.error) || '파일 전송에 실패했습니다.');
+            return;
+          }
+          appendMessageRow(
+            res.messageHtml,
+            res.createdAt,
+            profileDisplayName(myProfile),
+            true,
+            false,
+            res.uid,
+            res.id,
+            myProfile && myProfile.ip,
+            null,
+            res.createdAtFull || res.createdAt
+          );
+          noteDmOutboundJustSent();
+          if (res.uid) refreshChannelMessageUnreadCounts();
         } catch (err) {
-          console.error('첨부 읽기 실패:', err);
-          await appAlert('파일을 읽지 못했습니다.');
+          console.error('대용량 파일 전송 실패:', err);
+          await appAlert('파일 전송에 실패했습니다.');
         }
         return;
       }
