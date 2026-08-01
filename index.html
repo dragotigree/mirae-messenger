@@ -1331,6 +1331,18 @@
       padding: 12px 8px; font-size: 14px; vertical-align: middle;
       border-top: 1px solid #f1f5f9; min-width: 0;
     }
+    .schedule-board-table tbody td.schedule-board-room,
+    .schedule-board-table tbody td.schedule-board-name,
+    .schedule-board-table tbody td.schedule-board-detail,
+    .schedule-board-table tbody td.sb-col-doctor,
+    .schedule-board-table tbody td.sb-col-type,
+    .schedule-board-table tbody td.sb-col-remark,
+    .schedule-board-table tbody td.sb-col-meal,
+    .schedule-board-table tbody td.sb-col-time,
+    .schedule-board-table tbody td.sb-col-btns {
+      display: table-cell;
+      vertical-align: middle;
+    }
     .schedule-board-table tbody tr:hover { background: #f8fafc; }
     .schedule-board-table tbody tr.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
     .schedule-board-table td.sb-col-btns { text-align: right; }
@@ -1466,9 +1478,10 @@
     }
     .schedule-board-detail {
       min-width: 0; color: #334155; font-size: 13.5px; font-weight: 500; line-height: 1.4;
-      white-space: normal; overflow: visible; display: block;
+      white-space: normal; overflow: visible;
       word-break: keep-all; overflow-wrap: anywhere;
     }
+    span.schedule-board-detail { display: block; }
     .schedule-board-row .sb-type-cell .badge-admission,
     .schedule-board-row .sb-type-cell .badge-discharge,
     .schedule-board-row .sb-type-cell .badge-outpatient,
@@ -1508,10 +1521,17 @@
     }
     .schedule-board-meals .sb-meal-none { color: #94a3b8; font-weight: 600; }
     .schedule-board-times {
-      display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: #0f172a;
+      display: flex; flex-direction: column; justify-content: center; gap: 3px;
+      font-size: 13px; color: #0f172a;
       flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.25;
     }
     .schedule-board-times span { white-space: nowrap; }
+    .schedule-board-table .sb-type-cell {
+      display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px;
+    }
+    .schedule-board-table .schedule-board-row-btns {
+      display: inline-flex; vertical-align: middle;
+    }
     .schedule-board-row-btns { display: flex; gap: 4px; flex-shrink: 0; justify-content: flex-end; align-items: center; }
     .schedule-board-row-btns button {
       border: none; background: #f1f5f9; padding: 0; border-radius: 8px;
