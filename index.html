@@ -1311,14 +1311,14 @@
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 48px 68px max-content max-content minmax(110px, 1.15fr) minmax(160px, 1.85fr) max-content max-content auto;
+      grid-template-columns: 48px 68px 100px 56px minmax(100px, 1.1fr) minmax(150px, 1.9fr) 108px 88px 132px;
       grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
     }
     .schedule-board-col-head > span { min-width: 0; }
     .schedule-board-col-head.sb-referral-head {
-      grid-template-columns: 48px 48px 68px max-content minmax(0, 1fr) 52px 52px max-content auto;
+      grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       position: sticky; top: 0; z-index: 2; background: #eef2f7; padding-top: 10px; padding-bottom: 8px;
       border-bottom: 1px solid #e2e8f0; margin-bottom: 2px; font-size: 12px;
@@ -1327,28 +1327,28 @@
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 48px 68px max-content max-content minmax(110px, 1.15fr) minmax(160px, 1.85fr) max-content max-content auto;
+      grid-template-columns: 48px 68px 100px 56px minmax(100px, 1.1fr) minmax(150px, 1.9fr) 108px 88px 132px;
       grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 8px; padding: 13px 14px; border-top: 1px solid #f1f5f9; font-size: 14px;
     }
     .schedule-board-row > * { min-width: 0; }
     .schedule-board-row.sb-referral-row {
-      grid-template-columns: 48px 48px 68px max-content minmax(0, 1fr) 52px 52px max-content auto;
+      grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       font-size: 14px; padding: 13px 14px;
     }
     .sb-col-ward { grid-area: sb-ward; }
     .sb-col-room { grid-area: sb-room; }
     .sb-col-name { grid-area: sb-name; }
-    .sb-col-doctor { grid-area: sb-doctor; justify-self: start; width: max-content; max-width: 118px; }
+    .sb-col-doctor { grid-area: sb-doctor; justify-self: start; width: 100%; max-width: 100%; }
     .sb-col-type { grid-area: sb-type; justify-self: start; width: max-content; max-width: 100%; }
     .sb-col-detail { grid-area: sb-detail; }
     .sb-col-remark { grid-area: sb-remark; }
-    .sb-col-meal { grid-area: sb-meal; justify-self: start; width: max-content; max-width: 110px; }
-    .sb-col-time { grid-area: sb-time; justify-self: start; width: max-content; }
+    .sb-col-meal { grid-area: sb-meal; justify-self: start; width: 100%; max-width: 100%; }
+    .sb-col-time { grid-area: sb-time; justify-self: start; width: 100%; }
     .sb-col-tstart { grid-area: sb-tstart; }
     .sb-col-tend { grid-area: sb-tend; }
-    .sb-col-btns { grid-area: sb-btns; justify-self: end; }
+    .sb-col-btns { grid-area: sb-btns; justify-self: end; width: 100%; }
     .schedule-board-row.sb-referral-row .schedule-board-name { font-size: 14.5px; color: #0f172a; }
     .schedule-board-row.sb-referral-row .schedule-board-detail { color: #334155; font-weight: 500; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.35; }
     .schedule-board-ward-col { font-size: 12.5px; font-weight: 800; color: #475569; }
@@ -2829,9 +2829,9 @@
             <label for="sb-quick-detail">목적</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
           </div>
-          <div class="sb-quick-field sb-quick-field--guardian">
+          <div class="sb-quick-field sb-quick-field--guardian" id="sb-quick-guardian-wrap" style="display:none;">
             <label>동행</label>
-            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진·외출하는 경우">
+            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진하는 경우">
               <input type="checkbox" id="sb-quick-guardian-only">보호자만
             </label>
           </div>
@@ -10553,7 +10553,10 @@
     }
 
     function isScheduleGuardianOnly(sch) {
-      return !!(sch && (Number(sch.guardian_only) || sch.guardian_only === true));
+      if (!sch) return false;
+      const type = String(sch.type || '').trim().toUpperCase();
+      if (type !== 'OUTPATIENT') return false;
+      return !!(Number(sch.guardian_only) || sch.guardian_only === true);
     }
 
     function scheduleTypeCellHtml(sch) {
@@ -11228,7 +11231,7 @@
         mealCancelBreakfast: !!document.getElementById('sb-quick-meal-breakfast')?.checked,
         mealCancelLunch: !!document.getElementById('sb-quick-meal-lunch')?.checked,
         mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked,
-        guardianOnly: !!document.getElementById('sb-quick-guardian-only')?.checked,
+        guardianOnly: type === 'OUTPATIENT' && !!document.getElementById('sb-quick-guardian-only')?.checked,
         remark: normalizeScheduleRemarkInput(document.getElementById('sb-quick-remark')?.value)
       };
     }
@@ -11399,6 +11402,11 @@
         const endUnd = document.getElementById('sb-quick-time-end-undecided');
         if (endUnd) endUnd.checked = false;
       }
+      const guardianWrap = document.getElementById('sb-quick-guardian-wrap');
+      const guardianEl = document.getElementById('sb-quick-guardian-only');
+      const isOutpatient = type === 'OUTPATIENT';
+      if (guardianWrap) guardianWrap.style.display = isOutpatient ? 'flex' : 'none';
+      if (!isOutpatient && guardianEl) guardianEl.checked = false;
       syncScheduleBoardQuickTimeUndecidedUi();
       const editing = !!scheduleBoardEditingUid;
       const saveBtn = document.getElementById('sb-quick-save-btn');
@@ -12186,8 +12194,8 @@
           '<span class="sb-col-detail">목적</span>',
           '<span class="sb-col-remark">비고</span>',
           '<span class="sb-col-meal">식사취소</span>',
-          '<span class="sb-col-time">시간</span>',
-          '<span class="sb-col-btns"></span>'
+          '<span class="sb-col-time">출발/귀원</span>',
+          '<span class="sb-col-btns">변경</span>'
         ].join('');
       }
       parent.appendChild(head);

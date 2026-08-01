@@ -3100,6 +3100,8 @@ function scheduleMealCancelFromPayload(p) {
 
 function scheduleGuardianOnlyFromPayload(p) {
   const o = p || {};
+  const type = String(o.type || '').trim().toUpperCase();
+  if (type !== 'OUTPATIENT') return 0;
   return (o.guardianOnly || o.guardian_only) ? 1 : 0;
 }
 
