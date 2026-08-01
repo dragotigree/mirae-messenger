@@ -3816,23 +3816,29 @@
 
     const dmReadReceiptDebounceTimers = {};
     const pendingDmReadPeers = new Set();
-    let lastUserActivityAt = Date.now();
+    /** 실제 마우스/키보드 입력이 있을 때만 갱신. 포커스만으로는 읽음 처리하지 않음 */
+    let lastUserActivityAt = 0;
+    let messengerWindowFocused = typeof document !== 'undefined' && typeof document.hasFocus === 'function'
+      ? document.hasFocus()
+      : true;
+    const READ_RECEIPT_ACTIVITY_MS = 20_000;
 
     function isDmChatActivelyViewed() {
+      if (!messengerWindowFocused) return false;
       if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') {
         return false;
       }
-      if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) {
+      if (autoAwayTriggered) return false;
+      // 화면보호기·다른 앱: 최근 입력이 없으면 대화방이 열려 있어도 읽지 않은 것
+      if (!lastUserActivityAt || Date.now() - lastUserActivityAt > READ_RECEIPT_ACTIVITY_MS) {
         return false;
       }
-      if (autoAwayTriggered) return false;
-      // 화면보호기 등으로 입력이 끊기면 포커스가 남아 있어도 읽지 않은 것으로 본다
-      if (Date.now() - lastUserActivityAt > 90_000) return false;
       return true;
     }
 
     function markUserActivityForReadReceipt() {
       lastUserActivityAt = Date.now();
+      messengerWindowFocused = true;
     }
 
     function scheduleDmReadReceipt(peerIp) {
@@ -3842,7 +3848,6 @@
         return;
       }
       clearTimeout(dmReadReceiptDebounceTimers[peerIp]);
-      // 상대(보낸 사람) 화면에 바로 「읽음」이 뜨도록 거의 즉시 전송
       dmReadReceiptDebounceTimers[peerIp] = setTimeout(() => {
         delete dmReadReceiptDebounceTimers[peerIp];
         requestDmReadReceipt(peerIp, { force: true }).catch(() => {});
@@ -3896,7 +3901,8 @@
     }
 
     function retryDmReadReceiptIfNeeded() {
-      markUserActivityForReadReceipt();
+      // 포커스만 돌아온 경우에는 보내지 않음 — 실제 입력 후 flushPendingDmReadReceipts
+      if (!isDmChatActivelyViewed()) return;
       flushPendingDmReadReceipts();
       if (!activeChatUser || !isDirectMessagePeerKey(activeChatUser.ip)) return;
       if (dmReadReceiptSentFor[activeChatUser.ip]) return;
@@ -4275,8 +4281,9 @@
       if (autoAwayTriggered) {
         autoAwayTriggered = false;
         window.api.saveMyProfile({ statusState: 'ONLINE' }).then(() => updateMyStatusBadge('ONLINE'));
-        flushPendingDmReadReceipts();
       }
+      // 화면보호기/다른 화면에서 돌아온 뒤, 실제 조작이 있을 때만 읽음 전송
+      flushPendingDmReadReceipts();
       clearTimeout(idleTimer);
       idleTimer = setTimeout(async () => {
         try {
@@ -4291,10 +4298,23 @@
         }
       }, IDLE_MS);
     }
-    ['mousemove', 'mousedown', 'click', 'keydown'].forEach(evt => {
+    ['mousemove', 'mousedown', 'click', 'keydown', 'wheel'].forEach(evt => {
       window.addEventListener(evt, resetIdleTimer, { passive: true });
     });
-    resetIdleTimer();
+    // 최초 기동 시에는 입력으로 치지 않음 (읽음 오발송 방지)
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(async () => {
+      try {
+        const p = await window.api.getMyProfile();
+        if (p.statusState === 'ONLINE') {
+          autoAwayTriggered = true;
+          await window.api.saveMyProfile({ statusState: 'TREATMENT' });
+          updateMyStatusBadge('TREATMENT');
+        }
+      } catch (e) {
+        console.error('자리비움 전환 실패:', e);
+      }
+    }, IDLE_MS);
 
     window.api.onUserListUpdate((users) => {
       persistContactSnapshotsFromUserList(users);
@@ -4610,6 +4630,7 @@
 
       if (isChatCurrentlyOpen(data.senderIP)) {
         appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
+        // 화면보호기·다른 화면이면 읽음 보내지 않음 (실제 입력 후에만)
         scheduleDmReadReceipt(data.senderIP);
       } else {
         bumpUnread(data.senderIP);
@@ -4676,14 +4697,20 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        markUserActivityForReadReceipt();
-        retryDmReadReceiptIfNeeded();
+      if (document.visibilityState !== 'visible') {
+        // 다른 화면/최소화 — 이후 실제 입력이 있을 때까지 읽음 금지
+        lastUserActivityAt = 0;
+        return;
       }
+      // visible만으로는 읽음 보내지 않음 (화면보호기 해제 직후 오발송 방지)
+    });
+    window.addEventListener('blur', () => {
+      messengerWindowFocused = false;
+      lastUserActivityAt = 0;
     });
     window.addEventListener('focus', () => {
-      markUserActivityForReadReceipt();
-      retryDmReadReceiptIfNeeded();
+      messengerWindowFocused = true;
+      // 포커스만으로는 읽음 보내지 않음 — 마우스/키보드 입력을 기다림
     });
 
     window.api.onMessageReactionUpdate((data) => {

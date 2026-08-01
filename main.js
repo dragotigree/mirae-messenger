@@ -3564,6 +3564,10 @@ ipcMain.handle('notify-read', async (event, targetIP) => {
       String(targetIP).startsWith('FLOOR:') || String(targetIP).startsWith('GROUP:')) {
     return { success: false };
   }
+  // 창이 포커스되지 않은 상태(화면보호기·다른 앱)에서는 읽음 통지 차단
+  if (!toastUiState.focused) {
+    return { success: false, reason: 'window-not-focused' };
+  }
   return new Promise((resolve) => {
     const client = new net.Socket();
     let settled = false;
