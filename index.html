@@ -4055,21 +4055,31 @@
         const existing = row.querySelector('.msg-send-status');
         const st = row.getAttribute('data-outbound-status') || '';
         const uid = row.getAttribute('data-msg-uid') || '';
-        if (st === 'PENDING' || messageRowIsOutboundPending(row)) {
+        const isLast = idx === lastIdx;
+        const isPending = st === 'PENDING' || messageRowIsOutboundPending(row);
+        const isAcked = !!(uid && isDmMsgAckedRead(peerIp, uid));
+
+        // 전송 실패(오류): 해당 메시지에 표시
+        if (isPending) {
           paintSendStatusSpan(ensureOutboundStatusSpan(row), 'error');
           return;
         }
-        // 읽음은 맨 마지막 메시지에만
-        if (peerRead && idx === lastIdx) {
-          paintSendStatusSpan(ensureOutboundStatusSpan(row), 'read');
+
+        // 마지막 내가 보낸 메시지: 읽음 / 보냄 / 오류
+        if (isLast) {
+          if (peerRead || isAcked) {
+            paintSendStatusSpan(ensureOutboundStatusSpan(row), 'read');
+          } else {
+            paintSendStatusSpan(ensureOutboundStatusSpan(row), 'sent');
+          }
           return;
         }
-        // 이전에 읽음 확인된 메시지 → 표시 없음
-        if (uid && isDmMsgAckedRead(peerIp, uid)) {
+
+        // 이전 메시지: 상대가 읽지 않은 것만 '보냄', 이미 읽은 것은 표시 없음
+        if (peerRead || isAcked) {
           if (existing) existing.remove();
           return;
         }
-        // 아직 안 읽은 메시지 → 보냄
         paintSendStatusSpan(ensureOutboundStatusSpan(row), 'sent');
       });
     }
