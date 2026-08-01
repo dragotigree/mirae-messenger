@@ -9308,10 +9308,14 @@
     async function submitMessageReaction(msgKey, emoji) {
       if (!msgKey || !emoji || !activeChatUser) return;
       const { targetIP, groupUid } = getEditMessageContext();
-      const res = await window.api.toggleMessageReaction(msgKey, emoji, targetIP, groupUid);
-      if (res && res.success) {
-        pushRecentReactionEmoji(emoji);
-        updateRowReactions(msgKey, res.reactions);
+      try {
+        const res = await window.api.toggleMessageReaction(msgKey, emoji, targetIP, groupUid);
+        if (res && res.success) {
+          pushRecentReactionEmoji(emoji);
+          updateRowReactions(msgKey, res.reactions);
+        }
+      } catch (e) {
+        console.error('리액션 저장 실패:', e);
       }
       closeReactionPicker();
     }
@@ -9402,7 +9406,10 @@
     document.getElementById('reaction-picker-body').addEventListener('click', (e) => {
       const btn = e.target.closest('[data-pick-emoji]');
       if (!btn || !reactionPickerState.key) return;
-      submitMessageReaction(reactionPickerState.key, btn.getAttribute('data-pick-emoji'));
+      e.preventDefault();
+      e.stopPropagation();
+      const emoji = btn.getAttribute('data-pick-emoji') || (btn.textContent || '').trim();
+      submitMessageReaction(reactionPickerState.key, emoji);
     });
 
     document.addEventListener('mousedown', (e) => {

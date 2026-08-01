@@ -4724,6 +4724,8 @@ ipcMain.handle('toggle-message-reaction', async (event, { msgKey, emoji, targetI
     if (!msgKey || !emoji) { resolve({ success: false }); return; }
     db.get(`SELECT emoji FROM message_reactions WHERE msg_key = ? AND reactor_ip = ?`, [msgKey, MY_IP], (err, row) => {
       if (err) { resolve({ success: false }); return; }
+      // 같은 이모지를 다시 누르면 해제, 다른 이모지면 교체
+      const remove = !!(row && String(row.emoji) === String(emoji));
       if (remove) {
         db.run(`DELETE FROM message_reactions WHERE msg_key = ? AND reactor_ip = ?`, [msgKey, MY_IP], (err2) => {
           if (err2) { resolve({ success: false }); return; }
