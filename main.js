@@ -1195,6 +1195,8 @@ db.serialize(() => {
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_at TEXT DEFAULT ''`, () => {});
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_by_name TEXT DEFAULT ''`, () => {});
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_by_ip TEXT DEFAULT ''`, () => {});
+  db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_start_undecided INTEGER DEFAULT 0`, () => {});
+  db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_end_undecided INTEGER DEFAULT 0`, () => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3018,9 +3020,10 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   if (Array.isArray(schedules)) {
     schedules.forEach(s => {
       const meta = schedulePatientMetaFromPayload(s);
+      const und = scheduleTimeUndecidedFromPayload(s);
       db.run(
-        `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name],
+        `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided],
         logDbErr
       );
     });
@@ -3070,12 +3073,21 @@ function schedulePatientMetaFromPayload(p) {
   };
 }
 
+function scheduleTimeUndecidedFromPayload(p) {
+  const o = p || {};
+  return {
+    time_start_undecided: (o.timeStartUndecided || o.time_start_undecided) ? 1 : 0,
+    time_end_undecided: (o.timeEndUndecided || o.time_end_undecided) ? 1 : 0
+  };
+}
+
 function handleScheduleAdd(s) {
   if (!s || !s.uid) return;
   const meta = schedulePatientMetaFromPayload(s);
+  const und = scheduleTimeUndecidedFromPayload(s);
   db.run(
-    `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name],
+    `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided],
     () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
   );
 }
@@ -3090,12 +3102,13 @@ function handleScheduleDelete(uid) {
 function handleScheduleEdit(s) {
   if (!s || !s.uid) return;
   const meta = schedulePatientMetaFromPayload(s);
+  const und = scheduleTimeUndecidedFromPayload(s);
   const modAt = s.modified_at || '';
   const modName = s.modified_by_name || '';
   const modIp = s.modified_by_ip || '';
   db.run(
-    `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-    [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, modAt, modName, modIp, s.uid],
+    `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+    [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, modAt, modName, modIp, s.uid],
     () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
   );
 }
@@ -4348,6 +4361,7 @@ ipcMain.handle('add-schedule', async (event, payload) => {
     }
     const p = payload || {};
     const meta = schedulePatientMetaFromPayload(p);
+    const und = scheduleTimeUndecidedFromPayload(p);
     const record = {
       uid: `${MY_IP}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: p.type,
@@ -4362,11 +4376,13 @@ ipcMain.handle('add-schedule', async (event, payload) => {
       ward: meta.ward,
       rm_team: meta.rm_team,
       room_no: meta.room_no,
-      patient_name: meta.patient_name
+      patient_name: meta.patient_name,
+      time_start_undecided: und.time_start_undecided,
+      time_end_undecided: und.time_end_undecided
     };
     db.run(
-      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name],
+      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided],
       (err) => {
         if (!err) broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
         resolve(err ? { success: false, msg: err.message || '등록 실패' } : { success: true, ...record });
@@ -4398,12 +4414,13 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
   }
   return new Promise((resolve) => {
     const meta = schedulePatientMetaFromPayload(p);
+    const und = scheduleTimeUndecidedFromPayload(p);
     const attending = p.attendingPhysician || '';
     const timeEnd = p.timeEndStr || '';
     const audit = scheduleModificationAudit();
     db.run(
-      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-      [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
+      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+      [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
       (err) => {
         if (!err) {
           broadcastToOnlinePeers({
@@ -4412,6 +4429,7 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
               uid: p.uid, type: p.type, title: p.title, time_str: p.timeStr,
               remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
               ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
+              time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
               modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip
             }
           });

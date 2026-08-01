@@ -1511,6 +1511,19 @@
       padding: 6px 4px;
       font-size: 11px;
     }
+    .sb-quick-time-row {
+      display: flex; align-items: center; gap: 6px; min-width: 0;
+    }
+    .sb-quick-time-row input[type="time"] { flex: 1; min-width: 0; }
+    .sb-quick-time-row input[type="time"]:disabled {
+      background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
+    }
+    .sb-quick-undecided {
+      display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+      font-size: 10.5px; font-weight: 700; color: #0369a1; cursor: pointer;
+      white-space: nowrap; user-select: none;
+    }
+    .sb-quick-undecided input { width: auto; margin: 0; accent-color: #0284c7; cursor: pointer; }
     .sb-quick-field input:focus, .sb-quick-field select:focus { outline: none; border-color: #7dd3fc; }
     .sb-quick-save-btn {
       width: 100%; padding: 0 8px; border: none; border-radius: 9px; font-size: 11.5px; font-weight: 700;
@@ -2698,11 +2711,21 @@
           </div>
           <div class="sb-quick-field">
             <label for="sb-quick-time-start" id="sb-quick-time-start-label">출발</label>
-            <input type="time" id="sb-quick-time-start" value="09:00">
+            <div class="sb-quick-time-row">
+              <input type="time" id="sb-quick-time-start" value="09:00">
+              <label class="sb-quick-undecided" title="출발 시간 미정">
+                <input type="checkbox" id="sb-quick-time-start-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
+              </label>
+            </div>
           </div>
           <div class="sb-quick-field" id="sb-quick-time-end-wrap">
             <label for="sb-quick-time-end">귀원</label>
-            <input type="time" id="sb-quick-time-end" value="12:00">
+            <div class="sb-quick-time-row">
+              <input type="time" id="sb-quick-time-end" value="12:00">
+              <label class="sb-quick-undecided" title="귀원 시간 미정">
+                <input type="checkbox" id="sb-quick-time-end-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
+              </label>
+            </div>
           </div>
           <div class="sb-quick-field">
             <label for="sb-quick-detail">목적지·검사명</label>
@@ -10510,12 +10533,26 @@
       return `${h12}${minPart}${isPm ? 'P' : 'A'}`;
     }
 
+    function isScheduleStartUndecided(sch) {
+      if (!sch) return true;
+      return !!(Number(sch.time_start_undecided) || sch.time_start_undecided === true);
+    }
+
+    function isScheduleEndUndecided(sch) {
+      if (!sch) return true;
+      if (Number(sch.time_end_undecided) || sch.time_end_undecided === true) return true;
+      // 외진·외출·외박인데 귀원 시각이 없으면 미정으로 간주
+      if (SCHEDULE_RANGE_TYPES.has(sch.type || '') && !String(sch.time_end_str || '').trim()) return true;
+      return false;
+    }
+
     function formatMainBoardTimeLabel(sch) {
-      const startAmpm = formatMainBoardAmpmLabel(sch?.time_str);
-      const endAmpm = formatMainBoardAmpmLabel(sch?.time_end_str);
-      const startPart = startAmpm || '미정';
-      const endPart = endAmpm || '미정';
-      // 외진·외출·외박 등: 출발·도착 / 그 외 단일도 동일하게 표시(없으면 미정)
+      const startPart = isScheduleStartUndecided(sch)
+        ? '미정'
+        : (formatMainBoardAmpmLabel(sch?.time_str) || '미정');
+      const endPart = isScheduleEndUndecided(sch)
+        ? '미정'
+        : (formatMainBoardAmpmLabel(sch?.time_end_str) || '미정');
       return `(${startPart} 출발 · ${endPart} 도착)`;
     }
 
@@ -10788,9 +10825,23 @@
     function applyScheduleBoardQuickTimePreset(start, end) {
       const s = document.getElementById('sb-quick-time-start');
       const e = document.getElementById('sb-quick-time-end');
+      const su = document.getElementById('sb-quick-time-start-undecided');
+      const eu = document.getElementById('sb-quick-time-end-undecided');
+      if (su) su.checked = false;
+      if (eu) eu.checked = false;
       if (s) s.value = start;
       if (e) e.value = end;
+      syncScheduleBoardQuickTimeUndecidedUi();
       saveScheduleBoardQuickPrefs();
+    }
+
+    function syncScheduleBoardQuickTimeUndecidedUi() {
+      const startUnd = !!document.getElementById('sb-quick-time-start-undecided')?.checked;
+      const endUnd = !!document.getElementById('sb-quick-time-end-undecided')?.checked;
+      const startEl = document.getElementById('sb-quick-time-start');
+      const endEl = document.getElementById('sb-quick-time-end');
+      if (startEl) startEl.disabled = startUnd;
+      if (endEl) endEl.disabled = endUnd;
     }
 
     function collectScheduleBoardQuickSharedFields() {
@@ -10798,15 +10849,31 @@
       const type = document.getElementById('sb-quick-type')?.value || 'OUTPATIENT';
       const ward = (document.getElementById('sb-quick-ward')?.value || '').trim();
       const doctor = (document.getElementById('sb-quick-doctor')?.value || '').trim();
-      const startTime = document.getElementById('sb-quick-time-start')?.value || '09:00';
-      const endTime = document.getElementById('sb-quick-time-end')?.value || '12:00';
+      const startUndecided = !!document.getElementById('sb-quick-time-start-undecided')?.checked;
+      const endUndecided = !!document.getElementById('sb-quick-time-end-undecided')?.checked;
+      // 미정이어도 날짜 배치는 되도록 정오 시각을 보관
+      const startTime = startUndecided
+        ? '12:00'
+        : (document.getElementById('sb-quick-time-start')?.value || '09:00');
       const timeStr = `${dateStr}T${startTime}`;
       let timeEndStr = '';
+      let timeEndUndecided = false;
       if (SCHEDULE_RANGE_TYPES.has(type)) {
-        timeEndStr = `${dateStr}T${endTime}`;
+        if (endUndecided) {
+          timeEndUndecided = true;
+          timeEndStr = '';
+        } else {
+          const endTime = document.getElementById('sb-quick-time-end')?.value || '12:00';
+          timeEndStr = `${dateStr}T${endTime}`;
+        }
       }
       const { attendingPhysician, rmTeam } = attendingFromPhysicianSelect(doctor);
-      return { type, ward, rmTeam, attendingPhysician, timeStr, timeEndStr, startTime, endTime, dateStr };
+      return {
+        type, ward, rmTeam, attendingPhysician, timeStr, timeEndStr,
+        startTime, dateStr,
+        timeStartUndecided: startUndecided,
+        timeEndUndecided
+      };
     }
 
     function normalizeQuickRoomNo(roomNo) {
@@ -10825,7 +10892,7 @@
       if (!title) {
         throw new Error('empty');
       }
-      if (shared.timeEndStr && new Date(shared.timeEndStr) <= new Date(shared.timeStr)) {
+      if (shared.timeEndStr && !shared.timeStartUndecided && new Date(shared.timeEndStr) <= new Date(shared.timeStr)) {
         throw new Error('time');
       }
       await window.api.addSchedule({
@@ -10835,6 +10902,8 @@
         remindBefore: false,
         attendingPhysician: shared.attendingPhysician,
         timeEndStr: shared.timeEndStr,
+        timeStartUndecided: !!shared.timeStartUndecided,
+        timeEndUndecided: !!shared.timeEndUndecided,
         ward: entry.ward != null ? entry.ward : shared.ward,
         rmTeam: shared.rmTeam,
         roomNo,
@@ -10945,6 +11014,7 @@
       if (docSel) ensureAttendingPhysicianSelectOptions(docSel, docSel.value || '');
       updateScheduleBoardQuickAddUi();
       bindScheduleBoardQuickAddKeyboard();
+      syncScheduleBoardQuickTimeUndecidedUi();
       const saveBtn = document.getElementById('sb-quick-save-btn');
       if (saveBtn && !saveBtn.dataset.hinted) {
         saveBtn.dataset.hinted = '1';
@@ -10959,6 +11029,11 @@
       const isRange = SCHEDULE_RANGE_TYPES.has(type);
       if (endWrap) endWrap.style.display = isRange ? 'flex' : 'none';
       if (startLabel) startLabel.textContent = isRange ? '출발' : '시간';
+      if (!isRange) {
+        const endUnd = document.getElementById('sb-quick-time-end-undecided');
+        if (endUnd) endUnd.checked = false;
+      }
+      syncScheduleBoardQuickTimeUndecidedUi();
       const editing = !!scheduleBoardEditingUid;
       const saveBtn = document.getElementById('sb-quick-save-btn');
       const cancelBtn = document.getElementById('sb-quick-cancel-edit');
@@ -10994,6 +11069,11 @@
           endEl.value = `${String(d2.getHours()).padStart(2, '0')}:${String(d2.getMinutes()).padStart(2, '0')}`;
         }
       }
+      const startUndEl = document.getElementById('sb-quick-time-start-undecided');
+      const endUndEl = document.getElementById('sb-quick-time-end-undecided');
+      if (startUndEl) startUndEl.checked = isScheduleStartUndecided(sch);
+      if (endUndEl) endUndEl.checked = isScheduleEndUndecided(sch);
+      syncScheduleBoardQuickTimeUndecidedUi();
       const docSel = document.getElementById('sb-quick-doctor');
       const ap = (sch.attending_physician || '').trim();
       if (docSel) {
@@ -11067,7 +11147,7 @@
       }
       try {
         const shared = collectScheduleBoardQuickSharedFields();
-        if (shared.timeEndStr && new Date(shared.timeEndStr) <= new Date(shared.timeStr)) {
+        if (shared.timeEndStr && !shared.timeStartUndecided && new Date(shared.timeEndStr) <= new Date(shared.timeStr)) {
           await appAlert('귀원 시간은 출발 시간보다 이후여야 합니다.');
           return;
         }
@@ -11081,6 +11161,8 @@
             remindBefore: false,
             attendingPhysician: shared.attendingPhysician,
             timeEndStr: shared.timeEndStr,
+            timeStartUndecided: !!shared.timeStartUndecided,
+            timeEndUndecided: !!shared.timeEndUndecided,
             ward: shared.ward,
             rmTeam: shared.rmTeam,
             roomNo: normalizeQuickRoomNo(roomNo),
@@ -11424,8 +11506,8 @@
         '구분': typeLabel,
         '주치의': (sch.attending_physician || '').trim(),
         '상세내용': detail,
-        '출발': sch.time_str ? formatScheduleTime(sch.time_str) : '',
-        '귀원': sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '',
+        '출발': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
+        '귀원': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
         '작성자': sch.author_name || '',
         '수정일시': sch.modified_at ? formatScheduleModifiedDisplay(sch.modified_at) : '',
         '수정자': (sch.modified_by_name || '').trim(),
@@ -11548,10 +11630,12 @@
       const rm = (norm.rm_team || '').trim();
       const doctorPart = attending || rm || '';
       let timePart = '';
-      if (sch.time_end_str) {
-        timePart = `${formatScheduleTime(sch.time_str)}~${formatScheduleTime(sch.time_end_str)}`;
+      if (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch) || isScheduleStartUndecided(sch)) {
+        const startL = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '미정');
+        const endL = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '미정');
+        timePart = `${startL}~${endL}`;
       } else if (sch.time_str) {
-        timePart = formatScheduleTime(sch.time_str);
+        timePart = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
       }
       const parts = [];
       if (ward) parts.push(ward);
@@ -11567,9 +11651,11 @@
       if (scheduleBoardView === 'main') return scheduleBoardReferralLineText(sch);
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
-      const times = sch.time_end_str
-        ? `출발 ${formatScheduleTime(sch.time_str)} 귀원 ${formatScheduleTime(sch.time_end_str)}`
-        : formatScheduleTime(sch.time_str);
+      const startL = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '');
+      const endL = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
+      const times = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || endL)
+        ? `출발 ${startL || '미정'} 귀원 ${endL || '미정'}`
+        : (startL || '');
       return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), times].filter(Boolean).join('\t');
     }
 
@@ -11720,8 +11806,8 @@
           const attending = scheduleBoardAttendingLabel(sch, norm);
           if (isReferral) {
             const wardLbl = scheduleBoardWardShortLabel(norm) || '-';
-            const startT = sch.time_str ? formatScheduleTime(sch.time_str) : '-';
-            const endT = sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-';
+            const startT = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '-');
+            const endT = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-');
             row.innerHTML = `
               <span class="schedule-board-ward-col">${escapeHtml(wardLbl)}</span>
               <span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>
@@ -11735,9 +11821,11 @@
               ${modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''}
             `;
           } else {
-            const timeHtml = sch.time_end_str
-              ? `<span>출발 ${formatScheduleTime(sch.time_str)}</span><span>귀원 ${formatScheduleTime(sch.time_end_str)}</span>`
-              : `<span>${formatScheduleTime(sch.time_str)}</span>`;
+            const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
+            const endLabel = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
+            const timeHtml = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch))
+              ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
+              : `<span>${escapeHtml(startLabel)}</span>`;
             row.innerHTML = `
               <span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>
               <span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>
