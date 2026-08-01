@@ -224,7 +224,7 @@ function getToastPreloadPath() {
   return resolvedToastPreloadPath;
 }
 
-// 미니 모드 상단 툴바(공지·관리·파일·기억·기록·새로고침 6개)가 잘리지 않도록 최소 너비 확보
+// 미니 모드 상단 툴바(공지·관리·파일·기록·새로고침 등)가 잘리지 않도록 최소 너비 확보
 const COMPACT_DEFAULT_WIDTH = 480;
 const COMPACT_DEFAULT_HEIGHT = 680;
 const COMPACT_MIN_WIDTH = 480;

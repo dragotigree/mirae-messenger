@@ -388,7 +388,6 @@
     .left-footer-btn #master-lock-btn { --footer-icon: #fbbf24; --footer-icon-hover: #fde68a; }
     .left-footer-btn #master-lock-btn.is-master-authed { --footer-icon: #86efac; --footer-icon-hover: #bbf7d0; color: #86efac; }
     .left-footer-btn #toolbar-logs-btn { --footer-icon: #67e8f9; --footer-icon-hover: #a5f3fc; }
-    .left-footer-btn #toolbar-pin-btn { --footer-icon: #f9a8d4; --footer-icon-hover: #fbcfe8; }
     .left-footer-btn #toolbar-folder-btn { --footer-icon: #fcd34d; --footer-icon-hover: #fde68a; }
     .left-footer-btn #toolbar-refresh-btn { --footer-icon: #6ee7b7; --footer-icon-hover: #a7f3d0; }
     .left-footer-btn #compact-mode-btn { --footer-icon: #c4b5fd; --footer-icon-hover: #ddd6fe; }
@@ -1856,10 +1855,6 @@
     .calendar-day-add-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
     .calendar-day-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
-    .pinned-item { background: #fffbeb; border: 1px solid #fde68a; padding: 12px 14px; border-radius: 18px; font-size: 12px; margin-bottom: 10px; position: relative; }
-    .pinned-item-content { font-weight: 600; color: #78350f; margin-bottom: 6px; word-break: break-all; line-height: 1.5; }
-    .pinned-item-time { font-size: 11px; color: #92400e; display: flex; justify-content: space-between; align-items: center; }
-
     /* 📜 전체 대화 기록 모달 */
     .modal-card.all-logs-modal-card { width: 640px; height: 620px; max-height: 90vh; padding: 0; gap: 0; overflow: hidden; }
     .all-logs-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px 16px; border-bottom: 1px solid #eef2f6; flex-shrink: 0; }
@@ -2254,7 +2249,6 @@
       <div class="brand-icons footer-toolbar">
         <button class="icon-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
         <button class="icon-btn" id="toolbar-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+Alt+E)"></button>
-        <button class="icon-btn" id="toolbar-pin-btn" onclick="openPinnedModal()" title="기억할 내용 보관함"></button>
         <button class="icon-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
         <button class="icon-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
@@ -2335,7 +2329,6 @@
               <button type="button" class="compact-more-cell" onclick="openBoardModal()"><span class="compact-more-cell-icon" data-ui-icon="notice"></span>공지</button>
               <button type="button" class="compact-more-cell" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span class="compact-more-cell-icon" id="compact-master-lock-icon" data-ui-icon="lock"></span>관리</button>
               <button type="button" class="compact-more-cell" onclick="window.api.openFilesFolder()"><span class="compact-more-cell-icon" data-ui-icon="folder"></span>파일</button>
-              <button type="button" class="compact-more-cell" onclick="openPinnedModal()"><span class="compact-more-cell-icon" data-ui-icon="pin"></span>기억</button>
               <button type="button" class="compact-more-cell" onclick="openAllLogsModal()"><span class="compact-more-cell-icon" data-ui-icon="logs"></span>기록</button>
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
@@ -2568,17 +2561,6 @@
         <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
       </div>
       <div id="all-logs-container" class="all-logs-list"></div>
-    </div>
-  </div>
-
-  <!-- 📌 기억할 내용 보관함 모달 -->
-  <div id="pinned-modal" class="modal-overlay">
-    <div class="modal-card" style="width:480px; max-height:550px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent); padding-bottom:12px;">
-        <div style="font-size:17px; font-weight:700; color:#0369a1;">📌 기억할 내용 보관함</div>
-        <button style="padding:6px 10px; background:#f1f5f9; border:none; border-radius: 12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;" onclick="closePinnedModal()">✖ 닫기</button>
-      </div>
-      <div id="pinned-modal-container" style="flex:1; overflow-y:auto; padding-top:8px;"></div>
     </div>
   </div>
 
@@ -3823,7 +3805,6 @@
       return String(uid || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
     let canManageNotices = false;
-    let pinnedMessages = JSON.parse(localStorage.getItem('pinnedMessages') || '[]');
     let hospitalSchedules = [];
     let schedulesByDateStr = new Map();
     let scheduleBoardEventDates = new Set();
@@ -4769,7 +4750,6 @@
     function paintUiIcons() {
       const pairs = [
         ['toolbar-logs-btn', 'logs'],
-        ['toolbar-pin-btn', 'pin'],
         ['toolbar-folder-btn', 'folder'],
         ['toolbar-refresh-btn', 'refresh'],
         ['toolbar-settings-btn', 'settings'],
@@ -5209,8 +5189,7 @@
         { test: () => isFlexOverlay('master-admin-modal'), close: () => closeMasterAdminModal(), confirm: true, name: '관리자' },
         { test: () => isFlexOverlay('settings-modal'), close: () => closeSettingsModal(), confirm: true, name: '환경설정' },
         { test: () => isFlexOverlay('board-modal'), close: () => closeBoardModal(), confirm: true, name: '공지 게시판' },
-        { test: () => isFlexOverlay('all-logs-modal'), close: () => closeAllLogsModal(), confirm: true, name: '전체 로그' },
-        { test: () => isFlexOverlay('pinned-modal'), close: () => closePinnedModal(), confirm: true, name: '핀 메시지' }
+        { test: () => isFlexOverlay('all-logs-modal'), close: () => closeAllLogsModal(), confirm: true, name: '전체 로그' }
       ];
     }
 
@@ -8080,15 +8059,6 @@
       });
     }
 
-    function openPinnedModal() {
-      renderPinnedMessages();
-      document.getElementById('pinned-modal').style.display = 'flex';
-    }
-
-    function closePinnedModal() {
-      document.getElementById('pinned-modal').style.display = 'none';
-    }
-
     function openBoardModal() {
       document.getElementById('board-modal').style.display = 'flex';
       refreshNoticePermission();
@@ -10687,7 +10657,7 @@
                 <div class="chat-bubble">${displayMsg}</div>
                 ${bubbleMetaAfter}
               </div>
-              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button><button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌공지</button></span>
+              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button><button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌</button></span>
             </div>
             ${pendingNoticeHtml}
             ${reactionsHostHtml}
@@ -10720,8 +10690,7 @@
                 ${reactBtnHtml}
                 <button type="button" class="copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button>
                 <button type="button" class="share-btn" title="다른 사람에게 전달" onclick="shareThisMessage(this)">↪️</button>
-                <button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌공지</button>
-                <button type="button" class="pin-btn" title="기억하기" onclick="pinThisMessage(this, \`${encodeURIComponent(msg)}\`, \`${time}\`, \`${encodeURIComponent(displayName)}\`)">📌</button>
+                <button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌</button>
               </div>
             </div>
             ${reactionsHostHtml}
@@ -11047,44 +11016,6 @@
       setTimeout(() => { btn.textContent = orig; }, 800);
     }
 
-    function pinThisMessage(btn, encodedMsg, time, encodedSender) {
-      const msgText = decodeURIComponent(encodedMsg);
-      const senderName = decodeURIComponent(encodedSender || '');
-      const newItem = { id: Date.now(), text: msgText, time: time, sender: senderName || '상대방' };
-      pinnedMessages.unshift(newItem);
-      localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
-      btn.textContent = '✅';
-      setTimeout(() => btn.textContent = '📌', 1000);
-    }
-
-    function renderPinnedMessages() {
-      const container = document.getElementById('pinned-modal-container');
-      if (!container) return;
-      if (pinnedMessages.length === 0) {
-        container.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px; padding: 40px 12px;">중요한 대화 말풍선에 마우스를 올리고 <b>[📌]</b> 아이콘을 눌러 기억할 내용을 저장해 보세요!</div>`;
-        return;
-      }
-      container.innerHTML = '';
-      pinnedMessages.forEach((item) => {
-        const div = document.createElement('div');
-        div.className = 'pinned-item';
-        div.innerHTML = `
-          <div class="pinned-item-content">${item.text}</div>
-          <div class="pinned-item-time">
-            <span>👤 ${item.sender} (${item.time})</span>
-            <span style="color: #ef4444; cursor: pointer; font-weight: 700;" onclick="removePinnedMessage(${item.id})">삭제</span>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    function removePinnedMessage(id) {
-      pinnedMessages = pinnedMessages.filter(item => item.id !== id);
-      localStorage.setItem('pinnedMessages', JSON.stringify(pinnedMessages));
-      renderPinnedMessages();
-    }
-
     function getActiveChatChannelKey() {
       return activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : '';
     }
@@ -11163,7 +11094,7 @@
       if (btn) {
         const prev = btn.textContent;
         btn.textContent = '✅';
-        setTimeout(() => { btn.textContent = prev || '📌공지'; }, 900);
+        setTimeout(() => { btn.textContent = prev || '📌'; }, 900);
       }
     }
 
