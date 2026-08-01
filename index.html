@@ -1441,11 +1441,16 @@
     .schedule-board-row-btns button { border: none; background: #f1f5f9; padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; }
     .schedule-board-row-btns button:hover { background: #e2e8f0; }
     .schedule-board-row-btns .sb-del { color: #dc2626; background: #fef2f2; }
-    .schedule-board-row.has-modified { align-items: start; }
     .schedule-board-row.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
-    .schedule-board-modified {
-      grid-column: 1 / -1; font-size: 10px; color: #94a3b8; margin-top: -2px; padding-bottom: 2px;
+    .schedule-board-row.has-modified { position: relative; }
+    .sb-mod-tip {
+      position: fixed; z-index: 10050; pointer-events: none;
+      max-width: min(360px, 90vw); padding: 8px 11px; border-radius: 10px;
+      background: #0f172a; color: #f8fafc; font-size: 12px; font-weight: 600;
+      line-height: 1.4; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+      opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease;
     }
+    .sb-mod-tip.is-visible { opacity: 1; transform: translateY(0); }
     .sb-quick-cancel-edit-btn {
       margin-left: 6px; border: none; background: #f1f5f9; color: #475569; padding: 8px 12px;
       border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer;
@@ -10817,6 +10822,60 @@
       return `${formatScheduleModifiedDisplay(sch.modified_at)} · ${who}`;
     }
 
+    let scheduleBoardModTipEl = null;
+    let scheduleBoardModTipTimer = null;
+
+    function hideScheduleBoardModTip() {
+      if (scheduleBoardModTipTimer) {
+        clearTimeout(scheduleBoardModTipTimer);
+        scheduleBoardModTipTimer = null;
+      }
+      if (scheduleBoardModTipEl) {
+        scheduleBoardModTipEl.classList.remove('is-visible');
+        scheduleBoardModTipEl.remove();
+        scheduleBoardModTipEl = null;
+      }
+    }
+
+    function showScheduleBoardModTip(modMeta, clientX, clientY) {
+      hideScheduleBoardModTip();
+      const tip = document.createElement('div');
+      tip.className = 'sb-mod-tip';
+      tip.textContent = `수정: ${modMeta}`;
+      document.body.appendChild(tip);
+      scheduleBoardModTipEl = tip;
+      const pad = 12;
+      let left = clientX + 14;
+      let top = clientY + 16;
+      const rect = tip.getBoundingClientRect();
+      if (left + rect.width + pad > window.innerWidth) left = Math.max(pad, clientX - rect.width - 10);
+      if (top + rect.height + pad > window.innerHeight) top = Math.max(pad, clientY - rect.height - 10);
+      tip.style.left = `${Math.round(left)}px`;
+      tip.style.top = `${Math.round(top)}px`;
+      requestAnimationFrame(() => tip.classList.add('is-visible'));
+    }
+
+    function bindScheduleBoardModifiedHover(row, modMeta) {
+      if (!row || !modMeta) return;
+      row.classList.add('has-modified');
+      let lastX = 0;
+      let lastY = 0;
+      row.addEventListener('mouseenter', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (scheduleBoardModTipTimer) clearTimeout(scheduleBoardModTipTimer);
+        scheduleBoardModTipTimer = setTimeout(() => {
+          scheduleBoardModTipTimer = null;
+          showScheduleBoardModTip(modMeta, lastX, lastY);
+        }, 500);
+      });
+      row.addEventListener('mousemove', (e) => {
+        lastX = e.clientX;
+        lastY = e.clientY;
+      });
+      row.addEventListener('mouseleave', () => hideScheduleBoardModTip());
+    }
+
     function formatSidebarCalendarDayTime(sch) {
       if (!sch || !sch.time_str) return '';
       const start = new Date(sch.time_str);
@@ -12030,7 +12089,7 @@
           const norm = normalizeSchedulePatient(sch);
           const row = document.createElement('div');
           const modMeta = formatScheduleModifiedMeta(sch);
-          row.className = 'schedule-board-row' + (isReferral ? ' sb-referral-row' : '') + (modMeta ? ' has-modified' : '') + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
+          row.className = 'schedule-board-row' + (isReferral ? ' sb-referral-row' : '') + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
           const badge = scheduleBadgeHtml(sch.type);
           const detail = scheduleBoardDetailText(sch, norm);
           const canRowManage = canModifySchedule(sch);
@@ -12056,8 +12115,7 @@
               `<span class="schedule-board-time-cell">${escapeHtml(startT)}</span>`,
               `<span class="schedule-board-time-cell">${escapeHtml(endT)}</span>`,
               `<span class="schedule-board-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
-              `<div class="schedule-board-row-btns">${manageHtml}</div>`,
-              modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''
+              `<div class="schedule-board-row-btns">${manageHtml}</div>`
             ].join('');
           } else {
             const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
@@ -12074,13 +12132,13 @@
               scheduleBoardRemarkCellHtml(sch),
               scheduleBoardMealCellHtml(sch),
               `<div class="schedule-board-times">${timeHtml}</div>`,
-              `<div class="schedule-board-row-btns">${manageHtml}</div>`,
-              modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''
+              `<div class="schedule-board-row-btns">${manageHtml}</div>`
             ].join('');
           }
           row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
           row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
           row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
+          bindScheduleBoardModifiedHover(row, modMeta);
           sec.appendChild(row);
         });
         body.appendChild(sec);
