@@ -1,4 +1,4 @@
 {
-  "version": "1.0.281",
-  "notes": "수동업데이트.cmd UTF-8 깨짐 수정(ASCII) + hotfix ps1 UTF-8 BOM"
+  "version": "1.0.282",
+  "notes": "manual-hotfix-update.ps1: param()을 try/chcp보다 앞으로 이동(ParserError 수정)"
 }

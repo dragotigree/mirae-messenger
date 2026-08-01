@@ -1,21 +1,22 @@
-﻿# encoding: UTF-8 BOM
-try {
-  chcp 65001 | Out-Null
-  [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
-  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-  $OutputEncoding = [Console]::OutputEncoding
-} catch {}
-# Mirae Messenger — 앱이 안 열릴 때 / 업데이트가 멈췄을 때 수동 핫픽스
+﻿# Mirae Messenger — 앱이 안 열릴 때 / 업데이트가 멈췄을 때 수동 핫픽스
 # 사용법 (메신저 종료 후):
 #   powershell -ExecutionPolicy Bypass -File "Z:\9.재활치료실(PT&OT&언어&임상심리)\물리치료실\messenger\scripts\manual-hotfix-update.ps1"
 #   powershell -ExecutionPolicy Bypass -File "...\manual-hotfix-update.ps1" -ForceKill
 #   powershell -ExecutionPolicy Bypass -File "...\manual-hotfix-update.ps1" -TargetAppDir "C:\...\resources\app"
+# NOTE: param() must be first statement (comments/#Requires only above it).
 
 param(
   [string]$SourceDir = (Split-Path -Parent $PSScriptRoot),
   [string]$TargetAppDir = '',
   [switch]$ForceKill
 )
+
+try {
+  chcp 65001 | Out-Null
+  [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
+  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+  $OutputEncoding = [Console]::OutputEncoding
+} catch {}
 
 $ErrorActionPreference = 'Stop'
 
