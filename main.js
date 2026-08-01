@@ -313,9 +313,13 @@ let profileLoaded = false;
 let showNotificationPreview = true;
 let notifyIncomingMessages = true;
 let notifyReadReceipts = true;
+/** 새 메시지 알림 방식: toast(기본) | desktop — 둘 중 하나만 표시 */
+let incomingNotifyMode = 'toast';
 /** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
 let toastDurationSeconds = 7;
 let pendingToastChannelKey = '';
+/** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
+const activeIncomingNotifyUntil = new Map();
 let spellCheckerEnabled = false;
 
 // 🔄 쉬운 업데이트 기능: package.json의 version 값을 단일 기준으로 사용한다.
@@ -533,10 +537,13 @@ function getDisplayForIncomingToast() {
 function closeMessageToast() {
   clearTimeout(toastDismissTimer);
   toastDismissTimer = null;
+  const key = pendingToastChannelKey;
+  if (key) activeIncomingNotifyUntil.delete(key);
   if (toastWindow && !toastWindow.isDestroyed()) {
     toastWindow.close();
   }
   toastWindow = null;
+  pendingToastChannelKey = '';
 }
 
 function truncateToastText(text, maxLen) {
@@ -556,8 +563,13 @@ function showMessageToast({ title, body, urgent, channelKey }) {
   const x = Math.round(work.x + (work.width - width) / 2);
   const y = Math.round(work.y + (work.height - height) / 2);
 
+  clearTimeout(toastDismissTimer);
+  toastDismissTimer = null;
+  if (toastWindow && !toastWindow.isDestroyed()) {
+    toastWindow.close();
+  }
+  toastWindow = null;
   pendingToastChannelKey = String(channelKey || '');
-  closeMessageToast();
 
   toastWindow = new BrowserWindow({
     width,
@@ -622,13 +634,27 @@ function notifyIncomingMessageNotification(opts) {
   if (!notifyIncomingMessages) return;
   if (shouldSuppressMessageToast(opts && opts.channelKey)) return;
   const o = opts || {};
-  showMessageToast(o);
-  showDesktopNotification({
-    title: o.title || '새 메시지',
-    body: o.body || '메시지가 도착했습니다.',
-    urgent: !!o.urgent,
-    channelKey: o.channelKey
-  });
+  const key = String(o.channelKey || '').trim() || '__unknown__';
+  const now = Date.now();
+  const until = activeIncomingNotifyUntil.get(key) || 0;
+  // 동일 발신/채널: 알림 유지 시간 동안은 추가 알림 없음 (토스트·데스크탑 공통)
+  if (until > now) return;
+
+  const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
+  const ms = ((o.urgent ? secs + 2 : secs) * 1000);
+  activeIncomingNotifyUntil.set(key, now + ms);
+
+  const mode = incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
+  if (mode === 'desktop') {
+    showDesktopNotification({
+      title: o.title || '새 메시지',
+      body: o.body || '메시지가 도착했습니다.',
+      urgent: !!o.urgent,
+      channelKey: o.channelKey
+    });
+  } else {
+    showMessageToast(o);
+  }
 }
 
 let chatLogDirEnsured = false;
@@ -1839,6 +1865,7 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_incoming_messages INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_read_receipts INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
@@ -1852,6 +1879,11 @@ db.serialize(() => {
       if (row.toast_duration_seconds != null) {
         const n = parseInt(row.toast_duration_seconds, 10);
         if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
+      }
+      if (row.incoming_notify_mode === 'desktop' || row.incoming_notify_mode === 'toast') {
+        incomingNotifyMode = row.incoming_notify_mode;
+      } else {
+        incomingNotifyMode = 'toast';
       }
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
@@ -6070,7 +6102,8 @@ ipcMain.handle('set-notification-preview-setting', async (event, enabled) => {
 ipcMain.handle('get-message-notification-settings', async () => ({
   notifyIncomingMessages,
   notifyReadReceipts,
-  toastDurationSeconds
+  toastDurationSeconds,
+  incomingNotifyMode
 }));
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
@@ -6084,12 +6117,15 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
     const n = parseInt(settings.toastDurationSeconds, 10);
     if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
   }
+  if (settings && (settings.incomingNotifyMode === 'toast' || settings.incomingNotifyMode === 'desktop')) {
+    incomingNotifyMode = settings.incomingNotifyMode;
+  }
   db.run(
-    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ? WHERE id = 1`,
-    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds],
+    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ?, incoming_notify_mode = ? WHERE id = 1`,
+    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds, incomingNotifyMode],
     logDbErr
   );
-  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds };
+  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds, incomingNotifyMode };
 });
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);

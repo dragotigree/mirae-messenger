@@ -2665,9 +2665,21 @@
             <input type="checkbox" id="setting-notify-incoming" checked>
             <span class="settings-toggle-text">
               <span class="settings-toggle-title">새 메시지 알림</span>
-              <span class="settings-toggle-desc">상대가 메시지를 보냈을 때 토스트·데스크탑 알림 (보고 있는 대화방은 제외)</span>
+              <span class="settings-toggle-desc">상대가 메시지를 보냈을 때 알림 (보고 있는 대화방은 제외). 같은 상대의 연속 메시지는 알림 1개만 표시</span>
             </span>
           </label>
+          <div style="padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:13px; font-weight:700; color:#0f172a;">알림 방식</div>
+            <div style="font-size:11px; color:#94a3b8; line-height:1.4; margin-top:-2px;">토스트와 데스크탑 중 하나만 사용합니다. 기본값은 토스트입니다.</div>
+            <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="radio" name="incoming-notify-mode" value="toast" id="notify-mode-toast" checked>
+              토스트 알림 (화면 중앙)
+            </label>
+            <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="radio" name="incoming-notify-mode" value="desktop" id="notify-mode-desktop">
+              데스크탑 알림 (OS 알림)
+            </label>
+          </div>
           <label class="settings-toggle-row" for="setting-notify-read-receipt">
             <input type="checkbox" id="setting-notify-read-receipt" checked>
             <span class="settings-toggle-text">
@@ -2685,7 +2697,7 @@
           <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px;">
             <span class="settings-toggle-text" style="flex:1;">
               <span class="settings-toggle-title" style="display:block; font-size:13px; font-weight:700; color:#0f172a;">토스트 표시 시간</span>
-              <span class="settings-toggle-desc" style="display:block; font-size:11px; color:#94a3b8; margin-top:2px;">중앙 토스트가 자동으로 사라지기까지 (2~60초, 긴급은 +2초)</span>
+              <span class="settings-toggle-desc" style="display:block; font-size:11px; color:#94a3b8; margin-top:2px;">토스트 알림이 자동으로 사라지기까지 (2~60초, 긴급은 +2초). 같은 상대 알림 묶음에도 사용</span>
             </span>
             <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
               <input type="number" id="setting-toast-duration" min="2" max="60" step="1" value="7" style="width:64px; padding:7px 8px; border:1px solid #cbd5e1; border-radius:9px; font-size:13px; text-align:center;">
@@ -2693,7 +2705,7 @@
             </span>
           </label>
         </div>
-        <p class="settings-notify-note">토스트의 <b>열기</b>는 해당 대화로 이동하고, <b>닫기</b>는 바로 숨깁니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다.</p>
+        <p class="settings-notify-note">토스트의 <b>열기</b>는 해당 대화로 이동하고, <b>닫기</b>는 바로 숨깁니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다. 같은 상대가 연속으로 보내도 알림은 1개만 표시됩니다.</p>
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
@@ -13411,6 +13423,11 @@
     const toastDurEl = document.getElementById('setting-toast-duration');
     if (incomingEl) incomingEl.checked = msgNotify.notifyIncomingMessages !== false;
     if (readReceiptEl) readReceiptEl.checked = msgNotify.notifyReadReceipts !== false;
+    const mode = msgNotify.incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
+    const modeToastEl = document.getElementById('notify-mode-toast');
+    const modeDesktopEl = document.getElementById('notify-mode-desktop');
+    if (modeToastEl) modeToastEl.checked = mode === 'toast';
+    if (modeDesktopEl) modeDesktopEl.checked = mode === 'desktop';
     if (toastDurEl) {
       const secs = parseInt(msgNotify.toastDurationSeconds, 10);
       toastDurEl.value = String(Number.isFinite(secs) ? Math.max(2, Math.min(60, secs)) : 7);
@@ -13451,6 +13468,8 @@
     const n = parseInt(toastDurEl.value, 10);
     if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
   }
+  const notifyModeEl = document.querySelector('input[name="incoming-notify-mode"]:checked');
+  const incomingNotifyMode = (notifyModeEl && notifyModeEl.value === 'desktop') ? 'desktop' : 'toast';
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
@@ -13476,7 +13495,12 @@
   
   await window.api.setAutoLaunch(autoLaunch);
   await window.api.setNotificationPreviewSetting(notificationPreview);
-  await window.api.setMessageNotificationSettings({ notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds });
+  await window.api.setMessageNotificationSettings({
+    notifyIncomingMessages,
+    notifyReadReceipts,
+    toastDurationSeconds,
+    incomingNotifyMode
+  });
   await syncSpellcheckEngine();
 
   applyAppSettingsToUI();
