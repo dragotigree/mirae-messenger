@@ -95,47 +95,6 @@ function pendingUpdateDir() {
   return path.join(app.getPath('userData'), 'pending-update');
 }
 
-function startupLoadingMarkerPath() {
-  return path.join(app.getPath('userData'), 'startup-loading.json');
-}
-
-/** 재시작 직후 스플래시에 "업데이트 적용 중" 등을 보여 주기 위한 마커 */
-function markStartupLoading(reason, extra = {}) {
-  try {
-    fs.writeFileSync(startupLoadingMarkerPath(), JSON.stringify({
-      reason: String(reason || 'restart'),
-      at: Date.now(),
-      version: APP_VERSION,
-      ...extra
-    }), 'utf8');
-  } catch (e) {
-    console.warn('[startup-loading] 마커 저장 실패:', e.message);
-  }
-}
-
-function consumeStartupLoadingInfo() {
-  const p = startupLoadingMarkerPath();
-  try {
-    if (!fs.existsSync(p)) return null;
-    const raw = fs.readFileSync(p, 'utf8');
-    fs.unlinkSync(p);
-    const data = JSON.parse(raw);
-    // 너무 오래된 마커는 무시 (비정상 종료 후 재실행 등)
-    if (data && data.at && (Date.now() - Number(data.at)) > 10 * 60 * 1000) return null;
-    return data;
-  } catch (e) {
-    try { fs.unlinkSync(p); } catch (_) {}
-    return null;
-  }
-}
-
-function relaunchForUpdate(extra = {}) {
-  markStartupLoading('update', extra);
-  isQuitting = true;
-  app.relaunch();
-  app.exit();
-}
-
 function pendingRelSafe(relPath) {
   return String(relPath).replace(/\//g, '__');
 }
@@ -2121,8 +2080,6 @@ function createWindow() {
     title: "Mirae Messenger",
     icon: getAppNativeIcon(),
     frame: false,
-    backgroundColor: '#0a2540',
-    show: false,
     webPreferences: {
       preload: getMainPreloadPath(),
       contextIsolation: true,
@@ -2134,9 +2091,6 @@ function createWindow() {
 
   mainWindow.setMenu(null);
   attachEditableContextMenu(mainWindow.webContents);
-  mainWindow.once('ready-to-show', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
-  });
   mainWindow.loadFile('index.html');
 
   mainWindow.on('hide', () => {
@@ -6176,11 +6130,6 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);
 
-ipcMain.handle('get-startup-loading-info', async () => {
-  const info = consumeStartupLoadingInfo();
-  return info || { reason: 'normal' };
-});
-
 ipcMain.handle('get-update-source-path', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   return updateSourcePath;
@@ -6347,11 +6296,6 @@ ipcMain.handle('apply-update', async () => {
   if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
   try {
     await applyUpdateFiles();
-    let nextVersion = APP_VERSION;
-    try {
-      nextVersion = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version || APP_VERSION;
-    } catch (e) {}
-    markStartupLoading('update', { from: 'apply-update', remoteVersion: nextVersion });
     setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
@@ -6386,7 +6330,9 @@ async function autoCheckAndApplyUpdate() {
     });
     clearTimeout(pendingRestartTimer);
     pendingRestartTimer = setTimeout(() => {
-      relaunchForUpdate({ from: 'auto-countdown', remoteVersion: pendingUpdateRemoteVersion });
+      isQuitting = true;
+      app.relaunch();
+      app.exit();
     }, 30000);
   } catch (e) {
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
@@ -6406,15 +6352,15 @@ ipcMain.handle('snooze-pending-restart', async (event, minutes) => {
         countdownSeconds: 30
       });
     }
-    pendingRestartTimer = setTimeout(() => {
-      relaunchForUpdate({ from: 'snooze-countdown', remoteVersion: pendingUpdateRemoteVersion });
-    }, 30000);
+    pendingRestartTimer = setTimeout(() => { isQuitting = true; app.relaunch(); app.exit(); }, 30000);
   }, snoozeMs);
   return true;
 });
 
 ipcMain.handle('restart-now-for-update', async () => {
-  relaunchForUpdate({ from: 'restart-now', remoteVersion: pendingUpdateRemoteVersion });
+  isQuitting = true;
+  app.relaunch();
+  app.exit();
 });
 
 function startUpdateChecker() {

@@ -101,7 +101,6 @@ contextBridge.exposeInMainWorld('api', {
 
   // 🔄 쉬운 업데이트
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  getStartupLoadingInfo: () => ipcRenderer.invoke('get-startup-loading-info'),
   getUpdateSourcePath: () => ipcRenderer.invoke('get-update-source-path'),
   setUpdateSourcePath: (folderPath) => ipcRenderer.invoke('set-update-source-path', folderPath),
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
