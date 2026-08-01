@@ -2374,7 +2374,8 @@
 
     <div class="sidebar-section-title">
       <span>📅 병원 달력</span>
-      <div style="display:flex; gap:4px;">
+      <div style="display:flex; gap:4px; align-items:center;">
+        <button type="button" id="sidebar-cal-refresh-btn" style="padding:4px 8px; background:#f8fafc; color:#475569; border:1px solid #e2e8f0; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
         <button type="button" style="padding:4px 8px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; border-radius:9px; font-size:10.5px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardModal()">📋 현황판</button>
         <button id="add-sch-btn" style="display:none; padding:4px 8px; background:var(--accent); color:#fff; border:none; border-radius: 9px; font-size:11px; cursor:pointer; font-weight:700;" onclick="openScheduleBoardForQuickAdd()">+ 일정 등록</button>
       </div>
@@ -10710,6 +10711,22 @@
         schedulesRefreshInFlight = null;
       });
       return schedulesRefreshInFlight;
+    }
+
+    async function refreshSidebarHospitalCalendar() {
+      const btn = document.getElementById('sidebar-cal-refresh-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '…';
+      }
+      try {
+        await refreshSchedulesFromServer();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔄';
+        }
+      }
     }
 
     function formatCalendarDayHeader(dateStr) {

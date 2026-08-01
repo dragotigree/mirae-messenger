@@ -1077,6 +1077,20 @@ function safeWebContentsSend(channel, ...args) {
   }
 }
 
+/** 일정 DB 변경 시 메인·현황판 등 모든 창에 반영 */
+function notifySchedulesChanged() {
+  try {
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win || win.isDestroyed()) return;
+      const wc = win.webContents;
+      if (!wc || wc.isDestroyed()) return;
+      try { wc.send('schedules-update'); } catch (e) { /* ignore */ }
+    });
+  } catch (e) {
+    console.error('schedules-update broadcast 실패:', e.message);
+  }
+}
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3035,7 +3049,7 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
         logDbErr
       );
     });
-    if (mainWindow) safeWebContentsSend('schedules-update');
+    if (mainWindow) notifySchedulesChanged();
   }
   if (Array.isArray(remoteProfileOverrides)) {
     remoteProfileOverrides.forEach((row) => {
@@ -3120,14 +3134,14 @@ function handleScheduleAdd(s) {
   db.run(
     `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly],
-    () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
+    () => { notifySchedulesChanged(); }
   );
 }
 
 function handleScheduleDelete(uid) {
   if (!uid) return;
   db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [uid], () => {
-    if (mainWindow) safeWebContentsSend('schedules-update');
+    notifySchedulesChanged();
   });
 }
 
@@ -3144,7 +3158,7 @@ function handleScheduleEdit(s) {
   db.run(
     `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
     [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
-    () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
+    () => { notifySchedulesChanged(); }
   );
 }
 
@@ -4427,7 +4441,10 @@ ipcMain.handle('add-schedule', async (event, payload) => {
       `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided, record.meal_cancel_breakfast, record.meal_cancel_lunch, record.meal_cancel_dinner, record.remark, record.guardian_only],
       (err) => {
-        if (!err) broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
+        if (!err) {
+          broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
+          notifySchedulesChanged();
+        }
         resolve(err ? { success: false, msg: err.message || '등록 실패' } : { success: true, ...record });
       }
     );
@@ -4441,7 +4458,10 @@ ipcMain.handle('delete-schedule', async (event, uid) => {
   }
   return new Promise((resolve) => {
     db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [uid], (err) => {
-      if (!err) broadcastToOnlinePeers({ type: 'SCHEDULE_DELETE', uid });
+      if (!err) {
+        broadcastToOnlinePeers({ type: 'SCHEDULE_DELETE', uid });
+        notifySchedulesChanged();
+      }
       resolve({ success: !err });
     });
   });
@@ -4482,6 +4502,7 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
               modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip
             }
           });
+          notifySchedulesChanged();
         }
         resolve({ success: !err });
       }
