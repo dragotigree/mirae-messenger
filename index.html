@@ -10859,10 +10859,17 @@
       return `(${startPart} 출발 · ${endPart} 도착)`;
     }
 
+    function scheduleBoardRoomLabel(roomNo) {
+      const raw = String(roomNo || '').trim();
+      if (!raw) return '';
+      const digits = raw.replace(/\D/g, '');
+      if (digits) return digits;
+      return raw.replace(/호/g, '').trim();
+    }
+
     function scheduleBoardMainEntryHtml(sch) {
       const norm = normalizeSchedulePatient(sch);
-      let room = (norm.room_no || '').trim();
-      if (room && !room.includes('호')) room = room.replace(/\s/g, '') + '호';
+      const room = scheduleBoardRoomLabel(norm.room_no);
       const name = (norm.patient_name || '').trim();
       // title 잔여분 = 병원명·진료과(메모)
       const dest = (scheduleBoardDetailText(sch, norm) || '').trim();
@@ -11977,8 +11984,7 @@
       const doctorLabel = (sch.attending_physician || '').trim() || (norm.rm_team || '').trim() || '미지정';
       const mealTxt = formatScheduleMealCancelText(sch);
       const remarkParts = [scheduleBoardRemarkText(sch), mealTxt ? `식사취소 ${mealTxt.replace(/ 취소$/, '')}` : ''].filter(Boolean);
-      let room = (norm.room_no || '').trim();
-      if (room && !/호/.test(room)) room = `${room.replace(/\s/g, '')}호`;
+      let room = scheduleBoardRoomLabel(norm.room_no);
       return {
         'RM': norm.rm_team || '',
         '병동': wardLabel,
@@ -12113,7 +12119,7 @@
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
       const ward = scheduleBoardWardShortLabel(norm);
-      const room = (norm.room_no || '').trim() || '-';
+      const room = scheduleBoardRoomLabel(norm.room_no) || '-';
       const patient = (norm.patient_name || '').trim() || (sch.title || '').trim() || '-';
       const purpose = scheduleBoardDetailText(sch, norm) || '';
       const attending = scheduleBoardAttendingLabel(sch, norm);
@@ -12151,7 +12157,7 @@
         : (startL || '');
       const mealTxt = formatScheduleMealCancelText(sch);
       const remarkTxt = scheduleBoardRemarkText(sch);
-      return [norm.room_no, norm.patient_name || sch.title, typeOut, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), remarkTxt, mealTxt, times].filter(Boolean).join('\t');
+      return [scheduleBoardRoomLabel(norm.room_no), norm.patient_name || sch.title, typeOut, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), remarkTxt, mealTxt, times].filter(Boolean).join('\t');
     }
 
     function printScheduleBoardReferral() {
@@ -12412,7 +12418,7 @@
             const endT = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-');
             row.innerHTML = [
               `<span class="schedule-board-ward-col sb-col-ward">${escapeHtml(wardLbl)}</span>`,
-              `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
+              `<span class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</span>`,
               `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
               `<div class="sb-col-type">${typeCell}</div>`,
               `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
@@ -12432,7 +12438,7 @@
               ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>`
               : '—';
             row.innerHTML = [
-              `<td class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</td>`,
+              `<td class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</td>`,
               `<td class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</td>`,
               `<td class="sb-col-doctor">${doctorHtml}</td>`,
               `<td class="sb-col-type">${typeCell}</td>`,
