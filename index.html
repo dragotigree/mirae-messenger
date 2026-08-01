@@ -1270,6 +1270,22 @@
     }
     .sb-board-side .sb-chip-row { gap: 5px; }
     .sb-board-side .schedule-board-chip { padding: 5px 8px; font-size: 11px; }
+    #schedule-board-ward-chips {
+      flex-wrap: nowrap;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #schedule-board-ward-chips::-webkit-scrollbar { display: none; }
+    #schedule-board-ward-chips .schedule-board-chip.sb-ward-chip {
+      width: 28px; height: 28px; border-radius: 10px; flex-shrink: 0;
+    }
+    #schedule-board-ward-chips .schedule-board-chip.sb-ward-chip .sb-ward-icon {
+      width: 20px; height: 20px; border-radius: 7px; font-size: 12px;
+    }
+    #schedule-board-ward-chips .schedule-board-chip:not(.sb-ward-chip) {
+      padding: 5px 8px; flex-shrink: 0; white-space: nowrap;
+    }
     .sb-board-side .sb-search-inline { flex-direction: column; align-items: stretch; gap: 5px; }
     .sb-board-side .sb-search-inline .schedule-board-search { width: 100%; max-width: none; flex: none; font-size: 12px; padding: 6px 8px; }
     .sb-board-side .schedule-board-mini-cal { padding: 8px; border-radius: 12px; }
