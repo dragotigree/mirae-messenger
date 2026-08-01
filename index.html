@@ -95,10 +95,45 @@
     .compact-brand-sub, .compact-item-dept, .msg-time, .bubble-time, .group-member-sub {
       font-weight: var(--font-weight-regular);
     }
-    #splash-screen { position: fixed; inset: 0; z-index: 9999; background: #ffffff; display: flex; align-items: center; justify-content: center; transition: opacity .4s ease; }
-    #splash-screen img { width: 260px; height: auto; animation: splash-fade-in .5s ease; }
+    #splash-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(165deg, #0a2540 0%, #081c32 48%, #0c4a6e 100%);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity .45s ease;
+    }
+    #update-applying-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100000;
+      background: linear-gradient(165deg, #0a2540 0%, #081c32 48%, #0c4a6e 100%);
+      align-items: center; justify-content: center;
+    }
+    #update-applying-overlay.is-visible { display: flex; }
+    .splash-inner {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      padding: 28px 32px; animation: splash-fade-in .5s ease;
+      text-align: center; max-width: 420px;
+    }
+    .splash-inner img { width: 240px; height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.28)); }
+    .splash-brand {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.72); text-transform: uppercase;
+    }
+    .splash-status {
+      font-size: 15px; font-weight: 700; color: #f8fafc; letter-spacing: -0.02em;
+      min-height: 1.4em;
+    }
+    .splash-hint {
+      font-size: 12.5px; color: rgba(226,232,240,0.78); line-height: 1.5;
+    }
+    .splash-spinner {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.18);
+      border-top-color: #38bdf8;
+      animation: splash-spin .7s linear infinite;
+      margin-top: 2px;
+    }
     #splash-screen.is-hidden { opacity: 0; pointer-events: none; }
     @keyframes splash-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes splash-spin { to { transform: rotate(360deg); } }
     #app-body-row { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
     /* 🪟 커스텀 타이틀바 — 사이드바와 동일 톤의 단일 스트립 */
@@ -2060,9 +2095,26 @@
 </head>
 <body>
 
-  <!-- 🏥 시작 스플래시 화면 -->
-  <div id="splash-screen">
-    <img src="assets/splash.png" alt="미래병원" width="384" height="173" decoding="async">
+  <!-- 🏥 시작 스플래시 / 로딩 화면 -->
+  <div id="splash-screen" role="status" aria-live="polite">
+    <div class="splash-inner">
+      <img src="assets/splash.png" alt="미래병원" width="384" height="173" decoding="async">
+      <div class="splash-brand">Mirae Messenger</div>
+      <div class="splash-spinner" aria-hidden="true"></div>
+      <div class="splash-status" id="splash-status">시작하는 중…</div>
+      <div class="splash-hint" id="splash-hint">잠시만 기다려 주세요</div>
+    </div>
+  </div>
+
+  <!-- 🔄 업데이트 적용 중 전체 화면 (재시작 직전) -->
+  <div id="update-applying-overlay" role="status" aria-live="polite">
+    <div class="splash-inner">
+      <img src="assets/splash.png" alt="미래병원" width="384" height="173" decoding="async">
+      <div class="splash-brand">Mirae Messenger</div>
+      <div class="splash-spinner" aria-hidden="true"></div>
+      <div class="splash-status" id="update-applying-status">업데이트를 적용하는 중…</div>
+      <div class="splash-hint" id="update-applying-hint">파일이 준비되면 자동으로 재시작됩니다.<br>창을 닫지 마세요.</div>
+    </div>
   </div>
 
   <!-- 🪟 커스텀 타이틀바 (카카오톡 PC 스타일) -->
@@ -4707,14 +4759,54 @@
         });
       }
       updateMainPanelVisibility();
-      setTimeout(() => {
-        const splash = document.getElementById('splash-screen');
-        if (splash) {
-          splash.classList.add('is-hidden');
-          setTimeout(() => splash.remove(), 500);
-        }
-      }, 1200);
+      prepareStartupSplash().finally(() => {
+        const holdMs = window.__splashHoldMs || 1600;
+        setTimeout(() => {
+          const splash = document.getElementById('splash-screen');
+          if (splash) {
+            splash.classList.add('is-hidden');
+            setTimeout(() => splash.remove(), 500);
+          }
+        }, holdMs);
+      });
     });
+
+    async function prepareStartupSplash() {
+      if (isScheduleBoardStandalone()) return;
+      const statusEl = document.getElementById('splash-status');
+      const hintEl = document.getElementById('splash-hint');
+      try {
+        const info = await window.api.getStartupLoadingInfo();
+        if (info && info.reason === 'update') {
+          window.__splashHoldMs = 2600;
+          if (statusEl) statusEl.textContent = '업데이트를 적용하는 중…';
+          if (hintEl) {
+            const ver = info.remoteVersion || info.version || '';
+            hintEl.textContent = ver
+              ? `새 버전(${ver})으로 시작하는 중입니다. 잠시만 기다려 주세요.`
+              : '새 버전으로 시작하는 중입니다. 잠시만 기다려 주세요.';
+          }
+          return;
+        }
+      } catch (e) { /* ignore */ }
+      window.__splashHoldMs = 1600;
+      if (statusEl) statusEl.textContent = '시작하는 중…';
+      if (hintEl) hintEl.textContent = '잠시만 기다려 주세요';
+    }
+
+    function showUpdateApplyingOverlay(statusText, hintHtml) {
+      const overlay = document.getElementById('update-applying-overlay');
+      const statusEl = document.getElementById('update-applying-status');
+      const hintEl = document.getElementById('update-applying-hint');
+      if (statusEl && statusText) statusEl.textContent = statusText;
+      if (hintEl && hintHtml) hintEl.innerHTML = hintHtml;
+      if (overlay) overlay.classList.add('is-visible');
+    }
+
+    function hideUpdateApplyingOverlay() {
+      const overlay = document.getElementById('update-applying-overlay');
+      if (overlay) overlay.classList.remove('is-visible');
+    }
 
     function resetIdleTimer() {
       markUserActivityForReadReceipt();
@@ -8120,8 +8212,25 @@
         confirmText: '재시작',
         cancelText: '나중에'
       })) return;
-      const res = await window.api.applyUpdate();
-      if (!res.success) { await appAlert(res.msg || '업데이트 적용에 실패했습니다.'); return; }
+      showUpdateApplyingOverlay(
+        '업데이트를 적용하는 중…',
+        '파일을 내려받는 중입니다.<br>곧 자동으로 재시작됩니다. 창을 닫지 마세요.'
+      );
+      try {
+        const res = await window.api.applyUpdate();
+        if (!res || !res.success) {
+          hideUpdateApplyingOverlay();
+          await appAlert((res && res.msg) || '업데이트 적용에 실패했습니다.');
+          return;
+        }
+        showUpdateApplyingOverlay(
+          '재시작하는 중…',
+          '업데이트가 준비되었습니다.<br>잠시만 기다려 주세요.'
+        );
+      } catch (e) {
+        hideUpdateApplyingOverlay();
+        await appAlert('업데이트 적용 중 오류가 발생했습니다.');
+      }
     }
 
     let autoUpdateCountdownTimer = null;
@@ -8142,6 +8251,10 @@
 
     async function restartNowForAutoUpdate() {
       clearInterval(autoUpdateCountdownTimer);
+      showUpdateApplyingOverlay(
+        '재시작하는 중…',
+        '새 버전으로 다시 시작합니다.<br>잠시만 기다려 주세요.'
+      );
       await window.api.restartNowForUpdate();
     }
 
