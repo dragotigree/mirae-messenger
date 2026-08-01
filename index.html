@@ -1311,13 +1311,15 @@
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(72px, 120px) minmax(96px, 120px) 88px auto;
+      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(64px, 100px) minmax(108px, 140px) minmax(92px, 120px) auto;
+      grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
     }
     .schedule-board-col-head > span { min-width: 0; }
     .schedule-board-col-head.sb-referral-head {
       grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
+      grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       position: sticky; top: 0; z-index: 2; background: #eef2f7; padding-top: 10px; padding-bottom: 8px;
       border-bottom: 1px solid #e2e8f0; margin-bottom: 2px; font-size: 12px;
     }
@@ -1325,14 +1327,28 @@
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(72px, 120px) minmax(96px, 120px) 88px auto;
+      grid-template-columns: 52px 76px minmax(72px, 100px) 68px minmax(0, 1fr) minmax(64px, 100px) minmax(108px, 140px) minmax(92px, 120px) auto;
+      grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
       align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #f1f5f9; font-size: 13.5px;
     }
     .schedule-board-row > * { min-width: 0; }
     .schedule-board-row.sb-referral-row {
       grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
+      grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       font-size: 13.5px; padding: 12px 14px;
     }
+    .sb-col-ward { grid-area: sb-ward; }
+    .sb-col-room { grid-area: sb-room; }
+    .sb-col-name { grid-area: sb-name; }
+    .sb-col-doctor { grid-area: sb-doctor; }
+    .sb-col-type { grid-area: sb-type; }
+    .sb-col-detail { grid-area: sb-detail; }
+    .sb-col-remark { grid-area: sb-remark; }
+    .sb-col-meal { grid-area: sb-meal; }
+    .sb-col-time { grid-area: sb-time; }
+    .sb-col-tstart { grid-area: sb-tstart; }
+    .sb-col-tend { grid-area: sb-tend; }
+    .sb-col-btns { grid-area: sb-btns; }
     .schedule-board-row.sb-referral-row .schedule-board-name { font-size: 14.5px; color: #0f172a; }
     .schedule-board-row.sb-referral-row .schedule-board-detail { color: #334155; font-weight: 500; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.35; }
     .schedule-board-ward-col { font-size: 12.5px; font-weight: 800; color: #475569; }
@@ -1424,6 +1440,7 @@
     .schedule-board-remark {
       font-size: 12.5px; color: #64748b; line-height: 1.35;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: block; min-height: 1.2em;
     }
     .schedule-board-remark.is-empty { color: #cbd5e1; }
     .schedule-board-meals {
@@ -11925,8 +11942,8 @@
 
     function scheduleBoardRemarkCellHtml(sch) {
       const text = scheduleBoardRemarkText(sch);
-      if (!text) return '<span class="schedule-board-remark is-empty"></span>';
-      return `<span class="schedule-board-remark" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+      if (!text) return '<span class="schedule-board-remark sb-col-remark is-empty">—</span>';
+      return `<span class="schedule-board-remark sb-col-remark" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
     }
 
     function formatScheduleMealCancelLabels(sch) {
@@ -11945,8 +11962,8 @@
 
     function scheduleBoardMealCellHtml(sch) {
       const parts = formatScheduleMealCancelLabels(sch);
-      if (!parts.length) return '<div class="schedule-board-meals"><span class="sb-meal-none">—</span></div>';
-      return `<div class="schedule-board-meals">${parts.map((p) => `<span class="sb-meal-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
+      if (!parts.length) return '<div class="schedule-board-meals sb-col-meal"><span class="sb-meal-none">—</span></div>';
+      return `<div class="schedule-board-meals sb-col-meal">${parts.map((p) => `<span class="sb-meal-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
     }
 
     function summarizeScheduleMealCancels(items) {
@@ -11968,9 +11985,29 @@
       const head = document.createElement('div');
       head.className = 'schedule-board-col-head' + (isReferral ? ' sb-referral-head' : '');
       if (isReferral) {
-        head.innerHTML = '<span>병동</span><span>호실</span><span>환자명</span><span>구분</span><span>목적·검사</span><span>출발</span><span>귀원</span><span>RM·주치의</span><span></span>';
+        head.innerHTML = [
+          '<span class="sb-col-ward">병동</span>',
+          '<span class="sb-col-room">호실</span>',
+          '<span class="sb-col-name">환자명</span>',
+          '<span class="sb-col-type">구분</span>',
+          '<span class="sb-col-detail">목적·검사</span>',
+          '<span class="sb-col-tstart">출발</span>',
+          '<span class="sb-col-tend">귀원</span>',
+          '<span class="sb-col-doctor">RM·주치의</span>',
+          '<span class="sb-col-btns"></span>'
+        ].join('');
       } else {
-        head.innerHTML = '<span>호실</span><span>환자명</span><span>주치의</span><span>구분</span><span>목적·검사</span><span>비고</span><span>식사취소</span><span>시간</span><span></span>';
+        head.innerHTML = [
+          '<span class="sb-col-room">호실</span>',
+          '<span class="sb-col-name">환자명</span>',
+          '<span class="sb-col-doctor">주치의</span>',
+          '<span class="sb-col-type">구분</span>',
+          '<span class="sb-col-detail">목적·검사</span>',
+          '<span class="sb-col-remark">비고</span>',
+          '<span class="sb-col-meal">식사취소</span>',
+          '<span class="sb-col-time">시간</span>',
+          '<span class="sb-col-btns"></span>'
+        ].join('');
       }
       parent.appendChild(head);
     }
@@ -12107,15 +12144,15 @@
             const startT = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '-');
             const endT = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-');
             row.innerHTML = [
-              `<span class="schedule-board-ward-col">${escapeHtml(wardLbl)}</span>`,
-              `<span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>`,
-              `<span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>`,
-              badge,
-              `<span class="schedule-board-detail">${escapeHtml(detail || '')}</span>`,
-              `<span class="schedule-board-time-cell">${escapeHtml(startT)}</span>`,
-              `<span class="schedule-board-time-cell">${escapeHtml(endT)}</span>`,
-              `<span class="schedule-board-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
-              `<div class="schedule-board-row-btns">${manageHtml}</div>`
+              `<span class="schedule-board-ward-col sb-col-ward">${escapeHtml(wardLbl)}</span>`,
+              `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
+              `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
+              badge.replace('class="', 'class="sb-col-type '),
+              `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
+              `<span class="schedule-board-time-cell sb-col-tstart">${escapeHtml(startT)}</span>`,
+              `<span class="schedule-board-time-cell sb-col-tend">${escapeHtml(endT)}</span>`,
+              `<span class="schedule-board-doctor sb-col-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
+              `<div class="schedule-board-row-btns sb-col-btns">${manageHtml}</div>`
             ].join('');
           } else {
             const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
@@ -12123,16 +12160,19 @@
             const timeHtml = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch))
               ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
               : `<span>${escapeHtml(startLabel)}</span>`;
+            const doctorHtml = attending
+              ? `<span class="schedule-board-doctor sb-col-doctor" title="주치의">${escapeHtml(attending)}</span>`
+              : '<span class="sb-col-doctor">—</span>';
             row.innerHTML = [
-              `<span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>`,
-              `<span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>`,
-              attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>',
-              badge,
-              `<span class="schedule-board-detail">${escapeHtml(detail || '')}</span>`,
+              `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
+              `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
+              doctorHtml,
+              badge.replace('class="', 'class="sb-col-type '),
+              `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
               scheduleBoardRemarkCellHtml(sch),
               scheduleBoardMealCellHtml(sch),
-              `<div class="schedule-board-times">${timeHtml}</div>`,
-              `<div class="schedule-board-row-btns">${manageHtml}</div>`
+              `<div class="schedule-board-times sb-col-time">${timeHtml}</div>`,
+              `<div class="schedule-board-row-btns sb-col-btns">${manageHtml}</div>`
             ].join('');
           }
           row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
