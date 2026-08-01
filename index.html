@@ -13592,7 +13592,7 @@
 
       if (!isImage) {
         if (file.size > MAX_FILE_XFER_BYTES) {
-          await appAlert('파일이 너무 커서 전송할 수 없습니다.\n공유 폴더를 이용해 주세요.');
+          await appAlert('파일이 너무 커서 전송할 수 없습니다. (최대 50MB)\n공유 폴더를 이용해 주세요.');
           return;
         }
 
@@ -13621,7 +13621,7 @@
           return;
         }
 
-        // 큰 파일(250KB~10MB): 1:1·그룹만 분할 전송. 전체/부서/층은 안내.
+        // 큰 파일(250KB~50MB): 1:1·그룹만 분할 전송. 전체/부서/층은 안내.
         if (isChannelBroadcast) {
           await appAlert('큰 파일은 1:1 또는 그룹에서 보내 주세요.');
           return;

@@ -4592,7 +4592,7 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
     if (buf.length > MAX_FILE_XFER_BYTES || sizeHint > MAX_FILE_XFER_BYTES) {
       return {
         status: 'ERROR',
-        error: '파일이 너무 커서 전송할 수 없습니다.\n공유 폴더를 이용해 주세요.'
+        error: '파일이 너무 커서 전송할 수 없습니다. (최대 50MB)\n공유 폴더를 이용해 주세요.'
       };
     }
 
