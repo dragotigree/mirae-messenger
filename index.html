@@ -2832,7 +2832,7 @@
               <button type="button" class="sb-quick-close-btn" onclick="hideScheduleBoardQuickAddPanel()" title="닫기">✕ 닫기</button>
             </div>
             <div class="sb-quick-add-body" id="sb-quick-add-body">
-        <p class="schedule-board-quick-hint">진료의뢰서에 필요한 <b>호실·환자명·목적·시간·주치의</b>를 입력하세요. 영양실 식수용으로 <b>아침·점심·저녁 취소</b>도 체크할 수 있습니다. <kbd>Enter</kbd>로 다음 칸 이동 · 마지막 칸에서 <kbd>Enter</kbd> 또는 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 등록</p>
+        <p class="schedule-board-quick-hint">진료의뢰서에 필요한 <b>호실·환자명·목적·시간·주치의</b>를 입력하세요. <b>아침·점심·저녁 취소</b>도 체크할 수 있습니다. <kbd>Enter</kbd>로 다음 칸 이동 · 마지막 칸에서 <kbd>Enter</kbd> 또는 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 등록</p>
         <div class="sb-quick-grid-wrap">
         <div class="sb-quick-grid">
           <div class="sb-quick-field">
@@ -2884,18 +2884,8 @@
             <label for="sb-quick-detail">목적</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
           </div>
-          <div class="sb-quick-field sb-quick-field--guardian" id="sb-quick-guardian-wrap" style="display:none;">
-            <label>동행</label>
-            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진하는 경우">
-              <input type="checkbox" id="sb-quick-guardian-only">보호자만
-            </label>
-          </div>
-          <div class="sb-quick-field sb-quick-field--remark">
-            <label for="sb-quick-remark">비고 <span style="font-weight:600;color:#94a3b8;">(길게 입력 가능 · Enter 줄바꿈 · Ctrl+Enter 등록)</span></label>
-            <textarea id="sb-quick-remark" rows="3" placeholder="참고 사항, 전달 내용 등 자유롭게 입력 (선택)"></textarea>
-          </div>
           <div class="sb-quick-field sb-quick-field--meals">
-            <label>식사 취소 (영양실 식수)</label>
+            <label>식사 취소</label>
             <div class="sb-quick-meal-row">
               <label class="sb-quick-undecided" title="아침 식사 취소">
                 <input type="checkbox" id="sb-quick-meal-breakfast">아침 취소
@@ -2907,6 +2897,16 @@
                 <input type="checkbox" id="sb-quick-meal-dinner">저녁 취소
               </label>
             </div>
+          </div>
+          <div class="sb-quick-field sb-quick-field--guardian" id="sb-quick-guardian-wrap" style="display:none;">
+            <label>동행</label>
+            <label class="sb-quick-undecided sb-quick-guardian" title="환자는 병실에 두고 보호자만 외진하는 경우">
+              <input type="checkbox" id="sb-quick-guardian-only">보호자만
+            </label>
+          </div>
+          <div class="sb-quick-field sb-quick-field--remark">
+            <label for="sb-quick-remark">비고 <span style="font-weight:600;color:#94a3b8;">(길게 입력 가능 · Enter 줄바꿈 · Ctrl+Enter 등록)</span></label>
+            <textarea id="sb-quick-remark" rows="3" placeholder="참고 사항, 전달 내용 등 자유롭게 입력 (선택)"></textarea>
           </div>
           <div class="sb-quick-field">
             <label aria-hidden="true">&nbsp;</label>
