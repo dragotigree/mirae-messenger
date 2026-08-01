@@ -900,8 +900,20 @@
 
     .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: var(--radius-xl); display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast), transform var(--transition-fast); box-shadow: var(--shadow-sm); }
     .chat-img-preview:hover { opacity: 0.92; transform: scale(1.01); }
-    .chat-file-box { display: flex; align-items: center; gap: 10px; background: var(--surface-muted); padding: 10px 14px; border-radius: var(--radius-xl); margin-top: 6px; border: 1px solid var(--border); max-width: 320px; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+    .chat-file-box { display: flex; align-items: center; gap: 10px; background: var(--surface-muted); color: var(--text-primary); padding: 10px 12px; border-radius: var(--radius-xl); margin-top: 6px; border: 1px solid var(--border); max-width: 320px; min-width: 0; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     .chat-file-box:hover { border-color: #bae6fd; box-shadow: var(--shadow-xs); }
+    /* 보낸 말풍선(흰 글자) 안에서도 파일명·용량이 보이도록 대비 고정 */
+    .msg-row.is-me .msg-text .chat-file-box,
+    .is-me .chat-bubble .chat-file-box { color: var(--text-primary); }
+    .chat-file-box .chat-file-meta { min-width: 0; flex: 1; }
+    .chat-file-box .chat-file-name { font-weight: 700; font-size: 13px; color: var(--text-primary); line-height: 1.3; word-break: break-all; }
+    .chat-file-box .chat-file-size { font-size: 11px; color: #64748b; }
+    .chat-file-box > a,
+    .chat-file-box .chat-file-dl {
+      margin-left: auto; flex-shrink: 0; padding: 6px 12px; min-width: 44px; box-sizing: border-box;
+      background: var(--accent); color: #fff !important; border-radius: 9px; text-decoration: none;
+      font-size: 11px; font-weight: 700; white-space: nowrap; text-align: center;
+    }
 
     /* 🔴 안 읽은 메시지 배지 */
     .unread-badge { background: linear-gradient(135deg, #f87171, #ef4444); color: #fff; font-size: 10px; font-weight: var(--font-weight-bold); min-width: 18px; height: 18px; border-radius: 99px; display: flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
@@ -1059,7 +1071,7 @@
     .bubble-line .msg-unread-count { align-self: center; }
     .is-me .bubble-time .read-status { color: var(--accent-dark); }
     .msg-row-bubble .chat-img-preview { max-width: 180px; max-height: 160px; }
-    .msg-row-bubble .chat-file-box { max-width: 200px; }
+    .msg-row-bubble .chat-file-box { max-width: 240px; }
 
     /* ========== 3단 상세 패널 ========== */
     #sidebar-right { width: 290px; background: var(--surface); padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
@@ -10202,6 +10214,12 @@
       return `<div class="msg-pending-notice">${escapeHtml(text)}</div>`;
     }
 
+    /** 저장된 파일 말풍선의 옛 '다운로드' 라벨을 '받기'로 통일 */
+    function normalizeChatFileBoxHtml(html) {
+      if (typeof html !== 'string' || html.indexOf('chat-file-box') === -1) return html;
+      return html.replace(/(<div[^>]*class="[^"]*chat-file-box[^"]*"[^>]*>[\s\S]*?<a\b[^>]*>)\s*다운로드\s*(<\/a>)/gi, '$1받기$2');
+    }
+
     function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
       const options = opts || {};
       const skipStatusUpdate = !!options.skipStatusUpdate;
@@ -10264,7 +10282,9 @@
       const reactionsHostHtml = canReact ? `<div class="msg-reactions" data-reaction-host="${escapeMsgUidAttr(reactionKey)}"></div>` : '';
       const unreadCountHtml = (isMe && isGroupChannel && msgUid)
         ? `<span class="msg-unread-count"></span>` : '';
-      const displayMsg = isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg;
+      const displayMsg = normalizeChatFileBoxHtml(
+        isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg
+      );
       const pendingNoticeHtml = offlinePendingNoticeHtml(isMe, outboundStatus, sentAtLabelForPending || time);
 
       const useBubbleLayout = compact && isGroupChannel;
@@ -13044,7 +13064,7 @@
             const fileDataUrl = await readFileAsDataUrl(file);
             const downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${escapeHtmlText(file.name)}"`;
             const contentHtml =
-              `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${escapeHtmlText(file.name)}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+              `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div class="chat-file-meta"><div class="chat-file-name">${escapeHtmlText(file.name)}</div><div class="chat-file-size">${(file.size / 1024).toFixed(1)} KB</div></div><a class="chat-file-dl" href="${fileDataUrl}" ${downloadAttr}>받기</a></div>`;
             dispatchOutgoing(contentHtml).then((res) => {
               if (res && res.status === 'ERROR') return;
               appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,

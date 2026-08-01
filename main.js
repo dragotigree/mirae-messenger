@@ -675,7 +675,7 @@ function buildChatFileBoxHtml(fileName, sizeBytes, storedName) {
   ));
   const href = `mirae-file://${encodeURIComponent(storedName)}`;
   const sizeLabel = formatFileSizeLabel(sizeBytes);
-  return `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${safeName}</div><div style="font-size: 11px; color: #64748b;">${sizeLabel}</div></div><a href="${href}" download="${safeName}" style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+  return `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div class="chat-file-meta"><div class="chat-file-name">${safeName}</div><div class="chat-file-size">${sizeLabel}</div></div><a class="chat-file-dl" href="${href}" download="${safeName}">받기</a></div>`;
 }
 
 function clearPendingFileXfer(xferUid) {
