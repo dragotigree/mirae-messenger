@@ -1299,10 +1299,10 @@
       font-size: 12px; background: #f8fafc; max-width: none;
     }
     .sb-board-content .schedule-board-login-hint { margin: 10px 14px 0; flex-shrink: 0; }
-    .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 14px; background: #eef2f7; }
-    .schedule-board-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; background: #eef2f7; }
+    .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; background: #eef2f7; }
+    .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: #eef2f7; }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
-    .schedule-board-section { border-radius: 14px; overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .schedule-board-section { border-radius: 14px; overflow-x: auto; overflow-y: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
     .schedule-board-section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
     .schedule-board-section-head .sb-count { font-size: 12.5px; font-weight: 600; opacity: 0.85; margin-left: 6px; }
     .schedule-board-section-head .sb-meal-summary { font-size: 12px; font-weight: 700; color: #b45309; margin-left: 10px; }
@@ -1310,14 +1310,14 @@
     .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-table {
-      width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff;
+      width: 100%; min-width: 980px; border-collapse: collapse; table-layout: fixed; background: #fff;
     }
     .schedule-board-table col.sb-c-room { width: 52px; }
     .schedule-board-table col.sb-c-name { width: 72px; }
     .schedule-board-table col.sb-c-doctor { width: 118px; }
-    .schedule-board-table col.sb-c-type { width: 64px; }
-    .schedule-board-table col.sb-c-detail { width: 16%; }
-    .schedule-board-table col.sb-c-remark { width: 22%; }
+    .schedule-board-table col.sb-c-type { width: 72px; }
+    .schedule-board-table col.sb-c-detail { width: 22%; }
+    .schedule-board-table col.sb-c-remark { width: 20%; }
     .schedule-board-table col.sb-c-meal { width: 112px; }
     .schedule-board-table col.sb-c-time { width: 96px; }
     .schedule-board-table col.sb-c-btns { width: 138px; }
@@ -1335,6 +1335,10 @@
     .schedule-board-table tbody tr.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
     .schedule-board-table td.sb-col-btns { text-align: right; }
     .schedule-board-table td.sb-col-type { white-space: nowrap; }
+    .schedule-board-table td.sb-col-detail,
+    .schedule-board-table th.sb-col-detail { min-width: 160px; }
+    .schedule-board-table td.sb-col-remark,
+    .schedule-board-table th.sb-col-remark { min-width: 140px; }
     .schedule-board-col-head {
       display: none;
     }
@@ -1388,9 +1392,9 @@
       text-align: center; font-size: 11.5px; color: #64748b; margin: 0 0 14px; line-height: 1.45;
     }
     .sb-main-grid {
-      width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0;
+      width: 100%; min-width: 880px; border-collapse: separate; border-spacing: 0;
       table-layout: fixed; background: #fff; border: none; font-size: 12px; line-height: 1.45;
-      border-radius: 10px; overflow: hidden; outline: 1px solid #e8ecf1;
+      border-radius: 10px; overflow: visible; outline: 1px solid #e8ecf1;
     }
     .sb-main-grid th, .sb-main-grid td {
       border-right: 1px solid #e8ecf1; border-bottom: 1px solid #e8ecf1;
@@ -1413,10 +1417,10 @@
       margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, 0.35);
     }
     .sb-main-entry .sb-main-l1 { font-weight: 700; color: #0f172a; }
-    .sb-main-entry .sb-main-l2 { color: #1e293b; margin-top: 1px; word-break: keep-all; }
+    .sb-main-entry .sb-main-l2 { color: #1e293b; margin-top: 1px; word-break: keep-all; white-space: normal; overflow: visible; }
     .sb-main-entry .sb-main-remark {
       color: #64748b; white-space: pre-wrap; word-break: keep-all; line-height: 1.4;
-      max-height: 7.2em; overflow: hidden;
+      max-height: none; overflow: visible;
     }
     .sb-main-entry .sb-main-time { color: #2563eb; font-weight: 600; font-size: 11px; margin-top: 3px; }
     .sb-main-row-rm4 td { background: #fff; }
@@ -1462,8 +1466,8 @@
     }
     .schedule-board-detail {
       min-width: 0; color: #334155; font-size: 13.5px; font-weight: 500; line-height: 1.4;
-      white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-      word-break: keep-all;
+      white-space: normal; overflow: visible; display: block;
+      word-break: keep-all; overflow-wrap: anywhere;
     }
     .schedule-board-row .sb-type-cell .badge-admission,
     .schedule-board-row .sb-type-cell .badge-discharge,
@@ -1488,9 +1492,8 @@
     }
     .schedule-board-remark {
       font-size: 12.5px; color: #475569; line-height: 1.4;
-      white-space: pre-wrap; word-break: keep-all; overflow: hidden;
-      display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical;
-      min-height: 1.2em;
+      white-space: pre-wrap; word-break: keep-all; overflow: visible;
+      display: block; min-height: 1.2em; overflow-wrap: anywhere;
     }
     .schedule-board-remark.is-empty { color: #cbd5e1; white-space: nowrap; display: block; -webkit-line-clamp: unset; }
     .schedule-board-remark.is-long { cursor: help; }
