@@ -1309,46 +1309,61 @@
     .schedule-board-section-actions { display: flex; gap: 4px; }
     .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
-    .schedule-board-col-head {
-      display: grid;
-      grid-template-columns: 48px 68px 100px 56px minmax(100px, 1.1fr) minmax(150px, 1.9fr) 108px 88px 132px;
-      grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
-      align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
-      text-transform: none; letter-spacing: -0.02em; border-top: none;
+    .schedule-board-table {
+      width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff;
     }
-    .schedule-board-col-head > span { min-width: 0; }
+    .schedule-board-table col.sb-c-room { width: 52px; }
+    .schedule-board-table col.sb-c-name { width: 72px; }
+    .schedule-board-table col.sb-c-doctor { width: 118px; }
+    .schedule-board-table col.sb-c-type { width: 64px; }
+    .schedule-board-table col.sb-c-detail { width: 16%; }
+    .schedule-board-table col.sb-c-remark { width: 22%; }
+    .schedule-board-table col.sb-c-meal { width: 112px; }
+    .schedule-board-table col.sb-c-time { width: 96px; }
+    .schedule-board-table col.sb-c-btns { width: 138px; }
+    .schedule-board-table thead th {
+      padding: 10px 8px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
+      text-align: left; vertical-align: middle; letter-spacing: -0.02em;
+      border-bottom: 1px solid #e2e8f0; background: #fff; white-space: nowrap;
+    }
+    .schedule-board-table thead th.sb-col-btns { text-align: right; }
+    .schedule-board-table tbody td {
+      padding: 12px 8px; font-size: 14px; vertical-align: middle;
+      border-top: 1px solid #f1f5f9; min-width: 0;
+    }
+    .schedule-board-table tbody tr:hover { background: #f8fafc; }
+    .schedule-board-table tbody tr.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
+    .schedule-board-table td.sb-col-btns { text-align: right; }
+    .schedule-board-table td.sb-col-type { white-space: nowrap; }
+    .schedule-board-col-head {
+      display: none;
+    }
     .schedule-board-col-head.sb-referral-head {
+      display: grid;
       grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
-      position: sticky; top: 0; z-index: 2; background: #eef2f7; padding-top: 10px; padding-bottom: 8px;
-      border-bottom: 1px solid #e2e8f0; margin-bottom: 2px; font-size: 12px;
+      align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12px; font-weight: 800; color: #64748b;
+      position: sticky; top: 0; z-index: 2; background: #eef2f7;
+      border-bottom: 1px solid #e2e8f0; margin-bottom: 2px;
     }
     .schedule-board-modal-card.sb-mode-referral .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
-    .schedule-board-row {
-      display: grid;
-      grid-template-columns: 48px 68px 100px 56px minmax(100px, 1.1fr) minmax(150px, 1.9fr) 108px 88px 132px;
-      grid-template-areas: "sb-room sb-name sb-doctor sb-type sb-detail sb-remark sb-meal sb-time sb-btns";
-      align-items: center; gap: 8px; padding: 13px 14px; border-top: 1px solid #f1f5f9; font-size: 14px;
-    }
-    .schedule-board-row > * { min-width: 0; }
     .schedule-board-row.sb-referral-row {
+      display: grid;
       grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
-      font-size: 14px; padding: 13px 14px;
+      align-items: center; gap: 8px; font-size: 14px; padding: 13px 14px; border-top: 1px solid #f1f5f9;
     }
+    .schedule-board-row.sb-referral-row > * { min-width: 0; }
     .sb-col-ward { grid-area: sb-ward; }
-    .sb-col-room { grid-area: sb-room; }
-    .sb-col-name { grid-area: sb-name; }
-    .sb-col-doctor { grid-area: sb-doctor; justify-self: start; width: 100%; max-width: 100%; }
-    .sb-col-type { grid-area: sb-type; justify-self: start; width: max-content; max-width: 100%; }
-    .sb-col-detail { grid-area: sb-detail; }
-    .sb-col-remark { grid-area: sb-remark; }
-    .sb-col-meal { grid-area: sb-meal; justify-self: start; width: 100%; max-width: 100%; }
-    .sb-col-time { grid-area: sb-time; justify-self: start; width: 100%; }
+    .sb-referral-row .sb-col-room { grid-area: sb-room; }
+    .sb-referral-row .sb-col-name { grid-area: sb-name; }
+    .sb-referral-row .sb-col-doctor { grid-area: sb-doctor; }
+    .sb-referral-row .sb-col-type { grid-area: sb-type; }
+    .sb-referral-row .sb-col-detail { grid-area: sb-detail; }
     .sb-col-tstart { grid-area: sb-tstart; }
     .sb-col-tend { grid-area: sb-tend; }
-    .sb-col-btns { grid-area: sb-btns; justify-self: end; width: 100%; }
+    .sb-referral-row .sb-col-btns { grid-area: sb-btns; justify-self: end; }
     .schedule-board-row.sb-referral-row .schedule-board-name { font-size: 14.5px; color: #0f172a; }
     .schedule-board-row.sb-referral-row .schedule-board-detail { color: #334155; font-weight: 500; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.35; }
     .schedule-board-ward-col { font-size: 12.5px; font-weight: 800; color: #475569; }
@@ -1440,7 +1455,7 @@
     .schedule-board-room { font-weight: 800; color: #0f172a; min-width: 0; font-size: 14.5px; letter-spacing: -0.02em; }
     .schedule-board-name { font-weight: 700; color: #0f172a; min-width: 0; font-size: 14.5px; letter-spacing: -0.02em; }
     .schedule-board-doctor {
-      display: inline-block; box-sizing: border-box; width: auto; max-width: 118px;
+      display: inline-block; box-sizing: border-box; width: auto; max-width: 100%;
       font-size: 11.5px; font-weight: 700; padding: 4px 8px; border-radius: 8px;
       background: #e0f2fe; color: #0369a1; line-height: 1.25; word-break: keep-all;
       white-space: normal; overflow: hidden;
@@ -1458,7 +1473,16 @@
     .schedule-board-row .sb-type-cell .badge-transfer,
     .schedule-board-row .sb-type-cell .badge-exam,
     .schedule-board-row .sb-type-cell .badge-leave,
-    .schedule-board-row .sb-type-cell .badge-general {
+    .schedule-board-row .sb-type-cell .badge-general,
+    .schedule-board-table .sb-type-cell .badge-admission,
+    .schedule-board-table .sb-type-cell .badge-discharge,
+    .schedule-board-table .sb-type-cell .badge-outpatient,
+    .schedule-board-table .sb-type-cell .badge-outing,
+    .schedule-board-table .sb-type-cell .badge-overnight,
+    .schedule-board-table .sb-type-cell .badge-transfer,
+    .schedule-board-table .sb-type-cell .badge-exam,
+    .schedule-board-table .sb-type-cell .badge-leave,
+    .schedule-board-table .sb-type-cell .badge-general {
       display: inline-block; width: max-content; padding: 4px 9px; border-radius: 8px;
       font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;
     }
@@ -1490,7 +1514,8 @@
     .schedule-board-row-btns button:hover { background: #e2e8f0; }
     .schedule-board-row-btns .sb-del { color: #dc2626; background: #fef2f2; }
     .schedule-board-row.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
-    .schedule-board-row.has-modified { position: relative; }
+    .schedule-board-row.has-modified,
+    .schedule-board-data-row.has-modified { position: relative; }
     .sb-mod-tip {
       position: fixed; z-index: 10050; pointer-events: none;
       max-width: min(420px, 92vw); max-height: min(50vh, 360px); overflow: auto;
@@ -10564,7 +10589,7 @@
       const g = isScheduleGuardianOnly(sch)
         ? '<span class="badge-guardian-only">보호자만</span>'
         : '';
-      return `<div class="sb-col-type sb-type-cell">${badge}${g}</div>`;
+      return `<div class="sb-type-cell">${badge}${g}</div>`;
     }
 
     function attendingFromPhysicianSelect(value) {
@@ -12130,9 +12155,9 @@
 
     function scheduleBoardRemarkCellHtml(sch) {
       const text = scheduleBoardRemarkText(sch);
-      if (!text) return '<span class="schedule-board-remark sb-col-remark is-empty">—</span>';
+      if (!text) return '<span class="schedule-board-remark is-empty">—</span>';
       const longCls = (text.length > 48 || text.includes('\n')) ? ' is-long' : '';
-      return `<span class="schedule-board-remark sb-col-remark${longCls}">${escapeHtml(text)}</span>`;
+      return `<span class="schedule-board-remark${longCls}">${escapeHtml(text)}</span>`;
     }
 
     function formatScheduleMealCancelLabels(sch) {
@@ -12151,8 +12176,8 @@
 
     function scheduleBoardMealCellHtml(sch) {
       const parts = formatScheduleMealCancelLabels(sch);
-      if (!parts.length) return '<div class="schedule-board-meals sb-col-meal"><span class="sb-meal-none">—</span></div>';
-      return `<div class="schedule-board-meals sb-col-meal">${parts.map((p) => `<span class="sb-meal-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
+      if (!parts.length) return '<div class="schedule-board-meals"><span class="sb-meal-none">—</span></div>';
+      return `<div class="schedule-board-meals">${parts.map((p) => `<span class="sb-meal-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
     }
 
     function summarizeScheduleMealCancels(items) {
@@ -12170,34 +12195,53 @@
       return bits.length ? `식사취소 ${bits.join(' · ')}` : '';
     }
 
+    function scheduleBoardTableColgroupHtml() {
+      return [
+        '<colgroup>',
+        '<col class="sb-c-room">',
+        '<col class="sb-c-name">',
+        '<col class="sb-c-doctor">',
+        '<col class="sb-c-type">',
+        '<col class="sb-c-detail">',
+        '<col class="sb-c-remark">',
+        '<col class="sb-c-meal">',
+        '<col class="sb-c-time">',
+        '<col class="sb-c-btns">',
+        '</colgroup>'
+      ].join('');
+    }
+
+    function scheduleBoardTableHeadHtml() {
+      return [
+        '<thead><tr>',
+        '<th class="sb-col-room">호실</th>',
+        '<th class="sb-col-name">환자명</th>',
+        '<th class="sb-col-doctor">주치의</th>',
+        '<th class="sb-col-type">구분</th>',
+        '<th class="sb-col-detail">목적</th>',
+        '<th class="sb-col-remark">비고</th>',
+        '<th class="sb-col-meal">식사취소</th>',
+        '<th class="sb-col-time">출발/귀원</th>',
+        '<th class="sb-col-btns">변경</th>',
+        '</tr></thead>'
+      ].join('');
+    }
+
     function appendScheduleBoardColumnHeader(parent, isReferral) {
+      if (!isReferral) return;
       const head = document.createElement('div');
-      head.className = 'schedule-board-col-head' + (isReferral ? ' sb-referral-head' : '');
-      if (isReferral) {
-        head.innerHTML = [
-          '<span class="sb-col-ward">병동</span>',
-          '<span class="sb-col-room">호실</span>',
-          '<span class="sb-col-name">환자명</span>',
-          '<span class="sb-col-type">구분</span>',
-          '<span class="sb-col-detail">목적</span>',
-          '<span class="sb-col-tstart">출발</span>',
-          '<span class="sb-col-tend">귀원</span>',
-          '<span class="sb-col-doctor">RM·주치의</span>',
-          '<span class="sb-col-btns"></span>'
-        ].join('');
-      } else {
-        head.innerHTML = [
-          '<span class="sb-col-room">호실</span>',
-          '<span class="sb-col-name">환자명</span>',
-          '<span class="sb-col-doctor">주치의</span>',
-          '<span class="sb-col-type">구분</span>',
-          '<span class="sb-col-detail">목적</span>',
-          '<span class="sb-col-remark">비고</span>',
-          '<span class="sb-col-meal">식사취소</span>',
-          '<span class="sb-col-time">출발/귀원</span>',
-          '<span class="sb-col-btns">변경</span>'
-        ].join('');
-      }
+      head.className = 'schedule-board-col-head sb-referral-head';
+      head.innerHTML = [
+        '<span class="sb-col-ward">병동</span>',
+        '<span class="sb-col-room">호실</span>',
+        '<span class="sb-col-name">환자명</span>',
+        '<span class="sb-col-type">구분</span>',
+        '<span class="sb-col-detail">목적</span>',
+        '<span class="sb-col-tstart">출발</span>',
+        '<span class="sb-col-tend">귀원</span>',
+        '<span class="sb-col-doctor">RM·주치의</span>',
+        '<span class="sb-col-btns"></span>'
+      ].join('');
       parent.appendChild(head);
     }
 
@@ -12290,7 +12334,6 @@
 
       body.innerHTML = '';
       if (isReferral) appendScheduleBoardColumnHeader(body, true);
-      let colHeadAdded = isReferral;
       sortKeys.forEach(groupKey => {
         const items = groups.get(groupKey);
         const sec = document.createElement('div');
@@ -12306,16 +12349,23 @@
         head.querySelector('.sb-copy-section')?.addEventListener('click', () => copyScheduleBoardSection(groupKey, items));
         head.querySelector('.sb-excel-section')?.addEventListener('click', () => exportScheduleBoardExcelGroup(groupKey, items));
         sec.appendChild(head);
-        if (!colHeadAdded) {
-          appendScheduleBoardColumnHeader(sec, false);
-          colHeadAdded = true;
+
+        let table = null;
+        let tbody = null;
+        if (!isReferral) {
+          table = document.createElement('table');
+          table.className = 'schedule-board-table';
+          table.innerHTML = scheduleBoardTableColgroupHtml() + scheduleBoardTableHeadHtml() + '<tbody></tbody>';
+          tbody = table.querySelector('tbody');
+          sec.appendChild(table);
         }
 
         items.forEach(sch => {
           const norm = normalizeSchedulePatient(sch);
-          const row = document.createElement('div');
+          const row = document.createElement(isReferral ? 'div' : 'tr');
           const modMeta = formatScheduleModifiedMeta(sch);
-          row.className = 'schedule-board-row' + (isReferral ? ' sb-referral-row' : '') + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
+          row.className = (isReferral ? 'schedule-board-row sb-referral-row' : 'schedule-board-data-row')
+            + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
           const typeCell = scheduleTypeCellHtml(sch);
           const detail = scheduleBoardDetailText(sch, norm);
           const canRowManage = canModifySchedule(sch);
@@ -12336,13 +12386,14 @@
               `<span class="schedule-board-ward-col sb-col-ward">${escapeHtml(wardLbl)}</span>`,
               `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
               `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
-              typeCell,
+              `<div class="sb-col-type">${typeCell}</div>`,
               `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
               `<span class="schedule-board-time-cell sb-col-tstart">${escapeHtml(startT)}</span>`,
               `<span class="schedule-board-time-cell sb-col-tend">${escapeHtml(endT)}</span>`,
               `<span class="schedule-board-doctor sb-col-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
               `<div class="schedule-board-row-btns sb-col-btns">${manageHtml}</div>`
             ].join('');
+            sec.appendChild(row);
           } else {
             const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
             const endLabel = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
@@ -12350,26 +12401,26 @@
               ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
               : `<span>${escapeHtml(startLabel)}</span>`;
             const doctorHtml = attending
-              ? `<span class="schedule-board-doctor sb-col-doctor" title="주치의">${escapeHtml(attending)}</span>`
-              : '<span class="sb-col-doctor">—</span>';
+              ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>`
+              : '—';
             row.innerHTML = [
-              `<span class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</span>`,
-              `<span class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</span>`,
-              doctorHtml,
-              typeCell,
-              `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
-              scheduleBoardRemarkCellHtml(sch),
-              scheduleBoardMealCellHtml(sch),
-              `<div class="schedule-board-times sb-col-time">${timeHtml}</div>`,
-              `<div class="schedule-board-row-btns sb-col-btns">${manageHtml}</div>`
+              `<td class="schedule-board-room sb-col-room">${escapeHtml(norm.room_no || '-')}</td>`,
+              `<td class="schedule-board-name sb-col-name">${escapeHtml(norm.patient_name || '-')}</td>`,
+              `<td class="sb-col-doctor">${doctorHtml}</td>`,
+              `<td class="sb-col-type">${typeCell}</td>`,
+              `<td class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</td>`,
+              `<td class="sb-col-remark">${scheduleBoardRemarkCellHtml(sch)}</td>`,
+              `<td class="sb-col-meal">${scheduleBoardMealCellHtml(sch)}</td>`,
+              `<td class="sb-col-time"><div class="schedule-board-times">${timeHtml}</div></td>`,
+              `<td class="sb-col-btns"><div class="schedule-board-row-btns">${manageHtml}</div></td>`
             ].join('');
+            tbody.appendChild(row);
           }
           row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
           row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
           row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
           bindScheduleBoardModifiedHover(row, modMeta);
           bindScheduleBoardRemarkHover(row);
-          sec.appendChild(row);
         });
         body.appendChild(sec);
       });
