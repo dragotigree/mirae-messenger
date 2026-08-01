@@ -10481,7 +10481,21 @@
         if (m) room_no = m[1] + '호';
       }
       if (!patient_name && title) {
-        const stripped = title.replace(/^\d{3,4}\s*호?\s*/i, '').trim();
+        let stripped = title;
+        if (room_no) {
+          const roomDigits = room_no.replace(/\D/g, '');
+          if (roomDigits) {
+            stripped = stripped.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '').trim();
+          } else {
+            const roomCore = room_no.replace(/호\s*$/u, '').trim();
+            const esc = roomCore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (esc) {
+              stripped = stripped.replace(new RegExp('^\\s*' + esc + '\\s*호?\\s*', 'i'), '').trim();
+            }
+          }
+        } else {
+          stripped = stripped.replace(/^\d{3,4}\s*호?\s*/i, '').trim();
+        }
         if (stripped && !/^RM\s*\d/i.test(stripped)) {
           patient_name = stripped.split(/[\s,·/]/)[0] || '';
         }
@@ -11297,8 +11311,29 @@
     function normalizeQuickRoomNo(roomNo) {
       let r = (roomNo || '').trim();
       if (!r) return '';
-      if (!r.includes('호')) r = r.replace(/\s/g, '') + '호';
-      return r;
+      const digits = r.replace(/\D/g, '');
+      // 숫자 호실만 정규화(503 → 503호). 문자만 있는 값은 호를 붙이지 않음.
+      if (digits) return `${digits}호`;
+      return r.replace(/\s/g, '');
+    }
+
+    function validateScheduleBoardQuickPatientFields(roomNo, patientName, detail) {
+      const room = (roomNo || '').trim();
+      const patient = (patientName || '').trim();
+      const memo = (detail || '').trim();
+      if (!room && !patient && !memo) {
+        return '호실·환자명·목적 중 하나 이상 입력해 주세요.';
+      }
+      if (!patient) {
+        return '환자명을 입력해 주세요.';
+      }
+      if (room) {
+        const digits = room.replace(/\D/g, '');
+        if (!digits) {
+          return '호실은 숫자로 입력해 주세요. (예: 503)';
+        }
+      }
+      return '';
     }
 
     async function submitScheduleBoardQuickEntry(entry) {
@@ -11582,9 +11617,16 @@
       let roomNo = (document.getElementById('sb-quick-room')?.value || '').trim();
       const patientName = (document.getElementById('sb-quick-patient')?.value || '').trim();
       const detail = (document.getElementById('sb-quick-detail')?.value || '').trim();
-      if (!roomNo && !patientName && !detail) {
-        await appAlert('호실·환자명·메모 중 하나 이상 입력해 주세요.');
-        focusScheduleBoardQuickRoom();
+      const fieldErr = validateScheduleBoardQuickPatientFields(roomNo, patientName, detail);
+      if (fieldErr) {
+        await appAlert(fieldErr);
+        if (!patientName) {
+          document.getElementById('sb-quick-patient')?.focus();
+        } else if (roomNo && !roomNo.replace(/\D/g, '')) {
+          focusScheduleBoardQuickRoom();
+        } else {
+          focusScheduleBoardQuickRoom();
+        }
         return;
       }
       try {
@@ -11638,7 +11680,7 @@
         if (e && e.message === 'time') {
           await appAlert('귀원 시간은 출발 시간보다 이후여야 합니다.');
         } else if (e && e.message === 'empty') {
-          await appAlert('호실·환자명·메모 중 하나 이상 입력해 주세요.');
+          await appAlert('호실·환자명·목적 중 하나 이상 입력해 주세요.');
         } else if (e && /작성 권한|로그인/i.test(String(e.message || ''))) {
           await appAlert(e.message);
           openOperatorLoginModal();
