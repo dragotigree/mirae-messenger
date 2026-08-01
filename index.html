@@ -4731,7 +4731,21 @@
     }
 
     function refreshUnreadBadges() {
-      renderUserListTree();
+      // 목록 구조가 이미 있으면 카드 뱃지만 갱신 (전체 트리 재구축 생략)
+      const treeEl = document.getElementById('user-list-tree');
+      if (treeEl && treeEl.querySelector('.user-card-item[data-user-ip]')) {
+        treeEl.querySelectorAll('.user-card-item[data-user-ip]').forEach((card) => {
+          const ip = card.getAttribute('data-user-ip');
+          const u = findUserByIp(ip);
+          if (!u) return;
+          const unread = getUnreadForUser(u);
+          const host = card.querySelector('.user-card-unread');
+          if (!host) return;
+          host.innerHTML = unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : '';
+        });
+      } else {
+        renderUserListTree();
+      }
       renderGroupChannels();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
@@ -8322,7 +8336,7 @@
           }
           const urgent = typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1;
           const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
-          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full);
+          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true });
         });
         pendingUnreadScrollCount = 0;
         if (unreadStartIndex >= 0 && unreadStartIndex < history.length) {
@@ -8334,6 +8348,7 @@
         } else {
           scrollChatToBottom(false);
         }
+        updateMineOutboundStatusLabels();
         await refreshAllVisibleReactions();
         if (!keyword) {
           await markChannelReadFromHistory(history);
@@ -8421,7 +8436,11 @@
       if (activeChatUser && activeChatUser.isGroup) {
         return window.api.sendGroupMessage(activeChatUser.groupUid, activeChatUser.groupName, contentHtml);
       }
-      return window.api.sendMessage(activeChatUser.ip, contentHtml, isUrgentMode);
+      const res = await window.api.sendMessage(activeChatUser.ip, contentHtml, isUrgentMode);
+      if (res && res.status === 'ERROR') {
+        await appAlert('메시지를 저장하지 못했습니다.\n잠시 후 다시 보내 주세요.');
+      }
+      return res;
     }
 
     function getEditMessageContext() {
@@ -9888,7 +9907,9 @@
       return `<div class="msg-pending-notice">${escapeHtml(text)}</div>`;
     }
 
-    function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending) {
+    function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
+      const options = opts || {};
+      const skipStatusUpdate = !!options.skipStatusUpdate;
       const container = document.getElementById('chat-messages-area');
       const wasNearBottom = isMe || isNearChatBottom();
 
@@ -10022,7 +10043,7 @@
       }
       container.appendChild(row);
       bindMessageForwardDrag(row);
-      if (isMe && !isGroupChannel) updateMineOutboundStatusLabels();
+      if (isMe && !isGroupChannel && !skipStatusUpdate) updateMineOutboundStatusLabels();
       if (wasNearBottom) scrollChatToBottom(false);
     }
 

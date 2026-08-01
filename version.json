@@ -1,4 +1,4 @@
 {
-  "version": "1.0.255",
-  "notes": "빠른등록 더 컴팩트: 식사취소·동행을 목적과 같은 줄, 구분~주치의·출발/귀원 열 너비 축소"
+  "version": "1.0.256",
+  "notes": "속도·안정성: DM ACK 재전송, 채널 멱등, presence debounce, NOTICE_SYNC 청크, 첨부 compact, bind 재시도"
 }

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer, protocol } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
 const net = require('net');
@@ -28,6 +28,25 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
   process.exit(0);
+}
+
+// mirae-file:// 첨부 미리보기용 — app ready 전에 등록해야 img/src에서 로드됨
+try {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'mirae-file',
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        bypassCSP: true,
+        stream: true,
+        corsEnabled: true
+      }
+    }
+  ]);
+} catch (e) {
+  /* ignore */
 }
 app.on('second-instance', () => {
   showAndFocusWindow();
@@ -219,6 +238,13 @@ const PRESENCE_STALE_MS = 12000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
+/** NOTICE_SYNC 한 줄이 이 값을 넘지 않도록 청크로 나눔 (구버전도 RESPONSE 병합 가능) */
+const NOTICE_SYNC_SAFE_LINE_BYTES = 400 * 1024;
+/** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
+const SENT_ACK_RETRY_AFTER_MS = 8000;
+const SENT_ACK_MAX_RETRIES = 4;
+/** 사용자 목록 IPC 디바운스 */
+const USER_LIST_NOTIFY_DEBOUNCE_MS = 350;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -246,6 +272,16 @@ const persistedPhotos = {}; // ip -> photo (재시작 후에도 사진이 바로
 const onlineUsers = new Map();
 /** @type {Set<string>} 재전송 중인 PENDING msg_uid(또는 id) — 짧은 간격 중복 TCP 방지 */
 const pendingResendInflight = new Set();
+/** @type {Map<string, number>} SENT→ACK 재시도 횟수 */
+const sentAckRetryCount = new Map();
+let notifyUserListTimer = null;
+let notifyUserListForce = false;
+let miraeFileProtocolRegistered = false;
+let willDownloadHandlerBound = false;
+let udpBindRetryTimer = null;
+let tcpBindRetryTimer = null;
+let tcpServerInstance = null;
+let presenceFlushTimersStarted = false;
 
 const MY_IP = getMyIP();
 
@@ -614,33 +650,97 @@ function getReceivedFilesDir() {
   return dir;
 }
 
-// 💬 채팅 메시지 안에 첨부된 이미지/파일(base64 data URL)을 찾아서 실제 파일로 저장해 둔다.
-// (사이드바 📁 버튼 · 환경설정 '지정된 폴더'와 동일한 경로)
-function extractAndSaveAttachments(messageHtml) {
-  if (typeof messageHtml !== 'string') return;
-  const regex = /(?:src|href)="data:([^;]+);base64,([^"]+)"[^>]*(?:alt="([^"]*)")?/g;
+// 💬 채팅 메시지 안에 첨부된 이미지/파일(base64 data URL)을 찾아서 실제 파일로 저장한다.
+// compact=true 이면 DB 저장용으로 data URL을 mirae-file:// 로 바꿔 용량을 줄인다.
+// (재전송이 필요할 수 있는 PENDING/SENT 행에는 compact 하지 말 것 — wire에는 원본 data URL 유지)
+function extractAndSaveAttachments(messageHtml, options) {
+  const opts = options || {};
+  const compact = !!opts.compact;
+  if (typeof messageHtml !== 'string' || messageHtml.indexOf('data:') === -1) return messageHtml;
+  const dir = getReceivedFilesDir();
+  let out = messageHtml;
+  const regex = /((?:src|href)=")(data:([^;]+);base64,([^"]+))(")/gi;
+  const replacements = [];
   let match;
   while ((match = regex.exec(messageHtml)) !== null) {
-    const mimeType = match[1];
-    const base64Data = match[2];
-    let fileName = match[3];
+    const full = match[0];
+    const prefix = match[1];
+    const mimeType = match[3];
+    const base64Data = match[4];
+    const suffix = match[5];
+    let fileName = '';
+    const around = messageHtml.slice(Math.max(0, match.index - 80), match.index + full.length + 120);
+    const altMatch = around.match(/alt="([^"]*)"/i);
+    if (altMatch) fileName = altMatch[1];
     if (!fileName) {
-      // 파일 첨부(chat-file-box)는 alt가 아니라 별도 텍스트에 파일명이 있으므로 근처에서 찾아본다.
-      const nameMatch = messageHtml.match(/font-size: 13px;">([^<]+)<\/div>/);
+      const nameMatch = around.match(/font-size:\s*13px;">([^<]+)<\/div>/i);
       fileName = nameMatch ? nameMatch[1] : `file_${Date.now()}`;
     }
     try {
-      const ext = mimeType.split('/')[1] || 'bin';
+      const ext = (mimeType.split('/')[1] || 'bin').split(';')[0] || 'bin';
       const safeName = sanitizeFileName(fileName);
       const finalName = safeName.includes('.') ? safeName : `${safeName}.${ext}`;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filePath = path.join(getReceivedFilesDir(), `${timestamp}_${finalName}`);
-      fs.writeFile(filePath, Buffer.from(base64Data, 'base64'), (err) => {
-        if (err) console.error('첨부파일 저장 오류:', err.message);
-      });
+      const storedName = `${timestamp}_${finalName}`;
+      const filePath = path.join(dir, storedName);
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+      if (compact) {
+        replacements.push({
+          from: full,
+          to: `${prefix}mirae-file://${encodeURIComponent(storedName)}${suffix}`
+        });
+      }
     } catch (e) {
       console.error('첨부파일 처리 오류:', e.message);
     }
+  }
+  if (compact && replacements.length) {
+    replacements.forEach((r) => { out = out.split(r.from).join(r.to); });
+  }
+  return out;
+}
+
+function compactStoredMessageHtml(messageHtml) {
+  return extractAndSaveAttachments(messageHtml, { compact: true });
+}
+
+function maybeCompactMessageRowByUid(msgUid) {
+  const uid = String(msgUid || '').trim();
+  if (!uid) return;
+  db.get(
+    `SELECT id, message, status FROM messages WHERE msg_uid = ? AND sender_ip = ? LIMIT 1`,
+    [uid, MY_IP],
+    (err, row) => {
+      if (err || !row || !row.message) return;
+      if (row.status === 'PENDING') return;
+      if (typeof row.message !== 'string' || row.message.indexOf('data:') === -1) return;
+      const compacted = compactStoredMessageHtml(row.message);
+      if (compacted && compacted !== row.message) {
+        db.run(`UPDATE messages SET message = ? WHERE id = ?`, [compacted, row.id], logDbErr);
+      }
+    }
+  );
+}
+
+function registerMiraeFileProtocol() {
+  if (miraeFileProtocolRegistered) return;
+  try {
+    protocol.registerFileProtocol('mirae-file', (request, callback) => {
+      try {
+        const raw = String(request.url || '').replace(/^mirae-file:\/\//i, '').split(/[?#]/)[0];
+        const name = path.basename(decodeURIComponent(raw));
+        if (!name || name === '.' || name === '..') {
+          callback({ error: -2 });
+          return;
+        }
+        callback({ path: path.join(getReceivedFilesDir(), name) });
+      } catch (e) {
+        callback({ error: -2 });
+      }
+    });
+    miraeFileProtocolRegistered = true;
+  } catch (e) {
+    console.error('mirae-file 프로토콜 등록 실패:', e.message);
   }
 }
 
@@ -970,6 +1070,7 @@ db.on('error', (err) => {
 db.serialize(() => {
   db.run(`PRAGMA journal_mode = WAL`);
   db.run(`PRAGMA synchronous = NORMAL`);
+  db.run(`PRAGMA busy_timeout = 5000`);
   db.get(`PRAGMA integrity_check`, (err, row) => {
     const ok = !err && row && row.integrity_check === 'ok';
     if (ok) return;
@@ -1502,15 +1603,19 @@ function createWindow() {
   mainWindow.on('blur', () => { toastUiState.focused = false; });
 
   // 📁 채팅에서 파일/사진을 "다운로드"하면 브라우저 기본 위치 대신 설정에서 지정한 폴더로 저장한다.
-  mainWindow.webContents.session.on('will-download', (event, item) => {
-    try {
-      const targetDir = downloadFolderPath || app.getPath('downloads');
-      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-      item.setSavePath(path.join(targetDir, item.getFilename()));
-    } catch (e) {
-      console.error('다운로드 경로 설정 오류:', e.message);
-    }
-  });
+  // session 공유 리스너이므로 창 재생성 시 중복 등록하지 않는다.
+  if (!willDownloadHandlerBound) {
+    willDownloadHandlerBound = true;
+    session.defaultSession.on('will-download', (event, item) => {
+      try {
+        const targetDir = downloadFolderPath || app.getPath('downloads');
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        item.setSavePath(path.join(targetDir, item.getFilename()));
+      } catch (e) {
+        console.error('다운로드 경로 설정 오류:', e.message);
+      }
+    });
+  }
 
   mainWindow.on('maximize', () => {
     if (mainWindow) safeWebContentsSend('window-maximized-state', true);
@@ -1721,6 +1826,7 @@ app.whenReady().then(async () => {
     console.error('[preload-cache] 시작 시 캐시 초기화 실패:', e.message);
   }
   initSpellCheckerSession();
+  registerMiraeFileProtocol();
   createWindow();
   createTray();
   registerGlobalShortcuts();
@@ -1750,22 +1856,28 @@ function notifyNetworkStatus() {
 }
 
 function startUdpDiscovery() {
-  globalUdpSocket = dgram.createSocket('udp4');
+  if (globalUdpSocket) {
+    try { globalUdpSocket.removeAllListeners(); globalUdpSocket.close(); } catch (e) { /* ignore */ }
+    globalUdpSocket = null;
+  }
+  globalUdpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
-  globalUdpSocket.bind(UDP_PORT, () => {
-    globalUdpSocket.setBroadcast(true);
+  globalUdpSocket.once('listening', () => {
+    try { globalUdpSocket.setBroadcast(true); } catch (e) { /* ignore */ }
     udpStatus = 'running';
     notifyNetworkStatus();
     registerSelf();
     broadcastPresence(globalUdpSocket);
 
-    setInterval(() => {
-      registerSelf();
-      broadcastPresence(globalUdpSocket);
-    }, 4000);
-
-    setTimeout(() => flushAllPendingOutboundMessages(), 2500);
-    setInterval(() => flushAllPendingOutboundMessages(), 15000);
+    if (!presenceFlushTimersStarted) {
+      presenceFlushTimersStarted = true;
+      setInterval(() => {
+        registerSelf();
+        if (globalUdpSocket) broadcastPresence(globalUdpSocket);
+      }, 4000);
+      setTimeout(() => flushAllPendingOutboundMessages(), 2500);
+      setInterval(() => flushAllPendingOutboundMessages(), 15000);
+    }
   });
 
   globalUdpSocket.on('message', (msg, rinfo) => {
@@ -1791,16 +1903,25 @@ function startUdpDiscovery() {
           isMe: false
         };
         const userObj = mergeUserProfile(previouslyKnown, overlay, true);
-        // mergeUserProfile 끝에서 applyStoredProfileOverride가 적용됨.
-        // 아래처럼 UDP 값을 다시 채우면 마스터가 직급을 비워도 상대 PC PING의 "실장" 등이 되살아난다.
         userObj.lastSeen = Date.now();
 
         const wasOffline = !onlineUsers.has(rinfo.address);
+        const profileChanged = !previouslyKnown
+          || previouslyKnown.username !== userObj.username
+          || previouslyKnown.rank !== userObj.rank
+          || previouslyKnown.dept !== userObj.dept
+          || previouslyKnown.floor !== userObj.floor
+          || previouslyKnown.extNo !== userObj.extNo
+          || previouslyKnown.phone !== userObj.phone
+          || previouslyKnown.statusState !== userObj.statusState
+          || previouslyKnown.appVersion !== userObj.appVersion
+          || !!previouslyKnown.online !== true;
+
         onlineUsers.set(rinfo.address, userObj);
         allKnownUsers.set(rinfo.address, userObj);
         persistKnownUserSnapshot(userObj);
 
-        notifyUserList();
+        if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
           resendPendingMessages(rinfo.address);
@@ -1820,7 +1941,21 @@ function startUdpDiscovery() {
     console.error('UDP 소켓 오류:', err);
     udpStatus = `오류: ${err.code || err.message}`;
     notifyNetworkStatus();
+    if (udpBindRetryTimer) return;
+    udpBindRetryTimer = setTimeout(() => {
+      udpBindRetryTimer = null;
+      console.error('UDP 재바인딩 시도…');
+      startUdpDiscovery();
+    }, 3000);
   });
+
+  try {
+    globalUdpSocket.bind(UDP_PORT);
+  } catch (e) {
+    console.error('UDP bind 예외:', e.message);
+    udpStatus = `오류: ${e.message}`;
+    notifyNetworkStatus();
+  }
 }
 
 function registerSelf() {
@@ -2441,7 +2576,28 @@ function dedupeUsersByPersonIdentity(list) {
   return out;
 }
 
-function notifyUserList() {
+function notifyUserList(force) {
+  if (force) notifyUserListForce = true;
+  if (notifyUserListTimer) return;
+  notifyUserListTimer = setTimeout(() => {
+    notifyUserListTimer = null;
+    const forced = notifyUserListForce;
+    notifyUserListForce = false;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const combinedList = dedupeUsersByPersonIdentity(
+      Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
+    );
+    safeWebContentsSend('user-list-update', combinedList);
+    if (forced) { /* keep API compatible */ }
+  }, USER_LIST_NOTIFY_DEBOUNCE_MS);
+}
+
+function notifyUserListNow() {
+  if (notifyUserListTimer) {
+    clearTimeout(notifyUserListTimer);
+    notifyUserListTimer = null;
+  }
+  notifyUserListForce = false;
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const combinedList = dedupeUsersByPersonIdentity(
     Array.from(allKnownUsers.values()).map(userListEntryForRenderer)
@@ -2499,6 +2655,10 @@ function startPresenceSweeper() {
 }
 
 function startTcpServer() {
+  if (tcpServerInstance) {
+    try { tcpServerInstance.close(); } catch (e) { /* ignore */ }
+    tcpServerInstance = null;
+  }
   const server = net.createServer((socket) => {
     let buffer = '';
 
@@ -2527,10 +2687,17 @@ function startTcpServer() {
     });
     socket.on('error', () => {});
   });
+  tcpServerInstance = server;
   server.on('error', (err) => {
     console.error('TCP 서버 오류:', err);
     tcpStatus = `오류: ${err.code || err.message}`;
     notifyNetworkStatus();
+    if (tcpBindRetryTimer) return;
+    tcpBindRetryTimer = setTimeout(() => {
+      tcpBindRetryTimer = null;
+      console.error('TCP 재바인딩 시도…');
+      startTcpServer();
+    }, 3000);
   });
   server.on('listening', () => {
     tcpStatus = 'running';
@@ -2543,7 +2710,8 @@ function parseAndRoute(line, socket) {
   if (!line || !line.trim()) return;
   try {
     const payload = JSON.parse(line);
-    const senderIP = socket.remoteAddress.replace('::ffff:', '');
+    const senderIP = (socket.remoteAddress || '').replace('::ffff:', '');
+    if (!senderIP) return;
     routeIncomingPayload(payload, senderIP);
   } catch (e) {
     console.error('TCP 페이로드 파싱 오류:', e.message);
@@ -2635,8 +2803,6 @@ function handleIncomingChat(payload, senderIP) {
     uid: payload.uid
   };
 
-  extractAndSaveAttachments(payload.message);
-
   // DB 저장을 기다리지 않고 바로 채팅창·토스트에 반영
   if (mainWindow) {
     safeWebContentsSend('receive-message', uiPayload);
@@ -2649,10 +2815,13 @@ function handleIncomingChat(payload, senderIP) {
   }
   appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
 
+  // 디스크 저장은 persist에서 compact 와 함께 수행 (즉시 UI는 원본 data URL 유지)
+
   const persist = () => {
+    const storedMessage = compactStoredMessageHtml(payload.message);
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, payload.message, payload.uid || null],
+      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, payload.uid || null],
       (err) => {
         logDbErr(err);
         if (!err && payload.uid) {
@@ -2687,30 +2856,34 @@ function handleIncomingDeptMessage(payload, senderIP) {
   const receiverKey = `DEPT:${payload.dept}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const senderName = formatSenderDisplay(payload.sender, senderIP);
+  const msgUid = payload.msgUid || null;
 
-  if (mainWindow) {
-    safeWebContentsSend('receive-dept-message', {
-      dept: payload.dept,
-      senderName,
-      senderIP: senderIP,
-      message: payload.message,
-      createdAt: currentTime,
-      msgUid: payload.msgUid || null,
-      messageId: null
+  shouldSkipDuplicateChannelMessage(msgUid, () => {
+    const storedMessage = compactStoredMessageHtml(payload.message);
+    if (mainWindow) {
+      safeWebContentsSend('receive-dept-message', {
+        dept: payload.dept,
+        senderName,
+        senderIP: senderIP,
+        message: payload.message,
+        createdAt: currentTime,
+        msgUid,
+        messageId: null
+      });
+    }
+    notifyIncomingMessageNotification({
+      title: `👥 [${payload.dept}] ${senderName}님의 메시지`,
+      body: previewBody(payload.message),
+      channelKey: receiverKey
     });
-  }
-  notifyIncomingMessageNotification({
-    title: `👥 [${payload.dept}] ${senderName}님의 메시지`,
-    body: previewBody(payload.message),
-    channelKey: receiverKey
-  });
 
-  db.run(
-    `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [senderName, senderIP, receiverKey, payload.message, payload.msgUid || null],
-    logDbErr
-  );
-  appendChatLog(receiverKey, `부서_${payload.dept}`, payload.sender, payload.message);
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      logDbErr
+    );
+    appendChatLog(receiverKey, `부서_${payload.dept}`, payload.sender, payload.message);
+  });
 }
 
 function handleIncomingFloorMessage(payload, senderIP) {
@@ -2719,30 +2892,34 @@ function handleIncomingFloorMessage(payload, senderIP) {
   const receiverKey = `FLOOR:${payload.floor}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const senderName = formatSenderDisplay(payload.sender, senderIP);
+  const msgUid = payload.msgUid || null;
 
-  if (mainWindow) {
-    safeWebContentsSend('receive-floor-message', {
-      floor: payload.floor,
-      senderName,
-      senderIP: senderIP,
-      message: payload.message,
-      createdAt: currentTime,
-      msgUid: payload.msgUid || null,
-      messageId: null
+  shouldSkipDuplicateChannelMessage(msgUid, () => {
+    const storedMessage = compactStoredMessageHtml(payload.message);
+    if (mainWindow) {
+      safeWebContentsSend('receive-floor-message', {
+        floor: payload.floor,
+        senderName,
+        senderIP: senderIP,
+        message: payload.message,
+        createdAt: currentTime,
+        msgUid,
+        messageId: null
+      });
+    }
+    notifyIncomingMessageNotification({
+      title: `🏢 [${payload.floor}] ${senderName}님의 메시지`,
+      body: previewBody(payload.message),
+      channelKey: receiverKey
     });
-  }
-  notifyIncomingMessageNotification({
-    title: `🏢 [${payload.floor}] ${senderName}님의 메시지`,
-    body: previewBody(payload.message),
-    channelKey: receiverKey
-  });
 
-  db.run(
-    `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [senderName, senderIP, receiverKey, payload.message, payload.msgUid || null],
-    logDbErr
-  );
-  appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      logDbErr
+    );
+    appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
+  });
 }
 
 /** 1:1 읽음 데스크탑 알림은 상대당 앱 실행 중 딱 1회만 */
@@ -2764,6 +2941,29 @@ function rememberIncomingChatUid(uid) {
   if (recentIncomingChatUids.has(key)) return true;
   recentIncomingChatUids.set(key, now);
   return false;
+}
+
+/** 채널(전체/부서/층/그룹) 수신 멱등 — 1:1과 동일 TTL 맵 공유 */
+function rememberIncomingChannelUid(uid) {
+  return rememberIncomingChatUid(uid);
+}
+
+function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
+  const uid = msgUid ? String(msgUid).trim() : '';
+  if (!uid) {
+    onUnique();
+    return;
+  }
+  if (rememberIncomingChannelUid(uid)) return;
+  db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
+    if (err) {
+      logDbErr(err);
+      onUnique();
+      return;
+    }
+    if (row) return;
+    onUnique();
+  });
 }
 
 function armDmReadReceiptNotify(targetIP) {
@@ -2939,29 +3139,33 @@ async function handleChannelRead(payload, senderIP) {
 function handleIncomingBroadcast(payload, senderIP) {
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const senderName = formatSenderDisplay(payload.sender, senderIP);
+  const msgUid = payload.msgUid || null;
 
-  if (mainWindow) {
-    safeWebContentsSend('receive-broadcast', {
-      senderName,
-      senderIP: senderIP,
-      message: payload.message,
-      createdAt: currentTime,
-      msgUid: payload.msgUid || null,
-      messageId: null
+  shouldSkipDuplicateChannelMessage(msgUid, () => {
+    const storedMessage = compactStoredMessageHtml(payload.message);
+    if (mainWindow) {
+      safeWebContentsSend('receive-broadcast', {
+        senderName,
+        senderIP: senderIP,
+        message: payload.message,
+        createdAt: currentTime,
+        msgUid,
+        messageId: null
+      });
+    }
+    notifyIncomingMessageNotification({
+      title: `📢 전체공지 - ${senderName}`,
+      body: previewBody(payload.message),
+      channelKey: 'BROADCAST'
     });
-  }
-  notifyIncomingMessageNotification({
-    title: `📢 전체공지 - ${senderName}`,
-    body: previewBody(payload.message),
-    channelKey: 'BROADCAST'
-  });
 
-  db.run(
-    `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
-    [senderName, senderIP, payload.message, payload.msgUid || null],
-    logDbErr
-  );
-  appendChatLog('BROADCAST', '전체공지', payload.sender, payload.message);
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
+      [senderName, senderIP, storedMessage, msgUid],
+      logDbErr
+    );
+    appendChatLog('BROADCAST', '전체공지', payload.sender, payload.message);
+  });
 }
 
 function handleNoticeAdd(n) {
@@ -2990,27 +3194,111 @@ function handleNoticeDelete(uid) {
   });
 }
 
+function tcpWriteJsonLines(targetIP, payloads) {
+  const lines = (payloads || []).map((p) => JSON.stringify(p) + '\n').filter((l) => l.length > 1);
+  if (!lines.length || !targetIP) return;
+  const client = new net.Socket();
+  client.setTimeout(4000);
+  client.connect(TCP_PORT, targetIP, () => {
+    for (const line of lines) {
+      if (Buffer.byteLength(line, 'utf8') > MAX_TCP_LINE_BUFFER - 2048) {
+        console.error('NOTICE_SYNC 청크가 여전히 너무 큼 — 건너뜀');
+        continue;
+      }
+      client.write(line);
+    }
+    client.end();
+  });
+  client.on('error', () => {});
+  client.on('timeout', () => client.destroy());
+}
+
+function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows) {
+  const chunks = [];
+  const baseMeta = {
+    type: 'NOTICE_SYNC_RESPONSE',
+    notices: [],
+    operators: [],
+    schedules: [],
+    profileOverrides: [],
+    updateSourcePath: updateSourcePath || ''
+  };
+
+  const tryPush = (obj) => {
+    const size = Buffer.byteLength(JSON.stringify(obj) + '\n', 'utf8');
+    if (size <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+      chunks.push(obj);
+      return true;
+    }
+    return false;
+  };
+
+  // 1) 공지+작성자+overrides (보통 작음)
+  const head = {
+    ...baseMeta,
+    notices: notices || [],
+    operators: operators || [],
+    profileOverrides: profileOverridesRows || []
+  };
+  if (!tryPush(head)) {
+    // 극단적으로 크면 필드별로
+    if ((notices || []).length) tryPush({ ...baseMeta, notices });
+    if ((operators || []).length) tryPush({ ...baseMeta, operators });
+    if ((profileOverridesRows || []).length) tryPush({ ...baseMeta, profileOverrides: profileOverridesRows });
+  }
+
+  // 2) 일정은 청크로
+  const list = schedules || [];
+  if (!list.length) return chunks.length ? chunks : [{ ...baseMeta }];
+
+  let batch = [];
+  const flushBatch = () => {
+    if (!batch.length) return;
+    const obj = { ...baseMeta, schedules: batch };
+    if (tryPush(obj)) {
+      batch = [];
+      return;
+    }
+    // 단건도 크면 스킵(손상된 거대 행 방지)
+    if (batch.length === 1) {
+      console.error('일정 단건이 TCP 한도를 초과해 동기화에서 제외:', batch[0] && batch[0].uid);
+      batch = [];
+      return;
+    }
+    const half = batch.slice(0, Math.ceil(batch.length / 2));
+    const rest = batch.slice(Math.ceil(batch.length / 2));
+    batch = half;
+    flushBatch();
+    batch = rest;
+    flushBatch();
+  };
+
+  list.forEach((s) => {
+    batch.push(s);
+    const probe = { ...baseMeta, schedules: batch };
+    if (Buffer.byteLength(JSON.stringify(probe) + '\n', 'utf8') > NOTICE_SYNC_SAFE_LINE_BYTES) {
+      batch.pop();
+      flushBatch();
+      batch.push(s);
+    }
+  });
+  flushBatch();
+  return chunks.length ? chunks : [{ ...baseMeta, schedules: list.slice(0, 1) }];
+}
+
 function handleNoticeSyncRequest(senderIP) {
   db.all(`SELECT * FROM notices`, [], (err, notices) => {
     if (err) return;
     db.all(`SELECT * FROM notice_operators`, [], (err2, operators) => {
       db.all(`SELECT * FROM hospital_schedules`, [], (err3, schedules) => {
         db.all(`SELECT * FROM user_profile_overrides`, [], (err4, profileOverridesRows) => {
-        const replyClient = new net.Socket();
-        replyClient.setTimeout(1500);
-        replyClient.connect(TCP_PORT, senderIP, () => {
-          replyClient.write(JSON.stringify({
-            type: 'NOTICE_SYNC_RESPONSE',
-            notices: notices || [],
-            operators: operators || [],
-            schedules: schedules || [],
-            profileOverrides: profileOverridesRows || [],
-            updateSourcePath: updateSourcePath || ''
-          }) + '\n');
-          replyClient.end();
-        });
-        replyClient.on('error', () => {});
-        replyClient.on('timeout', () => replyClient.destroy());
+          const chunks = buildNoticeSyncPayloadChunks(
+            notices || [],
+            operators || [],
+            schedules || [],
+            profileOverridesRows || []
+          );
+          tcpWriteJsonLines(senderIP, chunks);
         });
       });
     });
@@ -3184,34 +3472,37 @@ function handleGroupSync(g) {
 }
 
 function handleIncomingGroupMessage(payload, senderIP) {
-  extractAndSaveAttachments(payload.message);
   const receiverKey = `GROUP:${payload.uid}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const senderName = formatSenderDisplay(payload.sender, senderIP);
+  const msgUid = payload.msgUid || null;
 
-  if (mainWindow) {
-    safeWebContentsSend('receive-group-message', {
-      uid: payload.uid,
-      senderName,
-      senderIP: senderIP,
-      message: payload.message,
-      createdAt: currentTime,
-      msgUid: payload.msgUid,
-      messageId: null
-    });
-    notifyIncomingMessageNotification({
-      title: `👥 [${payload.groupName || '그룹'}] ${senderName}님의 메시지`,
-      body: previewBody(payload.message),
-      channelKey: receiverKey
-    });
-  }
+  shouldSkipDuplicateChannelMessage(msgUid, () => {
+    const storedMessage = compactStoredMessageHtml(payload.message);
+    if (mainWindow) {
+      safeWebContentsSend('receive-group-message', {
+        uid: payload.uid,
+        senderName,
+        senderIP: senderIP,
+        message: payload.message,
+        createdAt: currentTime,
+        msgUid,
+        messageId: null
+      });
+      notifyIncomingMessageNotification({
+        title: `👥 [${payload.groupName || '그룹'}] ${senderName}님의 메시지`,
+        body: previewBody(payload.message),
+        channelKey: receiverKey
+      });
+    }
 
-  db.run(
-    `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [senderName, senderIP, receiverKey, payload.message, payload.msgUid],
-    logDbErr
-  );
-  appendChatLog(receiverKey, payload.groupName || '그룹', payload.sender, payload.message);
+    db.run(
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      logDbErr
+    );
+    appendChatLog(receiverKey, payload.groupName || '그룹', payload.sender, payload.message);
+  });
 }
 
 function handleGroupRenameNotice(payload) {
@@ -3328,44 +3619,69 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       resolve({ ...result, createdAt, createdAtFull });
     };
 
+    const startTcpSend = (localRowId) => {
+      extractAndSaveAttachments(message);
+      appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
+
+      client.connect(TCP_PORT, targetIP, () => {
+        isConnected = true;
+        try {
+          client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message, urgent: !!urgent, uid: msgUid }) + '\n');
+          client.end();
+          armDmReadReceiptNotify(targetIP);
+          finish({ status: 'SENT', createdAt, uid: msgUid, id: localRowId });
+        } catch (writeErr) {
+          console.error('DM write 오류:', writeErr.message);
+          db.run(
+            `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ?`,
+            [msgUid, MY_IP],
+            () => finish({ status: 'PENDING', id: localRowId, createdAt, uid: msgUid })
+          );
+        }
+      });
+
+      const handleFailure = () => {
+        if (isConnected || settled) return;
+        client.destroy();
+        db.run(
+          `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ?`,
+          [msgUid, MY_IP],
+          (updErr) => {
+            logDbErr(updErr);
+            armDmReadReceiptNotify(targetIP);
+            finish({ status: 'PENDING', id: localRowId, createdAt, uid: msgUid });
+          }
+        );
+      };
+
+      client.on('timeout', handleFailure);
+      client.on('error', handleFailure);
+    };
+
     // TCP 연결 전에 먼저 저장 → 루프백 수신과의 msg_uid 레이스·보관함 중복 방지
+    // wire/재전송용으로는 원본(message)을 유지. ACK 후 compact.
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
       function (insertErr) {
         if (insertErr) {
           logDbErr(insertErr);
-          finish({ status: 'PENDING', createdAt, uid: msgUid });
-          return;
-        }
-        const localRowId = this.lastID;
-        extractAndSaveAttachments(message);
-        appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
-
-        client.connect(TCP_PORT, targetIP, () => {
-          isConnected = true;
-          client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message, urgent: !!urgent, uid: msgUid }) + '\n');
-          client.end();
-          armDmReadReceiptNotify(targetIP);
-          finish({ status: 'SENT', createdAt, uid: msgUid, id: localRowId });
-        });
-
-        const handleFailure = () => {
-          if (isConnected || settled) return;
-          client.destroy();
+          // 가짜 PENDING 금지: 실제 PENDING 행을 남기거나 ERROR 반환
           db.run(
-            `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ?`,
-            [msgUid, MY_IP],
-            (updErr) => {
-              logDbErr(updErr);
-              armDmReadReceiptNotify(targetIP);
-              finish({ status: 'PENDING', id: localRowId, createdAt, uid: msgUid });
+            `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+            [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
+            function (insertErr2) {
+              if (insertErr2) {
+                logDbErr(insertErr2);
+                finish({ status: 'ERROR', error: insertErr.message || 'DB 저장 실패', uid: msgUid });
+                return;
+              }
+              startTcpSend(this.lastID);
             }
           );
-        };
-
-        client.on('timeout', handleFailure);
-        client.on('error', handleFailure);
+          return;
+        }
+        startTcpSend(this.lastID);
       }
     );
   });
@@ -3766,6 +4082,15 @@ function deliverPendingChatRow(row, targetIP) {
   const releaseInflight = () => pendingResendInflight.delete(inflightKey);
   setTimeout(releaseInflight, 15000);
 
+  if (row.status === 'SENT' && row.msg_uid) {
+    const tries = sentAckRetryCount.get(String(row.msg_uid)) || 0;
+    if (tries >= SENT_ACK_MAX_RETRIES) {
+      releaseInflight();
+      return;
+    }
+    sentAckRetryCount.set(String(row.msg_uid), tries + 1);
+  }
+
   const client = new net.Socket();
   client.setTimeout(2500);
   const senderLogin = (myProfile && myProfile.username) ? myProfile.username : row.sender_name;
@@ -3817,15 +4142,30 @@ function resendPendingMessages(targetIP) {
   if (!targetIP || !onlineUsers.has(targetIP)) return;
 
   db.all(
-    `SELECT id, sender_name, message, msg_uid FROM messages
-     WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING' ORDER BY id ASC`,
+    `SELECT id, sender_name, message, msg_uid, status, created_at FROM messages
+     WHERE sender_ip = ? AND receiver_ip = ?
+       AND (
+         status = 'PENDING'
+         OR (
+           status = 'SENT'
+           AND msg_uid IS NOT NULL AND trim(msg_uid) != ''
+           AND created_at <= datetime('now', '-8 seconds')
+         )
+       )
+     ORDER BY id ASC`,
     [MY_IP, targetIP],
     (err, rows) => {
       if (err) {
         logDbErr(err);
         return;
       }
-      (rows || []).forEach((row) => deliverPendingChatRow(row, targetIP));
+      (rows || []).forEach((row) => {
+        if (row.status === 'SENT' && row.message && String(row.message).indexOf('mirae-file://') !== -1) {
+          // compact 된 행은 wire 재전송 불가 — ACK만 기다리거나 스킵
+          return;
+        }
+        deliverPendingChatRow(row, targetIP);
+      });
     }
   );
 
@@ -3847,7 +4187,20 @@ function flushAllPendingOutboundMessages() {
   if (!profileLoaded) return;
   db.all(
     `SELECT DISTINCT receiver_ip FROM messages
-     WHERE sender_ip = ? AND status = 'PENDING'
+     WHERE sender_ip = ?
+       AND (
+         status = 'PENDING'
+         OR (
+           status = 'SENT'
+           AND msg_uid IS NOT NULL AND trim(msg_uid) != ''
+           AND receiver_ip NOT IN ('BROADCAST')
+           AND receiver_ip NOT LIKE 'DEPT:%'
+           AND receiver_ip NOT LIKE 'FLOOR:%'
+           AND receiver_ip NOT LIKE 'GROUP:%'
+           AND receiver_ip NOT LIKE 'BCAST:%'
+           AND created_at <= datetime('now', '-8 seconds')
+         )
+       )
        AND receiver_ip NOT IN ('BROADCAST')
        AND receiver_ip NOT LIKE 'DEPT:%'
        AND receiver_ip NOT LIKE 'FLOOR:%'
@@ -4865,10 +5218,14 @@ ipcMain.handle('toggle-message-reaction', async (event, { msgKey, emoji, targetI
 function handleMsgAck(payload) {
   if (!payload || !payload.msgUid) return;
   pendingResendInflight.delete(String(payload.msgUid));
+  sentAckRetryCount.delete(String(payload.msgUid));
   db.run(
     `UPDATE messages SET status = 'DELIVERED' WHERE msg_uid = ? AND sender_ip = ? AND status IN ('PENDING', 'SENT')`,
     [payload.msgUid, MY_IP],
-    logDbErr
+    (err) => {
+      logDbErr(err);
+      maybeCompactMessageRowByUid(payload.msgUid);
+    }
   );
   if (mainWindow) {
     safeWebContentsSend('message-delivered', { msgUid: payload.msgUid });
