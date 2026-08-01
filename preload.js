@@ -13,7 +13,10 @@ contextBridge.exposeInMainWorld('api', {
   syncTransportRequestStatuses: () => ipcRenderer.invoke('sync-transport-request-statuses'),
   getTransportWebappUrl: () => ipcRenderer.invoke('get-transport-webapp-url'),
   setTransportWebappUrl: (url) => ipcRenderer.invoke('set-transport-webapp-url', url),
-  notifyRead: (targetIP) => ipcRenderer.invoke('notify-read', targetIP),
+  notifyRead: (targetIP, opts) => ipcRenderer.invoke('notify-read', {
+    targetIP,
+    intentional: !!(opts && opts.intentional)
+  }),
   notifyChannelRead: (channelKey, lastReadMsgUid) => ipcRenderer.invoke('notify-channel-read', { channelKey, lastReadMsgUid }),
   getMessageUnreadCounts: (channelKey, messages) => ipcRenderer.invoke('get-message-unread-counts', { channelKey, messages }),
   onChannelReadUpdate: (callback) => ipcRenderer.on('channel-read-update', (e, data) => callback(data)),

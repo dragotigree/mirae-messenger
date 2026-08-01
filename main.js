@@ -493,6 +493,13 @@ function closeMessageToast() {
   toastWindow = null;
 }
 
+function truncateToastText(text, maxLen) {
+  const s = String(text || '').replace(/\s+/g, ' ').trim();
+  const limit = Math.max(12, Number(maxLen) || 72);
+  if (s.length <= limit) return s;
+  return `${s.slice(0, limit - 1)}…`;
+}
+
 function showMessageToast({ title, body, urgent, channelKey }) {
   if (!notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
@@ -528,8 +535,8 @@ function showMessageToast({ title, body, urgent, channelKey }) {
   });
 
   const q = new URLSearchParams({
-    title: String(title || '새 메시지').slice(0, 120),
-    body: String(body || '').slice(0, 280),
+    title: truncateToastText(title || '새 메시지', 48),
+    body: truncateToastText(body || '', 72),
     urgent: urgent ? '1' : '0'
   });
 
@@ -3565,13 +3572,15 @@ ipcMain.handle('choose-download-folder', async () => {
   return downloadFolderPath;
 });
 
-ipcMain.handle('notify-read', async (event, targetIP) => {
+ipcMain.handle('notify-read', async (event, arg) => {
+  const targetIP = typeof arg === 'string' ? arg : (arg && arg.targetIP);
+  const intentional = typeof arg === 'object' && arg && !!arg.intentional;
   if (!targetIP || targetIP === 'BROADCAST' || String(targetIP).startsWith('DEPT:') ||
       String(targetIP).startsWith('FLOOR:') || String(targetIP).startsWith('GROUP:')) {
     return { success: false };
   }
-  // 창이 포커스되지 않은 상태(화면보호기·다른 앱)에서는 읽음 통지 차단
-  if (!toastUiState.focused) {
+  // 토스트「읽기」등 의도적 확인이 아니면, 창 포커스 없을 때 읽음 차단
+  if (!intentional && !toastUiState.focused) {
     return { success: false, reason: 'window-not-focused' };
   }
   return new Promise((resolve) => {

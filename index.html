@@ -3785,17 +3785,19 @@
 
     async function requestDmReadReceipt(peerIp, opts) {
       if (!isDirectMessagePeerKey(peerIp)) return false;
-      if (!isDmChatActivelyViewed()) {
-        // 화면보호기·다른 창·자리비움 중에는 읽음 보내지 않음
+      const intentional = !!(opts && opts.intentional);
+      // 토스트「읽기」·대화방 직접 열기만 의도적 읽음. 팝업에 내용만 떠도 읽음 보내지 않음.
+      if (!intentional && !isDmChatActivelyViewed()) {
         pendingDmReadPeers.add(peerIp);
         return false;
       }
-      const force = !!(opts && opts.force);
+      if (intentional) markUserActivityForReadReceipt();
+      const force = !!(opts && (opts.force || opts.intentional));
       if (!force && dmReadReceiptSentFor[peerIp]) return true;
       if (dmReadReceiptInFlight[peerIp]) return false;
       dmReadReceiptInFlight[peerIp] = true;
       try {
-        const res = await window.api.notifyRead(peerIp);
+        const res = await window.api.notifyRead(peerIp, { intentional });
         const ok = !!(res && res.success);
         if (ok) {
           dmReadReceiptSentFor[peerIp] = true;
@@ -3886,7 +3888,8 @@
     }
 
     function maybeNotifyDmRead(peerIp) {
-      requestDmReadReceipt(peerIp).catch(() => {});
+      // 대화방을 직접 연 경우 → 의도적 읽음
+      requestDmReadReceipt(peerIp, { force: true, intentional: true }).catch(() => {});
     }
 
     function flushPendingDmReadReceipts() {
@@ -4630,8 +4633,9 @@
 
       if (isChatCurrentlyOpen(data.senderIP)) {
         appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
-        // 화면보호기·다른 화면이면 읽음 보내지 않음 (실제 입력 후에만)
-        scheduleDmReadReceipt(data.senderIP);
+        // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
+        pendingDmReadPeers.add(data.senderIP);
+        if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
       } else {
         bumpUnread(data.senderIP);
         rememberPendingInbound(data.senderIP, data);
@@ -5425,6 +5429,14 @@
     function openChatFromToastChannelKey(channelKey) {
       const key = String(channelKey || '').trim();
       if (!key) return;
+      // 토스트「읽기」= 의도적으로 확인한 것
+      markUserActivityForReadReceipt();
+      const afterOpen = () => {
+        if (isDirectMessagePeerKey(key)) {
+          delete dmReadReceiptSentFor[key];
+          requestDmReadReceipt(key, { force: true, intentional: true }).catch(() => {});
+        }
+      };
       if (key === 'BROADCAST') {
         selectUserChat(BROADCAST_CHANNEL);
         return;
@@ -5445,10 +5457,10 @@
       }
       const user = findUserByIp(key) || (allUsers || []).find((u) => u.ip === key);
       if (user) {
-        selectUserChat(user);
+        Promise.resolve(selectUserChat(user)).then(afterOpen);
         return;
       }
-      selectUserChat({ ip: key, username: key, rank: '', dept: '', floor: '', extNo: '' });
+      Promise.resolve(selectUserChat({ ip: key, username: key, rank: '', dept: '', floor: '', extNo: '' })).then(afterOpen);
     }
 
     if (window.api && typeof window.api.onOpenChatFromToast === 'function') {
@@ -8010,7 +8022,7 @@
           if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
             drainPendingInboundForActiveChat();
             delete dmReadReceiptSentFor[activeChatUser.ip];
-            await requestDmReadReceipt(activeChatUser.ip, { force: true });
+            await requestDmReadReceipt(activeChatUser.ip, { force: true, intentional: true });
             updateMineOutboundStatusLabels();
           }
         }
