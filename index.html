@@ -2470,7 +2470,7 @@
             <input type="checkbox" id="setting-notify-read-receipt" checked>
             <span class="settings-toggle-text">
               <span class="settings-toggle-title">읽음 확인 알림</span>
-              <span class="settings-toggle-desc">1:1에서 상대가 내 메시지를 처음 읽었을 때</span>
+              <span class="settings-toggle-desc">상대가 처음 읽었을 때 데스크탑 알림 1회 (채팅방에는 보냄·읽음·오류만 표시)</span>
             </span>
           </label>
           <label class="settings-toggle-row" for="setting-notification-preview">
@@ -4602,11 +4602,8 @@
     function applyReadReceiptUi(data) {
       if (!data || !data.readerIP) return;
       setDmReadReceiptFlag(data.readerIP, true);
-      const label = data.readerName || '상대방';
       const inChat = isDmChatWithPeer(data.readerIP);
-      if (data.showAlert && inChat) {
-        showReadReceiptNote(`${label}님이 ${data.readAt || ''} 읽었습니다`);
-      }
+      // 「○○님이 … 읽었습니다」 배너는 쓰지 않음 — 말풍선 상태(보냄/읽음/오류)만 갱신
       if (inChat) {
         updateMineOutboundStatusLabels();
       }
@@ -9737,11 +9734,9 @@
       } catch (e) {}
     }
 
-    function showReadReceiptNote(text) {
-      const el = document.getElementById('read-receipt-note');
-      if (!el) return;
-      el.textContent = `✅ ${text}`;
-      el.style.display = 'block';
+    function showReadReceiptNote(_text) {
+      // 배너 미사용 — 말풍선 「보냄/읽음/오류」만 표시
+      hideReadReceiptNote();
     }
 
     function hideReadReceiptNote() {
