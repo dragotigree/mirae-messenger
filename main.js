@@ -2586,28 +2586,36 @@ function handleProfilePhotoRequest(fromIP) {
 function handleIncomingChat(payload, senderIP) {
   if (senderIP === MY_IP) return;
 
-  const deliver = () => {
-    extractAndSaveAttachments(payload.message);
+  if (payload.uid && rememberIncomingChatUid(payload.uid)) {
+    sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: payload.uid });
+    return;
+  }
 
-    if (mainWindow) {
-      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      safeWebContentsSend('receive-message', {
-        senderName: formatSenderDisplay(payload.sender, senderIP),
-        senderIP: senderIP,
-        message: payload.message,
-        urgent: !!payload.urgent,
-        createdAt: currentTime,
-        uid: payload.uid
-      });
+  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const uiPayload = {
+    senderName: formatSenderDisplay(payload.sender, senderIP),
+    senderIP: senderIP,
+    message: payload.message,
+    urgent: !!payload.urgent,
+    createdAt: currentTime,
+    uid: payload.uid
+  };
 
-      notifyIncomingMessageNotification({
-        title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
-        body: previewBody(payload.message),
-        urgent: !!payload.urgent,
-        channelKey: senderIP
-      });
-    }
+  extractAndSaveAttachments(payload.message);
 
+  // DB 저장을 기다리지 않고 바로 채팅창·토스트에 반영
+  if (mainWindow) {
+    safeWebContentsSend('receive-message', uiPayload);
+    notifyIncomingMessageNotification({
+      title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
+      body: previewBody(payload.message),
+      urgent: !!payload.urgent,
+      channelKey: senderIP
+    });
+  }
+  appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
+
+  const persist = () => {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, payload.message, payload.uid || null],
@@ -2618,26 +2626,25 @@ function handleIncomingChat(payload, senderIP) {
         }
       }
     );
-    appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
   };
 
   if (payload.uid) {
     db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [payload.uid], (err, row) => {
       if (err) {
         logDbErr(err);
-        deliver();
+        persist();
         return;
       }
       if (row) {
         sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: payload.uid });
         return;
       }
-      deliver();
+      persist();
     });
     return;
   }
 
-  deliver();
+  persist();
 }
 
 function handleIncomingDeptMessage(payload, senderIP) {
@@ -2645,30 +2652,29 @@ function handleIncomingDeptMessage(payload, senderIP) {
 
   const receiverKey = `DEPT:${payload.dept}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const senderName = formatSenderDisplay(payload.sender, senderIP);
+
+  if (mainWindow) {
+    safeWebContentsSend('receive-dept-message', {
+      dept: payload.dept,
+      senderName,
+      senderIP: senderIP,
+      message: payload.message,
+      createdAt: currentTime,
+      msgUid: payload.msgUid || null,
+      messageId: null
+    });
+  }
   notifyIncomingMessageNotification({
-    title: `👥 [${payload.dept}] ${formatSenderDisplay(payload.sender, senderIP)}님의 메시지`,
+    title: `👥 [${payload.dept}] ${senderName}님의 메시지`,
     body: previewBody(payload.message),
     channelKey: receiverKey
   });
 
   db.run(
     `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [formatSenderDisplay(payload.sender, senderIP), senderIP, receiverKey, payload.message, payload.msgUid || null],
-    function (err) {
-      logDbErr(err);
-      const messageId = this.lastID;
-      if (mainWindow) {
-        safeWebContentsSend('receive-dept-message', {
-          dept: payload.dept,
-          senderName: formatSenderDisplay(payload.sender, senderIP),
-          senderIP: senderIP,
-          message: payload.message,
-          createdAt: currentTime,
-          msgUid: payload.msgUid || null,
-          messageId
-        });
-      }
-    }
+    [senderName, senderIP, receiverKey, payload.message, payload.msgUid || null],
+    logDbErr
   );
   appendChatLog(receiverKey, `부서_${payload.dept}`, payload.sender, payload.message);
 }
@@ -2678,42 +2684,71 @@ function handleIncomingFloorMessage(payload, senderIP) {
 
   const receiverKey = `FLOOR:${payload.floor}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const senderName = formatSenderDisplay(payload.sender, senderIP);
+
+  if (mainWindow) {
+    safeWebContentsSend('receive-floor-message', {
+      floor: payload.floor,
+      senderName,
+      senderIP: senderIP,
+      message: payload.message,
+      createdAt: currentTime,
+      msgUid: payload.msgUid || null,
+      messageId: null
+    });
+  }
   notifyIncomingMessageNotification({
-    title: `🏢 [${payload.floor}] ${formatSenderDisplay(payload.sender, senderIP)}님의 메시지`,
+    title: `🏢 [${payload.floor}] ${senderName}님의 메시지`,
     body: previewBody(payload.message),
     channelKey: receiverKey
   });
 
   db.run(
     `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [formatSenderDisplay(payload.sender, senderIP), senderIP, receiverKey, payload.message, payload.msgUid || null],
-    function (err) {
-      logDbErr(err);
-      const messageId = this.lastID;
-      if (mainWindow) {
-        safeWebContentsSend('receive-floor-message', {
-          floor: payload.floor,
-          senderName: formatSenderDisplay(payload.sender, senderIP),
-          senderIP: senderIP,
-          message: payload.message,
-          createdAt: currentTime,
-          msgUid: payload.msgUid || null,
-          messageId
-        });
-      }
-    }
+    [senderName, senderIP, receiverKey, payload.message, payload.msgUid || null],
+    logDbErr
   );
   appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
 }
 
 /** 1:1 상대가 읽음 확인 시 알림·배너는 내가 보낸 뒤 첫 확인 1회만 */
 const dmAwaitingReadReceiptNotify = new Map();
+/** 같은 상대에게 읽음 데스크탑 알림을 너무 자주 띄우지 않음 */
+const dmReadReceiptDesktopNotifyAt = new Map();
+const READ_RECEIPT_DESKTOP_COOLDOWN_MS = 10 * 60 * 1000;
+/** 세션 내 동일 CHAT 재전송 즉시 차단 (DB 조회 대기 없이) */
+const recentIncomingChatUids = new Map();
+const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
+
+function rememberIncomingChatUid(uid) {
+  const key = String(uid || '').trim();
+  if (!key) return false;
+  const now = Date.now();
+  if (recentIncomingChatUids.size > 800) {
+    recentIncomingChatUids.forEach((t, k) => {
+      if (now - t > RECENT_CHAT_UID_TTL_MS) recentIncomingChatUids.delete(k);
+    });
+  }
+  if (recentIncomingChatUids.has(key)) return true;
+  recentIncomingChatUids.set(key, now);
+  return false;
+}
 
 function handleReadReceipt(payload, senderIP) {
   const readerLabel = formatSenderDisplay(payload.readerName, senderIP);
-  const showAlert = dmAwaitingReadReceiptNotify.get(senderIP) === true;
-  if (showAlert) dmAwaitingReadReceiptNotify.set(senderIP, false);
-  const notifyRead = showAlert && notifyReadReceipts;
+  const wasAwaiting = dmAwaitingReadReceiptNotify.get(senderIP) === true;
+  if (wasAwaiting) dmAwaitingReadReceiptNotify.set(senderIP, false);
+
+  let notifyRead = wasAwaiting && notifyReadReceipts;
+  if (notifyRead) {
+    const lastAt = dmReadReceiptDesktopNotifyAt.get(senderIP) || 0;
+    if (Date.now() - lastAt < READ_RECEIPT_DESKTOP_COOLDOWN_MS) {
+      notifyRead = false;
+    } else {
+      dmReadReceiptDesktopNotifyAt.set(senderIP, Date.now());
+    }
+  }
+
   if (mainWindow) {
     safeWebContentsSend('read-receipt', {
       readerIP: senderIP,
@@ -2871,29 +2906,28 @@ async function handleChannelRead(payload, senderIP) {
 
 function handleIncomingBroadcast(payload, senderIP) {
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const senderName = formatSenderDisplay(payload.sender, senderIP);
+
+  if (mainWindow) {
+    safeWebContentsSend('receive-broadcast', {
+      senderName,
+      senderIP: senderIP,
+      message: payload.message,
+      createdAt: currentTime,
+      msgUid: payload.msgUid || null,
+      messageId: null
+    });
+  }
   notifyIncomingMessageNotification({
-    title: `📢 전체공지 - ${formatSenderDisplay(payload.sender, senderIP)}`,
+    title: `📢 전체공지 - ${senderName}`,
     body: previewBody(payload.message),
     channelKey: 'BROADCAST'
   });
 
   db.run(
     `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
-    [formatSenderDisplay(payload.sender, senderIP), senderIP, payload.message, payload.msgUid || null],
-    function (err) {
-      logDbErr(err);
-      const messageId = this.lastID;
-      if (mainWindow) {
-        safeWebContentsSend('receive-broadcast', {
-          senderName: formatSenderDisplay(payload.sender, senderIP),
-          senderIP: senderIP,
-          message: payload.message,
-          createdAt: currentTime,
-          msgUid: payload.msgUid || null,
-          messageId
-        });
-      }
-    }
+    [senderName, senderIP, payload.message, payload.msgUid || null],
+    logDbErr
   );
   appendChatLog('BROADCAST', '전체공지', payload.sender, payload.message);
 }
@@ -3080,29 +3114,29 @@ function handleIncomingGroupMessage(payload, senderIP) {
   extractAndSaveAttachments(payload.message);
   const receiverKey = `GROUP:${payload.uid}`;
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const senderName = formatSenderDisplay(payload.sender, senderIP);
+
+  if (mainWindow) {
+    safeWebContentsSend('receive-group-message', {
+      uid: payload.uid,
+      senderName,
+      senderIP: senderIP,
+      message: payload.message,
+      createdAt: currentTime,
+      msgUid: payload.msgUid,
+      messageId: null
+    });
+    notifyIncomingMessageNotification({
+      title: `👥 [${payload.groupName || '그룹'}] ${senderName}님의 메시지`,
+      body: previewBody(payload.message),
+      channelKey: receiverKey
+    });
+  }
+
   db.run(
     `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-    [formatSenderDisplay(payload.sender, senderIP), senderIP, receiverKey, payload.message, payload.msgUid],
-    function (err) {
-      logDbErr(err);
-      const messageId = this.lastID;
-      if (mainWindow) {
-        safeWebContentsSend('receive-group-message', {
-          uid: payload.uid,
-          senderName: formatSenderDisplay(payload.sender, senderIP),
-          senderIP: senderIP,
-          message: payload.message,
-          createdAt: currentTime,
-          msgUid: payload.msgUid,
-          messageId
-        });
-        notifyIncomingMessageNotification({
-          title: `👥 [${payload.groupName || '그룹'}] ${formatSenderDisplay(payload.sender, senderIP)}님의 메시지`,
-          body: previewBody(payload.message),
-          channelKey: receiverKey
-        });
-      }
-    }
+    [senderName, senderIP, receiverKey, payload.message, payload.msgUid],
+    logDbErr
   );
   appendChatLog(receiverKey, payload.groupName || '그룹', payload.sender, payload.message);
 }
