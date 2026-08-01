@@ -1592,27 +1592,18 @@
       padding: 3px 8px; border-radius: 7px; cursor: pointer;
     }
     .sb-quick-close-btn:hover { background: #e2e8f0; color: #334155; }
-    .sb-board-content .sb-quick-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
     .sb-board-content .sb-quick-grid-wrap { overflow-x: visible; }
-    @media (min-width: 1100px) {
-      .sb-board-content .sb-quick-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-      }
-    }
     .sb-quick-grid {
       display: grid;
       grid-template-columns:
-        minmax(64px, 0.7fr)
-        minmax(58px, 0.6fr)
-        minmax(56px, 0.55fr)
-        minmax(78px, 0.85fr)
-        minmax(110px, 1.15fr)
-        minmax(88px, 0.85fr)
-        minmax(88px, 0.85fr)
-        minmax(120px, 1.4fr);
-      gap: 6px 8px;
+        minmax(52px, 0.55fr)
+        minmax(48px, 0.5fr)
+        minmax(44px, 0.45fr)
+        minmax(70px, 0.75fr)
+        minmax(96px, 1fr)
+        minmax(70px, 0.65fr)
+        minmax(70px, 0.65fr);
+      gap: 5px 6px;
       align-items: end;
       min-width: 0;
     }
@@ -1622,52 +1613,55 @@
       padding: 0;
     }
     @media (max-width: 960px) {
-      .sb-quick-grid { min-width: 820px; }
+      .sb-quick-grid { min-width: 720px; }
     }
     .sb-quick-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .sb-quick-field label { font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap; line-height: 1.2; }
     .sb-quick-field input, .sb-quick-field select, .sb-quick-field textarea {
-      width: 100%; box-sizing: border-box; padding: 5px 7px; border: 1px solid #cbd5e1;
+      width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid #cbd5e1;
       border-radius: 8px; font-size: 12.5px; background: #fff; font-family: inherit;
-      min-height: 30px;
+      min-height: 28px;
     }
     .sb-quick-field textarea {
-      min-height: 44px; max-height: 120px; resize: vertical; line-height: 1.35;
-      padding: 6px 8px;
+      min-height: 40px; max-height: 100px; resize: vertical; line-height: 1.35;
+      padding: 5px 7px;
     }
     .sb-quick-field input[type="time"] {
-      padding: 4px 4px;
-      font-size: 12px;
-      min-height: 30px;
+      padding: 3px 2px;
+      font-size: 11.5px;
+      min-height: 28px;
     }
     .sb-quick-time-row {
-      display: flex; align-items: center; gap: 4px; min-width: 0;
+      display: flex; align-items: center; gap: 3px; min-width: 0;
     }
-    .sb-quick-time-row input[type="time"] { flex: 1; min-width: 0; }
+    .sb-quick-time-row input[type="time"] { flex: 1; min-width: 0; width: auto; }
     .sb-quick-time-row input[type="time"]:disabled {
       background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
     }
     .sb-quick-undecided {
       display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0;
-      font-size: 11px; font-weight: 700; color: #0369a1; cursor: pointer;
+      font-size: 10.5px; font-weight: 700; color: #0369a1; cursor: pointer;
       white-space: nowrap; user-select: none;
     }
     .sb-quick-undecided input { width: auto; margin: 0; accent-color: #0284c7; cursor: pointer; min-height: 0; }
     .sb-quick-meal-row {
-      display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center;
-      min-height: 30px; padding: 0;
+      display: flex; flex-wrap: nowrap; gap: 4px 8px; align-items: center;
+      min-height: 28px; padding: 0;
     }
-    .sb-quick-meal-row .sb-quick-undecided { color: #c2410c; font-size: 11.5px; }
+    .sb-quick-meal-row .sb-quick-undecided { color: #c2410c; font-size: 11px; }
     .sb-quick-meal-row .sb-quick-undecided input { accent-color: #ea580c; }
-    .sb-quick-field--meals { grid-column: span 3; }
-    .sb-quick-field--remark { grid-column: 1 / -1; align-self: stretch; }
-    .sb-quick-field--guardian { justify-content: flex-end; }
+    .sb-quick-field--detail { grid-column: 1 / 3; }
+    .sb-quick-field--meals { grid-column: 3 / 7; }
+    .sb-quick-grid.is-outpatient .sb-quick-field--meals { grid-column: 3 / 6; }
+    .sb-quick-field--guardian { grid-column: 6 / 7; justify-content: flex-end; }
     .sb-quick-field--actions {
-      display: flex; flex-direction: row; align-items: flex-end; gap: 6px;
+      grid-column: 7 / 8;
+      display: flex; flex-direction: row; align-items: flex-end; gap: 5px;
       justify-content: flex-end;
     }
+    .sb-quick-field--remark { grid-column: 1 / -1; align-self: stretch; }
     .sb-quick-field--actions > label { display: none; }
-    .sb-quick-guardian { color: #7c3aed; font-size: 11.5px; min-height: 30px; align-items: center; }
+    .sb-quick-guardian { color: #7c3aed; font-size: 11px; min-height: 28px; align-items: center; }
     .sb-quick-guardian input { accent-color: #7c3aed; }
     .sb-quick-field input:focus, .sb-quick-field select:focus, .sb-quick-field textarea:focus { outline: none; border-color: #7dd3fc; }
     .sb-quick-save-btn {
@@ -2881,21 +2875,21 @@
               </label>
             </div>
           </div>
-          <div class="sb-quick-field">
+          <div class="sb-quick-field sb-quick-field--detail">
             <label for="sb-quick-detail">목적</label>
-            <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
+            <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI" autocomplete="off">
           </div>
           <div class="sb-quick-field sb-quick-field--meals">
             <label>식사 취소</label>
             <div class="sb-quick-meal-row">
               <label class="sb-quick-undecided" title="아침 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-breakfast">아침 취소
+                <input type="checkbox" id="sb-quick-meal-breakfast">아침
               </label>
               <label class="sb-quick-undecided" title="점심 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-lunch">점심 취소
+                <input type="checkbox" id="sb-quick-meal-lunch">점심
               </label>
               <label class="sb-quick-undecided" title="저녁 식사 취소">
-                <input type="checkbox" id="sb-quick-meal-dinner">저녁 취소
+                <input type="checkbox" id="sb-quick-meal-dinner">저녁
               </label>
             </div>
           </div>
@@ -2908,7 +2902,7 @@
           <div class="sb-quick-field sb-quick-field--actions">
             <label aria-hidden="true">&nbsp;</label>
             <button type="button" class="sb-quick-save-btn" id="sb-quick-save-btn" onclick="saveScheduleBoardQuickAdd()">등록</button>
-            <button type="button" class="sb-quick-cancel-edit-btn" id="sb-quick-cancel-edit" style="display:none;" onclick="cancelScheduleBoardQuickEdit()">수정 취소</button>
+            <button type="button" class="sb-quick-cancel-edit-btn" id="sb-quick-cancel-edit" style="display:none;" onclick="cancelScheduleBoardQuickEdit()">취소</button>
           </div>
           <div class="sb-quick-field sb-quick-field--remark">
             <label for="sb-quick-remark">비고</label>
@@ -11529,6 +11523,8 @@
       const guardianWrap = document.getElementById('sb-quick-guardian-wrap');
       const guardianEl = document.getElementById('sb-quick-guardian-only');
       const isOutpatient = type === 'OUTPATIENT';
+      const quickGrid = document.querySelector('#sb-quick-add-body .sb-quick-grid');
+      if (quickGrid) quickGrid.classList.toggle('is-outpatient', isOutpatient);
       if (guardianWrap) guardianWrap.style.display = isOutpatient ? 'flex' : 'none';
       if (!isOutpatient && guardianEl) guardianEl.checked = false;
       syncScheduleBoardQuickTimeUndecidedUi();
