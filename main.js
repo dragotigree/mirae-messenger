@@ -243,13 +243,13 @@ const NOTICE_SYNC_SAFE_LINE_BYTES = 400 * 1024;
 /** CHAT 등 단일 TCP 라인 안전 상한 (수신 버퍼 512KB 미만 여유) */
 const MAX_CHAT_WIRE_BYTES = 400 * 1024;
 /** 분할 파일 전송 최대 크기 (이보다 크면 공유 폴더 안내) */
-const MAX_FILE_XFER_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_XFER_BYTES = 50 * 1024 * 1024;
 /** 청크 원본 바이트 — base64(~373KB)+JSON 이 MAX_TCP_LINE_BUFFER(512KB) 아래 */
 const FILE_XFER_CHUNK_RAW_BYTES = 280 * 1024;
-/** 수신 조립 타임아웃 */
-const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 3 * 60 * 1000;
-/** 전송 TCP 타임아웃 (피어당) */
-const FILE_XFER_SEND_TIMEOUT_MS = 90 * 1000;
+/** 수신 조립 타임아웃 (50MB·느린 망 여유) */
+const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 8 * 60 * 1000;
+/** 전송 TCP 타임아웃 (피어당, 50MB 여유) */
+const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
