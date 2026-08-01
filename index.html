@@ -550,9 +550,16 @@
     .msg-row.is-me .msg-time { color: #64748b; }
     .read-status { font-size: 10px; color: #64748b; font-weight: 600; margin-right: 4px; letter-spacing: -0.02em; }
     .msg-row.is-me .read-status { color: #64748b; }
-    .msg-unread-count { font-size: 11px; font-weight: var(--font-weight-bold); color: #facc15; line-height: 1.15; display: none; }
-    .bubble-meta-col, .msg-time-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
-    .is-me .msg-time-col { align-items: flex-end; }
+    .msg-unread-count {
+      font-size: 11px; font-weight: var(--font-weight-bold); color: #facc15;
+      line-height: 1; display: none; flex-shrink: 0; align-self: center;
+    }
+    .msg-content-line {
+      display: flex; align-items: flex-end; gap: 6px; max-width: 100%;
+    }
+    .msg-row.is-me .msg-content-line { justify-content: flex-end; }
+    .msg-row.is-other .msg-content-line { justify-content: flex-start; }
+    .msg-content-line .msg-time { align-self: flex-end; white-space: nowrap; flex-shrink: 0; }
     .delivery-status { font-size: 10px; color: #94a3b8; font-weight: 600; margin-right: 4px; }
     .msg-pending-notice {
       font-size: 10.5px;
@@ -1039,7 +1046,8 @@
     .bubble-line .chat-bubble { max-width: min(280px, 100%); padding: 10px 14px; font-size: 13px; line-height: 1.5; word-break: break-word; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
     .is-me .chat-bubble { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: #fff; border-radius: 20px 20px 6px 20px; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.22); }
     .is-other .chat-bubble { background: #ffffff; color: var(--text-primary); border: 1px solid #e2e8f0; border-radius: 20px 20px 20px 6px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06); }
-    .bubble-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    .bubble-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
+    .bubble-line .msg-unread-count { align-self: center; }
     .is-me .bubble-time .read-status { color: var(--accent-dark); }
     .msg-row-bubble .chat-img-preview { max-width: 180px; max-height: 160px; }
     .msg-row-bubble .chat-file-box { max-width: 200px; }
@@ -9641,17 +9649,23 @@
       const pendingNoticeHtml = offlinePendingNoticeHtml(isMe, outboundStatus, sentAtLabelForPending || time);
 
       const useBubbleLayout = compact && isGroupChannel;
-      const bubbleTimeHtml = isMe
-        ? (unreadCountHtml
-          ? `<span class="bubble-meta-col">${unreadCountHtml}<span class="bubble-time">${time}</span></span>`
-          : `<span class="bubble-time">${time}</span>`)
+      // 보낸 메시지: [시간][안읽음][말풍선] / 받은 메시지: [말풍선][안읽음][시간]
+      const sideMetaBefore = isMe
+        ? `<span class="msg-time">${time}</span>${unreadCountHtml}`
         : '';
-      const normalTimeHtml = (isMe && unreadCountHtml)
-        ? `<span class="msg-time-col">${unreadCountHtml}<span class="msg-time">${time}</span></span>`
-        : `<span class="msg-time">${time}</span>`;
+      const sideMetaAfter = !isMe
+        ? `${unreadCountHtml}<span class="msg-time">${time}</span>`
+        : '';
+      const bubbleMetaBefore = isMe
+        ? `<span class="bubble-time">${time}</span>${unreadCountHtml}`
+        : '';
+      const bubbleMetaAfter = !isMe
+        ? `${unreadCountHtml}<span class="bubble-time">${time}</span>`
+        : '';
 
       if (useBubbleLayout) {
         row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${urgent ? 'is-urgent' : ''}`.trim();
+        if (isMe) row.classList.add('is-mine-msg');
         const showName = !isMe && isGroupChannel;
         row.innerHTML = `
           ${showName ? `<div class="bubble-sender">${displayName}</div>` : ''}
@@ -9659,9 +9673,9 @@
           <div class="bubble-block">
             <div class="bubble-stack">
               <div class="bubble-line">
-                ${isMe ? bubbleTimeHtml : ''}
+                ${bubbleMetaBefore}
                 <div class="chat-bubble">${displayMsg}</div>
-                ${!isMe ? `<span class="bubble-time">${time}</span>` : ''}
+                ${bubbleMetaAfter}
               </div>
               <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button></span>
             </div>
@@ -9671,6 +9685,7 @@
         `;
       } else {
         row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${urgent ? 'is-urgent' : ''}`.trim();
+        if (isMe) row.classList.add('is-mine-msg');
         const avatarClass = isMe ? 'avatar-me' : (isGroupChannel ? 'avatar-broadcast' : 'avatar-other');
         const avCtx = avatarContextForSender(isMe, displayName);
         const avPhotoOk = isUsableProfilePhoto(avCtx.photo);
@@ -9680,11 +9695,14 @@
           <div class="msg-body">
             <div class="msg-meta">
               <span class="msg-sender-name ${isMe ? 'is-me' : 'is-other'}">${displayName}</span>${sendStatusHtml}
-              ${normalTimeHtml}
             </div>
             ${urgentBadgeHtml}
             <div class="msg-bubble-stack">
-              <div class="msg-text">${displayMsg}</div>
+              <div class="msg-content-line">
+                ${sideMetaBefore}
+                <div class="msg-text">${displayMsg}</div>
+                ${sideMetaAfter}
+              </div>
               ${pendingNoticeHtml}
               <div class="msg-action-btns">
                 ${editDeleteActionHtml}
