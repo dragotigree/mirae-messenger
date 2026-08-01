@@ -1371,10 +1371,32 @@
     .schedule-board-chip {
       border: 1px solid #e2e8f0; background: #f8fafc; padding: 6px 12px; border-radius: 999px;
       font-size: 11.5px; font-weight: 600; color: #475569; cursor: pointer;
-      transition: border-color 0.12s, background 0.12s, color 0.12s;
+      transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.12s, box-shadow 0.12s;
     }
     .schedule-board-chip:hover { border-color: #cbd5e1; background: #fff; }
     .schedule-board-chip.active { border-color: #0284c7; background: #e0f2fe; color: #0369a1; }
+    .schedule-board-chip.sb-ward-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; padding: 0; border-radius: 12px;
+      background: #fff; border-color: #e2e8f0;
+    }
+    .schedule-board-chip.sb-ward-chip .sb-ward-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 8px;
+      font-size: 13px; font-weight: 800; color: #fff; letter-spacing: -0.04em;
+      line-height: 1; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.14);
+    }
+    .schedule-board-chip.sb-ward-chip.w4 .sb-ward-icon { background: #3b82f6; }
+    .schedule-board-chip.sb-ward-chip.w5 .sb-ward-icon { background: #22c55e; }
+    .schedule-board-chip.sb-ward-chip.w7 .sb-ward-icon { background: #f97316; }
+    .schedule-board-chip.sb-ward-chip.w8 .sb-ward-icon { background: #a855f7; }
+    .schedule-board-chip.sb-ward-chip.w9 .sb-ward-icon { background: #ec4899; }
+    .schedule-board-chip.sb-ward-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); }
+    .schedule-board-chip.sb-ward-chip.w4.active { border-color: #3b82f6; background: #dbeafe; }
+    .schedule-board-chip.sb-ward-chip.w5.active { border-color: #22c55e; background: #dcfce7; }
+    .schedule-board-chip.sb-ward-chip.w7.active { border-color: #f97316; background: #ffedd5; }
+    .schedule-board-chip.sb-ward-chip.w8.active { border-color: #a855f7; background: #f3e8ff; }
+    .schedule-board-chip.sb-ward-chip.w9.active { border-color: #ec4899; background: #fce7f3; }
     .schedule-board-chip.w4.active { border-color: #3b82f6; background: #dbeafe; color: #1d4ed8; }
     .schedule-board-chip.w5.active { border-color: #22c55e; background: #dcfce7; color: #15803d; }
     .schedule-board-chip.w7.active { border-color: #f97316; background: #ffedd5; color: #c2410c; }
@@ -12748,14 +12770,17 @@
         syncScheduleBoardTypeChipActive();
       }
       const wardHost = document.getElementById('schedule-board-ward-chips');
-      if (wardHost && !wardHost.dataset.inited) {
-        wardHost.dataset.inited = '1';
+      if (wardHost) {
         const wards = [{ key: 'all', label: '전체', cls: '' }].concat(
           SCHEDULE_BOARD_WARDS.map(w => ({ key: w, label: SCHEDULE_BOARD_WARD_LABELS[w], cls: ' w' + w }))
         );
-        wardHost.innerHTML = wards.map(w =>
-          `<button type="button" class="schedule-board-chip${w.cls}${w.key === scheduleBoardWardTab ? ' active' : ''}" data-ward="${w.key}" onclick="setScheduleBoardWardTab('${w.key}')">${w.label}</button>`
-        ).join('');
+        wardHost.innerHTML = wards.map(w => {
+          if (w.key === 'all') {
+            return `<button type="button" class="schedule-board-chip${w.key === scheduleBoardWardTab ? ' active' : ''}" data-ward="all" onclick="setScheduleBoardWardTab('all')" title="전체 병동">전체</button>`;
+          }
+          return `<button type="button" class="schedule-board-chip sb-ward-chip${w.cls}${w.key === scheduleBoardWardTab ? ' active' : ''}" data-ward="${w.key}" onclick="setScheduleBoardWardTab('${w.key}')" title="${w.label}" aria-label="${w.label}"><span class="sb-ward-icon">${w.key}</span></button>`;
+        }).join('');
+        wardHost.dataset.inited = '1';
       }
       // 병동 칩과 같이 고정 주치의(RM) 칩을 미리 채워 둠 (일정 유무와 무관)
       const doctorHost = document.getElementById('schedule-board-doctor-chips');
