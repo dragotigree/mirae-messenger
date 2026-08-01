@@ -623,22 +623,68 @@
     .reply-input-row .reply-input-arrow { flex-shrink: 0; font-size: 16px; color: #0284c7; font-weight: 700; line-height: 1.5; margin-top: 2px; display: none; }
     .input-box-inner.is-reply-mode .reply-input-arrow { display: block; }
     .reply-input-row textarea { flex: 1; min-width: 0; }
-    .reply-quote-block { cursor: pointer; margin-bottom: 8px; padding: 8px 10px 8px 12px; border-left: 3px solid #0284c7; background: #f1f5f9; border-radius: 10px; text-align: left; transition: background var(--transition-fast), box-shadow var(--transition-fast); }
-    .reply-quote-block:hover { background: #e8eef4; }
-    .msg-row.is-me .reply-quote-block, .is-me .chat-bubble .reply-quote-block, .is-me .msg-text .reply-quote-block {
-      background: rgba(255, 255, 255, 0.96);
-      border-left-color: #0369a1;
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+    .reply-quote-block {
+      cursor: pointer; margin: 0 0 8px; padding: 6px 0 6px 10px;
+      border-left: 2.5px solid rgba(2, 132, 199, 0.55);
+      background: transparent; border-radius: 0;
+      text-align: left; box-shadow: none;
+      transition: opacity var(--transition-fast), border-color var(--transition-fast);
     }
-    .msg-row.is-me .reply-quote-block:hover, .is-me .reply-quote-block:hover {
-      background: #ffffff;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+    .reply-quote-block:hover { opacity: 0.88; }
+    .msg-row.is-me .reply-quote-block,
+    .is-me .chat-bubble .reply-quote-block,
+    .is-me .msg-text .reply-quote-block {
+      border-left-color: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      padding: 7px 10px 7px 11px;
+      box-shadow: none;
     }
-    .reply-quote-label { font-size: 10.5px; font-weight: var(--font-weight-semibold); color: #0369a1; margin-bottom: 4px; letter-spacing: -0.01em; line-height: 1.3; }
-    .msg-row.is-me .reply-quote-label, .is-me .reply-quote-label { color: #0284c7; opacity: 1; }
-    .reply-quote-snippet { font-size: 11.5px; font-weight: var(--font-weight-regular); color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(260px, 100%); line-height: 1.4; }
-    .msg-row.is-me .reply-quote-snippet, .is-me .reply-quote-snippet { color: #475569; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .chat-bubble .reply-quote-snippet, .msg-text .reply-quote-snippet { max-width: min(220px, 100%); }
+    .msg-row.is-me .reply-quote-block:hover,
+    .is-me .reply-quote-block:hover {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+      opacity: 1;
+    }
+    .msg-row.is-other .reply-quote-block,
+    .is-other .chat-bubble .reply-quote-block,
+    .is-other .msg-text .reply-quote-block {
+      background: rgba(148, 163, 184, 0.12);
+      border-radius: 8px;
+      padding: 7px 10px 7px 11px;
+      border-left-color: #38bdf8;
+    }
+    .reply-quote-label {
+      font-size: 11px; font-weight: 700; color: #0284c7;
+      margin-bottom: 2px; letter-spacing: -0.02em; line-height: 1.25;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .msg-row.is-me .reply-quote-label,
+    .is-me .reply-quote-label {
+      color: rgba(255, 255, 255, 0.92); opacity: 1;
+    }
+    .msg-row.is-other .reply-quote-label,
+    .is-other .reply-quote-label { color: #0369a1; }
+    .reply-quote-snippet {
+      font-size: 11.5px; font-weight: 400; color: #64748b;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: min(240px, 100%); line-height: 1.35;
+    }
+    .msg-row.is-me .reply-quote-snippet,
+    .is-me .reply-quote-snippet {
+      color: rgba(255, 255, 255, 0.78);
+      white-space: nowrap; display: block; -webkit-line-clamp: unset;
+    }
+    .msg-row.is-other .reply-quote-snippet,
+    .is-other .reply-quote-snippet { color: #64748b; }
+    .chat-bubble .reply-quote-snippet,
+    .msg-text .reply-quote-snippet { max-width: min(210px, 100%); }
+    body.compact-mode .is-me .reply-quote-block {
+      background: rgba(0, 0, 0, 0.06);
+      border-left-color: rgba(25, 25, 25, 0.35);
+    }
+    body.compact-mode .is-me .reply-quote-label { color: #3f3f46; }
+    body.compact-mode .is-me .reply-quote-snippet { color: #71717a; }
 
     /* 😊 메시지 리액션 (카카오톡 스타일) */
     .msg-reactions { display: none; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; max-width: 100%; }
@@ -9042,7 +9088,7 @@
       const preview = escapeHtmlText(replyInfo.previewPlain);
       return `<span class="reply-msg-flag" style="display:none"></span>` +
         `<div class="reply-quote-block" data-reply-to="${key}" onclick="scrollToReplyTarget(this.getAttribute('data-reply-to'))">` +
-        `<div class="reply-quote-label">${name}에게 답장</div>` +
+        `<div class="reply-quote-label">↩ ${name}</div>` +
         `<div class="reply-quote-snippet">${preview}</div></div>`;
     }
 
