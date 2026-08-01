@@ -2711,11 +2711,9 @@ function handleIncomingFloorMessage(payload, senderIP) {
   appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
 }
 
-/** 1:1 상대가 읽음 확인 시 알림·배너는 내가 보낸 뒤 첫 확인 1회만 */
+/** 1:1 읽음 데스크탑 알림은 상대당 앱 실행 중 딱 1회만 */
 const dmAwaitingReadReceiptNotify = new Map();
-/** 같은 상대에게 읽음 데스크탑 알림을 너무 자주 띄우지 않음 */
-const dmReadReceiptDesktopNotifyAt = new Map();
-const READ_RECEIPT_DESKTOP_COOLDOWN_MS = 10 * 60 * 1000;
+const dmReadReceiptDesktopShown = new Set();
 /** 세션 내 동일 CHAT 재전송 즉시 차단 (DB 조회 대기 없이) */
 const recentIncomingChatUids = new Map();
 const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
@@ -2734,20 +2732,20 @@ function rememberIncomingChatUid(uid) {
   return false;
 }
 
+function armDmReadReceiptNotify(targetIP) {
+  const ip = String(targetIP || '').trim();
+  if (!ip) return;
+  if (dmReadReceiptDesktopShown.has(ip)) return;
+  dmAwaitingReadReceiptNotify.set(ip, true);
+}
+
 function handleReadReceipt(payload, senderIP) {
   const readerLabel = formatSenderDisplay(payload.readerName, senderIP);
   const wasAwaiting = dmAwaitingReadReceiptNotify.get(senderIP) === true;
   if (wasAwaiting) dmAwaitingReadReceiptNotify.set(senderIP, false);
 
-  let notifyRead = wasAwaiting && notifyReadReceipts;
-  if (notifyRead) {
-    const lastAt = dmReadReceiptDesktopNotifyAt.get(senderIP) || 0;
-    if (Date.now() - lastAt < READ_RECEIPT_DESKTOP_COOLDOWN_MS) {
-      notifyRead = false;
-    } else {
-      dmReadReceiptDesktopNotifyAt.set(senderIP, Date.now());
-    }
-  }
+  let notifyRead = wasAwaiting && notifyReadReceipts && !dmReadReceiptDesktopShown.has(senderIP);
+  if (notifyRead) dmReadReceiptDesktopShown.add(senderIP);
 
   if (mainWindow) {
     safeWebContentsSend('read-receipt', {
@@ -2760,7 +2758,7 @@ function handleReadReceipt(payload, senderIP) {
   if (notifyRead) {
     showDesktopNotification({
       title: '✓ 메시지를 읽었습니다',
-      body: `${readerLabel}님이 보낸 메시지를 확인했습니다.`,
+      body: `${readerLabel}님이 메시지를 확인했습니다.`,
       silent: false
     });
   }
@@ -3273,7 +3271,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
           isConnected = true;
           client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message, urgent: !!urgent, uid: msgUid }) + '\n');
           client.end();
-          dmAwaitingReadReceiptNotify.set(targetIP, true);
+          armDmReadReceiptNotify(targetIP);
           finish({ status: 'SENT', createdAt, uid: msgUid, id: localRowId });
         });
 
@@ -3285,7 +3283,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
             [msgUid, MY_IP],
             (updErr) => {
               logDbErr(updErr);
-              dmAwaitingReadReceiptNotify.set(targetIP, true);
+              armDmReadReceiptNotify(targetIP);
               finish({ status: 'PENDING', id: localRowId, createdAt, uid: msgUid });
             }
           );
