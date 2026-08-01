@@ -4299,7 +4299,7 @@ ipcMain.handle('get-schedules', async () => {
   });
 });
 
-const SCHEDULE_EXCEL_HEADERS = ['날짜', '병동', '호실', '환자명', 'RM', '구분', '주치의', '상세내용', '출발', '귀원', '작성자', '수정일시', '수정자'];
+const SCHEDULE_EXCEL_HEADERS = ['RM', '병동', '호실', '환자명', '구분', '목적', '비고', '출발시간', '귀원시간', '등록자'];
 
 function buildScheduleCsvContent(rows) {
   const esc = (v) => {

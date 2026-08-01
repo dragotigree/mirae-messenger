@@ -11831,6 +11831,42 @@
       return sortScheduleBoardList(filterScheduleBoardList(getScheduleBoardBaseList(), { applyViewFilters: false }));
     }
 
+    function formatScheduleBoardExcelKoreanDate(dateStr) {
+      const parts = String(dateStr || '').split('-').map(Number);
+      if (parts.length < 3 || !parts[0]) return dateStr || '';
+      return `${parts[0]}년 ${parts[1]}월 ${parts[2]}일`;
+    }
+
+    function scheduleBoardExcelTypePhrase() {
+      if (scheduleBoardTypeFilter && scheduleBoardTypeFilter !== 'all') {
+        const m = SCHEDULE_TYPE_ORDER.find((x) => x.key === scheduleBoardTypeFilter);
+        return (m && m.label) ? `${m.label}일정` : '일정';
+      }
+      if (scheduleBoardView === 'main') {
+        const labels = scheduleBoardMainSelectedTypeLabels();
+        if (labels.length === 1) return `${labels[0]}일정`;
+        if (labels.length > 1 && labels.length <= 3) return `${labels.join('·')}일정`;
+      }
+      return '일정';
+    }
+
+    function scheduleBoardExcelSheetTitle(scopeLabel) {
+      const datePart = formatScheduleBoardExcelKoreanDate(scheduleBoardDateStr);
+      const typePart = scheduleBoardExcelTypePhrase();
+      const scope = (scopeLabel || '전체').trim();
+      if (scope === '전체' || scope === '현재목록') {
+        return `${datePart} 전체 병동 ${typePart}`.replace(/\s+/g, ' ').trim();
+      }
+      return `${datePart} ${scope} ${typePart}`.replace(/\s+/g, ' ').trim();
+    }
+
+    function scheduleBoardExcelExportMeta(count) {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      return `총 ${count}건 · 추출 ${stamp}`;
+    }
+
     function scheduleToExcelRow(sch) {
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
@@ -11839,26 +11875,34 @@
         : '';
       const detail = scheduleBoardDetailText(sch, norm) || '';
       const doctorLabel = (sch.attending_physician || '').trim() || (norm.rm_team || '').trim() || '미지정';
+      const mealTxt = formatScheduleMealCancelText(sch);
+      const remarkParts = [scheduleBoardRemarkText(sch), mealTxt ? `식사취소 ${mealTxt.replace(/ 취소$/, '')}` : ''].filter(Boolean);
+      let room = (norm.room_no || '').trim();
+      if (room && !/호/.test(room)) room = `${room.replace(/\s/g, '')}호`;
       return {
-        '날짜': scheduleBoardDateStr,
-        '병동': wardLabel,
-        '호실': norm.room_no || '',
-        '환자명': norm.patient_name || '',
         'RM': norm.rm_team || '',
+        '병동': wardLabel,
+        '호실': room,
+        '환자명': norm.patient_name || '',
         '구분': typeLabel,
-        '주치의': (sch.attending_physician || '').trim(),
-        '상세내용': detail,
-        '비고': scheduleBoardRemarkText(sch),
-        '출발': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
-        '귀원': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
-        '아침취소': getScheduleMealCancelFlags(sch).breakfast ? 'Y' : '',
-        '점심취소': getScheduleMealCancelFlags(sch).lunch ? 'Y' : '',
-        '저녁취소': getScheduleMealCancelFlags(sch).dinner ? 'Y' : '',
-        '작성자': sch.author_name || '',
-        '수정일시': sch.modified_at ? formatScheduleModifiedDisplay(sch.modified_at) : '',
-        '수정자': (sch.modified_by_name || '').trim(),
+        '목적': detail,
+        '비고': remarkParts.join('\n'),
+        '출발시간': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
+        '귀원시간': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
+        '등록자': sch.author_name || '',
         __wardKey: norm.ward || 'other',
         __doctorKey: doctorLabel
+      };
+    }
+
+    function wrapScheduleExcelSheet(name, list) {
+      const rows = (list || []).map(scheduleToExcelRow);
+      return {
+        name,
+        kind: 'schedule',
+        title: scheduleBoardExcelSheetTitle(name),
+        exportMeta: scheduleBoardExcelExportMeta(rows.length),
+        rows
       };
     }
 
@@ -11889,7 +11933,7 @@
           return;
         }
         const filterNote = res.format === 'xlsx'
-          ? '엑셀 맨 앞 「입력샘플」 시트에 호실·환자명·메모 형식 예시가 있습니다.\n데이터 시트는 병동·주치의 색 구분·필터·틀 고정이 적용되어 있습니다.'
+          ? '데이터 시트는 파란 제목·초록 헤더·병동 색으로 현황판 느낌으로 저장됩니다.\n맨 앞 「입력샘플」 시트는 여러 명 붙여넣기용입니다.'
           : 'CSV는 엑셀에서 연 뒤 [데이터] → [필터]를 사용해 주세요.';
         await appAlert(`저장되었습니다.\n${res.path}\n\n${filterNote}`);
       } catch (err) {
@@ -11900,11 +11944,11 @@
 
     async function exportScheduleBoardExcelAllWards() {
       const list = getScheduleBoardAllWardsExportList();
-      const sheets = [{ name: '전체', rows: list.map(scheduleToExcelRow) }];
+      const sheets = [wrapScheduleExcelSheet('전체', list)];
       SCHEDULE_BOARD_WARDS.forEach(w => {
         const items = list.filter(sch => normalizeSchedulePatient(sch).ward === w);
         if (items.length) {
-          sheets.push({ name: SCHEDULE_BOARD_WARD_LABELS[w], rows: items.map(scheduleToExcelRow) });
+          sheets.push(wrapScheduleExcelSheet(SCHEDULE_BOARD_WARD_LABELS[w], items));
         }
       });
       const other = list.filter(sch => {
@@ -11914,21 +11958,20 @@
       const noWard = list.filter(sch => !normalizeSchedulePatient(sch).ward);
       const misc = [...other, ...noWard];
       if (misc.length) {
-        sheets.push({ name: '기타', rows: misc.map(scheduleToExcelRow) });
+        sheets.push(wrapScheduleExcelSheet('기타', misc));
       }
       await runScheduleBoardExcelExport(sheets);
     }
 
     async function exportScheduleBoardExcelFiltered() {
       const list = getScheduleBoardFilteredSortedList();
-      await runScheduleBoardExcelExport([{ name: '현재목록', rows: list.map(scheduleToExcelRow) }]);
+      await runScheduleBoardExcelExport([wrapScheduleExcelSheet('현재목록', list)]);
     }
 
     async function exportScheduleBoardExcelGroup(groupKey, items) {
-      await runScheduleBoardExcelExport([{
-        name: scheduleBoardGroupTitle(groupKey),
-        rows: items.map(scheduleToExcelRow)
-      }]);
+      await runScheduleBoardExcelExport([
+        wrapScheduleExcelSheet(scheduleBoardGroupTitle(groupKey), items)
+      ]);
     }
 
     function updateScheduleBoardExportLabels(allCount, filteredCount) {
