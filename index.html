@@ -1320,7 +1320,7 @@
     .schedule-board-table col.sb-c-remark { width: 20%; }
     .schedule-board-table col.sb-c-meal { width: 112px; }
     .schedule-board-table col.sb-c-time { width: 96px; }
-    .schedule-board-table col.sb-c-btns { width: 138px; }
+    .schedule-board-table col.sb-c-btns { width: 108px; }
     .schedule-board-table thead th {
       padding: 10px 8px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-align: left; vertical-align: middle; letter-spacing: -0.02em;
@@ -1512,10 +1512,16 @@
       flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.25;
     }
     .schedule-board-times span { white-space: nowrap; }
-    .schedule-board-row-btns { display: flex; gap: 5px; flex-shrink: 0; }
-    .schedule-board-row-btns button { border: none; background: #f1f5f9; padding: 6px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: #475569; }
+    .schedule-board-row-btns { display: flex; gap: 4px; flex-shrink: 0; justify-content: flex-end; align-items: center; }
+    .schedule-board-row-btns button {
+      border: none; background: #f1f5f9; padding: 0; border-radius: 8px;
+      width: 30px; height: 30px; font-size: 14px; line-height: 1;
+      cursor: pointer; color: #475569;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
     .schedule-board-row-btns button:hover { background: #e2e8f0; }
     .schedule-board-row-btns .sb-del { color: #dc2626; background: #fef2f2; }
+    .schedule-board-row-btns .sb-del:hover { background: #fee2e2; }
     .schedule-board-row.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
     .schedule-board-row.has-modified,
     .schedule-board-data-row.has-modified { position: relative; }
@@ -12373,12 +12379,13 @@
           const detail = scheduleBoardDetailText(sch, norm);
           const canRowManage = canModifySchedule(sch);
           const copyLabel = isReferral ? '의뢰복사' : '복사';
-          const manageHtml = `<button type="button" class="sb-copy">${copyLabel}</button>` +
+          const copyIcon = isReferral ? '📄' : '📋';
+          const manageHtml = `<button type="button" class="sb-copy" title="${copyLabel}" aria-label="${copyLabel}">${copyIcon}</button>` +
             (canRowManage && !isReferral
-              ? `<button type="button" class="sb-edit">수정</button>
-               <button type="button" class="sb-del">삭제</button>`
+              ? `<button type="button" class="sb-edit" title="수정" aria-label="수정">✏️</button>
+               <button type="button" class="sb-del" title="삭제" aria-label="삭제">🗑️</button>`
               : (canRowManage && isReferral
-                ? `<button type="button" class="sb-edit">수정</button>`
+                ? `<button type="button" class="sb-edit" title="수정" aria-label="수정">✏️</button>`
                 : ''));
           const attending = scheduleBoardAttendingLabel(sch, norm);
           if (isReferral) {
