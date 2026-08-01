@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Mirae Messenger</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/static/woff2/SUIT.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-  <link rel="stylesheet" href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/leetaewook/gmarket-sans-dynamic-subset/GmarketSans.css">
+  <link href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css" rel="stylesheet" type="text/css">
   <link rel="stylesheet" href="https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/eulyoo1945.css">
   <style>
     @font-face {
       font-family: 'RIDIBatang';
@@ -20,7 +20,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 
     :root {
-      --font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --font-family: 'SUIT', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      --chat-font-family: 'RIDIBatang', 'Batang', 'BatangChe', 'Apple Myungjo', serif;
       --font-weight-regular: 400;
       --font-weight-medium: 500;
       --font-weight-semibold: 600;
@@ -78,7 +79,7 @@
     body { display: flex; flex-direction: column; height: 100vh; background: var(--surface-muted); color: var(--text-primary); user-select: none; overflow: hidden; letter-spacing: -0.01em; font-weight: var(--font-weight-regular); }
     input, textarea, select, [contenteditable="true"] { user-select: text; -webkit-user-select: text; font-weight: var(--font-weight-regular); }
     strong, b { font-weight: var(--font-weight-bold); }
-    .msg-text, .chat-bubble { font-weight: var(--font-weight-regular); }
+    .msg-text, .chat-bubble { font-family: var(--chat-font-family); font-weight: var(--font-weight-regular); }
     button, .btn-send, .ctx-menu-item, .channel-item, .user-name-text,
     .section-label, .subsection-label, .compact-item-name, .compact-section-label,
     .detail-name, .sidebar-section-title, .all-logs-title, .empty-title,
@@ -2709,16 +2710,24 @@
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">앱을 켤 때와 설정 저장 시 선택한 화면으로 전환됩니다. 사이드바 하단 좁은 창 아이콘으로도 바꿀 수 있습니다.</div>
         <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          글꼴:
+          시스템 폰트:
           <select id="setting-font-family" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="ibmPlex">IBM Plex Sans KR (기본)</option>
-            <option value="pretendard">Pretendard</option>
-            <option value="nanumSquare">나눔스퀘어</option>
-            <option value="ridiBatang">리디바탕</option>
-            <option value="maruBuri">마루부리</option>
+            <option value="suit">수트 (SUIT)</option>
+            <option value="pretendard">프리텐다드 (Pretendard)</option>
+            <option value="gmarketSans">G마켓 산스 (Gmarket Sans)</option>
+            <option value="spoqa">스포카 (Spoqa Han Sans)</option>
           </select>
         </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">앱 전체 UI에 적용됩니다. 저장 후 즉시 반영됩니다.</div>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">메뉴·사이드바·설정·일정판·버튼 등 UI 전체에 적용됩니다.</div>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+          채팅방용 폰트:
+          <select id="setting-chat-font-family" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
+            <option value="ridiBatang">리디바탕 (RIDIBatang)</option>
+            <option value="maruBuri">마루부리 (MaruBuri)</option>
+            <option value="eulyoo1945">을유1945 (Eulyoo1945)</option>
+          </select>
+        </label>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">1:1·그룹·방송·부서·층 채팅 말풍선 글씨에만 적용됩니다.</div>
         <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
           대화창 글씨 크기:
           <select id="setting-font-size" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
@@ -3807,36 +3816,89 @@
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "ibmPlex", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
     }
-    if (!appSettings.fontFamily) appSettings.fontFamily = 'ibmPlex';
     if (appSettings.spellcheck === undefined) appSettings.spellcheck = false;
     if (appSettings.showUserListAvatars === undefined) appSettings.showUserListAvatars = true;
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
-    const UI_FONT_PRESETS = {
-      ibmPlex: {
-        cssFamily: "'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+    const SYSTEM_FONT_PRESETS = {
+      suit: {
+        cssFamily: "'SUIT', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
       },
       pretendard: {
         cssFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
       },
-      nanumSquare: {
-        cssFamily: "'NanumSquare', 'Nanum Square', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
+      gmarketSans: {
+        cssFamily: "'Gmarket Sans', 'GMarketSans', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
       },
+      spoqa: {
+        cssFamily: "'Spoqa Han Sans Neo', 'Spoqa Han Sans', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
+      }
+    };
+
+    const CHAT_FONT_PRESETS = {
       ridiBatang: {
         cssFamily: "'RIDIBatang', 'Batang', 'BatangChe', 'Apple Myungjo', serif"
       },
       maruBuri: {
-        cssFamily: "'MaruBuri', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
+        cssFamily: "'MaruBuri', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', serif"
+      },
+      eulyoo1945: {
+        cssFamily: "'Eulyoo1945', 'Batang', 'BatangChe', 'Apple Myungjo', serif"
       }
     };
 
-    function resolveUiFontPreset(key) {
-      return UI_FONT_PRESETS[key] || UI_FONT_PRESETS.ibmPlex;
+    const LEGACY_SYSTEM_FONT_MAP = {
+      ibmPlex: 'suit',
+      nanumSquare: 'suit',
+      pretendard: 'pretendard',
+      suit: 'suit',
+      gmarketSans: 'gmarketSans',
+      spoqa: 'spoqa'
+    };
+
+    function migrateFontSettings(settings) {
+      const oldKey = settings.fontFamily;
+      const hasChatKey = !!settings.chatFontFamily;
+      if (!hasChatKey) {
+        if (oldKey === 'ridiBatang' || oldKey === 'maruBuri' || oldKey === 'eulyoo1945') {
+          settings.chatFontFamily = oldKey;
+          settings.fontFamily = 'suit';
+        } else {
+          settings.fontFamily = LEGACY_SYSTEM_FONT_MAP[oldKey] || 'suit';
+          settings.chatFontFamily = 'ridiBatang';
+        }
+      } else {
+        if (!SYSTEM_FONT_PRESETS[settings.fontFamily]) {
+          if (CHAT_FONT_PRESETS[settings.fontFamily]) {
+            if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) settings.chatFontFamily = settings.fontFamily;
+            settings.fontFamily = 'suit';
+          } else {
+            settings.fontFamily = LEGACY_SYSTEM_FONT_MAP[settings.fontFamily] || 'suit';
+          }
+        }
+        if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) {
+          settings.chatFontFamily = CHAT_FONT_PRESETS[oldKey] ? oldKey : 'ridiBatang';
+        }
+      }
+      if (!SYSTEM_FONT_PRESETS[settings.fontFamily]) settings.fontFamily = 'suit';
+      if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) settings.chatFontFamily = 'ridiBatang';
+      return settings;
+    }
+
+    migrateFontSettings(appSettings);
+    localStorage.setItem('appSettings', JSON.stringify(appSettings));
+
+    function resolveSystemFontPreset(key) {
+      return SYSTEM_FONT_PRESETS[key] || SYSTEM_FONT_PRESETS.suit;
+    }
+
+    function resolveChatFontPreset(key) {
+      return CHAT_FONT_PRESETS[key] || CHAT_FONT_PRESETS.ridiBatang;
     }
 
     function applyUserListAvatarVisibility() {
@@ -3846,8 +3908,10 @@
 
     function applyAppSettingsToUI() {
       document.documentElement.style.setProperty('--chat-font-size', appSettings.fontSize || '14px');
-      const preset = resolveUiFontPreset(appSettings.fontFamily);
-      document.documentElement.style.setProperty('--font-family', preset.cssFamily);
+      const systemPreset = resolveSystemFontPreset(appSettings.fontFamily);
+      const chatPreset = resolveChatFontPreset(appSettings.chatFontFamily);
+      document.documentElement.style.setProperty('--font-family', systemPreset.cssFamily);
+      document.documentElement.style.setProperty('--chat-font-family', chatPreset.cssFamily);
       applySpellcheckToInputs(appSettings.spellcheck === true);
       applyUserListAvatarVisibility();
     }
@@ -13115,7 +13179,9 @@
     document.getElementById('setting-ext').value = p.extNo || '';
     document.getElementById('setting-phone').value = p.phone || '';
     document.getElementById('setting-font-size').value = appSettings.fontSize;
-    document.getElementById('setting-font-family').value = appSettings.fontFamily || 'ibmPlex';
+    document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
+    const chatFontEl = document.getElementById('setting-chat-font-family');
+    if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
     document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
     document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
     const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
@@ -13153,7 +13219,10 @@
     async function saveAppSettings() {
   const fileMode = document.querySelector('input[name="file-recv-mode"]:checked').value;
   const fontSize = document.getElementById('setting-font-size').value;
-  const fontFamily = document.getElementById('setting-font-family').value || 'ibmPlex';
+  const fontFamily = document.getElementById('setting-font-family').value || 'suit';
+  const chatFontFamily = document.getElementById('setting-chat-font-family')
+    ? (document.getElementById('setting-chat-font-family').value || 'ridiBatang')
+    : (appSettings.chatFontFamily || 'ridiBatang');
   const defaultViewMode = document.getElementById('setting-default-view').value || 'normal';
   const userGrouping = document.getElementById('setting-user-grouping').value;
   const autoLaunch = document.getElementById('setting-auto-launch').checked;
@@ -13182,7 +13251,7 @@
   const phone = document.getElementById('setting-phone').value.trim();
   const statusState = document.getElementById('setting-my-status').value;
 
-  appSettings = { fileMode, fontSize, fontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars };
+  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
