@@ -13281,7 +13281,6 @@
         if (!cell.other && cell.dateStr === selectedCalendarDateStr) cls += ' selected';
         el.className = cls;
         const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
-        const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
         const hasDuty = !cell.other && dutyRosterDates.has(cell.dateStr);
         el.innerHTML = `${cell.dayNum}${hasSchedule ? '<span class="dot"></span>' : ''}${hasDuty ? '<span class="duty-mark"></span>' : ''}`;
         if (!cell.other) el.onclick = () => calendarSelectDate(cell.dateStr);
