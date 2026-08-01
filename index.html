@@ -10395,9 +10395,24 @@
       const title = String(sch.title || '').trim();
       if (!title) return '';
       let rest = title;
-      if (norm.room_no) rest = rest.replace(new RegExp('^\\s*' + norm.room_no.replace(/호?$/, '') + '\\s*호?\\s*', 'i'), '');
-      if (norm.patient_name) rest = rest.replace(norm.patient_name, '').trim();
+      const room = String(norm?.room_no || '').trim();
+      const patient = String(norm?.patient_name || '').trim();
+      if (room) {
+        const roomDigits = room.replace(/호?$/, '').replace(/\s/g, '');
+        if (roomDigits) {
+          rest = rest.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '');
+        }
+      }
+      if (patient) {
+        const esc = patient.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        rest = rest.replace(new RegExp('^\\s*' + esc + '\\s*', 'i'), '').trim();
+        rest = rest.replace(new RegExp('(?:^|\\s)' + esc + '(?=\\s|$)', 'gi'), ' ').trim();
+      }
       rest = rest.replace(/^RM\s*\d+\s*/i, '').trim();
+      // 호실·환자명만으로 만든 title이면 목적·검사는 빈 값
+      if (!rest) return '';
+      const rebuilt = [room, patient].filter(Boolean).join(' ').trim();
+      if (rebuilt && rest === rebuilt) return '';
       return rest;
     }
 
@@ -10694,7 +10709,7 @@
       const line1 = [room, name].filter(Boolean).join(' ') || (sch.title || '').trim();
       return `<div class="sb-main-entry">`
         + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}</div>`
-        + `<div class="sb-main-l2">${escapeHtml(dest || '—')}</div>`
+        + (dest ? `<div class="sb-main-l2">${escapeHtml(dest)}</div>` : '')
         + `<div class="sb-main-time">${escapeHtml(time)}</div>`
         + `</div>`;
     }
@@ -11637,7 +11652,7 @@
       const wardLabel = norm.ward
         ? (SCHEDULE_BOARD_WARD_LABELS[norm.ward] || `${norm.ward}병동`)
         : '';
-      const detail = scheduleBoardDetailText(sch, norm) || sch.title || '';
+      const detail = scheduleBoardDetailText(sch, norm) || '';
       const doctorLabel = (sch.attending_physician || '').trim() || (norm.rm_team || '').trim() || '미지정';
       return {
         '날짜': scheduleBoardDateStr,
@@ -12003,7 +12018,7 @@
               <span class="schedule-board-room">${escapeHtml(norm.room_no || '-')}</span>
               <span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>
               ${badge}
-              <span class="schedule-board-detail">${escapeHtml(detail || sch.title || '')}</span>
+              <span class="schedule-board-detail">${escapeHtml(detail || '')}</span>
               <span class="schedule-board-time-cell">${escapeHtml(startT)}</span>
               <span class="schedule-board-time-cell">${escapeHtml(endT)}</span>
               <span class="schedule-board-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>
@@ -12021,7 +12036,7 @@
               <span class="schedule-board-name">${escapeHtml(norm.patient_name || '-')}</span>
               ${attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>'}
               ${badge}
-              <span class="schedule-board-detail">${escapeHtml(detail || sch.title || '')}</span>
+              <span class="schedule-board-detail">${escapeHtml(detail || '')}</span>
               ${scheduleBoardMealCellHtml(sch)}
               <div class="schedule-board-times">${timeHtml}</div>
               <div class="schedule-board-row-btns">${manageHtml}</div>
