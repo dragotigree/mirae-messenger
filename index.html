@@ -1088,10 +1088,10 @@
     .sidebar-cal-day-line {
       display: block; width: 100%; text-align: left; border: none; background: transparent;
       padding: 6px 12px; font-size: 12px; font-weight: 500; color: #334155; line-height: 1.35;
-      cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       letter-spacing: -0.02em;
     }
-    .sidebar-cal-day-line:hover { background: #f8fafc; color: #0f172a; }
+    .sidebar-cal-day-line:hover { background: transparent; color: #334155; }
     .sidebar-cal-day-empty { text-align: center; padding: 16px 12px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
 
     .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 14px; padding: 8px; }
@@ -11079,23 +11079,19 @@
       if (!bodyEl || !dateStr) return;
 
       const list = getSchedulesForDate(dateStr);
+      bodyEl.onclick = null;
       if (list.length === 0) {
-        bodyEl.innerHTML = `<div class="sidebar-cal-day-empty">일정 없음 · 클릭하면 현황판</div>`;
-        bodyEl.onclick = () => openScheduleBoardModal(dateStr);
+        bodyEl.innerHTML = `<div class="sidebar-cal-day-empty">일정 없음</div>`;
         return;
       }
 
-      bodyEl.onclick = null;
       bodyEl.innerHTML = '';
       const sorted = [...list].sort((a, b) => String(a.time_str || '').localeCompare(String(b.time_str || '')));
       sorted.forEach((sch) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'sidebar-cal-day-line';
-        btn.textContent = formatSidebarCalendarDayLine(sch);
-        btn.title = '현황판에서 자세히 보기';
-        btn.addEventListener('click', () => openScheduleBoardModal(dateStr));
-        bodyEl.appendChild(btn);
+        const line = document.createElement('div');
+        line.className = 'sidebar-cal-day-line';
+        line.textContent = formatSidebarCalendarDayLine(sch);
+        bodyEl.appendChild(line);
       });
     }
 
