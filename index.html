@@ -3765,6 +3765,11 @@
 
     async function requestDmReadReceipt(peerIp, opts) {
       if (!isDirectMessagePeerKey(peerIp)) return false;
+      if (!isDmChatActivelyViewed()) {
+        // 화면보호기·다른 창·자리비움 중에는 읽음 보내지 않음
+        pendingDmReadPeers.add(peerIp);
+        return false;
+      }
       const force = !!(opts && opts.force);
       if (!force && dmReadReceiptSentFor[peerIp]) return true;
       if (dmReadReceiptInFlight[peerIp]) return false;
@@ -3772,11 +3777,17 @@
       try {
         const res = await window.api.notifyRead(peerIp);
         const ok = !!(res && res.success);
-        if (ok) dmReadReceiptSentFor[peerIp] = true;
-        else delete dmReadReceiptSentFor[peerIp];
+        if (ok) {
+          dmReadReceiptSentFor[peerIp] = true;
+          pendingDmReadPeers.delete(peerIp);
+        } else {
+          delete dmReadReceiptSentFor[peerIp];
+          pendingDmReadPeers.add(peerIp);
+        }
         return ok;
       } catch (e) {
         delete dmReadReceiptSentFor[peerIp];
+        pendingDmReadPeers.add(peerIp);
         return false;
       } finally {
         delete dmReadReceiptInFlight[peerIp];
@@ -3784,8 +3795,32 @@
     }
 
     const dmReadReceiptDebounceTimers = {};
+    const pendingDmReadPeers = new Set();
+    let lastUserActivityAt = Date.now();
+
+    function isDmChatActivelyViewed() {
+      if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') {
+        return false;
+      }
+      if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) {
+        return false;
+      }
+      if (autoAwayTriggered) return false;
+      // 화면보호기 등으로 입력이 끊기면 포커스가 남아 있어도 읽지 않은 것으로 본다
+      if (Date.now() - lastUserActivityAt > 90_000) return false;
+      return true;
+    }
+
+    function markUserActivityForReadReceipt() {
+      lastUserActivityAt = Date.now();
+    }
+
     function scheduleDmReadReceipt(peerIp) {
       if (!isDirectMessagePeerKey(peerIp)) return;
+      if (!isDmChatActivelyViewed()) {
+        pendingDmReadPeers.add(peerIp);
+        return;
+      }
       clearTimeout(dmReadReceiptDebounceTimers[peerIp]);
       dmReadReceiptDebounceTimers[peerIp] = setTimeout(() => {
         delete dmReadReceiptDebounceTimers[peerIp];
@@ -3828,7 +3863,20 @@
       requestDmReadReceipt(peerIp).catch(() => {});
     }
 
+    function flushPendingDmReadReceipts() {
+      if (!isDmChatActivelyViewed()) return;
+      if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
+        pendingDmReadPeers.add(activeChatUser.ip);
+      }
+      const peers = [...pendingDmReadPeers];
+      peers.forEach((ip) => {
+        requestDmReadReceipt(ip, { force: true }).catch(() => {});
+      });
+    }
+
     function retryDmReadReceiptIfNeeded() {
+      markUserActivityForReadReceipt();
+      flushPendingDmReadReceipts();
       if (!activeChatUser || !isDirectMessagePeerKey(activeChatUser.ip)) return;
       if (dmReadReceiptSentFor[activeChatUser.ip]) return;
       requestDmReadReceipt(activeChatUser.ip, { force: true }).catch(() => {});
@@ -4202,9 +4250,11 @@
     });
 
     function resetIdleTimer() {
+      markUserActivityForReadReceipt();
       if (autoAwayTriggered) {
         autoAwayTriggered = false;
         window.api.saveMyProfile({ statusState: 'ONLINE' }).then(() => updateMyStatusBadge('ONLINE'));
+        flushPendingDmReadReceipts();
       }
       clearTimeout(idleTimer);
       idleTimer = setTimeout(async () => {
@@ -4220,7 +4270,7 @@
         }
       }, IDLE_MS);
     }
-    ['mousemove', 'mousedown', 'click'].forEach(evt => {
+    ['mousemove', 'mousedown', 'click', 'keydown'].forEach(evt => {
       window.addEventListener(evt, resetIdleTimer, { passive: true });
     });
     resetIdleTimer();
@@ -4258,10 +4308,6 @@
     function isDirectMessagePeerKey(key) {
       if (!key || typeof key !== 'string') return false;
       return key !== 'BROADCAST' && !key.startsWith('DEPT:') && !key.startsWith('FLOOR:') && !key.startsWith('GROUP:') && !key.startsWith('BCAST:');
-    }
-
-    function maybeNotifyDmRead(peerIp) {
-      requestDmReadReceipt(peerIp);
     }
 
     function bumpUnread(key) {
@@ -4610,9 +4656,13 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') retryDmReadReceiptIfNeeded();
+      if (document.visibilityState === 'visible') {
+        markUserActivityForReadReceipt();
+        retryDmReadReceiptIfNeeded();
+      }
     });
     window.addEventListener('focus', () => {
+      markUserActivityForReadReceipt();
       retryDmReadReceiptIfNeeded();
     });
 
