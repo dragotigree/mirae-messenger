@@ -1146,9 +1146,9 @@
       display: flex; flex: 1; min-height: 0; overflow: hidden;
     }
     .sb-board-side {
-      width: 168px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
-      padding: 8px 8px 10px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
-      display: flex; flex-direction: column; gap: 8px;
+      width: 228px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+      padding: 10px 10px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
+      display: flex; flex-direction: column; gap: 10px;
     }
     .sb-board-content {
       flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column;
@@ -1157,30 +1157,30 @@
     .sb-board-side-hint {
       font-size: 10px; color: #64748b; line-height: 1.4; padding: 0 1px;
     }
-    .sb-board-side .schedule-board-view-tabs { width: 100%; justify-content: stretch; gap: 2px; }
-    .sb-board-side .schedule-board-view-tab { flex: 1; text-align: center; padding: 6px 2px; font-size: 10px; }
+    .sb-board-side .schedule-board-view-tabs { width: 100%; justify-content: stretch; gap: 4px; }
+    .sb-board-side .schedule-board-view-tab { flex: 1; text-align: center; padding: 7px 4px; font-size: 11px; }
     .sb-board-side .sb-date-field { width: 100%; }
-    .sb-board-side .schedule-board-date { width: 100%; min-width: 0; font-size: 11px; padding: 5px 6px; }
+    .sb-board-side .schedule-board-date { width: 100%; min-width: 0; font-size: 12px; padding: 6px 8px; }
     .sb-board-side .sb-filter-panel {
-      padding: 8px; gap: 6px; border-radius: 10px;
+      padding: 10px; gap: 8px; border-radius: 12px;
     }
     .sb-board-side .sb-filter-block--row { flex-wrap: wrap; align-items: flex-start; }
     .sb-board-side .sb-filter-panel .sb-filter-label {
-      width: 100%; min-width: 0; font-size: 9.5px; color: #94a3b8; margin-bottom: 1px;
+      width: 100%; min-width: 0; font-size: 10.5px; color: #94a3b8; margin-bottom: 2px;
     }
-    .sb-board-side .sb-chip-row { gap: 3px; }
-    .sb-board-side .schedule-board-chip { padding: 3px 6px; font-size: 10px; }
-    .sb-board-side .sb-search-inline { flex-direction: column; align-items: stretch; gap: 4px; }
-    .sb-board-side .sb-search-inline .schedule-board-search { width: 100%; max-width: none; flex: none; font-size: 11px; padding: 5px 7px; }
-    .sb-board-side .schedule-board-mini-cal { padding: 6px; border-radius: 10px; }
-    .sb-board-side .mini-cal-header { font-size: 10.5px; margin-bottom: 2px; }
-    .sb-board-side .mini-cal-weekdays { font-size: 9px; }
-    .sb-board-side .mini-cal-day { font-size: 9.5px; padding: 3px 0; border-radius: 6px; }
+    .sb-board-side .sb-chip-row { gap: 5px; }
+    .sb-board-side .schedule-board-chip { padding: 5px 8px; font-size: 11px; }
+    .sb-board-side .sb-search-inline { flex-direction: column; align-items: stretch; gap: 5px; }
+    .sb-board-side .sb-search-inline .schedule-board-search { width: 100%; max-width: none; flex: none; font-size: 12px; padding: 6px 8px; }
+    .sb-board-side .schedule-board-mini-cal { padding: 8px; border-radius: 12px; }
+    .sb-board-side .mini-cal-header { font-size: 11.5px; margin-bottom: 4px; }
+    .sb-board-side .mini-cal-weekdays { font-size: 10px; }
+    .sb-board-side .mini-cal-day { font-size: 11px; padding: 5px 0; border-radius: 7px; }
     .schedule-board-export-row.sb-side-export {
-      flex-direction: column; align-items: stretch; padding: 0; background: transparent; border: none; gap: 5px;
+      flex-direction: column; align-items: stretch; padding: 0; background: transparent; border: none; gap: 6px;
     }
-    .schedule-board-export-row.sb-side-export .schedule-board-export-btn { width: 100%; text-align: center; font-size: 10px; padding: 6px 6px; line-height: 1.25; }
-    .schedule-board-export-row.sb-side-export .schedule-board-export-hint { font-size: 9.5px; line-height: 1.35; min-width: 0; }
+    .schedule-board-export-row.sb-side-export .schedule-board-export-btn { width: 100%; text-align: center; font-size: 11px; padding: 8px 8px; line-height: 1.3; }
+    .schedule-board-export-row.sb-side-export .schedule-board-export-hint { font-size: 10.5px; line-height: 1.4; min-width: 0; }
     @media (max-width: 880px) {
       .schedule-board-main { flex-direction: column; }
       .sb-board-side { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid #e2e8f0; }
@@ -1780,8 +1780,8 @@
       max-width: none;
     }
     .modal-card.schedule-board-modal-card {
-      width: min(1280px, 98vw) !important;
-      height: min(900px, 94vh);
+      width: min(1480px, 98vw) !important;
+      height: min(940px, 94vh);
       max-height: 94vh;
       border-radius: 16px;
     }
