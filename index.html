@@ -3736,12 +3736,96 @@
       localStorage.setItem('dmReadReceiptFlags', JSON.stringify(flags));
     }
 
+    function getDmReadAckedMap() {
+      try { return JSON.parse(localStorage.getItem('dmReadAckedUids') || '{}'); } catch (e) { return {}; }
+    }
+
+    function getDmReadAckedSet(peerIp) {
+      const map = getDmReadAckedMap();
+      const arr = map[peerIp];
+      return new Set(Array.isArray(arr) ? arr : []);
+    }
+
+    function saveDmReadAckedSet(peerIp, set) {
+      if (!peerIp) return;
+      const map = getDmReadAckedMap();
+      map[peerIp] = [...set];
+      // 용량 제한
+      if (map[peerIp].length > 500) map[peerIp] = map[peerIp].slice(-500);
+      localStorage.setItem('dmReadAckedUids', JSON.stringify(map));
+    }
+
+    function addDmReadAckedUids(peerIp, uids) {
+      if (!peerIp || !uids || !uids.length) return;
+      const set = getDmReadAckedSet(peerIp);
+      uids.forEach((uid) => { if (uid) set.add(String(uid)); });
+      saveDmReadAckedSet(peerIp, set);
+      if (activeChatUser && userMatchesIp(activeChatUser, peerIp)) {
+        [activeChatUser.ip, ...((activeChatUser.aliasIps) || [])].forEach((ip) => {
+          if (ip && ip !== peerIp) {
+            const s2 = getDmReadAckedSet(ip);
+            uids.forEach((uid) => { if (uid) s2.add(String(uid)); });
+            saveDmReadAckedSet(ip, s2);
+          }
+        });
+      }
+    }
+
+    function isDmMsgAckedRead(peerIp, msgUid) {
+      if (!peerIp || !msgUid) return false;
+      if (getDmReadAckedSet(peerIp).has(String(msgUid))) return true;
+      if (activeChatUser && userMatchesIp(activeChatUser, peerIp)) {
+        if (getDmReadAckedSet(activeChatUser.ip).has(String(msgUid))) return true;
+        return (activeChatUser.aliasIps || []).some((ip) => getDmReadAckedSet(ip).has(String(msgUid)));
+      }
+      return false;
+    }
+
+    function collectMineOutboundMsgUids() {
+      return [...document.querySelectorAll('#chat-messages-area .is-mine-msg[data-msg-uid]')]
+        .map((r) => r.getAttribute('data-msg-uid'))
+        .filter(Boolean);
+    }
+
+    function ackAllCurrentMineOutbound(peerIp) {
+      addDmReadAckedUids(peerIp, collectMineOutboundMsgUids());
+    }
+
+    /** 새 메시지 전송 직후: 직전까지는 읽힌 것으로 확정 */
+    function ackMineOutboundBeforeLast(peerIp) {
+      const uids = collectMineOutboundMsgUids();
+      if (uids.length < 2) return;
+      addDmReadAckedUids(peerIp, uids.slice(0, -1));
+    }
+
+    /** 기존 대화: 읽음 이력 없으면 과거는 확인된 것으로 보고, 같은 시각의 맨 끝 묶음만 미확인으로 둠 */
+    function migrateDmReadAckedIfNeeded(peerIp) {
+      if (!peerIp) return;
+      const map = getDmReadAckedMap();
+      if (Object.prototype.hasOwnProperty.call(map, peerIp)) return;
+      const rows = [...document.querySelectorAll('#chat-messages-area .is-mine-msg[data-msg-uid]')];
+      const allUids = rows.map((r) => r.getAttribute('data-msg-uid')).filter(Boolean);
+      const set = new Set(allUids);
+      if (!isPeerMarkedRead(peerIp) && rows.length) {
+        const lastTime = (rows[rows.length - 1].querySelector('.msg-time')?.textContent || '').trim();
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const t = (rows[i].querySelector('.msg-time')?.textContent || '').trim();
+          if (lastTime && t === lastTime) set.delete(rows[i].getAttribute('data-msg-uid'));
+          else break;
+        }
+      }
+      saveDmReadAckedSet(peerIp, set);
+    }
+
     function markPeerMessagesRead(peerIp) {
       if (!peerIp) return;
       setDmReadReceiptFlag(peerIp, true);
       if (activeChatUser && userMatchesIp(activeChatUser, peerIp)) {
         setDmReadReceiptFlag(activeChatUser.ip, true);
         (activeChatUser.aliasIps || []).forEach((ip) => setDmReadReceiptFlag(ip, true));
+        ackAllCurrentMineOutbound(activeChatUser.ip);
+      } else {
+        ackAllCurrentMineOutbound(peerIp);
       }
     }
 
@@ -3791,27 +3875,41 @@
 
     function updateMineOutboundStatusLabels() {
       if (!isDmOutboundStatusContext()) return;
-      const peerRead = isPeerMarkedRead(activeChatUser.ip);
-      // 1:1은 내가 보낸 「마지막」 메시지에만 보냄/읽음 표시
+      const peerIp = activeChatUser.ip;
+      migrateDmReadAckedIfNeeded(peerIp);
+      const peerRead = isPeerMarkedRead(peerIp);
       const rows = [...document.querySelectorAll('#chat-messages-area .is-mine-msg')];
       const lastIdx = rows.length - 1;
       rows.forEach((row, idx) => {
         const existing = row.querySelector('.msg-send-status');
-        if (idx !== lastIdx) {
+        const st = row.getAttribute('data-outbound-status') || '';
+        const uid = row.getAttribute('data-msg-uid') || '';
+        if (st === 'PENDING' || messageRowIsOutboundPending(row)) {
+          paintSendStatusSpan(ensureOutboundStatusSpan(row), 'error');
+          return;
+        }
+        // 읽음은 맨 마지막 메시지에만
+        if (peerRead && idx === lastIdx) {
+          paintSendStatusSpan(ensureOutboundStatusSpan(row), 'read');
+          return;
+        }
+        // 이전에 읽음 확인된 메시지 → 표시 없음
+        if (uid && isDmMsgAckedRead(peerIp, uid)) {
           if (existing) existing.remove();
           return;
         }
-        const span = ensureOutboundStatusSpan(row);
-        if (!span) return;
-        const st = row.getAttribute('data-outbound-status') || '';
-        if (st === 'PENDING' || messageRowIsOutboundPending(row)) {
-          paintSendStatusSpan(span, 'error');
-        } else if (peerRead) {
-          paintSendStatusSpan(span, 'read');
-        } else {
-          paintSendStatusSpan(span, 'sent');
-        }
+        // 아직 안 읽은 메시지 → 보냄
+        paintSendStatusSpan(ensureOutboundStatusSpan(row), 'sent');
       });
+    }
+
+    function noteDmOutboundJustSent() {
+      if (!activeChatUser || !isDirectMessagePeerKey(activeChatUser.ip)) return;
+      const peerIp = activeChatUser.ip;
+      if (isPeerMarkedRead(peerIp)) ackMineOutboundBeforeLast(peerIp);
+      setDmReadReceiptFlag(peerIp, false);
+      (activeChatUser.aliasIps || []).forEach((ip) => setDmReadReceiptFlag(ip, false));
+      updateMineOutboundStatusLabels();
     }
 
     function updateLastMineReadReceiptDisplay() {
@@ -8295,10 +8393,7 @@
       const dmPending = res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip);
       appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, urgent, res.uid, res.id, myProfile && myProfile.ip, dmPending ? 'PENDING' : null, res.createdAtFull || res.createdAt);
       if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
-        if (dmPending) setDmReadReceiptFlag(activeChatUser.ip, false);
-        else if (res.status === 'SENT' || res.status === 'DELIVERED') setDmReadReceiptFlag(activeChatUser.ip, false);
-        (activeChatUser.aliasIps || []).forEach((ip) => setDmReadReceiptFlag(ip, false));
-        updateMineOutboundStatusLabels();
+        noteDmOutboundJustSent();
       }
       if (res.uid) refreshChannelMessageUnreadCounts();
       textarea.value = '';
@@ -8764,6 +8859,7 @@
         appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
           res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
           res.createdAtFull || res.createdAt);
+        noteDmOutboundJustSent();
         if (res.uid) refreshChannelMessageUnreadCounts();
       }).catch(async (err) => {
         console.error('캡처 전송 실패:', err);
@@ -9646,7 +9742,7 @@
       const displayName = resolveMessageSenderDisplay(senderName, isMe, senderIP) || (isMe ? '나' : '상대방');
       const compact = document.body.classList.contains('compact-mode');
       const urgentBadgeHtml = urgent ? `<div class="urgent-badge">🚨 긴급</div>` : '';
-      // 보냄/읽음은 append 후 updateMineOutboundStatusLabels가 「마지막」 보낸 메시지에만 붙임
+      // 보냄/읽음: 미확인은 보냄, 읽음은 마지막만 (updateMineOutboundStatusLabels)
       const sendStatusHtml = '';
       // 텍스트는 수정·삭제, 사진·파일은 삭제만 (msg_uid 필요)
       const isDeletedAlready = typeof msg === 'string' && msg.indexOf('class="deleted-msg-flag"') !== -1;
@@ -12010,6 +12106,7 @@
           appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
             res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
             res.createdAtFull || res.createdAt);
+          noteDmOutboundJustSent();
           if (res.uid) refreshChannelMessageUnreadCounts();
         });
       };
