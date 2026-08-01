@@ -9241,24 +9241,113 @@
       return Math.floor((dataUrl.length - i - 1) * 3 / 4);
     }
 
-    // TCP 단일 라인 버퍼(~512KB) 여유: base64 팽창 고려해 원본 파일 약 250KB 한도
-    const MAX_ATTACHMENT_BYTES = 250 * 1024;
-    const MAX_ATTACHMENT_LABEL = '250KB';
+    // TCP 단일 라인 ~512KB. base64+JSON이 main.js MAX_CHAT_WIRE_BYTES(~400KB) 아래여야 함.
+    // 디코드 기준 ~300KB → base64 ~400KB 직전; 래퍼 여유를 위해 280KB 목표.
+    const MAX_COMPRESSED_IMAGE_BYTES = 280 * 1024;
+    const MAX_NON_IMAGE_BYTES = 250 * 1024;
+    const MAX_NON_IMAGE_LABEL = '250KB';
+    const MAX_IMAGE_LONG_EDGE = 1920;
+    const JPEG_QUALITY_START = 0.82;
+    const JPEG_QUALITY_MIN = 0.45;
+    const JPEG_QUALITY_STEP = 0.07;
+
+    function preferJpegFileName(name) {
+      const raw = String(name || 'image').trim() || 'image';
+      const base = raw.replace(/\.[^.]+$/, '') || 'image';
+      return `${base}.jpg`;
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FILE_READ_FAILED'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImageElement(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'));
+        img.src = url;
+      });
+    }
+
+    /** 채팅 전송용: 긴 변 축소 + JPEG 품질 하향. 작은 PNG는 유지. 성공 시 조용히 반환. */
+    async function compressImageDataUrlForChat(dataUrl, fileName, mimeHint) {
+      const mime = mimeHint || (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || 'image/jpeg';
+      const originalBytes = estimateDataUrlBytes(dataUrl);
+      const outName = fileName || 'image.jpg';
+
+      if (originalBytes > 0 && originalBytes <= MAX_COMPRESSED_IMAGE_BYTES) {
+        if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/webp' || mime === 'image/gif') {
+          return { dataUrl, fileName: outName, bytes: originalBytes };
+        }
+      }
+
+      const img = await loadImageElement(dataUrl);
+      const ow = img.naturalWidth || img.width || 1;
+      const oh = img.naturalHeight || img.height || 1;
+
+      const drawScaled = (longEdge, quality) => {
+        const long = Math.max(ow, oh);
+        const scale = long > longEdge ? longEdge / long : 1;
+        const w = Math.max(1, Math.round(ow * scale));
+        const h = Math.max(1, Math.round(oh * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const nextUrl = canvas.toDataURL('image/jpeg', quality);
+        return { dataUrl: nextUrl, bytes: estimateDataUrlBytes(nextUrl) };
+      };
+
+      let longEdge = MAX_IMAGE_LONG_EDGE;
+      let quality = JPEG_QUALITY_START;
+      let best = drawScaled(longEdge, quality);
+
+      while (best.bytes > MAX_COMPRESSED_IMAGE_BYTES && quality > JPEG_QUALITY_MIN + 0.001) {
+        quality = Math.max(JPEG_QUALITY_MIN, +(quality - JPEG_QUALITY_STEP).toFixed(2));
+        best = drawScaled(longEdge, quality);
+      }
+
+      while (best.bytes > MAX_COMPRESSED_IMAGE_BYTES && longEdge > 800) {
+        longEdge = Math.max(800, Math.floor(longEdge * 0.75));
+        quality = JPEG_QUALITY_MIN;
+        best = drawScaled(longEdge, quality);
+      }
+
+      return {
+        dataUrl: best.dataUrl,
+        fileName: preferJpegFileName(outName),
+        bytes: best.bytes
+      };
+    }
 
     async function processAndSendImageDataUrl(dataUrl, fileName) {
       if (!activeChatUser) {
         await appAlert('대화 상대를 먼저 선택하세요.');
         return;
+      }
+      let compressed;
+      try {
+        compressed = await compressImageDataUrlForChat(dataUrl, fileName || 'screenshot.jpg', 'image/jpeg');
+      } catch (err) {
+        console.error('캡처 이미지 압축 실패:', err);
+        await appAlert('캡처 이미지를 처리하지 못했습니다.');
         return;
       }
-      const bytes = estimateDataUrlBytes(dataUrl);
-      if (bytes > MAX_ATTACHMENT_BYTES) {
-        await appAlert(`캡처 이미지가 너무 큽니다 (${(bytes / 1024).toFixed(0)}KB).\n첨부 파일은 최대 ${MAX_ATTACHMENT_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
-        return;
+      if (compressed.bytes > MAX_COMPRESSED_IMAGE_BYTES) {
+        await appAlert(`캡처 이미지가 너무 큽니다 (${(compressed.bytes / 1024).toFixed(0)}KB).\n자동 압축 후에도 전송 한도를 초과합니다.\n영역을 줄이거나 공유 폴더를 이용해 주세요.`);
         return;
       }
-      const safeName = escapeHtmlText(fileName || 'screenshot.jpg');
-      const contentHtml = `<img src="${dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
+      const safeName = escapeHtmlText(compressed.fileName || fileName || 'screenshot.jpg');
+      const contentHtml = `<img src="${compressed.dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
       dispatchOutgoing(contentHtml).then((res) => {
         if (res && res.status === 'ERROR') return;
         appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
@@ -12930,21 +13019,50 @@
     initAttendingPhysicianSelects();
 
     async function processAndSendFile(file) {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        await appAlert(`파일이 너무 큽니다 (${(file.size / 1024).toFixed(0)}KB).\n첨부 파일은 최대 ${MAX_ATTACHMENT_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
-        return;
+      if (!file) return;
+      if (!activeChatUser) {
+        await appAlert('대화 상대를 먼저 선택하세요.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const fileDataUrl = event.target.result;
-        let downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${file.name}"`;
 
-        let contentHtml = file.type.startsWith('image/') ?
-          `<img src="${fileDataUrl}" class="chat-img-preview" alt="${file.name}" />` :
-          `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${file.name}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+      const isImage = !!(file.type && file.type.startsWith('image/'));
 
-        dispatchOutgoing(contentHtml).then(res => {
+      if (!isImage) {
+        if (file.size > MAX_NON_IMAGE_BYTES) {
+          await appAlert(`파일이 너무 큽니다 (${(file.size / 1024).toFixed(0)}KB).\n일반 첨부 파일은 최대 ${MAX_NON_IMAGE_LABEL}까지 보낼 수 있습니다.\n(메신저 네트워크 전송 한도)\n큰 파일은 공유 폴더 등을 이용해 주세요.`);
+          return;
+        }
+        try {
+          const fileDataUrl = await readFileAsDataUrl(file);
+          const downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${escapeHtmlText(file.name)}"`;
+          const contentHtml =
+            `<div class="chat-file-box"><span style="font-size: 24px;">📄</span><div><div style="font-weight: 700; font-size: 13px;">${escapeHtmlText(file.name)}</div><div style="font-size: 11px; color: #64748b;">${(file.size / 1024).toFixed(1)} KB</div></div><a href="${fileDataUrl}" ${downloadAttr} style="margin-left:auto; padding:6px 10px; background:var(--accent); color:#fff; border-radius: 9px; text-decoration:none; font-size:11px; font-weight:700;">다운로드</a></div>`;
+          dispatchOutgoing(contentHtml).then((res) => {
+            if (res && res.status === 'ERROR') return;
+            appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
+              res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
+              res.createdAtFull || res.createdAt);
+            noteDmOutboundJustSent();
+            if (res.uid) refreshChannelMessageUnreadCounts();
+          });
+        } catch (err) {
+          console.error('첨부 읽기 실패:', err);
+          await appAlert('파일을 읽지 못했습니다.');
+        }
+        return;
+      }
+
+      // 이미지: 원본이 커도 읽고 압축 후 전송 (성공 시 알림 없음)
+      try {
+        const rawDataUrl = await readFileAsDataUrl(file);
+        const compressed = await compressImageDataUrlForChat(rawDataUrl, file.name, file.type);
+        if (compressed.bytes > MAX_COMPRESSED_IMAGE_BYTES) {
+          await appAlert(`이미지를 압축해도 너무 큽니다 (${(compressed.bytes / 1024).toFixed(0)}KB).\n화면 캡처·사진은 자동으로 줄여 보내지만, 이 파일은 전송 한도를 넘습니다.\n공유 폴더 등을 이용해 주세요.`);
+          return;
+        }
+        const safeName = escapeHtmlText(compressed.fileName || file.name || 'image.jpg');
+        const contentHtml = `<img src="${compressed.dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
+        dispatchOutgoing(contentHtml).then((res) => {
           if (res && res.status === 'ERROR') return;
           appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip,
             res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null,
@@ -12952,8 +13070,10 @@
           noteDmOutboundJustSent();
           if (res.uid) refreshChannelMessageUnreadCounts();
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('이미지 첨부 실패:', err);
+        await appAlert('이미지를 처리하지 못했습니다.');
+      }
     }
 
     function handleFileSelect(e) { const f = e.target.files[0]; if (f && activeChatUser) processAndSendFile(f); }

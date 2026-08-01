@@ -3764,7 +3764,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
     if (isChatWireTooLarge(chatPayload)) {
       finish({
         status: 'ERROR',
-        error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+        error: '첨부/메시지가 너무 큽니다. 네트워크 전송 한도(약 400KB)를 초과합니다. 이미지는 자동 압축되며, 큰 파일은 공유 폴더를 이용해 주세요.',
         uid: msgUid
       });
       return;
@@ -3874,7 +3874,7 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
   if (isChatWireTooLarge(deptPayload)) {
     return {
       status: 'ERROR',
-      error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+      error: '첨부/메시지가 너무 큽니다. 네트워크 전송 한도(약 400KB)를 초과합니다. 이미지는 자동 압축되며, 큰 파일은 공유 폴더를 이용해 주세요.',
       createdAt,
       uid: msgUid
     };
@@ -3929,7 +3929,7 @@ ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
   if (isChatWireTooLarge(floorPayload)) {
     return {
       status: 'ERROR',
-      error: '첨부/메시지가 너무 큽니다. 약 250KB 이하만 보낼 수 있습니다. 큰 파일은 공유 폴더를 이용해 주세요.',
+      error: '첨부/메시지가 너무 큽니다. 네트워크 전송 한도(약 400KB)를 초과합니다. 이미지는 자동 압축되며, 큰 파일은 공유 폴더를 이용해 주세요.',
       createdAt,
       uid: msgUid
     };
