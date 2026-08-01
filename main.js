@@ -1197,6 +1197,9 @@ db.serialize(() => {
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_by_ip TEXT DEFAULT ''`, () => {});
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_start_undecided INTEGER DEFAULT 0`, () => {});
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_end_undecided INTEGER DEFAULT 0`, () => {});
+  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_breakfast INTEGER DEFAULT 0`, () => {});
+  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_lunch INTEGER DEFAULT 0`, () => {});
+  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_dinner INTEGER DEFAULT 0`, () => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3021,9 +3024,10 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     schedules.forEach(s => {
       const meta = schedulePatientMetaFromPayload(s);
       const und = scheduleTimeUndecidedFromPayload(s);
+      const meal = scheduleMealCancelFromPayload(s);
       db.run(
-        `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided],
+        `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner],
         logDbErr
       );
     });
@@ -3081,13 +3085,23 @@ function scheduleTimeUndecidedFromPayload(p) {
   };
 }
 
+function scheduleMealCancelFromPayload(p) {
+  const o = p || {};
+  return {
+    meal_cancel_breakfast: (o.mealCancelBreakfast || o.meal_cancel_breakfast) ? 1 : 0,
+    meal_cancel_lunch: (o.mealCancelLunch || o.meal_cancel_lunch) ? 1 : 0,
+    meal_cancel_dinner: (o.mealCancelDinner || o.meal_cancel_dinner) ? 1 : 0
+  };
+}
+
 function handleScheduleAdd(s) {
   if (!s || !s.uid) return;
   const meta = schedulePatientMetaFromPayload(s);
   const und = scheduleTimeUndecidedFromPayload(s);
+  const meal = scheduleMealCancelFromPayload(s);
   db.run(
-    `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided],
+    `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner],
     () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
   );
 }
@@ -3103,12 +3117,13 @@ function handleScheduleEdit(s) {
   if (!s || !s.uid) return;
   const meta = schedulePatientMetaFromPayload(s);
   const und = scheduleTimeUndecidedFromPayload(s);
+  const meal = scheduleMealCancelFromPayload(s);
   const modAt = s.modified_at || '';
   const modName = s.modified_by_name || '';
   const modIp = s.modified_by_ip || '';
   db.run(
-    `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-    [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, modAt, modName, modIp, s.uid],
+    `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+    [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, modAt, modName, modIp, s.uid],
     () => { if (mainWindow) safeWebContentsSend('schedules-update'); }
   );
 }
@@ -4362,6 +4377,7 @@ ipcMain.handle('add-schedule', async (event, payload) => {
     const p = payload || {};
     const meta = schedulePatientMetaFromPayload(p);
     const und = scheduleTimeUndecidedFromPayload(p);
+    const meal = scheduleMealCancelFromPayload(p);
     const record = {
       uid: `${MY_IP}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: p.type,
@@ -4378,11 +4394,14 @@ ipcMain.handle('add-schedule', async (event, payload) => {
       room_no: meta.room_no,
       patient_name: meta.patient_name,
       time_start_undecided: und.time_start_undecided,
-      time_end_undecided: und.time_end_undecided
+      time_end_undecided: und.time_end_undecided,
+      meal_cancel_breakfast: meal.meal_cancel_breakfast,
+      meal_cancel_lunch: meal.meal_cancel_lunch,
+      meal_cancel_dinner: meal.meal_cancel_dinner
     };
     db.run(
-      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided],
+      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided, record.meal_cancel_breakfast, record.meal_cancel_lunch, record.meal_cancel_dinner],
       (err) => {
         if (!err) broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
         resolve(err ? { success: false, msg: err.message || '등록 실패' } : { success: true, ...record });
@@ -4415,12 +4434,13 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
   return new Promise((resolve) => {
     const meta = schedulePatientMetaFromPayload(p);
     const und = scheduleTimeUndecidedFromPayload(p);
+    const meal = scheduleMealCancelFromPayload(p);
     const attending = p.attendingPhysician || '';
     const timeEnd = p.timeEndStr || '';
     const audit = scheduleModificationAudit();
     db.run(
-      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-      [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
+      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+      [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
       (err) => {
         if (!err) {
           broadcastToOnlinePeers({
@@ -4430,6 +4450,7 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
               remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
               ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
               time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
+              meal_cancel_breakfast: meal.meal_cancel_breakfast, meal_cancel_lunch: meal.meal_cancel_lunch, meal_cancel_dinner: meal.meal_cancel_dinner,
               modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip
             }
           });

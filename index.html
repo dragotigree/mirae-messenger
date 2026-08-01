@@ -1303,37 +1303,38 @@
     .schedule-board-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 18px; background: #eef2f7; }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
     .schedule-board-section { border-radius: 14px; overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
-    .schedule-board-section-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-size: 13px; font-weight: 700; }
-    .schedule-board-section-head .sb-count { font-size: 11px; font-weight: 600; opacity: 0.85; margin-left: 6px; }
+    .schedule-board-section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
+    .schedule-board-section-head .sb-count { font-size: 12.5px; font-weight: 600; opacity: 0.85; margin-left: 6px; }
+    .schedule-board-section-head .sb-meal-summary { font-size: 12px; font-weight: 700; color: #b45309; margin-left: 10px; }
     .schedule-board-section-actions { display: flex; gap: 4px; }
-    .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 5px 10px; border-radius: 8px; font-size: 10.5px; font-weight: 700; cursor: pointer; color: inherit; }
+    .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-col-head {
       display: grid;
-      grid-template-columns: 52px 76px minmax(72px, 100px) 72px minmax(0, 1fr) 88px auto;
-      align-items: center; gap: 8px; padding: 8px 14px 6px; font-size: 10px; font-weight: 800; color: #94a3b8;
+      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) 110px 92px auto;
+      align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-transform: none; letter-spacing: -0.02em; border-top: none;
     }
     .schedule-board-col-head.sb-referral-head {
-      grid-template-columns: 52px 52px 76px 68px minmax(0, 1fr) 46px 46px minmax(72px, 96px) auto;
+      grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
       position: sticky; top: 0; z-index: 2; background: #eef2f7; padding-top: 10px; padding-bottom: 8px;
-      border-bottom: 1px solid #e2e8f0; margin-bottom: 2px;
+      border-bottom: 1px solid #e2e8f0; margin-bottom: 2px; font-size: 12px;
     }
     .schedule-board-modal-card.sb-mode-referral .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
     .schedule-board-row {
       display: grid;
-      grid-template-columns: 52px 76px minmax(72px, 100px) 72px minmax(0, 1fr) 88px auto;
-      align-items: center; gap: 8px; padding: 11px 14px; border-top: 1px solid #f1f5f9; font-size: 12px;
+      grid-template-columns: 56px 84px minmax(80px, 110px) 76px minmax(0, 1fr) 110px 92px auto;
+      align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #f1f5f9; font-size: 13.5px;
     }
     .schedule-board-row.sb-referral-row {
-      grid-template-columns: 52px 52px 76px 68px minmax(0, 1fr) 46px 46px minmax(72px, 96px) auto;
-      font-size: 13px; padding: 12px 14px;
+      grid-template-columns: 52px 56px 84px 76px minmax(0, 1fr) 52px 52px minmax(80px, 110px) auto;
+      font-size: 13.5px; padding: 12px 14px;
     }
-    .schedule-board-row.sb-referral-row .schedule-board-name { font-size: 14px; color: #0f172a; }
+    .schedule-board-row.sb-referral-row .schedule-board-name { font-size: 14.5px; color: #0f172a; }
     .schedule-board-row.sb-referral-row .schedule-board-detail { color: #334155; font-weight: 500; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.35; }
-    .schedule-board-ward-col { font-size: 11px; font-weight: 800; color: #475569; }
-    .schedule-board-time-cell { font-size: 11.5px; font-weight: 700; color: #0369a1; font-variant-numeric: tabular-nums; }
+    .schedule-board-ward-col { font-size: 12.5px; font-weight: 800; color: #475569; }
+    .schedule-board-time-cell { font-size: 12.5px; font-weight: 700; color: #0369a1; font-variant-numeric: tabular-nums; }
     .schedule-board-export-btn.referral-only { display: none; }
     .schedule-board-modal-card.sb-mode-main .schedule-board-export-btn.referral-only { display: inline-block; }
     .schedule-board-modal-card.sb-mode-main .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
@@ -1414,13 +1415,22 @@
       body.schedule-board-printing .sb-main-grid td { border-color: #cbd5e1; }
     }
     .schedule-board-row:hover { background: #f8fafc; }
-    .schedule-board-room { font-weight: 700; color: #0f172a; min-width: 52px; flex-shrink: 0; }
-    .schedule-board-name { font-weight: 600; color: #1e293b; min-width: 64px; flex-shrink: 0; }
-    .schedule-board-doctor { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e0f2fe; color: #0369a1; flex-shrink: 0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .schedule-board-detail { flex: 1; min-width: 0; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .schedule-board-times { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; color: #64748b; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+    .schedule-board-room { font-weight: 700; color: #0f172a; min-width: 52px; flex-shrink: 0; font-size: 13.5px; }
+    .schedule-board-name { font-weight: 600; color: #1e293b; min-width: 64px; flex-shrink: 0; font-size: 13.5px; }
+    .schedule-board-doctor { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #e0f2fe; color: #0369a1; flex-shrink: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .schedule-board-detail { flex: 1; min-width: 0; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+    .schedule-board-meals {
+      display: flex; flex-wrap: wrap; gap: 3px; align-items: center; min-width: 0;
+      font-size: 11.5px; font-weight: 700; line-height: 1.25;
+    }
+    .schedule-board-meals .sb-meal-chip {
+      display: inline-block; padding: 2px 7px; border-radius: 999px;
+      background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; white-space: nowrap;
+    }
+    .schedule-board-meals .sb-meal-none { color: #94a3b8; font-weight: 600; }
+    .schedule-board-times { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #475569; flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
     .schedule-board-row-btns { display: flex; gap: 4px; flex-shrink: 0; }
-    .schedule-board-row-btns button { border: none; background: #f1f5f9; padding: 4px 8px; border-radius: 8px; font-size: 10.5px; font-weight: 600; cursor: pointer; color: #475569; }
+    .schedule-board-row-btns button { border: none; background: #f1f5f9; padding: 5px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; }
     .schedule-board-row-btns button:hover { background: #e2e8f0; }
     .schedule-board-row-btns .sb-del { color: #dc2626; background: #fef2f2; }
     .schedule-board-row.has-modified { align-items: start; }
@@ -1502,14 +1512,14 @@
       .sb-quick-grid { min-width: 880px; }
     }
     .sb-quick-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .sb-quick-field label { font-size: 12.5px; font-weight: 700; color: #475569; white-space: nowrap; }
+    .sb-quick-field label { font-size: 13px; font-weight: 700; color: #475569; white-space: nowrap; }
     .sb-quick-field input, .sb-quick-field select {
       width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid #cbd5e1;
-      border-radius: 9px; font-size: 12.5px; background: #fff;
+      border-radius: 9px; font-size: 13px; background: #fff;
     }
     .sb-quick-field input[type="time"] {
       padding: 6px 4px;
-      font-size: 11px;
+      font-size: 12px;
     }
     .sb-quick-time-row {
       display: flex; align-items: center; gap: 6px; min-width: 0;
@@ -1520,10 +1530,17 @@
     }
     .sb-quick-undecided {
       display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
-      font-size: 10.5px; font-weight: 700; color: #0369a1; cursor: pointer;
+      font-size: 11.5px; font-weight: 700; color: #0369a1; cursor: pointer;
       white-space: nowrap; user-select: none;
     }
     .sb-quick-undecided input { width: auto; margin: 0; accent-color: #0284c7; cursor: pointer; }
+    .sb-quick-meal-row {
+      display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+      min-height: 32px; padding: 4px 2px 2px;
+    }
+    .sb-quick-meal-row .sb-quick-undecided { color: #c2410c; font-size: 12.5px; }
+    .sb-quick-meal-row .sb-quick-undecided input { accent-color: #ea580c; }
+    .sb-quick-field--meals { grid-column: 1 / -1; }
     .sb-quick-field input:focus, .sb-quick-field select:focus { outline: none; border-color: #7dd3fc; }
     .sb-quick-save-btn {
       width: 100%; padding: 0 8px; border: none; border-radius: 9px; font-size: 11.5px; font-weight: 700;
@@ -2679,7 +2696,7 @@
               <button type="button" class="sb-quick-close-btn" onclick="hideScheduleBoardQuickAddPanel()" title="닫기">✕ 닫기</button>
             </div>
             <div class="sb-quick-add-body" id="sb-quick-add-body">
-        <p class="schedule-board-quick-hint">진료의뢰서에 필요한 <b>호실·환자명·목적지·검사명·시간·주치의</b>를 입력하세요. <kbd>Enter</kbd>로 다음 칸 이동 · 마지막 칸에서 <kbd>Enter</kbd> 또는 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 등록</p>
+        <p class="schedule-board-quick-hint">진료의뢰서에 필요한 <b>호실·환자명·목적지·검사명·시간·주치의</b>를 입력하세요. 영양실 식수용으로 <b>아침·점심·저녁 취소</b>도 체크할 수 있습니다. <kbd>Enter</kbd>로 다음 칸 이동 · 마지막 칸에서 <kbd>Enter</kbd> 또는 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 등록</p>
         <div class="sb-quick-grid-wrap">
         <div class="sb-quick-grid">
           <div class="sb-quick-field">
@@ -2730,6 +2747,20 @@
           <div class="sb-quick-field">
             <label for="sb-quick-detail">목적지·검사명</label>
             <input type="text" id="sb-quick-detail" placeholder="예: OO병원 MRI, 외래" autocomplete="off">
+          </div>
+          <div class="sb-quick-field sb-quick-field--meals">
+            <label>식사 취소 (영양실 식수)</label>
+            <div class="sb-quick-meal-row">
+              <label class="sb-quick-undecided" title="아침 식사 취소">
+                <input type="checkbox" id="sb-quick-meal-breakfast">아침 취소
+              </label>
+              <label class="sb-quick-undecided" title="점심 식사 취소">
+                <input type="checkbox" id="sb-quick-meal-lunch">점심 취소
+              </label>
+              <label class="sb-quick-undecided" title="저녁 식사 취소">
+                <input type="checkbox" id="sb-quick-meal-dinner">저녁 취소
+              </label>
+            </div>
           </div>
           <div class="sb-quick-field">
             <label aria-hidden="true">&nbsp;</label>
@@ -10968,7 +10999,10 @@
         type, ward, rmTeam, attendingPhysician, timeStr, timeEndStr,
         startTime, dateStr,
         timeStartUndecided: startUndecided,
-        timeEndUndecided
+        timeEndUndecided,
+        mealCancelBreakfast: !!document.getElementById('sb-quick-meal-breakfast')?.checked,
+        mealCancelLunch: !!document.getElementById('sb-quick-meal-lunch')?.checked,
+        mealCancelDinner: !!document.getElementById('sb-quick-meal-dinner')?.checked
       };
     }
 
@@ -11000,6 +11034,9 @@
         timeEndStr: shared.timeEndStr,
         timeStartUndecided: !!shared.timeStartUndecided,
         timeEndUndecided: !!shared.timeEndUndecided,
+        mealCancelBreakfast: !!shared.mealCancelBreakfast,
+        mealCancelLunch: !!shared.mealCancelLunch,
+        mealCancelDinner: !!shared.mealCancelDinner,
         ward: entry.ward != null ? entry.ward : shared.ward,
         rmTeam: shared.rmTeam,
         roomNo,
@@ -11170,6 +11207,12 @@
       if (startUndEl) startUndEl.checked = isScheduleStartUndecided(sch);
       if (endUndEl) endUndEl.checked = isScheduleEndUndecided(sch);
       syncScheduleBoardQuickTimeUndecidedUi();
+      const mealB = document.getElementById('sb-quick-meal-breakfast');
+      const mealL = document.getElementById('sb-quick-meal-lunch');
+      const mealD = document.getElementById('sb-quick-meal-dinner');
+      if (mealB) mealB.checked = !!Number(sch.meal_cancel_breakfast);
+      if (mealL) mealL.checked = !!Number(sch.meal_cancel_lunch);
+      if (mealD) mealD.checked = !!Number(sch.meal_cancel_dinner);
       const docSel = document.getElementById('sb-quick-doctor');
       const ap = (sch.attending_physician || '').trim();
       if (docSel) {
@@ -11259,6 +11302,9 @@
             timeEndStr: shared.timeEndStr,
             timeStartUndecided: !!shared.timeStartUndecided,
             timeEndUndecided: !!shared.timeEndUndecided,
+            mealCancelBreakfast: !!shared.mealCancelBreakfast,
+            mealCancelLunch: !!shared.mealCancelLunch,
+            mealCancelDinner: !!shared.mealCancelDinner,
             ward: shared.ward,
             rmTeam: shared.rmTeam,
             roomNo: normalizeQuickRoomNo(roomNo),
@@ -11604,6 +11650,9 @@
         '상세내용': detail,
         '출발': isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : ''),
         '귀원': isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : ''),
+        '아침취소': getScheduleMealCancelFlags(sch).breakfast ? 'Y' : '',
+        '점심취소': getScheduleMealCancelFlags(sch).lunch ? 'Y' : '',
+        '저녁취소': getScheduleMealCancelFlags(sch).dinner ? 'Y' : '',
         '작성자': sch.author_name || '',
         '수정일시': sch.modified_at ? formatScheduleModifiedDisplay(sch.modified_at) : '',
         '수정자': (sch.modified_by_name || '').trim(),
@@ -11752,7 +11801,8 @@
       const times = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || endL)
         ? `출발 ${startL || '미정'} 귀원 ${endL || '미정'}`
         : (startL || '');
-      return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), times].filter(Boolean).join('\t');
+      const mealTxt = formatScheduleMealCancelText(sch);
+      return [norm.room_no, norm.patient_name || sch.title, typeLabel, norm.rm_team, sch.attending_physician, scheduleBoardDetailText(sch, norm), mealTxt, times].filter(Boolean).join('\t');
     }
 
     function printScheduleBoardReferral() {
@@ -11763,13 +11813,56 @@
       setTimeout(cleanup, 60000);
     }
 
+    function getScheduleMealCancelFlags(sch) {
+      return {
+        breakfast: !!(sch && (Number(sch.meal_cancel_breakfast) || sch.meal_cancel_breakfast === true)),
+        lunch: !!(sch && (Number(sch.meal_cancel_lunch) || sch.meal_cancel_lunch === true)),
+        dinner: !!(sch && (Number(sch.meal_cancel_dinner) || sch.meal_cancel_dinner === true))
+      };
+    }
+
+    function formatScheduleMealCancelLabels(sch) {
+      const f = getScheduleMealCancelFlags(sch);
+      const parts = [];
+      if (f.breakfast) parts.push('아침');
+      if (f.lunch) parts.push('점심');
+      if (f.dinner) parts.push('저녁');
+      return parts;
+    }
+
+    function formatScheduleMealCancelText(sch) {
+      const parts = formatScheduleMealCancelLabels(sch);
+      return parts.length ? `${parts.join('·')} 취소` : '';
+    }
+
+    function scheduleBoardMealCellHtml(sch) {
+      const parts = formatScheduleMealCancelLabels(sch);
+      if (!parts.length) return '<div class="schedule-board-meals"><span class="sb-meal-none">—</span></div>';
+      return `<div class="schedule-board-meals">${parts.map((p) => `<span class="sb-meal-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
+    }
+
+    function summarizeScheduleMealCancels(items) {
+      let b = 0; let l = 0; let d = 0;
+      (items || []).forEach((sch) => {
+        const f = getScheduleMealCancelFlags(sch);
+        if (f.breakfast) b += 1;
+        if (f.lunch) l += 1;
+        if (f.dinner) d += 1;
+      });
+      const bits = [];
+      if (b) bits.push(`아침 ${b}`);
+      if (l) bits.push(`점심 ${l}`);
+      if (d) bits.push(`저녁 ${d}`);
+      return bits.length ? `식사취소 ${bits.join(' · ')}` : '';
+    }
+
     function appendScheduleBoardColumnHeader(parent, isReferral) {
       const head = document.createElement('div');
       head.className = 'schedule-board-col-head' + (isReferral ? ' sb-referral-head' : '');
       if (isReferral) {
         head.innerHTML = '<span>병동</span><span>호실</span><span>환자명</span><span>구분</span><span>목적·검사</span><span>출발</span><span>귀원</span><span>RM·주치의</span><span></span>';
       } else {
-        head.innerHTML = '<span>호실</span><span>환자명</span><span>주치의</span><span>구분</span><span>목적·검사</span><span>시간</span><span></span>';
+        head.innerHTML = '<span>호실</span><span>환자명</span><span>주치의</span><span>구분</span><span>목적·검사</span><span>식사취소</span><span>시간</span><span></span>';
       }
       parent.appendChild(head);
     }
@@ -11870,7 +11963,8 @@
         sec.className = 'schedule-board-section ' + scheduleBoardSectionClass(groupKey);
         const head = document.createElement('div');
         head.className = 'schedule-board-section-head';
-        head.innerHTML = `<span>${escapeHtml(scheduleBoardGroupTitle(groupKey))}<span class="sb-count">${items.length}건</span></span>
+        const mealSummary = summarizeScheduleMealCancels(items);
+        head.innerHTML = `<span>${escapeHtml(scheduleBoardGroupTitle(groupKey))}<span class="sb-count">${items.length}건</span>${mealSummary ? `<span class="sb-meal-summary">${escapeHtml(mealSummary)}</span>` : ''}</span>
           <div class="schedule-board-section-actions">
             <button type="button" class="sb-copy-section">${isReferral ? '의뢰복사' : '복사'}</button>
             <button type="button" class="sb-excel-section">엑셀 추출</button>
@@ -11928,6 +12022,7 @@
               ${attending ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>` : '<span></span>'}
               ${badge}
               <span class="schedule-board-detail">${escapeHtml(detail || sch.title || '')}</span>
+              ${scheduleBoardMealCellHtml(sch)}
               <div class="schedule-board-times">${timeHtml}</div>
               <div class="schedule-board-row-btns">${manageHtml}</div>
               ${modMeta ? `<div class="schedule-board-modified">수정: ${escapeHtml(modMeta)}</div>` : ''}
