@@ -8,7 +8,15 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
   <link rel="stylesheet" href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square.css">
+  <link rel="stylesheet" href="https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css">
   <style>
+    @font-face {
+      font-family: 'RIDIBatang';
+      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 
     :root {
@@ -2706,6 +2714,8 @@
             <option value="ibmPlex">IBM Plex Sans KR (기본)</option>
             <option value="pretendard">Pretendard</option>
             <option value="nanumSquare">나눔스퀘어</option>
+            <option value="ridiBatang">리디바탕</option>
+            <option value="maruBuri">마루부리</option>
           </select>
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">앱 전체 UI에 적용됩니다. 저장 후 즉시 반영됩니다.</div>
@@ -3816,6 +3826,12 @@
       },
       nanumSquare: {
         cssFamily: "'NanumSquare', 'Nanum Square', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
+      },
+      ridiBatang: {
+        cssFamily: "'RIDIBatang', 'Batang', 'BatangChe', 'Apple Myungjo', serif"
+      },
+      maruBuri: {
+        cssFamily: "'MaruBuri', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif"
       }
     };
 
