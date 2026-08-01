@@ -1374,10 +1374,12 @@
       color: #334155; white-space: nowrap; letter-spacing: -0.02em;
       border-right: 1px solid #dde3ea !important;
     }
-    .sb-main-entry { color: #1e293b; }
+    .sb-main-entry { color: #1e293b; font-size: 12px; line-height: 1.4; }
     .sb-main-entry + .sb-main-entry {
       margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, 0.35);
     }
+    .sb-main-entry .sb-main-l1 { font-weight: 700; color: #0f172a; }
+    .sb-main-entry .sb-main-l2 { color: #1e293b; margin-top: 1px; word-break: keep-all; }
     .sb-main-entry .sb-main-time { color: #2563eb; font-weight: 600; font-size: 11px; margin-top: 3px; }
     .sb-main-row-rm4 td { background: #fff; }
     .sb-main-row-rm6 td { background: #fff9e1; }
@@ -10495,9 +10497,9 @@
       return rm;
     }
 
-    function formatMainBoardTimeLabel(sch) {
-      if (!sch?.time_str) return '';
-      const dt = new Date(sch.time_str);
+    function formatMainBoardAmpmLabel(timeStr) {
+      if (!timeStr) return '';
+      const dt = new Date(timeStr);
       if (Number.isNaN(dt.getTime())) return '';
       const h = dt.getHours();
       const m = dt.getMinutes();
@@ -10505,8 +10507,16 @@
       let h12 = h % 12;
       if (h12 === 0) h12 = 12;
       const minPart = m ? `:${String(m).padStart(2, '0')}` : '';
-      const suffix = isPm ? 'P' : 'A';
-      return `(${h12}${minPart}${suffix} 출발)`;
+      return `${h12}${minPart}${isPm ? 'P' : 'A'}`;
+    }
+
+    function formatMainBoardTimeLabel(sch) {
+      const startAmpm = formatMainBoardAmpmLabel(sch?.time_str);
+      const endAmpm = formatMainBoardAmpmLabel(sch?.time_end_str);
+      const startPart = startAmpm || '미정';
+      const endPart = endAmpm || '미정';
+      // 외진·외출·외박 등: 출발·도착 / 그 외 단일도 동일하게 표시(없으면 미정)
+      return `(${startPart} 출발 · ${endPart} 도착)`;
     }
 
     function scheduleBoardMainEntryHtml(sch) {
@@ -10514,10 +10524,15 @@
       let room = (norm.room_no || '').trim();
       if (room && !room.includes('호')) room = room.replace(/\s/g, '') + '호';
       const name = (norm.patient_name || '').trim();
+      // title 잔여분 = 병원명·진료과(메모)
       const dest = (scheduleBoardDetailText(sch, norm) || '').trim();
       const time = formatMainBoardTimeLabel(sch);
       const line1 = [room, name].filter(Boolean).join(' ') || (sch.title || '').trim();
-      return `<div class="sb-main-entry"><div>${escapeHtml(line1)}</div>${dest ? `<div>${escapeHtml(dest)}</div>` : ''}${time ? `<div class="sb-main-time">${escapeHtml(time)}</div>` : ''}</div>`;
+      return `<div class="sb-main-entry">`
+        + `<div class="sb-main-l1">${escapeHtml(line1 || '—')}</div>`
+        + `<div class="sb-main-l2">${escapeHtml(dest || '—')}</div>`
+        + `<div class="sb-main-time">${escapeHtml(time)}</div>`
+        + `</div>`;
     }
 
     function scheduleBoardMainTypeFilterPass(sch) {
