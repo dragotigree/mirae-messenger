@@ -8259,7 +8259,13 @@
     }
 
     async function saveUpdateSourcePath() {
-      const p = document.getElementById('update-source-path-input').value.trim();
+      // 버튼명대로 항상 GitHub 기본 주소로 저장 (입력칸에 Z경로가 남아 있어도 GitHub로 전환)
+      const githubDefault = 'https://github.com/dragotigree/mirae-messenger';
+      const pathInput = document.getElementById('update-source-path-input');
+      const typed = (pathInput?.value || '').trim();
+      const typedMeta = /^https?:\/\/(raw\.)?github/i.test(typed) || /^github:/i.test(typed);
+      const p = typedMeta ? typed : githubDefault;
+      pathInput.value = p;
       const res = await window.api.setUpdateSourcePath(p);
       if (res && res.success === false) {
         await appAlert(res.msg || 'GitHub 주소만 저장할 수 있습니다.');
