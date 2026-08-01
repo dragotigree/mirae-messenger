@@ -332,6 +332,17 @@ let updateSourcePath = '';
 // 기본: GitHub. 옛 버전 브리지용으로 Z/공유폴더 경로도 계속 지원한다.
 const DEFAULT_UPDATE_SOURCE_PATH = 'https://github.com/dragotigree/mirae-messenger';
 const Z_BRIDGE_UPDATE_SOURCE_PATH = 'Z:\\9.재활치료실(PT&OT&언어&임상심리)\\물리치료실\\messenger';
+const Z_BRIDGE_MIRROR_FILES = [
+  'main.js',
+  'preload.js',
+  'index.html',
+  'package.json',
+  'version.json',
+  'toast.html',
+  'toast-preload.js',
+  'lib/minimal-xlsx.js'
+];
+const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png'];
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
@@ -350,6 +361,87 @@ function compareVersions(a, b) {
     if (na < nb) return -1;
   }
   return 0;
+}
+
+/** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
+async function mirrorLocalInstallToZBridge(opts = {}) {
+  const force = !!(opts && opts.force);
+  const destRoot = Z_BRIDGE_UPDATE_SOURCE_PATH;
+  let localVer = APP_VERSION;
+  try {
+    const pkg = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'package.json'), 'utf8'));
+    if (pkg && pkg.version) localVer = String(pkg.version);
+  } catch (e) {}
+
+  try {
+    await fs.promises.access(path.dirname(destRoot));
+  } catch (e) {
+    return { mirrored: false, reason: 'Z드라이브에 연결되지 않았습니다.' };
+  }
+  try {
+    await fs.promises.mkdir(destRoot, { recursive: true });
+  } catch (e) {
+    return { mirrored: false, reason: 'Z 브리지 폴더를 만들 수 없습니다: ' + (e.message || e) };
+  }
+
+  let remoteVer = '';
+  try {
+    const raw = await fs.promises.readFile(path.join(destRoot, 'version.json'), 'utf8');
+    remoteVer = String((parseUpdateJsonText(raw) || {}).version || '');
+  } catch (e) {
+    remoteVer = '';
+  }
+  if (!force && remoteVer && compareVersions(localVer, remoteVer) <= 0) {
+    return { mirrored: false, reason: 'already-latest', version: remoteVer };
+  }
+
+  const copied = [];
+  const failed = [];
+  for (const rel of Z_BRIDGE_MIRROR_FILES) {
+    const src = path.join(__dirname, rel);
+    const dst = path.join(destRoot, rel);
+    try {
+      await fs.promises.access(src);
+      await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+      await copyFileWithRetry(src, dst);
+      try { await fs.promises.utimes(dst, new Date(), new Date()); } catch (e) {}
+      copied.push(rel);
+    } catch (e) {
+      failed.push(`${rel}(${e.message || e})`);
+    }
+  }
+  for (const rel of Z_BRIDGE_MIRROR_OPTIONAL) {
+    const src = path.join(__dirname, rel);
+    const dst = path.join(destRoot, rel);
+    try {
+      await fs.promises.access(src);
+      await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+      await copyFileWithRetry(src, dst);
+      copied.push(rel);
+    } catch (e) {
+      /* optional */
+    }
+  }
+
+  if (failed.length) {
+    console.warn('[Z브리지] 일부 파일 미러 실패:', failed.join(', '));
+    return { mirrored: false, reason: failed.join(', '), copied, version: localVer };
+  }
+
+  try {
+    const note = [
+      'Mirae Messenger - Z bridge (auto)',
+      `version: ${localVer}`,
+      `time: ${new Date().toISOString()}`,
+      '',
+      'GitHub 업데이트 후 자동으로 이 폴더에 미러됩니다.',
+      '옛 PC: Z 연결 후 메신저 실행 / 설정 > 업데이트 확인'
+    ].join('\n');
+    await fs.promises.writeFile(path.join(destRoot, 'Z-BRIDGE-README.txt'), note, 'utf8');
+  } catch (e) {}
+
+  console.log(`[Z브리지] ${destRoot} 에 v${localVer} 미러 완료 (${copied.length}개)`);
+  return { mirrored: true, version: localVer, copied };
 }
 
 function parseUpdateSource(src) {
@@ -2372,6 +2464,11 @@ app.whenReady().then(async () => {
   startPresenceSweeper();
   startAutoBackup();
   startUpdateChecker();
+  setTimeout(() => {
+    mirrorLocalInstallToZBridge().catch((e) => {
+      console.warn('[Z브리지] 시작 시 미러 생략:', e.message || e);
+    });
+  }, 8000);
 });
 
 app.on('before-quit', () => {
@@ -6512,6 +6609,27 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);
 
+ipcMain.handle('mirror-update-to-z-bridge', async () => {
+  try {
+    const res = await mirrorLocalInstallToZBridge({ force: true });
+    if (res && res.mirrored) {
+      return {
+        success: true,
+        version: res.version,
+        path: Z_BRIDGE_UPDATE_SOURCE_PATH,
+        copied: (res.copied || []).length
+      };
+    }
+    return {
+      success: false,
+      msg: (res && res.reason) || 'Z 브리지에 공유하지 못했습니다.',
+      path: Z_BRIDGE_UPDATE_SOURCE_PATH
+    };
+  } catch (e) {
+    return { success: false, msg: String(e.message || e), path: Z_BRIDGE_UPDATE_SOURCE_PATH };
+  }
+});
+
 ipcMain.handle('get-update-source-path', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   return updateSourcePath;
@@ -6670,6 +6788,18 @@ async function applyUpdateFiles() {
         ? `파일은 복사됐지만 버전이 반영되지 않았습니다 (예상 ${expectedVersion}, 실제 ${verifiedVersion}). 프로그램이 설치된 폴더의 쓰기 권한을 확인해 주세요.`
         : `다음 파일을 복사하지 못했습니다: ${failedFiles} (쓰기 권한을 확인해 주세요)`
     );
+  }
+
+  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패해도 업데이트는 성공)
+  try {
+    const zRes = await mirrorLocalInstallToZBridge({ force: true });
+    if (zRes && zRes.mirrored) {
+      console.log('[업데이트] Z 브리지 미러 완료:', zRes.version);
+    } else if (zRes && zRes.reason && zRes.reason !== 'already-latest') {
+      console.warn('[업데이트] Z 브리지 미러 생략:', zRes.reason);
+    }
+  } catch (e) {
+    console.warn('[업데이트] Z 브리지 미러 오류:', e.message || e);
   }
 }
 

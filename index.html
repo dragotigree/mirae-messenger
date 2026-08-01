@@ -2951,11 +2951,12 @@
           <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.45;">
-          기본은 GitHub입니다. 옛 버전 PC는 <b>Z:\...\물리치료실\messenger</b> 경로로도 받을 수 있습니다.
+          기본은 GitHub입니다. GitHub로 업데이트하면 Z 연결된 PC가 자동으로 <b>Z:\...\물리치료실\messenger</b>에도 공유합니다.
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button onclick="checkUpdateNow()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">지금 확인</button>
           <button id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">GitHub 주소 저장</button>
+          <button id="update-z-mirror-btn" onclick="mirrorUpdateToZBridgeNow()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">Z드라이브에 공유</button>
           <button type="button" onclick="window.api.openUserDataFolder()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">토큰 폴더 열기</button>
         </div>
         <div id="update-check-result" style="font-size:12px; color:#64748b;"></div>
@@ -8262,7 +8263,27 @@
       pathInput.value = savedPath || '';
       pathInput.disabled = !isMasterAuthenticated;
       document.getElementById('update-save-path-btn').style.display = isMasterAuthenticated ? 'inline-block' : 'none';
+      const zBtn = document.getElementById('update-z-mirror-btn');
+      if (zBtn) zBtn.style.display = isMasterAuthenticated ? 'inline-block' : 'none';
       document.getElementById('update-check-result').textContent = '';
+    }
+
+    async function mirrorUpdateToZBridgeNow() {
+      const resultEl = document.getElementById('update-check-result');
+      if (resultEl) resultEl.textContent = 'Z드라이브에 공유 중...';
+      if (!window.api.mirrorUpdateToZBridge) {
+        await appAlert('이 버전은 Z 공유 기능을 지원하지 않습니다. 먼저 GitHub 업데이트를 받아 주세요.');
+        return;
+      }
+      const res = await window.api.mirrorUpdateToZBridge();
+      if (res && res.success) {
+        if (resultEl) resultEl.textContent = `✅ Z드라이브에 v${res.version} 공유 완료`;
+        await appAlert(`Z드라이브에 v${res.version} 공유했습니다.\n\n${res.path || ''}`);
+      } else {
+        const msg = (res && res.msg) || '공유 실패';
+        if (resultEl) resultEl.textContent = '⚠ ' + msg;
+        await appAlert('Z드라이브 공유 실패: ' + msg);
+      }
     }
 
     async function saveUpdateSourcePath() {

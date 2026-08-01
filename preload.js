@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 🔄 쉬운 업데이트
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  mirrorUpdateToZBridge: () => ipcRenderer.invoke('mirror-update-to-z-bridge'),
   getUpdateSourcePath: () => ipcRenderer.invoke('get-update-source-path'),
   setUpdateSourcePath: (folderPath) => ipcRenderer.invoke('set-update-source-path', folderPath),
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),

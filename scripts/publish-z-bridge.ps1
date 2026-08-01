@@ -12,8 +12,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$DefaultZMessenger = "Z:\9.재활치료실(PT&OT&언어&임상심리)\물리치료실\messenger"
 if (-not $DestDir) {
-  $DestDir = $SourceDir
+  if (Test-Path -LiteralPath "Z:\") {
+    $DestDir = $DefaultZMessenger
+  } else {
+    $DestDir = $SourceDir
+  }
 }
 
 $files = @(
