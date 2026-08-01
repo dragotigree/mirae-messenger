@@ -3598,7 +3598,8 @@
     let schedulesRefreshInFlight = null;
     let schedulesRefreshPending = false;
     let scheduleBoardSearchRenderTimer = null;
-    let scheduleBoardDoctorSelectKey = '';
+    /** null = 아직 칩 미생성. '' 와 구분해야 일정이 없어도 고정 주치의 칩이 렌더됨 */
+    let scheduleBoardDoctorSelectKey = null;
     let notifiedScheduleUids = new Set(JSON.parse(localStorage.getItem('notifiedScheduleUids') || '[]'));
     let allUsers = [];
     const CONTACT_SNAPSHOT_STORAGE_KEY = 'miraeContactSnapshots';
@@ -11875,7 +11876,7 @@
     function onScheduleBoardDateChange(val) {
       if (!val) return;
       scheduleBoardDateStr = val;
-      scheduleBoardDoctorSelectKey = '';
+      scheduleBoardDoctorSelectKey = null;
       document.getElementById('schedule-board-title').textContent = formatCalendarDayHeader(scheduleBoardDateStr);
       const parts = val.split('-').map(Number);
       scheduleBoardCalViewDate = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -12011,6 +12012,14 @@
         wardHost.innerHTML = wards.map(w =>
           `<button type="button" class="schedule-board-chip${w.cls}${w.key === scheduleBoardWardTab ? ' active' : ''}" data-ward="${w.key}" onclick="setScheduleBoardWardTab('${w.key}')">${w.label}</button>`
         ).join('');
+      }
+      // 병동 칩과 같이 고정 주치의(RM) 칩을 미리 채워 둠 (일정 유무와 무관)
+      const doctorHost = document.getElementById('schedule-board-doctor-chips');
+      if (doctorHost && !doctorHost.dataset.inited) {
+        doctorHost.dataset.inited = '1';
+        const seedDocs = buildScheduleBoardDoctorOptions([]);
+        renderScheduleBoardDoctorChips(seedDocs);
+        scheduleBoardDoctorSelectKey = seedDocs.join('\u0001');
       }
       setScheduleBoardView(scheduleBoardView);
       try {
@@ -12528,11 +12537,13 @@
     }
 
     function populateScheduleBoardSelects(list) {
-      const fromList = (list || []).map((s) => scheduleBoardAttendingLabel(s, normalizeSchedulePatient(s)) || '').filter(Boolean);
-      const docsKey = fromList.slice().sort().join('\u0001');
-      if (docsKey !== scheduleBoardDoctorSelectKey) {
+      const docs = buildScheduleBoardDoctorOptions(list);
+      // 고정 옵션(RM4·RM6…)이 항상 포함되므로, 일정에 주치의가 없어도 키가 비지 않음
+      const docsKey = docs.join('\u0001');
+      const host = document.getElementById('schedule-board-doctor-chips');
+      const needsRender = docsKey !== scheduleBoardDoctorSelectKey || !host || !host.querySelector('.schedule-board-chip');
+      if (needsRender) {
         scheduleBoardDoctorSelectKey = docsKey;
-        const docs = buildScheduleBoardDoctorOptions(list);
         if (!docs.includes(scheduleBoardDoctorFilter) && scheduleBoardDoctorFilter !== 'all') {
           scheduleBoardDoctorFilter = 'all';
         }
