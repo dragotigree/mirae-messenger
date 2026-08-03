@@ -9704,12 +9704,54 @@
 
     function downloadSharedFile(href, fileName) {
       if (!href) return;
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = fileName || 'download';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      saveChatFileFromLink({
+        href,
+        download: fileName || 'download',
+        getAttribute: (k) => {
+          if (k === 'href') return href;
+          if (k === 'download') return fileName || 'download';
+          return null;
+        }
+      }).catch((err) => {
+        console.error('downloadSharedFile', err);
+        appAlert('파일 저장 중 오류가 발생했습니다.');
+      });
+    }
+
+    async function saveChatFileFromLink(anchorOrLike) {
+      const href = String(
+        (anchorOrLike && (anchorOrLike.getAttribute?.('href') || anchorOrLike.href || '')) || ''
+      ).trim();
+      const fileName = String(
+        (anchorOrLike && (anchorOrLike.getAttribute?.('download') || anchorOrLike.download || '')) || ''
+      ).trim();
+      if (!href) {
+        await appAlert('파일 링크가 없습니다.');
+        return;
+      }
+      if (!window.api.saveChatFileAttachment) {
+        if (/^data:/i.test(href)) {
+          const a = document.createElement('a');
+          a.href = href;
+          a.download = fileName || 'download';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          return;
+        }
+        await appAlert('이 버전에서는 파일 받기를 지원하지 않습니다. 업데이트를 확인해 주세요.');
+        return;
+      }
+      const ask = !!(appSettings && appSettings.fileMode === 'ask');
+      const res = await window.api.saveChatFileAttachment({ href, fileName, ask });
+      if (!res) {
+        await appAlert('파일 저장 요청에 실패했습니다.');
+        return;
+      }
+      if (res.canceled) return;
+      if (!res.success) {
+        await appAlert(res.msg || '파일을 저장하지 못했습니다.');
+      }
     }
 
     function toggleQuickPhrasePopover() {
@@ -10458,6 +10500,16 @@
     document.getElementById('chat-messages-area').addEventListener('click', (e) => {
       if (e.target.classList.contains('chat-img-preview')) {
         openImageLightbox(e.target.src);
+        return;
+      }
+      const fileDl = e.target.closest('a.chat-file-dl, .chat-file-box > a');
+      if (fileDl) {
+        e.preventDefault();
+        e.stopPropagation();
+        saveChatFileFromLink(fileDl).catch((err) => {
+          console.error('saveChatFileFromLink', err);
+          appAlert('파일 저장 중 오류가 발생했습니다.');
+        });
         return;
       }
       const editBtn = e.target.closest('[data-edit-msg]');

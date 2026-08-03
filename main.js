@@ -5112,6 +5112,100 @@ ipcMain.handle('choose-download-folder', async () => {
   return downloadFolderPath;
 });
 
+function uniqueSavePath(dir, fileName) {
+  const safe = sanitizeFileName(fileName || 'download');
+  let dest = path.join(dir, safe);
+  if (!fs.existsSync(dest)) return dest;
+  const ext = path.extname(safe);
+  const base = path.basename(safe, ext);
+  for (let i = 1; i < 1000; i++) {
+    dest = path.join(dir, `${base} (${i})${ext}`);
+    if (!fs.existsSync(dest)) return dest;
+  }
+  return path.join(dir, `${base}_${Date.now()}${ext}`);
+}
+
+/** 채팅 「받기」: mirae-file:// 또는 data: URL을 다운로드 폴더에 저장 */
+ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
+  try {
+    const p = payload || {};
+    const href = String(p.href || '').trim();
+    const ask = !!p.ask;
+    let preferredName = sanitizeFileName(p.fileName || 'download');
+    if (!href) return { success: false, msg: '파일 경로가 없습니다.' };
+
+    let sourcePath = '';
+    let buffer = null;
+
+    if (/^mirae-file:\/\//i.test(href)) {
+      const raw = href.replace(/^mirae-file:\/\//i, '').split(/[?#]/)[0];
+      const storedName = path.basename(decodeURIComponent(raw));
+      if (!storedName || storedName === '.' || storedName === '..') {
+        return { success: false, msg: '파일 이름을 확인할 수 없습니다.' };
+      }
+      sourcePath = path.join(getReceivedFilesDir(), storedName);
+      if (!fs.existsSync(sourcePath)) {
+        return { success: false, msg: '저장된 파일을 찾을 수 없습니다. 다시 받아 주세요.' };
+      }
+      if (!preferredName || preferredName === 'download') {
+        // storedName: uid_timestamp_원본이름 → 원본 이름 추정
+        const stripped = storedName.replace(/^[0-9a-f-]{8,}_/i, '').replace(/^\d{4}-\d{2}-\d{2}T[\d-]+Z_(\d+_)?/, '');
+        preferredName = sanitizeFileName(stripped || storedName);
+      }
+    } else if (/^data:/i.test(href)) {
+      const m = href.match(/^data:([^;]+);base64,(.+)$/i);
+      if (!m) return { success: false, msg: '파일 데이터 형식이 올바르지 않습니다.' };
+      buffer = Buffer.from(m[2], 'base64');
+      if (!preferredName.includes('.')) {
+        const ext = (m[1].split('/')[1] || 'bin').split(';')[0] || 'bin';
+        preferredName = `${preferredName}.${ext}`;
+      }
+    } else if (/^file:\/\//i.test(href)) {
+      try {
+        sourcePath = decodeURIComponent(href.replace(/^file:\/\//i, '').replace(/^\/([A-Za-z]:)/, '$1'));
+      } catch (e) {
+        return { success: false, msg: '로컬 파일 경로를 읽을 수 없습니다.' };
+      }
+      if (!sourcePath || !fs.existsSync(sourcePath)) {
+        return { success: false, msg: '로컬 파일을 찾을 수 없습니다.' };
+      }
+    } else {
+      return { success: false, msg: '지원하지 않는 파일 링크입니다.' };
+    }
+
+    const targetDir = getReceivedFilesDir();
+    let destPath = uniqueSavePath(targetDir, preferredName);
+
+    if (ask && mainWindow && !mainWindow.isDestroyed()) {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: destPath,
+        filters: [{ name: 'All Files', extensions: ['*'] }]
+      });
+      if (result.canceled || !result.filePath) return { success: false, canceled: true };
+      destPath = result.filePath;
+    }
+
+    if (buffer) {
+      await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+      await fs.promises.writeFile(destPath, buffer);
+    } else if (sourcePath) {
+      const same = path.resolve(sourcePath) === path.resolve(destPath);
+      if (!same) {
+        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+        await fs.promises.copyFile(sourcePath, destPath);
+      } else {
+        destPath = sourcePath;
+      }
+    }
+
+    try { shell.showItemInFolder(destPath); } catch (e) { /* ignore */ }
+    return { success: true, path: destPath };
+  } catch (err) {
+    console.error('save-chat-file-attachment', err);
+    return { success: false, msg: err.message || String(err) };
+  }
+});
+
 ipcMain.handle('notify-read', async (event, arg) => {
   const targetIP = typeof arg === 'string' ? arg : (arg && arg.targetIP);
   const intentional = typeof arg === 'object' && arg && !!arg.intentional;

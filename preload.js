@@ -134,6 +134,7 @@ contextBridge.exposeInMainWorld('api', {
   openFilesFolder: () => ipcRenderer.invoke('open-files-folder'),
   getDownloadFolder: () => ipcRenderer.invoke('get-download-folder'),
   chooseDownloadFolder: () => ipcRenderer.invoke('choose-download-folder'),
+  saveChatFileAttachment: (payload) => ipcRenderer.invoke('save-chat-file-attachment', payload),
 
   // 📡 실시간 이벤트 리스너
   onUserListUpdate: (callback) => ipcRenderer.on('user-list-update', (e, users) => callback(users)),
