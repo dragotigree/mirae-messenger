@@ -13237,7 +13237,7 @@
           return;
         }
         const filterNote = res.format === 'xlsx'
-          ? '데이터 시트는 파란 제목·초록 헤더·병동 색(RM·병동)으로 저장됩니다.'
+          ? '데이터 시트는 정돈된 제목·헤더와 RM·병동 색 구분으로 저장됩니다.'
           : 'CSV는 엑셀에서 연 뒤 [데이터] → [필터]를 사용해 주세요.';
         await appAlert(`저장되었습니다.\n${res.path}\n\n${filterNote}`);
       } catch (err) {
