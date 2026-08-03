@@ -3802,7 +3802,10 @@
 
     function syncNoticeOperatorSessionToMain() {
       if (window.api.setNoticeOperatorSession) {
-        window.api.setNoticeOperatorSession(!!isNoticeOperatorAuthenticated).catch(() => {});
+        window.api.setNoticeOperatorSession(
+          !!isNoticeOperatorAuthenticated,
+          !!(isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty)
+        ).catch(() => {});
       }
     }
 
@@ -8841,7 +8844,7 @@
       if (pendingOpenDutyRosterAfterLogin) {
         if (titleEl) titleEl.textContent = '🩺 일정등록 로그인';
         if (hintEl) {
-          hintEl.textContent = '작성자 계정(당직 권한) 또는 마스터 아이디로 로그인할 수 있습니다.';
+          hintEl.textContent = '마스터 아이디 또는 일정등록 권한이 있는 계정만 로그인할 수 있습니다.';
         }
       } else {
         if (titleEl) titleEl.textContent = '✍️ 작성자 로그인';
@@ -8883,9 +8886,25 @@
       const username = document.getElementById('operator-login-id').value.trim();
       const password = document.getElementById('operator-login-pwd').value;
       if (!username || !password) { await appAlert('아이디와 비밀번호를 입력해 주세요.'); return; }
+      const wantDuty = pendingOpenDutyRosterAfterLogin;
+
+      // 일정등록: 마스터 아이디를 먼저 확인 (마스터 또는 권한자만 진입)
+      if (wantDuty) {
+        const masterRes = await window.api.verifyMasterAuth({ id: username, password });
+        if (masterRes && masterRes.success) {
+          pendingOpenDutyRosterAfterLogin = false;
+          closeOperatorLoginModal();
+          await applyMasterAuthSuccess({ openDutyRoster: true, openAdmin: false });
+          return;
+        }
+      }
+
       const res = await window.api.noticeOperatorLogin({ username, password });
       if (res.success) {
-        const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
+        if (wantDuty && !res.canManageDuty) {
+          await appAlert('일정등록 권한이 없는 계정입니다.\n마스터 아이디 또는 권한이 부여된 계정으로 로그인해 주세요.');
+          return;
+        }
         pendingOpenDutyRosterAfterLogin = false;
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
@@ -8895,30 +8914,24 @@
         refreshNoticePermission();
         updateBoardAuthStatusText();
         refreshScheduleBoardEntryUi();
-        if (shouldOpenDuty) {
-          if (canManageDutyRoster()) {
-            openDutyRosterModal();
-          } else {
-            await appAlert('로그인되었습니다. 다만 주치의 OFF·당직의 등록 권한이 없습니다.\n마스터에게 권한 부여를 요청해 주세요.');
-          }
+        if (wantDuty) openDutyRosterModal();
+        return;
+      }
+
+      // 작성자 계정이 아니면 마스터 아이디로 재시도 (공지 작성 로그인 등)
+      if (!wantDuty) {
+        const masterRes = await window.api.verifyMasterAuth({ id: username, password });
+        if (masterRes && masterRes.success) {
+          pendingOpenDutyRosterAfterLogin = false;
+          closeOperatorLoginModal();
+          await applyMasterAuthSuccess({ openDutyRoster: false, openAdmin: true });
+          return;
         }
+        await appAlert((res && res.msg) || (masterRes && masterRes.msg) || '로그인에 실패했습니다.');
         return;
       }
 
-      // 작성자 계정이 아니면 마스터 아이디로 재시도 (일정등록 등)
-      const masterRes = await window.api.verifyMasterAuth({ id: username, password });
-      if (masterRes && masterRes.success) {
-        const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
-        pendingOpenDutyRosterAfterLogin = false;
-        closeOperatorLoginModal();
-        await applyMasterAuthSuccess({
-          openDutyRoster: shouldOpenDuty,
-          openAdmin: !shouldOpenDuty
-        });
-        return;
-      }
-
-      await appAlert((res && res.msg) || (masterRes && masterRes.msg) || '로그인에 실패했습니다.');
+      await appAlert((res && res.msg) || '마스터 아이디 또는 일정등록 권한이 있는 계정으로 로그인해 주세요.');
     }
 
     function logoutOperator() {
@@ -11362,6 +11375,7 @@
     let pendingOpenDutyRosterAfterLogin = false;
 
     function openDutyRosterModal() {
+      // 미로그인·무권한이면 로그인부터 (마스터 또는 일정등록 권한자만)
       if (!canManageDutyRoster()) {
         pendingOpenDutyRosterAfterLogin = true;
         openOperatorLoginModal();

@@ -71,6 +71,8 @@ let scheduleBoardWindow = null;
 let noticeOperatorSessionActive = false;
 /** 마스터 관리자 UI 로그인 (렌더러 verify-master-auth 성공 시) */
 let masterSessionActive = false;
+/** 작성자 세션이 당직·주치의 OFF(일정등록) 권한을 갖는지 */
+let noticeOperatorCanManageDutySession = false;
 /** ip → { username, rank, dept, floor, extNo, phone } — 마스터가 지정한 표시 정보 */
 const profileOverrides = new Map();
 let toastWindow = null;
@@ -6003,6 +6005,9 @@ ipcMain.handle('get-duty-roster', async (event, dateStr) => {
 });
 
 ipcMain.handle('set-duty-roster-for-date', async (event, payload) => {
+  if (!masterSessionActive && !noticeOperatorCanManageDutySession) {
+    return { success: false, msg: '마스터 또는 일정등록 권한이 있는 계정으로 로그인한 뒤 저장할 수 있습니다.' };
+  }
   const p = payload || {};
   return replaceDutyRosterForDate(p.dateStr, p.dutyNames || [], p.offNames || [], {
     byName: p.byName || myProfile.username || '',
@@ -6086,8 +6091,9 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
   }
 });
 
-ipcMain.handle('set-notice-operator-session', async (event, active) => {
+ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty) => {
   noticeOperatorSessionActive = !!active;
+  noticeOperatorCanManageDutySession = !!active && !!canManageDuty;
   return { success: true };
 });
 

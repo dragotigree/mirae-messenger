@@ -84,7 +84,7 @@ contextBridge.exposeInMainWorld('api', {
   deleteNoticeOperator: (username) => ipcRenderer.invoke('delete-notice-operator', username),
   setNoticeOperatorDutyPerm: (data) => ipcRenderer.invoke('set-notice-operator-duty-perm', data),
   noticeOperatorLogin: (data) => ipcRenderer.invoke('notice-operator-login', data),
-  setNoticeOperatorSession: (active) => ipcRenderer.invoke('set-notice-operator-session', active),
+  setNoticeOperatorSession: (active, canManageDuty) => ipcRenderer.invoke('set-notice-operator-session', active, canManageDuty),
 
   // 📌 채널·1:1 공지 고정
   getChatPin: (channelKey) => ipcRenderer.invoke('get-chat-pin', channelKey),
