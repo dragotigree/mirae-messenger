@@ -3305,8 +3305,8 @@
   <!-- ✍️ 작성자 로그인 모달 -->
   <div id="operator-login-modal" class="modal-overlay">
     <div class="modal-card" style="width:320px;">
-      <div style="font-size:16px; font-weight:700; color:var(--accent);">✍️ 작성자 로그인</div>
-      <div style="font-size:11px; color:#64748b; margin-top:-8px;">공지사항·회사 일정을 작성하려면 마스터에게 발급받은 아이디로 로그인하세요.</div>
+      <div style="font-size:16px; font-weight:700; color:var(--accent);" id="operator-login-title">✍️ 작성자 로그인</div>
+      <div id="operator-login-hint" style="font-size:11px; color:#64748b; margin-top:-8px;">공지사항·회사 일정을 작성하려면 마스터에게 발급받은 아이디로 로그인하세요.</div>
       <input type="text" id="operator-login-id" placeholder="아이디">
       <input type="password" id="operator-login-pwd" placeholder="비밀번호" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
@@ -8836,6 +8836,19 @@
     function openOperatorLoginModal() {
       document.getElementById('operator-login-id').value = '';
       document.getElementById('operator-login-pwd').value = '';
+      const titleEl = document.getElementById('operator-login-title');
+      const hintEl = document.getElementById('operator-login-hint');
+      if (pendingOpenDutyRosterAfterLogin) {
+        if (titleEl) titleEl.textContent = '🩺 일정등록 로그인';
+        if (hintEl) {
+          hintEl.textContent = '작성자 계정(당직 권한) 또는 마스터 아이디로 로그인할 수 있습니다.';
+        }
+      } else {
+        if (titleEl) titleEl.textContent = '✍️ 작성자 로그인';
+        if (hintEl) {
+          hintEl.textContent = '공지사항·회사 일정을 작성하려면 마스터에게 발급받은 아이디로 로그인하세요. 마스터 아이디로도 로그인할 수 있습니다.';
+        }
+      }
       document.getElementById('operator-login-modal').style.display = 'flex';
       if (!document.body.classList.contains('schedule-board-standalone')) {
         setModalOpenState(true);
@@ -8848,6 +8861,22 @@
       if (!document.body.classList.contains('schedule-board-standalone')) {
         setModalOpenState(false);
       }
+    }
+
+    async function applyMasterAuthSuccess(opts) {
+      const o = opts || {};
+      isMasterAuthenticated = true;
+      updateMasterAuthUi();
+      const addSchBtn = document.getElementById('add-sch-btn');
+      if (addSchBtn) addSchBtn.style.display = 'inline-flex';
+      renderSchedules();
+      refreshNoticePermission();
+      refreshScheduleBoardEntryUi();
+      if (o.openDutyRoster) {
+        openDutyRosterModal();
+        return;
+      }
+      if (o.openAdmin !== false) openMasterAdminModal();
     }
 
     async function submitOperatorLogin() {
@@ -8873,10 +8902,23 @@
             await appAlert('로그인되었습니다. 다만 주치의 OFF·당직의 등록 권한이 없습니다.\n마스터에게 권한 부여를 요청해 주세요.');
           }
         }
-      } else {
-        await appAlert(res.msg || '로그인에 실패했습니다.');
         return;
       }
+
+      // 작성자 계정이 아니면 마스터 아이디로 재시도 (일정등록 등)
+      const masterRes = await window.api.verifyMasterAuth({ id: username, password });
+      if (masterRes && masterRes.success) {
+        const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
+        pendingOpenDutyRosterAfterLogin = false;
+        closeOperatorLoginModal();
+        await applyMasterAuthSuccess({
+          openDutyRoster: shouldOpenDuty,
+          openAdmin: !shouldOpenDuty
+        });
+        return;
+      }
+
+      await appAlert((res && res.msg) || (masterRes && masterRes.msg) || '로그인에 실패했습니다.');
     }
 
     function logoutOperator() {
@@ -14052,13 +14094,13 @@
       const res = await window.api.verifyMasterAuth({ id, password: pwd });
 
       if (res.success) {
-        isMasterAuthenticated = true;
+        const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
+        pendingOpenDutyRosterAfterLogin = false;
         closeMasterAuthModal();
-        updateMasterAuthUi();
-        document.getElementById('add-sch-btn').style.display = 'inline-flex';
-        renderSchedules();
-        refreshNoticePermission();
-        openMasterAdminModal();
+        await applyMasterAuthSuccess({
+          openDutyRoster: shouldOpenDuty,
+          openAdmin: !shouldOpenDuty
+        });
       } else {
         errEl.textContent = res.msg;
         errEl.style.display = 'block';
