@@ -1607,7 +1607,6 @@
     .schedule-board-modal-card.sb-mode-main .schedule-board-export-btn.referral-only { display: inline-block; }
     .schedule-board-modal-card.sb-mode-main .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     .schedule-board-modal-card.sb-mode-main #schedule-board-doctor-filter-row,
-    .schedule-board-modal-card.sb-mode-main #schedule-board-ward-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-search-filter-row { display: none !important; }
     .schedule-board-modal-card.sb-mode-admit .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
@@ -1616,6 +1615,18 @@
       background: #fff; border-radius: 14px; border: 1px solid #e2e8f0;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.05);
     }
+    .sb-main-board-wrap + .sb-main-board-wrap { margin-top: 14px; }
+    .sb-main-board-ward-tag {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 28px; height: 22px; padding: 0 8px; margin-right: 8px;
+      border-radius: 8px; font-size: 12px; font-weight: 800; color: #0f172a;
+      background: #e2e8f0; vertical-align: middle;
+    }
+    .sb-main-board-wrap.w4 .sb-main-board-ward-tag { background: #bfdbfe; color: #1e3a8a; }
+    .sb-main-board-wrap.w5 .sb-main-board-ward-tag { background: #bbf7d0; color: #14532d; }
+    .sb-main-board-wrap.w7 .sb-main-board-ward-tag { background: #fed7aa; color: #9a3412; }
+    .sb-main-board-wrap.w8 .sb-main-board-ward-tag { background: #e9d5ff; color: #6b21a8; }
+    .sb-main-board-wrap.w9 .sb-main-board-ward-tag { background: #fbcfe8; color: #9d174d; }
     .sb-main-board-title {
       text-align: center; font-size: 16px; font-weight: 700; color: #0f172a;
       letter-spacing: -0.03em; margin: 0 0 6px; text-decoration: none;
@@ -11828,8 +11839,8 @@
       const wardRow = document.getElementById('schedule-board-ward-filter-row');
       const doctorRow = document.getElementById('schedule-board-doctor-filter-row');
       const searchRow = document.getElementById('schedule-board-search-filter-row');
-      // 병동별·입/퇴원: 병동 칩 + 주치의 칩을 함께 표시
-      if (wardRow) wardRow.style.display = showWardDoctor ? 'flex' : 'none';
+      // 메인·병동/주치의별·입/퇴원: 병동 칩 표시 / 주치의·검색은 메인 제외
+      if (wardRow) wardRow.style.display = (showWardDoctor || isMain) ? 'flex' : 'none';
       if (doctorRow) doctorRow.style.display = showWardDoctor ? 'flex' : 'none';
       if (searchRow) searchRow.style.display = isMain ? 'none' : 'flex';
     }
@@ -11983,28 +11994,19 @@
       return sortScheduleBoardList(filterScheduleBoardList(getScheduleBoardMainWeekRawList()));
     }
 
-    function renderScheduleBoardMainGrid(body) {
-      const weekDays = getScheduleBoardWeekDaysMonSat(scheduleBoardDateStr);
-      const list = getScheduleBoardMainFilteredList();
-      const wardLabel = scheduleBoardWardTab !== 'all'
-        ? SCHEDULE_BOARD_WARD_LABELS[scheduleBoardWardTab] || `${scheduleBoardWardTab}병동`
-        : '';
-      const typeLabels = scheduleBoardMainSelectedTypeLabels();
-      const typeLabelStr = typeLabels.length ? typeLabels.join('·') : '일정';
-      const title = wardLabel
-        ? `입원환자 ${typeLabelStr} 현황(${wardLabel})`
-        : `입원환자 ${typeLabelStr} 현황`;
-      const weekRange = weekDays.length >= 2
-        ? `${formatMainBoardDayHeader(weekDays[0])} ~ ${formatMainBoardDayHeader(weekDays[weekDays.length - 1])}`
-        : '';
+    function scheduleBoardWardKeyOf(sch, norm) {
+      const n = norm || normalizeSchedulePatient(sch);
+      return n.ward || inferWardFromRoomDigits((n.room_no || '').replace(/\D/g, '')) || 'other';
+    }
 
+    function buildScheduleBoardMainGridTableHtml(list, weekDays) {
       const grid = {};
       SCHEDULE_BOARD_RM_ROWS.forEach((rm) => {
         grid[rm] = {};
         weekDays.forEach((d) => { grid[rm][d] = []; });
       });
 
-      list.forEach((sch) => {
+      (list || []).forEach((sch) => {
         const dateStr = scheduleLocalDateStr(sch);
         if (!dateStr || !weekDays.includes(dateStr)) return;
         const norm = normalizeSchedulePatient(sch);
@@ -12028,12 +12030,88 @@
         table += '</tr>';
       });
       table += '</tbody></table>';
+      return table;
+    }
 
-      body.innerHTML = `<div class="sb-main-board-wrap">
-        <div class="sb-main-board-title">${escapeHtml(title)}</div>
+    function buildScheduleBoardMainBoardWrapHtml(opts) {
+      const o = opts || {};
+      const wardKey = o.wardKey || '';
+      const wardLabel = o.wardLabel || '';
+      const typeLabelStr = o.typeLabelStr || '일정';
+      const weekRange = o.weekRange || '';
+      const list = o.list || [];
+      const weekDays = o.weekDays || [];
+      const titleInner = wardLabel
+        ? `<span class="sb-main-board-ward-tag">${escapeHtml(SCHEDULE_BOARD_WARDS.includes(wardKey) ? wardKey : '·')}</span>입원환자 ${escapeHtml(typeLabelStr)} 현황(${escapeHtml(wardLabel)})`
+        : `입원환자 ${escapeHtml(typeLabelStr)} 현황`;
+      const wrapCls = 'sb-main-board-wrap' + (SCHEDULE_BOARD_WARDS.includes(wardKey) ? ` w${wardKey}` : '');
+      return `<div class="${wrapCls}">
+        <div class="sb-main-board-title">${titleInner}</div>
         ${weekRange ? `<div class="sb-main-board-sub">${escapeHtml(weekRange)} · ${escapeHtml(typeLabelStr)} ${list.length}건 (일요일 제외)${list.length === 0 ? ` · <span style="color:#64748b">선택한 구분(<b>${escapeHtml(typeLabelStr)}</b>)으로 등록된 일정만 표시됩니다</span>` : ''}</div>` : ''}
-        ${table}
+        ${buildScheduleBoardMainGridTableHtml(list, weekDays)}
       </div>`;
+    }
+
+    function renderScheduleBoardMainGrid(body) {
+      const weekDays = getScheduleBoardWeekDaysMonSat(scheduleBoardDateStr);
+      const list = getScheduleBoardMainFilteredList();
+      const typeLabels = scheduleBoardMainSelectedTypeLabels();
+      const typeLabelStr = typeLabels.length ? typeLabels.join('·') : '일정';
+      const weekRange = weekDays.length >= 2
+        ? `${formatMainBoardDayHeader(weekDays[0])} ~ ${formatMainBoardDayHeader(weekDays[weekDays.length - 1])}`
+        : '';
+
+      // 특정 병동 선택 시 해당 병동만
+      if (scheduleBoardWardTab !== 'all') {
+        const wardLabel = SCHEDULE_BOARD_WARD_LABELS[scheduleBoardWardTab] || `${scheduleBoardWardTab}병동`;
+        body.innerHTML = buildScheduleBoardMainBoardWrapHtml({
+          wardKey: scheduleBoardWardTab,
+          wardLabel,
+          typeLabelStr,
+          weekRange,
+          list,
+          weekDays
+        });
+        return;
+      }
+
+      // 전체: 병동별로 나눠 표시
+      const parts = [];
+      SCHEDULE_BOARD_WARDS.forEach((w) => {
+        const items = list.filter((sch) => scheduleBoardWardKeyOf(sch) === w);
+        if (!items.length) return;
+        parts.push(buildScheduleBoardMainBoardWrapHtml({
+          wardKey: w,
+          wardLabel: SCHEDULE_BOARD_WARD_LABELS[w] || `${w}병동`,
+          typeLabelStr,
+          weekRange,
+          list: items,
+          weekDays
+        }));
+      });
+      const other = list.filter((sch) => !SCHEDULE_BOARD_WARDS.includes(scheduleBoardWardKeyOf(sch)));
+      if (other.length) {
+        parts.push(buildScheduleBoardMainBoardWrapHtml({
+          wardKey: 'other',
+          wardLabel: '기타',
+          typeLabelStr,
+          weekRange,
+          list: other,
+          weekDays
+        }));
+      }
+      if (!parts.length) {
+        body.innerHTML = buildScheduleBoardMainBoardWrapHtml({
+          wardKey: '',
+          wardLabel: '',
+          typeLabelStr,
+          weekRange,
+          list: [],
+          weekDays
+        });
+        return;
+      }
+      body.innerHTML = parts.join('');
     }
 
     function formatScheduleModifiedDisplay(modifiedAt) {
@@ -13087,7 +13165,9 @@
       return list.filter(sch => {
         const norm = normalizeSchedulePatient(sch);
         if (applyView) {
-          if (isScheduleBoardWardStyleView() && scheduleBoardWardTab !== 'all') {
+          const applyWardFilter = (isScheduleBoardWardStyleView() || scheduleBoardView === 'main')
+            && scheduleBoardWardTab !== 'all';
+          if (applyWardFilter) {
             const w = norm.ward || inferWardFromRoomDigits((norm.room_no || '').replace(/\D/g, '')) || 'other';
             if (w !== scheduleBoardWardTab) return false;
           }
