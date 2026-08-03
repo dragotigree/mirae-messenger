@@ -13604,7 +13604,12 @@
       }
 
       if (scheduleBoardView === 'admit') {
-        renderScheduleBoardAdmitSplit(body, list);
+        if (list.length === 0) {
+          body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
+          return;
+        }
+        body.innerHTML = '';
+        appendScheduleBoardGroupedSections(body, list);
         return;
       }
 
@@ -13705,6 +13710,7 @@
     }
 
     function buildScheduleBoardAdmitColumn(title, kindClass, items) {
+      /* 입/퇴원은 단일 목록으로 표시 (좌우 분할 미사용) */
       const col = document.createElement('div');
       col.className = `sb-admit-col sb-admit-col--${kindClass}`;
       const head = document.createElement('div');
@@ -13723,47 +13729,13 @@
     }
 
     function renderScheduleBoardAdmitSplit(body, list) {
-      const filter = scheduleBoardTypeFilter;
-      const admissions = list.filter((s) => (s.type || '') === 'ADMISSION');
-      const discharges = list.filter((s) => (s.type || '') === 'DISCHARGE');
-      const transfers = list.filter((s) => (s.type || '') === 'TRANSFER');
-
-      body.innerHTML = '';
-
+      /* 호환용: 단일 목록으로 렌더 */
       if (!list.length) {
         body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
         return;
       }
-
-      const showAdmission = filter === 'all' || filter === 'ADMISSION';
-      const showDischarge = filter === 'all' || filter === 'DISCHARGE';
-      const showTransfer = filter === 'all' || filter === 'TRANSFER';
-
-      if (showAdmission || showDischarge) {
-        const split = document.createElement('div');
-        split.className = 'sb-admit-split' + ((showAdmission && showDischarge) ? '' : ' sb-admit-split--single');
-        if (showAdmission) split.appendChild(buildScheduleBoardAdmitColumn('입원', 'admission', admissions));
-        if (showDischarge) split.appendChild(buildScheduleBoardAdmitColumn('퇴원', 'discharge', discharges));
-        body.appendChild(split);
-      }
-
-      if (showTransfer && (filter === 'TRANSFER' || transfers.length)) {
-        const wrap = document.createElement('div');
-        wrap.className = 'sb-admit-transfer';
-        const head = document.createElement('div');
-        head.className = 'sb-admit-transfer-head';
-        head.innerHTML = `<span>전원</span><span class="sb-count">${transfers.length}건</span>`;
-        const tbody = document.createElement('div');
-        tbody.className = 'sb-admit-transfer-body';
-        if (!transfers.length) {
-          tbody.innerHTML = '<div class="sb-admit-col-empty">전원 일정이 없습니다.</div>';
-        } else {
-          appendScheduleBoardGroupedSections(tbody, transfers);
-        }
-        wrap.appendChild(head);
-        wrap.appendChild(tbody);
-        body.appendChild(wrap);
-      }
+      body.innerHTML = '';
+      appendScheduleBoardGroupedSections(body, list);
     }
 
     function formatDateStr(d) {
