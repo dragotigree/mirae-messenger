@@ -1609,6 +1609,7 @@
     .schedule-board-modal-card.sb-mode-main #schedule-board-doctor-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-ward-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-search-filter-row { display: none !important; }
+    .schedule-board-modal-card.sb-mode-admit .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
     .sb-main-board-wrap {
       margin: 4px 2px 12px; padding: 18px 16px 14px; overflow-x: auto;
@@ -3077,7 +3078,7 @@
           <div class="schedule-board-view-tabs">
             <button type="button" class="schedule-board-view-tab active" data-sb-view="main" onclick="setScheduleBoardView('main')">메인</button>
             <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')">병동별</button>
-            <button type="button" class="schedule-board-view-tab" data-sb-view="doctor" onclick="setScheduleBoardView('doctor')">주치의별</button>
+            <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')">입/퇴원</button>
           </div>
           <div class="sb-filter-panel">
             <div class="sb-filter-block sb-filter-block--row" id="schedule-board-search-filter-row">
@@ -11756,14 +11757,52 @@
       renderScheduleBoard();
     }
 
+    function isScheduleBoardWardStyleView() {
+      return scheduleBoardView === 'ward' || scheduleBoardView === 'admit';
+    }
+
     function updateScheduleBoardSideFiltersUi() {
       const isMain = scheduleBoardView === 'main';
+      const showWardDoctor = isScheduleBoardWardStyleView();
       const wardRow = document.getElementById('schedule-board-ward-filter-row');
       const doctorRow = document.getElementById('schedule-board-doctor-filter-row');
       const searchRow = document.getElementById('schedule-board-search-filter-row');
-      if (wardRow) wardRow.style.display = scheduleBoardView === 'ward' ? 'flex' : 'none';
-      if (doctorRow) doctorRow.style.display = scheduleBoardView === 'doctor' ? 'flex' : 'none';
+      // 병동별·입/퇴원: 병동 칩 + 주치의 칩을 함께 표시
+      if (wardRow) wardRow.style.display = showWardDoctor ? 'flex' : 'none';
+      if (doctorRow) doctorRow.style.display = showWardDoctor ? 'flex' : 'none';
       if (searchRow) searchRow.style.display = isMain ? 'none' : 'flex';
+    }
+
+    function getScheduleBoardTypeChipDefs() {
+      if (scheduleBoardView === 'admit') {
+        return [
+          { key: 'all', label: '전체' },
+          { key: 'ADMISSION', label: '입원' },
+          { key: 'DISCHARGE', label: '퇴원' }
+        ];
+      }
+      return [{ key: 'all', label: '전체' }].concat(
+        SCHEDULE_BOARD_TYPE_CHIP_KEYS.map((k) => SCHEDULE_TYPE_ORDER.find((m) => m.key === k))
+          .filter(Boolean)
+          .map((m) => ({ key: m.key, label: m.label }))
+      );
+    }
+
+    function refreshScheduleBoardTypeChips() {
+      const typeHost = document.getElementById('schedule-board-type-chips');
+      if (!typeHost) return;
+      const chips = getScheduleBoardTypeChipDefs();
+      typeHost.innerHTML = chips.map((c) =>
+        `<button type="button" class="schedule-board-chip" data-type="${c.key}" onclick="setScheduleBoardTypeFilter('${c.key}')">${c.label}</button>`
+      ).join('');
+      typeHost.dataset.inited = '1';
+      if (scheduleBoardView === 'admit'
+        && scheduleBoardTypeFilter !== 'all'
+        && scheduleBoardTypeFilter !== 'ADMISSION'
+        && scheduleBoardTypeFilter !== 'DISCHARGE') {
+        scheduleBoardTypeFilter = 'all';
+      }
+      syncScheduleBoardTypeChipActive();
     }
 
     function scheduleBoardRmKey(sch, norm) {
@@ -12792,39 +12831,46 @@
     }
 
     function setScheduleBoardView(view) {
-      if (view === 'rm') view = 'doctor';
+      // 예전「주치의별」은 병동별에 합침
+      if (view === 'rm' || view === 'doctor') view = 'ward';
       const prevView = scheduleBoardView;
       scheduleBoardView = view;
       if (view === 'main') {
         if (prevView !== 'main') applyScheduleBoardMainDefaults();
+      } else if (view === 'admit') {
+        scheduleBoardTypeFilter = 'all';
+        scheduleBoardWardTab = 'all';
+        scheduleBoardDoctorFilter = 'all';
+        document.querySelectorAll('#schedule-board-ward-chips .schedule-board-chip').forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-ward') === 'all');
+        });
+        syncScheduleBoardDoctorChipActive();
+        const quickType = document.getElementById('sb-quick-type');
+        if (quickType && [...quickType.options].some((o) => o.value === 'ADMISSION')) {
+          quickType.value = 'ADMISSION';
+        }
       } else {
-        // 병동별·주치의별: 모든 구분이 보이도록 전체
+        // 병동별: 모든 구분이 보이도록 전체
         scheduleBoardTypeFilter = 'all';
       }
       try { localStorage.setItem('mirae_schedule_board_view', view); } catch (e) { /* ignore */ }
       document.querySelectorAll('.schedule-board-view-tab').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-sb-view') === view);
       });
+      refreshScheduleBoardTypeChips();
       updateScheduleBoardSideFiltersUi();
-      syncScheduleBoardTypeChipActive();
       const card = document.querySelector('#schedule-board-modal .schedule-board-modal-card');
-      if (card) card.classList.toggle('sb-mode-main', view === 'main');
+      if (card) {
+        card.classList.toggle('sb-mode-main', view === 'main');
+        card.classList.toggle('sb-mode-admit', view === 'admit');
+      }
       refreshScheduleBoardEntryUi();
+      updateScheduleBoardQuickAddUi();
       renderScheduleBoard();
     }
 
     function initScheduleBoardFiltersUi() {
-      const typeHost = document.getElementById('schedule-board-type-chips');
-      if (typeHost && !typeHost.dataset.inited) {
-        typeHost.dataset.inited = '1';
-        const chips = [{ key: 'all', label: '전체' }].concat(
-          SCHEDULE_BOARD_TYPE_CHIP_KEYS.map(k => SCHEDULE_TYPE_ORDER.find(m => m.key === k)).filter(Boolean).map(m => ({ key: m.key, label: m.label }))
-        );
-        typeHost.innerHTML = chips.map(c =>
-          `<button type="button" class="schedule-board-chip" data-type="${c.key}" onclick="setScheduleBoardTypeFilter('${c.key}')">${c.label}</button>`
-        ).join('');
-        syncScheduleBoardTypeChipActive();
-      }
+      refreshScheduleBoardTypeChips();
       const wardHost = document.getElementById('schedule-board-ward-chips');
       if (wardHost) {
         const wards = [{ key: 'all', label: '전체', cls: '' }].concat(
@@ -12850,7 +12896,8 @@
       try {
         let savedView = localStorage.getItem('mirae_schedule_board_view');
         if (savedView === 'referral') savedView = 'main';
-        if (savedView && ['ward', 'doctor', 'main'].includes(savedView)) {
+        if (savedView === 'doctor' || savedView === 'rm') savedView = 'ward';
+        if (savedView && ['ward', 'admit', 'main'].includes(savedView)) {
           setScheduleBoardView(savedView);
         } else if (scheduleBoardView === 'main') {
           applyScheduleBoardMainDefaults();
@@ -12938,6 +12985,9 @@
     function getScheduleBoardBaseList() {
       return getSchedulesForDate(scheduleBoardDateStr).filter(s => {
         const t = s.type || 'GENERAL';
+        if (scheduleBoardView === 'admit') {
+          if (t !== 'ADMISSION' && t !== 'DISCHARGE') return false;
+        }
         if (scheduleBoardTypeFilter !== 'all' && t !== scheduleBoardTypeFilter) return false;
         if (!SCHEDULE_BOARD_TYPE_CHIP_KEYS.includes(t) && scheduleBoardTypeFilter === 'all') {
           if (t === 'GENERAL' || t === 'LEAVE') return false;
@@ -12953,11 +13003,11 @@
       return list.filter(sch => {
         const norm = normalizeSchedulePatient(sch);
         if (applyView) {
-          if (scheduleBoardView === 'ward' && scheduleBoardWardTab !== 'all') {
+          if (isScheduleBoardWardStyleView() && scheduleBoardWardTab !== 'all') {
             const w = norm.ward || inferWardFromRoomDigits((norm.room_no || '').replace(/\D/g, '')) || 'other';
             if (w !== scheduleBoardWardTab) return false;
           }
-          if (scheduleBoardView === 'doctor' && scheduleBoardDoctorFilter !== 'all') {
+          if (isScheduleBoardWardStyleView() && scheduleBoardDoctorFilter !== 'all') {
             const doc = scheduleBoardAttendingLabel(sch, norm) || '미지정';
             if (doc !== scheduleBoardDoctorFilter) return false;
           }
@@ -13152,24 +13202,16 @@
     }
 
     function scheduleBoardGroupKey(sch, norm) {
-      if (scheduleBoardView === 'doctor') return scheduleBoardAttendingLabel(sch, norm) || '미지정';
       return norm.ward || 'other';
     }
 
     function scheduleBoardGroupTitle(key) {
-      if (scheduleBoardView === 'ward' || scheduleBoardView === 'main') {
-        if (key === 'other') return '기타·미분류';
-        return SCHEDULE_BOARD_WARD_LABELS[key] || `${key}병동`;
-      }
-      return key === '미지정' ? '주치의 미지정' : key;
+      if (key === 'other') return '기타·미분류';
+      return SCHEDULE_BOARD_WARD_LABELS[key] || `${key}병동`;
     }
 
     function scheduleBoardSectionClass(key) {
-      if (scheduleBoardView === 'doctor') return 'w-other';
-      if (scheduleBoardView === 'main' || scheduleBoardView === 'ward') {
-        if (SCHEDULE_BOARD_WARDS.includes(key)) return 'w-' + key;
-        return 'w-other';
-      }
+      if (SCHEDULE_BOARD_WARDS.includes(key)) return 'w-' + key;
       return 'w-other';
     }
 
@@ -13417,18 +13459,14 @@
 
       const isReferral = false;
       const sortKeys = [...groups.keys()];
-      if (scheduleBoardView === 'ward' || scheduleBoardView === 'main') {
-        sortKeys.sort((a, b) => {
-          const ia = SCHEDULE_BOARD_WARDS.indexOf(a);
-          const ib = SCHEDULE_BOARD_WARDS.indexOf(b);
-          if (ia === -1 && ib === -1) return String(a).localeCompare(String(b));
-          if (ia === -1) return 1;
-          if (ib === -1) return -1;
-          return ia - ib;
-        });
-      } else {
-        sortKeys.sort((a, b) => String(a).localeCompare(String(b), 'ko'));
-      }
+      sortKeys.sort((a, b) => {
+        const ia = SCHEDULE_BOARD_WARDS.indexOf(a);
+        const ib = SCHEDULE_BOARD_WARDS.indexOf(b);
+        if (ia === -1 && ib === -1) return String(a).localeCompare(String(b));
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      });
 
       body.innerHTML = '';
       if (isReferral) appendScheduleBoardColumnHeader(body, true);
@@ -13438,7 +13476,7 @@
         sec.className = 'schedule-board-section ' + scheduleBoardSectionClass(groupKey);
         const head = document.createElement('div');
         head.className = 'schedule-board-section-head';
-        const mealSummary = scheduleBoardView === 'doctor' ? '' : summarizeScheduleMealCancels(items);
+        const mealSummary = summarizeScheduleMealCancels(items);
         head.innerHTML = `<span>${escapeHtml(scheduleBoardGroupTitle(groupKey))}<span class="sb-count">${items.length}건</span>${mealSummary ? `<span class="sb-meal-summary">${escapeHtml(mealSummary)}</span>` : ''}</span>
           <div class="schedule-board-section-actions">
             <button type="button" class="sb-copy-section">${isReferral ? '의뢰복사' : '복사'}</button>
