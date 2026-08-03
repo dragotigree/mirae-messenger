@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>미래병원 사내 메신저 — 사용 안내 책자 (A4)</title>
+  <style>
+    :root {
+      --ink: #1a2332;
+      --muted: #5a6577;
+      --line: #d5dde8;
+      --paper: #ffffff;
+      --soft: #f3f7fb;
+      --accent: #0b6e99;
+      --accent-soft: #e6f4fa;
+      --warn: #9a3412;
+      --warn-bg: #fff7ed;
+      --ok: #166534;
+      --ok-bg: #f0fdf4;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #e8eef4;
+      color: var(--ink);
+      font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 12.5pt;
+      line-height: 1.55;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: #0f172a;
+      color: #fff;
+      font-size: 13px;
+    }
+    .toolbar strong { font-size: 14px; }
+    .toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toolbar button {
+      border: none;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      background: #38bdf8;
+      color: #0f172a;
+    }
+    .toolbar button.secondary { background: #334155; color: #fff; }
+    .toolbar .hint { color: #94a3b8; font-size: 12px; }
+
+    .book {
+      width: 210mm;
+      margin: 18px auto 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: var(--paper);
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+      padding: 16mm 16mm 18mm;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      page-break-after: always;
+      break-after: page;
+    }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+
+    .page-foot {
+      margin-top: auto;
+      padding-top: 10mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9.5pt;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+    .page-num {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: -0.02em; }
+    p { margin: 0 0 0.7em; }
+    ul, ol { margin: 0.3em 0 0.8em; padding-left: 1.3em; }
+    li { margin: 0.28em 0; }
+
+    .cover {
+      background:
+        linear-gradient(165deg, #e8f6fc 0%, #ffffff 42%, #f7fafc 100%);
+      justify-content: space-between;
+    }
+    .cover-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .cover-brand {
+      margin-top: 28mm;
+      font-size: 15pt;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+    }
+    .cover h1 {
+      margin-top: 6mm;
+      font-size: 34pt;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      max-width: 14em;
+    }
+    .cover-sub {
+      margin-top: 6mm;
+      font-size: 14pt;
+      color: var(--muted);
+      max-width: 22em;
+      line-height: 1.6;
+    }
+    .cover-meta {
+      margin-top: 14mm;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.85);
+      font-size: 11pt;
+      color: var(--muted);
+    }
+    .cover-meta b { color: var(--ink); }
+    .cover-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    .cover-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+    }
+    .cover-step {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 10.5pt;
+    }
+    .cover-step b {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 2px;
+      font-size: 10pt;
+    }
+
+    .section-kicker {
+      color: var(--accent);
+      font-size: 10.5pt;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      margin-bottom: 3mm;
+    }
+    .page h2 {
+      font-size: 20pt;
+      margin-bottom: 4mm;
+      padding-bottom: 3mm;
+      border-bottom: 2px solid var(--accent);
+    }
+    .page h3 {
+      font-size: 13.5pt;
+      margin: 5mm 0 2.5mm;
+      color: var(--ink);
+    }
+
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 4mm 0 0;
+    }
+    .toc-list li {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 12.5pt;
+    }
+    .toc-list .n {
+      width: 1.6em;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .toc-list .dots {
+      flex: 1;
+      border-bottom: 1px dotted #cbd5e1;
+      height: 0.85em;
+      margin: 0 4px;
+    }
+    .toc-list .p { color: var(--muted); font-weight: 700; min-width: 1.5em; text-align: right; }
+
+    .callout {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      padding: 10px 12px;
+      margin: 3mm 0 4mm;
+      font-size: 11.5pt;
+    }
+    .callout.warn {
+      background: var(--warn-bg);
+      border-left-color: #ea580c;
+    }
+    .callout.ok {
+      background: var(--ok-bg);
+      border-left-color: var(--ok);
+    }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+      margin: 2mm 0 5mm;
+    }
+    .steps > li {
+      position: relative;
+      padding: 10px 12px 10px 48px;
+      margin: 0 0 8px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      min-height: 44px;
+    }
+    .steps > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      font-size: 12pt;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 26px;
+      text-align: center;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 2mm 0 4mm;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: #fff;
+    }
+    .card .icon {
+      font-size: 16pt;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .card b {
+      display: block;
+      font-size: 12pt;
+      margin-bottom: 3px;
+    }
+    .card p, .card span {
+      font-size: 10.5pt;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    table.simple {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2mm 0 4mm;
+      font-size: 11pt;
+    }
+    table.simple th, table.simple td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.simple th {
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      width: 28%;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 1px 7px;
+      border: 1px solid #94a3b8;
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: #f8fafc;
+      font-size: 10pt;
+      font-weight: 700;
+      font-family: Consolas, "Courier New", monospace;
+      white-space: nowrap;
+    }
+
+    .summary-box {
+      border: 2px solid var(--accent);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: var(--accent-soft);
+      margin-top: 3mm;
+    }
+    .summary-box h3 {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 13pt;
+    }
+    .summary-box ol {
+      margin: 0;
+      padding-left: 1.2em;
+    }
+    .summary-box li {
+      margin: 4px 0;
+      font-size: 12pt;
+      font-weight: 600;
+    }
+
+    .qa { margin: 0 0 4mm; }
+    .qa .q {
+      font-weight: 800;
+      font-size: 11.5pt;
+      margin-bottom: 2px;
+    }
+    .qa .a {
+      color: var(--muted);
+      font-size: 11pt;
+      padding-left: 0.2em;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none !important; }
+      .book { margin: 0; gap: 0; width: auto; }
+      .page {
+        box-shadow: none;
+        margin: 0;
+        width: auto;
+        min-height: auto;
+        height: auto;
+        padding: 14mm 15mm 16mm;
+      }
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div>
+      <strong>미래병원 사내 메신저 · A4 사용 안내 책자</strong>
+      <div class="hint">브라우저에서 열어 「인쇄」 →용지 A4 · 배경 그래픽 켜기 권장 · PDF로도 저장 가능</div>
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" class="secondary" onclick="window.close()">닫기</button>
+      <button type="button" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+    </div>
+  </div>
+
+  <div class="book">
+
+    <!-- 1. 표지 -->
+    <section class="page cover" aria-label="표지">
+      <div>
+        <span class="cover-badge">직원용 사용 안내</span>
+        <div class="cover-brand">미래병원 사내 메신저</div>
+        <h1>쉽게 따라하는<br />사용 안내 책자</h1>
+        <p class="cover-sub">
+          카카오톡처럼 쓰는 병원 내부 메신저입니다.<br />
+          글씨도 크게, 순서대로만 따라 하시면 됩니다.
+        </p>
+        <div class="cover-meta">
+          <div><b>대상</b> · 간호사 · 원무 · 치료실 · 전 직원</div>
+          <div><b>인쇄</b> · A4 · 양면 인쇄 후 스테이플러로 묶어 책자로 사용</div>
+          <div><b>기준</b> · 버전 1.0.301 전후 기능</div>
+        </div>
+      </div>
+      <div class="cover-bottom">
+        <div class="cover-steps">
+          <div class="cover-step"><b>1</b>아이콘에서 창 열기</div>
+          <div class="cover-step"><b>2</b>사람 이름 누르기</div>
+          <div class="cover-step"><b>3</b>글 쓰고 전송</div>
+          <div class="cover-step"><b>4</b>필요하면 파일·사진</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 목차 + 소개 -->
+    <section class="page">
+      <div class="section-kicker">CONTENTS</div>
+      <h2>목차</h2>
+      <ol class="toc-list">
+        <li><span class="n">01</span>이 프로그램은 무엇인가요?<span class="dots"></span><span class="p">3</span></li>
+        <li><span class="n">02</span>메신저 창 열기<span class="dots"></span><span class="p">4</span></li>
+        <li><span class="n">03</span>메시지 보내기<span class="dots"></span><span class="p">5</span></li>
+        <li><span class="n">04</span>사진 · 파일 · 화면 캡처<span class="dots"></span><span class="p">6</span></li>
+        <li><span class="n">05</span>공지 · 일정 · 이동요청<span class="dots"></span><span class="p">7</span></li>
+        <li><span class="n">06</span>설정 · 업데이트<span class="dots"></span><span class="p">8</span></li>
+        <li><span class="n">07</span>자주 묻는 질문<span class="dots"></span><span class="p">9</span></li>
+        <li><span class="n">08</span>한 장 요약 (책상 부착용)<span class="dots"></span><span class="p">10</span></li>
+      </ol>
+
+      <h3 style="margin-top:10mm;">이 책자를 읽는 방법</h3>
+      <div class="callout">
+        처음부터 끝까지 읽지 않으셔도 됩니다.<br />
+        <b>「창 열기 → 사람 찾기 → 전송」</b>만 익히면 바로 쓸 수 있습니다.<br />
+        나머지는 필요할 때 해당 페이지만 보시면 됩니다.
+      </div>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">2</span>
+      </div>
+    </section>
+
+    <!-- 3. 소개 -->
+    <section class="page">
+      <div class="section-kicker">01</div>
+      <h2>이 프로그램은 무엇인가요?</h2>
+
+      <p>
+        <b>미래병원 사내 메신저</b>는 병원 안 컴퓨터끼리
+        글·사진·파일을 주고받는 프로그램입니다.
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="icon">🏥</div>
+          <b>병원 안에서만</b>
+          <p>같은 병원망(내부망)에서 동작합니다. 일반 카카오톡이 아닙니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">💻</div>
+          <b>PC에 기록이 남음</b>
+          <p>대화는 내 컴퓨터에 저장됩니다. 두세 달 전 글도 찾아볼 수 있습니다.</p>
+        </div>
+        <div class="card">
+          <div class="icon">🔔</div>
+          <b>알림으로 알려 줌</b>
+          <p>새 메시지가 오면 화면에 알림이 뜹니다. (설정에서 끌 수 있음)</p>
+        </div>
+        <div class="card">
+          <div class="icon">⬇️</div>
+          <b>창을 닫아도 켜져 있음</b>
+          <p>창을 닫으면 오른쪽 아래 아이콘에 남습니다. 완전히 끄려면 「종료」를 누릅니다.</p>
+        </div>
+      </div>
+
+      <h3>화면 구성 (기본 화면)</h3>
+      <table class="simple">
+        <tr><th>왼쪽</th><td>직원 목록 · 부서/층 · 그룹 · 공지</td></tr>
+        <tr><th>가운데</th><td>대화 내용 · 글 쓰는 칸 · 전송 버튼</td></tr>
+        <tr><th>오른쪽</th><td>상대 정보 · 달력 · 일정</td></tr>
+      </table>
+
+      <div class="callout ok">
+        <b>다른 층 직원과도 됩니다.</b><br />
+        목록에 이름이 보이고 상대 컴퓨터가 켜져 있으면,
+        글·사진·파일을 보낼 수 있습니다.
+      </div>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">3</span>
+      </div>
+    </section>
+
+    <!-- 4. 열기 -->
+    <section class="page">
+      <div class="section-kicker">02</div>
+      <h2>메신저 창 열기</h2>
+
+      <h3>방법 A — 아이콘으로 열기 (가장 쉬움)</h3>
+      <ol class="steps">
+        <li>화면 <b>오른쪽 아래</b>(시계 근처)에서 메신저 아이콘을 찾습니다.<br />
+          (아이콘이 안 보이면 ▲ 또는 ^ 표시를 눌러 숨은 아이콘을 펼쳐 보세요.)</li>
+        <li>아이콘을 <b>마우스 오른쪽 버튼</b>으로 누릅니다.</li>
+        <li><b>「메시지 보내기」</b>를 누릅니다. → 창이 열립니다.</li>
+      </ol>
+
+      <h3>방법 B — 키보드</h3>
+      <p>
+        <span class="kbd">Ctrl</span> +
+        <span class="kbd">Alt</span> +
+        <span class="kbd">S</span>
+        를 <b>같이</b> 누르면 창이 열립니다.
+      </p>
+
+      <h3>아이콘 오른쪽 클릭 메뉴에서 자주 쓰는 것</h3>
+      <table class="simple">
+        <tr><th>메시지 보내기</th><td>메신저 창 열기</td></tr>
+        <tr><th>전체 주고받은 메시지</th><td>예전 대화 찾기</td></tr>
+        <tr><th>환경 설정</th><td>내 이름·알림·업데이트</td></tr>
+        <tr><th>기본 / 미니 화면</th><td>넓은 창 / 좁은 창</td></tr>
+        <tr><th>종료</th><td>메신저 완전히 끄기</td></tr>
+      </table>
+
+      <div class="callout warn">
+        <b>주의</b><br />
+        창의 <b>X(닫기)</b>는 “잠시 숨기기”에 가깝습니다.<br />
+        프로그램을 완전히 끄려면 아이콘 메뉴의 <b>「종료」</b>를 누르세요.
+      </div>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">4</span>
+      </div>
+    </section>
+
+    <!-- 5. 메시지 -->
+    <section class="page">
+      <div class="section-kicker">03</div>
+      <h2>메시지 보내기</h2>
+
+      <h3>한 사람에게 보내기</h3>
+      <ol class="steps">
+        <li>왼쪽 목록에서 <b>이름</b>을 찾습니다.<br />
+          위쪽 검색칸에 이름·부서·층을 입력해도 됩니다.</li>
+        <li>이름을 <b>한 번 클릭</b>합니다.</li>
+        <li>아래 칸에 글을 씁니다.</li>
+        <li><b>「전송」</b> 버튼을 누르거나, 키보드 <span class="kbd">Enter</span> 를 누릅니다.</li>
+      </ol>
+
+      <h3>글 쓰는 곳 아래 버튼</h3>
+      <div class="grid-2">
+        <div class="card"><div class="icon">📎</div><b>파일</b><span>서류·문서 보내기</span></div>
+        <div class="card"><div class="icon">📷</div><b>캡처</b><span>화면을 찍어 보내기</span></div>
+        <div class="card"><div class="icon">⏰</div><b>예약</b><span>나중에 자동으로 보내기</span></div>
+        <div class="card"><div class="icon">💬</div><b>빠른 문구</b><span>자주 쓰는 말 넣기</span></div>
+        <div class="card"><div class="icon">🚨</div><b>긴급</b><span>급한 메시지로 표시</span></div>
+        <div class="card"><div class="icon">✉️</div><b>쪽지</b><span>채팅방 없이 짧게 보내기</span></div>
+      </div>
+
+      <h3>여러 사람에게</h3>
+      <table class="simple">
+        <tr><th>부서 / 층</th><td>그 부서·층 사람들에게</td></tr>
+        <tr><th>전체 공지</th><td>가능한 많은 직원에게</td></tr>
+        <tr><th>그룹 (+)</th><td>몇 사람만 모아 대화</td></tr>
+      </table>
+
+      <div class="callout">
+        대화방 위 <b>돋보기</b>로 이 대화 안을 검색할 수 있습니다.<br />
+        예전 글은 <b>전체 대화 기록</b>
+        (<span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span class="kbd">E</span>)
+        에서도 찾을 수 있습니다.
+      </div>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">5</span>
+      </div>
+    </section>
+
+    <!-- 6. 파일 -->
+    <section class="page">
+      <div class="section-kicker">04</div>
+      <h2>사진 · 파일 · 화면 캡처</h2>
+
+      <h3>사진 보내기</h3>
+      <ol class="steps">
+        <li>대화 상대를 먼저 고릅니다.</li>
+        <li>
+          <b>📎</b> 로 사진을 고르거나,<br />
+          사진을 복사한 뒤 입력칸에서 <span class="kbd">Ctrl</span>+<span class="kbd">V</span> 로 붙여 넣습니다.
+        </li>
+        <li>자동으로 크기가 줄어든 뒤 전송됩니다. (성공 시 별도 안내 없이 보내집니다)</li>
+      </ol>
+
+      <h3>파일 보내기</h3>
+      <table class="simple">
+        <tr><th>작은 파일</th><td>바로 보낼 수 있습니다.</td></tr>
+        <tr><th>큰 파일 (최대 50MB)</th><td><b>한 사람</b> 또는 <b>그룹</b>에게만.<br />상대 메신저가 켜져 있어야 합니다.</td></tr>
+        <tr><th>더 큰 파일</th><td>메신저로는 안 됩니다. 공유 폴더를 이용해 주세요.</td></tr>
+      </table>
+
+      <div class="callout warn">
+        <b>전체 공지 · 부서 · 층 채널</b>에는 큰 파일을 보낼 수 없습니다.<br />
+        큰 파일은 <b>1:1</b> 또는 <b>그룹</b>으로 보내 주세요.
+      </div>
+
+      <h3>화면 캡처 (📷)</h3>
+      <ol class="steps">
+        <li>📷 버튼을 누릅니다.</li>
+        <li>「주 화면 전체」또는 「영역 캡처」를 고릅니다.</li>
+        <li>영역 캡처는 마우스로 필요한 부분만 드래그합니다.</li>
+        <li>대화에 첨부되어 전송됩니다.</li>
+      </ol>
+
+      <p style="font-size:11pt;color:var(--muted);">
+        받은 파일은 툴바의 <b>폴더</b> 아이콘으로 저장 위치를 열 수 있습니다.
+      </p>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">6</span>
+      </div>
+    </section>
+
+    <!-- 7. 공지 일정 -->
+    <section class="page">
+      <div class="section-kicker">05</div>
+      <h2>공지 · 일정 · 이동요청</h2>
+
+      <h3>원내 공지사항</h3>
+      <ol class="steps">
+        <li>왼쪽 위 <b>「원내 공지사항」</b>을 누릅니다.</li>
+        <li>목록에서 글을 눌러 내용을 봅니다.</li>
+      </ol>
+      <p style="font-size:11pt;color:var(--muted);">글쓰기는 권한이 있는 분만 할 수 있습니다.</p>
+
+      <h3>오른쪽 달력 · 일정</h3>
+      <ul>
+        <li>날짜를 누르면 그날 일정이 보입니다.</li>
+        <li>병동 일정은 <b>숫자 색 표시</b>로 구분됩니다.</li>
+        <li><b>📋 현황판</b>을 누르면 외진·입원·퇴원 등을 한눈에 볼 수 있습니다.</li>
+      </ul>
+
+      <h3>일정 현황판에서 보는 것 (예)</h3>
+      <div class="grid-2">
+        <div class="card"><b>🟠 외진</b><span>외래 동행 등</span></div>
+        <div class="card"><b>🟢 입원 / 🔴 퇴원</b><span>입퇴원</span></div>
+        <div class="card"><b>🟡 외출 / 🟣 외박</b><span>환자 외출·외박</span></div>
+        <div class="card"><b>🩺 검사 · 🔵 전원</b><span>검사·전원</span></div>
+      </div>
+
+      <h3>이동기사 요청 🚑</h3>
+      <ol class="steps">
+        <li>이동요청 메뉴(채널)를 엽니다.</li>
+        <li>병실 · 환자명 · 치료명 · 이동 위치 · 시간을 입력합니다.</li>
+        <li><b>「요청 보내기」</b>를 누릅니다.</li>
+      </ol>
+      <p style="font-size:11pt;color:var(--muted);">
+        요청이 등록되면 이동기사님 휴대폰으로 알림이 가도록 연결되어 있습니다.
+      </p>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">7</span>
+      </div>
+    </section>
+
+    <!-- 8. 설정 -->
+    <section class="page">
+      <div class="section-kicker">06</div>
+      <h2>설정 · 업데이트</h2>
+
+      <h3>설정 창 열기</h3>
+      <ul>
+        <li>창 안 <b>톱니바퀴(설정)</b> 버튼</li>
+        <li>또는 아이콘 오른쪽 클릭 → <b>환경 설정</b></li>
+      </ul>
+
+      <h3>꼭 확인해 두면 좋은 것</h3>
+      <table class="simple">
+        <tr><th>내 프로필</th><td>이름 · 층 · 부서 · 직급 · 내선 · 사진</td></tr>
+        <tr><th>근무 상태</th><td>온라인 / 진료·치료 중 / 자리 비움</td></tr>
+        <tr><th>알림</th><td>새 메시지 알림 켜기·끄기, 알림 방식</td></tr>
+        <tr><th>글씨 크기</th><td>글자가 작으면 여기서 키우기</td></tr>
+        <tr><th>자동 시작</th><td>컴퓨터 켤 때 메신저 자동 실행</td></tr>
+        <tr><th>업데이트</th><td>「지금 확인」으로 새 버전 받기</td></tr>
+      </table>
+
+      <div class="callout ok">
+        <b>새 기능이 안 보여요?</b><br />
+        설정 → 업데이트에서 <b>「지금 확인」</b>을 눌러 주세요.<br />
+        업데이트 주소는 <b>GitHub</b>를 사용합니다.
+      </div>
+
+      <h3>목록이 비어 보일 때</h3>
+      <ol class="steps">
+        <li>상대 컴퓨터에도 메신저가 켜져 있는지 확인합니다.</li>
+        <li>툴바의 <b>새로고침</b> 버튼을 한 번 누릅니다.</li>
+        <li>설정 화면의 네트워크 상태(UDP / TCP)를 확인합니다.</li>
+      </ol>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">8</span>
+      </div>
+    </section>
+
+    <!-- 9. FAQ -->
+    <section class="page">
+      <div class="section-kicker">07</div>
+      <h2>자주 묻는 질문</h2>
+
+      <div class="qa">
+        <div class="q">Q. 창을 닫으면 메신저가 꺼지나요?</div>
+        <div class="a">A. 아니요. 오른쪽 아래 아이콘에 남아 있습니다. 완전히 끄려면 「종료」를 누르세요.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 예전 대화도 볼 수 있나요?</div>
+        <div class="a">A. 네. 자동으로 지우지 않습니다. 대화방 검색 또는 「전체 대화 기록」을 이용하세요.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 「대화창 비우기」를 하면 기록이 사라지나요?</div>
+        <div class="a">A. 화면만 치웁니다. 컴퓨터에 저장된 기록은 남습니다.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 다른 층에도 사진·파일을 보낼 수 있나요?</div>
+        <div class="a">A. 네. 1:1(또는 그룹)이고 상대가 온라인으로 보이면 됩니다.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 전송이 안 돼요.</div>
+        <div class="a">A. 상대 메신저가 켜져 있는지, 내 목록에 이름이 있는지 확인한 뒤 새로고침을 눌러 보세요.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 큰 파일을 전체 공지에 보내려고 하니 안 됩니다.</div>
+        <div class="a">A. 맞습니다. 큰 파일은 한 사람 또는 그룹으로만 보내 주세요.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 글자가 너무 작아요.</div>
+        <div class="a">A. 환경 설정에서 글씨 크기를 키운 뒤 「설정 저장」을 누르세요.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Q. 도움이 더 필요하면?</div>
+        <div class="a">A. 전산·메신저 담당자에게 문의하거나, 상세 문서 <b>docs/기능-설명서.md</b> 를 참고하세요.</div>
+      </div>
+
+      <div class="callout">
+        <b>기억할 단축키 2개</b><br />
+        창 열기 <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span class="kbd">S</span>
+        &nbsp;·&nbsp;
+        전체 기록 <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span class="kbd">E</span>
+      </div>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">9</span>
+      </div>
+    </section>
+
+    <!-- 10. 한 장 요약 -->
+    <section class="page">
+      <div class="section-kicker">08</div>
+      <h2>한 장 요약 · 책상에 붙여 두기</h2>
+
+      <div class="summary-box">
+        <h3>매일 쓰는 순서</h3>
+        <ol>
+          <li>오른쪽 아래 아이콘 → 오른쪽 클릭 → <b>메시지 보내기</b></li>
+          <li>왼쪽에서 <b>사람 이름</b> 클릭</li>
+          <li>글 쓰고 <b>전송</b> (또는 Enter)</li>
+          <li>사진은 <b>Ctrl+V</b> 또는 📎 / 화면은 📷</li>
+        </ol>
+      </div>
+
+      <h3 style="margin-top:7mm;">버튼 빠른 안내</h3>
+      <table class="simple">
+        <tr><th>📎</th><td>파일 보내기</td></tr>
+        <tr><th>📷</th><td>화면 캡처</td></tr>
+        <tr><th>💬</th><td>빠른 문구</td></tr>
+        <tr><th>🚨</th><td>긴급 메시지</td></tr>
+        <tr><th>⚙️</th><td>환경 설정 · 업데이트</td></tr>
+        <tr><th>📋</th><td>일정 현황판</td></tr>
+        <tr><th>✉️</th><td>쪽지 (채팅방 없이)</td></tr>
+      </table>
+
+      <div class="callout warn">
+        <b>창 X = 숨기기</b> &nbsp;/&nbsp; <b>트레이 「종료」= 완전히 끄기</b><br />
+        메신저가 켜져 있어야 메시지를 받을 수 있습니다.
+      </div>
+
+      <div class="callout ok">
+        <b>미래병원 사내 메신저</b><br />
+        문의: 전산·메신저 담당 &nbsp;·&nbsp; 사용 중 새 버전이 있으면 설정에서 「지금 확인」
+      </div>
+
+      <p style="margin-top:8mm;font-size:10.5pt;color:var(--muted);text-align:center;">
+        — 이 페이지는 잘라서 모니터 옆·책상에 붙여 두셔도 됩니다 —
+      </p>
+
+      <div class="page-foot">
+        <span>미래병원 사내 메신저 사용 안내</span>
+        <span class="page-num">10</span>
+      </div>
+    </section>
+
+  </div>
+</body>
+</html>
