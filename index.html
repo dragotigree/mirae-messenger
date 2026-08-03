@@ -1610,6 +1610,81 @@
     .schedule-board-modal-card.sb-mode-main #schedule-board-ward-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-search-filter-row { display: none !important; }
     .schedule-board-modal-card.sb-mode-admit .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
+    .sb-admit-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+      margin: 4px 2px 10px;
+      min-width: 0;
+    }
+    .sb-admit-split.sb-admit-split--single { grid-template-columns: 1fr; }
+    .sb-admit-col {
+      min-width: 0;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .sb-admit-col-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .sb-admit-col--admission .sb-admit-col-head {
+      background: linear-gradient(180deg, #ecfdf5, #f0fdf4);
+      color: #166534;
+    }
+    .sb-admit-col--discharge .sb-admit-col-head {
+      background: linear-gradient(180deg, #fef2f2, #fff1f2);
+      color: #b91c1c;
+    }
+    .sb-admit-col-head .sb-count {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      background: rgba(255,255,255,0.75);
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .sb-admit-col-body { padding: 8px; max-height: min(62vh, 720px); overflow: auto; }
+    .sb-admit-col-body .schedule-board-section { margin: 0 0 10px; }
+    .sb-admit-col-body .schedule-board-section:last-child { margin-bottom: 0; }
+    .sb-admit-col-empty {
+      text-align: center;
+      padding: 28px 12px;
+      color: #94a3b8;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+    .sb-admit-transfer {
+      margin: 0 2px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .sb-admit-transfer-head {
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #1d4ed8;
+      background: linear-gradient(180deg, #eff6ff, #f8fafc);
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sb-admit-transfer-body { padding: 8px; }
+    @media (max-width: 1100px) {
+      .sb-admit-split { grid-template-columns: 1fr; }
+    }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
     .sb-main-board-wrap {
       margin: 4px 2px 12px; padding: 18px 16px 14px; overflow-x: auto;
@@ -3077,7 +3152,7 @@
         <aside class="sb-board-side">
           <div class="schedule-board-view-tabs">
             <button type="button" class="schedule-board-view-tab active" data-sb-view="main" onclick="setScheduleBoardView('main')">메인</button>
-            <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')">병동별</button>
+            <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')">병동/주치의별</button>
             <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')">입/퇴원</button>
           </div>
           <div class="sb-filter-panel">
@@ -4260,7 +4335,11 @@
     ];
     const SCHEDULE_BOARD_RM_ROWS = ['4', '6', '7', '8', '9'];
     const SCHEDULE_BOARD_RM_ROW_BG = { '4': 'rm4', '6': 'rm6', '7': 'rm7', '8': 'rm8', '9': 'rm9' };
-    const SCHEDULE_BOARD_TYPE_CHIP_KEYS = ['OUTPATIENT', 'OUTING', 'OVERNIGHT', 'ADMISSION', 'DISCHARGE', 'TRANSFER'];
+    /** 메인·병동/주치의별 빠른등록·구분 칩 */
+    const SCHEDULE_BOARD_FLOW_TYPES = ['OUTPATIENT', 'OUTING', 'OVERNIGHT'];
+    /** 입/퇴원 탭 빠른등록·구분 칩 */
+    const SCHEDULE_BOARD_ADMIT_TYPES = ['ADMISSION', 'DISCHARGE', 'TRANSFER'];
+    const SCHEDULE_BOARD_TYPE_CHIP_KEYS = SCHEDULE_BOARD_FLOW_TYPES.concat(SCHEDULE_BOARD_ADMIT_TYPES);
     let scheduleBoardDateStr = '';
     let scheduleBoardEditingUid = null;
     let scheduleBoardQuickPanelOpen = false;
@@ -11710,19 +11789,20 @@
       syncScheduleBoardTypeChipActive();
       scheduleBoardDoctorFilter = 'all';
       syncScheduleBoardDoctorChipActive();
+      refreshScheduleBoardQuickTypeOptions();
       const quickType = document.getElementById('sb-quick-type');
       if (quickType) quickType.value = 'OUTPATIENT';
     }
 
     function scheduleBoardMainSelectedTypeLabels() {
-      return SCHEDULE_BOARD_TYPE_CHIP_KEYS
+      return SCHEDULE_BOARD_FLOW_TYPES
         .filter((k) => scheduleBoardMainTypeFilters.has(k))
         .map((k) => SCHEDULE_TYPE_ORDER.find((m) => m.key === k)?.label || k);
     }
 
     function syncScheduleBoardTypeChipActive() {
       const isMain = scheduleBoardView === 'main';
-      const allMainSelected = SCHEDULE_BOARD_TYPE_CHIP_KEYS.every((k) => scheduleBoardMainTypeFilters.has(k));
+      const allMainSelected = SCHEDULE_BOARD_FLOW_TYPES.every((k) => scheduleBoardMainTypeFilters.has(k));
       document.querySelectorAll('#schedule-board-type-chips .schedule-board-chip').forEach((btn) => {
         const key = btn.getAttribute('data-type');
         if (isMain) {
@@ -11736,9 +11816,9 @@
 
     function toggleScheduleBoardMainTypeFilter(key) {
       if (key === 'all') {
-        const allSelected = SCHEDULE_BOARD_TYPE_CHIP_KEYS.every((k) => scheduleBoardMainTypeFilters.has(k));
+        const allSelected = SCHEDULE_BOARD_FLOW_TYPES.every((k) => scheduleBoardMainTypeFilters.has(k));
         if (allSelected) scheduleBoardMainTypeFilters = new Set(['OUTPATIENT']);
-        else scheduleBoardMainTypeFilters = new Set(SCHEDULE_BOARD_TYPE_CHIP_KEYS);
+        else scheduleBoardMainTypeFilters = new Set(SCHEDULE_BOARD_FLOW_TYPES);
       } else if (scheduleBoardMainTypeFilters.has(key)) {
         if (scheduleBoardMainTypeFilters.size <= 1) return;
         scheduleBoardMainTypeFilters.delete(key);
@@ -11773,16 +11853,22 @@
       if (searchRow) searchRow.style.display = isMain ? 'none' : 'flex';
     }
 
+    function getScheduleBoardQuickTypeKeys() {
+      return scheduleBoardView === 'admit'
+        ? SCHEDULE_BOARD_ADMIT_TYPES.slice()
+        : SCHEDULE_BOARD_FLOW_TYPES.slice();
+    }
+
     function getScheduleBoardTypeChipDefs() {
       if (scheduleBoardView === 'admit') {
-        return [
-          { key: 'all', label: '전체' },
-          { key: 'ADMISSION', label: '입원' },
-          { key: 'DISCHARGE', label: '퇴원' }
-        ];
+        return [{ key: 'all', label: '전체' }].concat(
+          SCHEDULE_BOARD_ADMIT_TYPES.map((k) => SCHEDULE_TYPE_ORDER.find((m) => m.key === k))
+            .filter(Boolean)
+            .map((m) => ({ key: m.key, label: m.label }))
+        );
       }
       return [{ key: 'all', label: '전체' }].concat(
-        SCHEDULE_BOARD_TYPE_CHIP_KEYS.map((k) => SCHEDULE_TYPE_ORDER.find((m) => m.key === k))
+        SCHEDULE_BOARD_FLOW_TYPES.map((k) => SCHEDULE_TYPE_ORDER.find((m) => m.key === k))
           .filter(Boolean)
           .map((m) => ({ key: m.key, label: m.label }))
       );
@@ -11796,13 +11882,25 @@
         `<button type="button" class="schedule-board-chip" data-type="${c.key}" onclick="setScheduleBoardTypeFilter('${c.key}')">${c.label}</button>`
       ).join('');
       typeHost.dataset.inited = '1';
-      if (scheduleBoardView === 'admit'
-        && scheduleBoardTypeFilter !== 'all'
-        && scheduleBoardTypeFilter !== 'ADMISSION'
-        && scheduleBoardTypeFilter !== 'DISCHARGE') {
+      const allowed = new Set(chips.map((c) => c.key));
+      if (scheduleBoardView !== 'main' && scheduleBoardTypeFilter !== 'all' && !allowed.has(scheduleBoardTypeFilter)) {
         scheduleBoardTypeFilter = 'all';
       }
       syncScheduleBoardTypeChipActive();
+    }
+
+    function refreshScheduleBoardQuickTypeOptions() {
+      const typeSel = document.getElementById('sb-quick-type');
+      if (!typeSel) return;
+      const keys = getScheduleBoardQuickTypeKeys();
+      const prev = typeSel.value;
+      typeSel.innerHTML = keys.map((k) => {
+        const m = SCHEDULE_TYPE_ORDER.find((x) => x.key === k);
+        return m ? `<option value="${m.key}">${m.label}</option>` : '';
+      }).join('');
+      typeSel.dataset.inited = '1';
+      if (keys.includes(prev)) typeSel.value = prev;
+      else typeSel.value = defaultScheduleBoardQuickType();
     }
 
     function scheduleBoardRmKey(sch, norm) {
@@ -11884,7 +11982,7 @@
 
     function scheduleBoardMainTypeFilterPass(sch) {
       const t = sch.type || 'GENERAL';
-      if (!SCHEDULE_BOARD_TYPE_CHIP_KEYS.includes(t)) return false;
+      if (!SCHEDULE_BOARD_FLOW_TYPES.includes(t)) return false;
       return scheduleBoardMainTypeFilters.has(t);
     }
 
@@ -12229,12 +12327,18 @@
     }
 
     function defaultScheduleBoardQuickType() {
-      if (scheduleBoardView === 'main' && scheduleBoardMainTypeFilters.size) {
-        if (scheduleBoardMainTypeFilters.has('OUTPATIENT')) return 'OUTPATIENT';
-        return [...scheduleBoardMainTypeFilters][0];
+      const allowed = getScheduleBoardQuickTypeKeys();
+      if (scheduleBoardView === 'admit') {
+        if (allowed.includes(scheduleBoardTypeFilter)) return scheduleBoardTypeFilter;
+        return 'ADMISSION';
       }
-      if (scheduleBoardTypeFilter && scheduleBoardTypeFilter !== 'all') return scheduleBoardTypeFilter;
-      return 'OUTPATIENT';
+      if (scheduleBoardView === 'main' && scheduleBoardMainTypeFilters.size) {
+        if (scheduleBoardMainTypeFilters.has('OUTPATIENT') && allowed.includes('OUTPATIENT')) return 'OUTPATIENT';
+        const first = [...scheduleBoardMainTypeFilters].find((k) => allowed.includes(k));
+        if (first) return first;
+      }
+      if (allowed.includes(scheduleBoardTypeFilter)) return scheduleBoardTypeFilter;
+      return allowed[0] || 'OUTPATIENT';
     }
 
     const SB_QUICK_PREFS_KEY = 'mirae_schedule_board_quick_prefs';
@@ -12262,11 +12366,12 @@
 
     function applyScheduleBoardQuickPrefs() {
       const prefs = loadScheduleBoardQuickPrefs();
-      const wardSel = document.getElementById('sb-quick-ward');
-      if (prefs.type) {
+      const allowedTypes = getScheduleBoardQuickTypeKeys();
+      if (prefs.type && allowedTypes.includes(prefs.type)) {
         const typeSel = document.getElementById('sb-quick-type');
         if (typeSel && [...typeSel.options].some(o => o.value === prefs.type)) typeSel.value = prefs.type;
       }
+      const wardSel = document.getElementById('sb-quick-ward');
       if (prefs.ward && wardSel && !wardSel.value) wardSel.value = prefs.ward;
       if (prefs.doctor) {
         ensureAttendingPhysicianSelectOptions(document.getElementById('sb-quick-doctor'), prefs.doctor);
@@ -12487,13 +12592,7 @@
     function initScheduleBoardQuickAddUi() {
       const typeSel = document.getElementById('sb-quick-type');
       if (!typeSel) return;
-      if (!typeSel.dataset.inited) {
-        typeSel.dataset.inited = '1';
-        typeSel.innerHTML = SCHEDULE_BOARD_TYPE_CHIP_KEYS.map(k => {
-          const m = SCHEDULE_TYPE_ORDER.find(x => x.key === k);
-          return m ? `<option value="${m.key}">${m.label}</option>` : '';
-        }).join('');
-      }
+      refreshScheduleBoardQuickTypeOptions();
       typeSel.value = defaultScheduleBoardQuickType();
       const wardSel = document.getElementById('sb-quick-ward');
       if (wardSel && scheduleBoardWardTab !== 'all') wardSel.value = scheduleBoardWardTab;
@@ -12831,7 +12930,7 @@
     }
 
     function setScheduleBoardView(view) {
-      // 예전「주치의별」은 병동별에 합침
+      // 예전「주치의별」은 병동/주치의별에 합침
       if (view === 'rm' || view === 'doctor') view = 'ward';
       const prevView = scheduleBoardView;
       scheduleBoardView = view;
@@ -12845,12 +12944,8 @@
           btn.classList.toggle('active', btn.getAttribute('data-ward') === 'all');
         });
         syncScheduleBoardDoctorChipActive();
-        const quickType = document.getElementById('sb-quick-type');
-        if (quickType && [...quickType.options].some((o) => o.value === 'ADMISSION')) {
-          quickType.value = 'ADMISSION';
-        }
       } else {
-        // 병동별: 모든 구분이 보이도록 전체
+        // 병동/주치의별: 외진·외출·외박이 보이도록 전체
         scheduleBoardTypeFilter = 'all';
       }
       try { localStorage.setItem('mirae_schedule_board_view', view); } catch (e) { /* ignore */ }
@@ -12858,6 +12953,7 @@
         btn.classList.toggle('active', btn.getAttribute('data-sb-view') === view);
       });
       refreshScheduleBoardTypeChips();
+      refreshScheduleBoardQuickTypeOptions();
       updateScheduleBoardSideFiltersUi();
       const card = document.querySelector('#schedule-board-modal .schedule-board-modal-card');
       if (card) {
@@ -12986,7 +13082,14 @@
       return getSchedulesForDate(scheduleBoardDateStr).filter(s => {
         const t = s.type || 'GENERAL';
         if (scheduleBoardView === 'admit') {
-          if (t !== 'ADMISSION' && t !== 'DISCHARGE') return false;
+          if (!SCHEDULE_BOARD_ADMIT_TYPES.includes(t)) return false;
+        } else if (scheduleBoardView === 'ward') {
+          if (!SCHEDULE_BOARD_FLOW_TYPES.includes(t)) return false;
+        } else if (scheduleBoardView === 'main') {
+          // 메인 주간표는 scheduleBoardMainTypeFilterPass에서 다시 거름
+          if (!SCHEDULE_BOARD_FLOW_TYPES.includes(t) && t !== 'GENERAL' && t !== 'LEAVE') {
+            if (SCHEDULE_BOARD_ADMIT_TYPES.includes(t)) return false;
+          }
         }
         if (scheduleBoardTypeFilter !== 'all' && t !== scheduleBoardTypeFilter) return false;
         if (!SCHEDULE_BOARD_TYPE_CHIP_KEYS.includes(t) && scheduleBoardTypeFilter === 'all') {
@@ -13444,20 +13547,71 @@
         return;
       }
 
+      if (scheduleBoardView === 'admit') {
+        renderScheduleBoardAdmitSplit(body, list);
+        return;
+      }
+
       if (list.length === 0) {
         body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
         return;
       }
 
+      body.innerHTML = '';
+      appendScheduleBoardGroupedSections(body, list);
+    }
+
+    function appendScheduleBoardDataRow(tbody, sch) {
+      const norm = normalizeSchedulePatient(sch);
+      const row = document.createElement('tr');
+      const modMeta = formatScheduleModifiedMeta(sch);
+      row.className = 'schedule-board-data-row'
+        + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
+      const typeCell = scheduleTypeCellHtml(sch);
+      const detail = scheduleBoardDetailText(sch, norm);
+      const canRowManage = canModifySchedule(sch);
+      const manageHtml = `<button type="button" class="sb-copy" title="복사" aria-label="복사">📋</button>` +
+        (canRowManage
+          ? `<button type="button" class="sb-edit" title="수정" aria-label="수정">✏️</button>
+           <button type="button" class="sb-del" title="삭제" aria-label="삭제">🗑️</button>`
+          : '');
+      const attending = scheduleBoardAttendingLabel(sch, norm);
+      const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
+      const endLabel = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
+      const timeHtml = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch))
+        ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
+        : `<span>${escapeHtml(startLabel)}</span>`;
+      const doctorHtml = attending
+        ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>`
+        : '—';
+      row.innerHTML = [
+        `<td class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</td>`,
+        `<td class="schedule-board-name sb-col-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '-')}</td>`,
+        `<td class="sb-col-doctor">${doctorHtml}</td>`,
+        `<td class="sb-col-type">${typeCell}</td>`,
+        `<td class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</td>`,
+        `<td class="sb-col-remark">${scheduleBoardRemarkCellHtml(sch)}</td>`,
+        `<td class="sb-col-meal">${scheduleBoardMealCellHtml(sch)}</td>`,
+        `<td class="sb-col-time"><div class="schedule-board-times">${timeHtml}</div></td>`,
+        `<td class="sb-col-btns"><div class="schedule-board-row-btns">${manageHtml}</div></td>`
+      ].join('');
+      tbody.appendChild(row);
+      row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
+      row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
+      row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
+      bindScheduleBoardModifiedHover(row, modMeta);
+      bindScheduleBoardRemarkHover(row);
+    }
+
+    function appendScheduleBoardGroupedSections(container, list) {
       const groups = new Map();
-      list.forEach(sch => {
+      list.forEach((sch) => {
         const norm = normalizeSchedulePatient(sch);
         const key = scheduleBoardGroupKey(sch, norm);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(sch);
       });
 
-      const isReferral = false;
       const sortKeys = [...groups.keys()];
       sortKeys.sort((a, b) => {
         const ia = SCHEDULE_BOARD_WARDS.indexOf(a);
@@ -13468,9 +13622,7 @@
         return ia - ib;
       });
 
-      body.innerHTML = '';
-      if (isReferral) appendScheduleBoardColumnHeader(body, true);
-      sortKeys.forEach(groupKey => {
+      sortKeys.forEach((groupKey) => {
         const items = groups.get(groupKey);
         const sec = document.createElement('div');
         sec.className = 'schedule-board-section ' + scheduleBoardSectionClass(groupKey);
@@ -13479,88 +13631,83 @@
         const mealSummary = summarizeScheduleMealCancels(items);
         head.innerHTML = `<span>${escapeHtml(scheduleBoardGroupTitle(groupKey))}<span class="sb-count">${items.length}건</span>${mealSummary ? `<span class="sb-meal-summary">${escapeHtml(mealSummary)}</span>` : ''}</span>
           <div class="schedule-board-section-actions">
-            <button type="button" class="sb-copy-section">${isReferral ? '의뢰복사' : '복사'}</button>
+            <button type="button" class="sb-copy-section">복사</button>
             <button type="button" class="sb-excel-section">엑셀 추출</button>
           </div>`;
         head.querySelector('.sb-copy-section')?.addEventListener('click', () => copyScheduleBoardSection(groupKey, items));
         head.querySelector('.sb-excel-section')?.addEventListener('click', () => exportScheduleBoardExcelGroup(groupKey, items));
         sec.appendChild(head);
 
-        let table = null;
-        let tbody = null;
-        if (!isReferral) {
-          table = document.createElement('table');
-          table.className = 'schedule-board-table';
-          table.innerHTML = scheduleBoardTableColgroupHtml() + scheduleBoardTableHeadHtml() + '<tbody></tbody>';
-          tbody = table.querySelector('tbody');
-          sec.appendChild(table);
-        }
-
-        items.forEach(sch => {
-          const norm = normalizeSchedulePatient(sch);
-          const row = document.createElement(isReferral ? 'div' : 'tr');
-          const modMeta = formatScheduleModifiedMeta(sch);
-          row.className = (isReferral ? 'schedule-board-row sb-referral-row' : 'schedule-board-data-row')
-            + (sch.uid === scheduleBoardEditingUid ? ' is-editing' : '');
-          const typeCell = scheduleTypeCellHtml(sch);
-          const detail = scheduleBoardDetailText(sch, norm);
-          const canRowManage = canModifySchedule(sch);
-          const copyLabel = isReferral ? '의뢰복사' : '복사';
-          const copyIcon = isReferral ? '📄' : '📋';
-          const manageHtml = `<button type="button" class="sb-copy" title="${copyLabel}" aria-label="${copyLabel}">${copyIcon}</button>` +
-            (canRowManage && !isReferral
-              ? `<button type="button" class="sb-edit" title="수정" aria-label="수정">✏️</button>
-               <button type="button" class="sb-del" title="삭제" aria-label="삭제">🗑️</button>`
-              : (canRowManage && isReferral
-                ? `<button type="button" class="sb-edit" title="수정" aria-label="수정">✏️</button>`
-                : ''));
-          const attending = scheduleBoardAttendingLabel(sch, norm);
-          if (isReferral) {
-            const wardLbl = scheduleBoardWardShortLabel(norm) || '-';
-            const startT = isScheduleStartUndecided(sch) ? '미정' : (sch.time_str ? formatScheduleTime(sch.time_str) : '-');
-            const endT = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '-');
-            row.innerHTML = [
-              `<span class="schedule-board-ward-col sb-col-ward">${escapeHtml(wardLbl)}</span>`,
-              `<span class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</span>`,
-              `<span class="schedule-board-name sb-col-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '-')}</span>`,
-              `<div class="sb-col-type">${typeCell}</div>`,
-              `<span class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</span>`,
-              `<span class="schedule-board-time-cell sb-col-tstart">${escapeHtml(startT)}</span>`,
-              `<span class="schedule-board-time-cell sb-col-tend">${escapeHtml(endT)}</span>`,
-              `<span class="schedule-board-doctor sb-col-doctor" title="RM·주치의">${escapeHtml(attending || '-')}</span>`,
-              `<div class="schedule-board-row-btns sb-col-btns">${manageHtml}</div>`
-            ].join('');
-            sec.appendChild(row);
-          } else {
-            const startLabel = isScheduleStartUndecided(sch) ? '미정' : formatScheduleTime(sch.time_str);
-            const endLabel = isScheduleEndUndecided(sch) ? '미정' : (sch.time_end_str ? formatScheduleTime(sch.time_end_str) : '');
-            const timeHtml = (SCHEDULE_RANGE_TYPES.has(sch.type || '') || sch.time_end_str || isScheduleEndUndecided(sch))
-              ? `<span>출발 ${escapeHtml(startLabel)}</span><span>귀원 ${escapeHtml(endLabel || '미정')}</span>`
-              : `<span>${escapeHtml(startLabel)}</span>`;
-            const doctorHtml = attending
-              ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>`
-              : '—';
-            row.innerHTML = [
-              `<td class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</td>`,
-              `<td class="schedule-board-name sb-col-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '-')}</td>`,
-              `<td class="sb-col-doctor">${doctorHtml}</td>`,
-              `<td class="sb-col-type">${typeCell}</td>`,
-              `<td class="schedule-board-detail sb-col-detail">${escapeHtml(detail || '')}</td>`,
-              `<td class="sb-col-remark">${scheduleBoardRemarkCellHtml(sch)}</td>`,
-              `<td class="sb-col-meal">${scheduleBoardMealCellHtml(sch)}</td>`,
-              `<td class="sb-col-time"><div class="schedule-board-times">${timeHtml}</div></td>`,
-              `<td class="sb-col-btns"><div class="schedule-board-row-btns">${manageHtml}</div></td>`
-            ].join('');
-            tbody.appendChild(row);
-          }
-          row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
-          row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
-          row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
-          bindScheduleBoardModifiedHover(row, modMeta);
-          bindScheduleBoardRemarkHover(row);
-        });
-        body.appendChild(sec);
+        const table = document.createElement('table');
+        table.className = 'schedule-board-table';
+        table.innerHTML = scheduleBoardTableColgroupHtml() + scheduleBoardTableHeadHtml() + '<tbody></tbody>';
+        const tbody = table.querySelector('tbody');
+        sec.appendChild(table);
+        items.forEach((sch) => appendScheduleBoardDataRow(tbody, sch));
+        container.appendChild(sec);
       });
+    }
+
+    function buildScheduleBoardAdmitColumn(title, kindClass, items) {
+      const col = document.createElement('div');
+      col.className = `sb-admit-col sb-admit-col--${kindClass}`;
+      const head = document.createElement('div');
+      head.className = 'sb-admit-col-head';
+      head.innerHTML = `<span>${escapeHtml(title)}</span><span class="sb-count">${items.length}건</span>`;
+      const body = document.createElement('div');
+      body.className = 'sb-admit-col-body';
+      if (!items.length) {
+        body.innerHTML = `<div class="sb-admit-col-empty">${escapeHtml(title)} 일정이 없습니다.</div>`;
+      } else {
+        appendScheduleBoardGroupedSections(body, items);
+      }
+      col.appendChild(head);
+      col.appendChild(body);
+      return col;
+    }
+
+    function renderScheduleBoardAdmitSplit(body, list) {
+      const filter = scheduleBoardTypeFilter;
+      const admissions = list.filter((s) => (s.type || '') === 'ADMISSION');
+      const discharges = list.filter((s) => (s.type || '') === 'DISCHARGE');
+      const transfers = list.filter((s) => (s.type || '') === 'TRANSFER');
+
+      body.innerHTML = '';
+
+      if (!list.length) {
+        body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
+        return;
+      }
+
+      const showAdmission = filter === 'all' || filter === 'ADMISSION';
+      const showDischarge = filter === 'all' || filter === 'DISCHARGE';
+      const showTransfer = filter === 'all' || filter === 'TRANSFER';
+
+      if (showAdmission || showDischarge) {
+        const split = document.createElement('div');
+        split.className = 'sb-admit-split' + ((showAdmission && showDischarge) ? '' : ' sb-admit-split--single');
+        if (showAdmission) split.appendChild(buildScheduleBoardAdmitColumn('입원', 'admission', admissions));
+        if (showDischarge) split.appendChild(buildScheduleBoardAdmitColumn('퇴원', 'discharge', discharges));
+        body.appendChild(split);
+      }
+
+      if (showTransfer && (filter === 'TRANSFER' || transfers.length)) {
+        const wrap = document.createElement('div');
+        wrap.className = 'sb-admit-transfer';
+        const head = document.createElement('div');
+        head.className = 'sb-admit-transfer-head';
+        head.innerHTML = `<span>전원</span><span class="sb-count">${transfers.length}건</span>`;
+        const tbody = document.createElement('div');
+        tbody.className = 'sb-admit-transfer-body';
+        if (!transfers.length) {
+          tbody.innerHTML = '<div class="sb-admit-col-empty">전원 일정이 없습니다.</div>';
+        } else {
+          appendScheduleBoardGroupedSections(tbody, transfers);
+        }
+        wrap.appendChild(head);
+        wrap.appendChild(tbody);
+        body.appendChild(wrap);
+      }
     }
 
     function formatDateStr(d) {
