@@ -1610,81 +1610,6 @@
     .schedule-board-modal-card.sb-mode-main #schedule-board-ward-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-search-filter-row { display: none !important; }
     .schedule-board-modal-card.sb-mode-admit .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
-    .sb-admit-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      align-items: start;
-      margin: 4px 2px 10px;
-      min-width: 0;
-    }
-    .sb-admit-split.sb-admit-split--single { grid-template-columns: 1fr; }
-    .sb-admit-col {
-      min-width: 0;
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .sb-admit-col-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 10px 12px;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .sb-admit-col--admission .sb-admit-col-head {
-      background: linear-gradient(180deg, #ecfdf5, #f0fdf4);
-      color: #166534;
-    }
-    .sb-admit-col--discharge .sb-admit-col-head {
-      background: linear-gradient(180deg, #fef2f2, #fff1f2);
-      color: #b91c1c;
-    }
-    .sb-admit-col-head .sb-count {
-      font-size: 11px;
-      font-weight: 700;
-      color: #64748b;
-      background: rgba(255,255,255,0.75);
-      border-radius: 999px;
-      padding: 2px 8px;
-    }
-    .sb-admit-col-body { padding: 8px; max-height: min(62vh, 720px); overflow: auto; }
-    .sb-admit-col-body .schedule-board-section { margin: 0 0 10px; }
-    .sb-admit-col-body .schedule-board-section:last-child { margin-bottom: 0; }
-    .sb-admit-col-empty {
-      text-align: center;
-      padding: 28px 12px;
-      color: #94a3b8;
-      font-size: 12.5px;
-      line-height: 1.5;
-    }
-    .sb-admit-transfer {
-      margin: 0 2px 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #fff;
-    }
-    .sb-admit-transfer-head {
-      padding: 10px 12px;
-      font-size: 13px;
-      font-weight: 800;
-      color: #1d4ed8;
-      background: linear-gradient(180deg, #eff6ff, #f8fafc);
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .sb-admit-transfer-body { padding: 8px; }
-    @media (max-width: 1100px) {
-      .sb-admit-split { grid-template-columns: 1fr; }
-    }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
     .sb-main-board-wrap {
       margin: 4px 2px 12px; padding: 18px 16px 14px; overflow-x: auto;
@@ -13707,35 +13632,6 @@
         items.forEach((sch) => appendScheduleBoardDataRow(tbody, sch));
         container.appendChild(sec);
       });
-    }
-
-    function buildScheduleBoardAdmitColumn(title, kindClass, items) {
-      /* 입/퇴원은 단일 목록으로 표시 (좌우 분할 미사용) */
-      const col = document.createElement('div');
-      col.className = `sb-admit-col sb-admit-col--${kindClass}`;
-      const head = document.createElement('div');
-      head.className = 'sb-admit-col-head';
-      head.innerHTML = `<span>${escapeHtml(title)}</span><span class="sb-count">${items.length}건</span>`;
-      const body = document.createElement('div');
-      body.className = 'sb-admit-col-body';
-      if (!items.length) {
-        body.innerHTML = `<div class="sb-admit-col-empty">${escapeHtml(title)} 일정이 없습니다.</div>`;
-      } else {
-        appendScheduleBoardGroupedSections(body, items);
-      }
-      col.appendChild(head);
-      col.appendChild(body);
-      return col;
-    }
-
-    function renderScheduleBoardAdmitSplit(body, list) {
-      /* 호환용: 단일 목록으로 렌더 */
-      if (!list.length) {
-        body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
-        return;
-      }
-      body.innerHTML = '';
-      appendScheduleBoardGroupedSections(body, list);
     }
 
     function formatDateStr(d) {
