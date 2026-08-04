@@ -375,6 +375,49 @@
     .user-card-item { display: flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box; padding: 3px 8px; border-radius: var(--radius-sm); margin: 0 2px 0 2px; cursor: pointer; transition: background var(--transition-fast), opacity var(--transition-fast); min-height: 0; }
     .user-card-item:hover { background: var(--sidebar-hover); }
     .user-card-item.active { background: var(--sidebar-active) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+    .user-card-item.is-multi-selected {
+      background: rgba(56, 189, 248, 0.22) !important;
+      box-shadow: inset 0 0 0 1.5px rgba(125, 211, 252, 0.85);
+    }
+    .user-card-item.is-multi-selected:hover { background: rgba(56, 189, 248, 0.3) !important; }
+    .compact-list-item-user.is-multi-selected {
+      background: #e0f2fe !important;
+      box-shadow: inset 3px 0 0 #0ea5e9;
+    }
+    #user-multi-select-bar {
+      display: none; flex-shrink: 0; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 0 8px 8px; padding: 8px 10px; border-radius: 12px;
+      background: rgba(14, 165, 233, 0.16); border: 1px solid rgba(125, 211, 252, 0.35);
+    }
+    #user-multi-select-bar.is-visible { display: flex; }
+    #user-multi-select-count {
+      flex: 1; min-width: 0; font-size: 11.5px; font-weight: 700; color: #e0f2fe; letter-spacing: -0.02em;
+    }
+    #user-multi-select-bar .ums-btn {
+      border: none; border-radius: 9px; padding: 6px 10px; font-size: 11px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; transition: background 0.12s, transform 0.12s;
+    }
+    #user-multi-select-bar .ums-btn:hover { transform: translateY(-1px); }
+    #user-multi-select-bar .ums-btn-clear {
+      background: rgba(255,255,255,0.12); color: #e2e8f0;
+    }
+    #user-multi-select-bar .ums-btn-group {
+      background: #0ea5e9; color: #fff;
+    }
+    .compact-multi-select-bar {
+      display: none; flex-shrink: 0; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 0 12px 10px; padding: 8px 10px; border-radius: 12px;
+      background: #e0f2fe; border: 1px solid #bae6fd;
+    }
+    .compact-multi-select-bar.is-visible { display: flex; }
+    .compact-multi-select-bar .ums-count {
+      flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: #0369a1;
+    }
+    .compact-multi-select-bar .ums-btn {
+      border: none; border-radius: 9px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    }
+    .compact-multi-select-bar .ums-btn-clear { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+    .compact-multi-select-bar .ums-btn-group { background: #0284c7; color: #fff; }
     .user-card-item.is-search-nav {
       background: rgba(56, 189, 248, 0.22) !important;
       box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.55);
@@ -2696,11 +2739,17 @@
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span>👥 사용자</span>
           </span>
+          <span style="font-size:10px; font-weight:600; color:var(--sidebar-text-dim); letter-spacing:-0.02em;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">Ctrl+클릭 다중선택</span>
         </div>
         <div class="user-search-box" id="user-search-box">
           <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
         </div>
         <div id="user-list-tree"></div>
+        <div id="user-multi-select-bar" aria-live="polite">
+          <span id="user-multi-select-count">0명 선택</span>
+          <button type="button" class="ums-btn ums-btn-clear" onclick="clearSidebarUserSelection()">해제</button>
+          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹 만들기</button>
+        </div>
       </div>
 
       <div id="sidebar-block-channels" class="sidebar-main-block" data-sidebar-block="channels">
@@ -2812,6 +2861,11 @@
               <span id="compact-more-version"></span>
             </div>
           </div>
+        </div>
+        <div id="compact-multi-select-bar" class="compact-multi-select-bar" aria-live="polite">
+          <span class="ums-count" id="compact-multi-select-count">0명 선택</span>
+          <button type="button" class="ums-btn ums-btn-clear" onclick="clearSidebarUserSelection()">해제</button>
+          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹 만들기</button>
         </div>
       </div>
     </div>
@@ -5257,6 +5311,10 @@
     })();
 
     let groupModalPrefillUser = null;
+    let groupModalPrefillIps = new Set();
+    let sidebarSelectedUserIps = new Set();
+    let sidebarSelectAnchorIp = null;
+
     let collapsedGroups = new Set(JSON.parse(localStorage.getItem('collapsedGroups') || '[]'));
     function toggleGroupCollapse(collapseKey) {
       if (collapsedGroups.has(collapseKey)) collapsedGroups.delete(collapseKey);
@@ -6500,7 +6558,7 @@
       const previewRow = preview
         ? `<div class="compact-item-bottom"><span class="compact-item-preview">${escapeHtml(preview)}</span>${unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : ''}</div>`
         : (unread > 0 ? `<div class="compact-item-bottom"><span class="compact-item-preview"></span><span class="unread-badge">${formatUnreadBadge(unread)}</span></div>` : '');
-      item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${preview ? '' : ' is-single-line'}`;
+      item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${sidebarSelectedUserIps.has(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
       item.dataset.userIp = u.ip;
       item.innerHTML = `
         <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
@@ -6512,7 +6570,7 @@
           ${previewRow}
         </div>
       `;
-      item.onclick = () => selectUserChat(u);
+      item.onclick = (e) => handleSidebarUserClick(u, e);
       item.oncontextmenu = (e) => showUserContextMenu(e, u);
       bindUserDragSource(item, u);
       container.appendChild(item);
@@ -6733,7 +6791,7 @@
         avatarClass: isUsableProfilePhoto(u.photo) ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip),
         avatarHtml: avatarInnerHtml(u.username, u.photo, u.ip),
         user: u,
-        onClick: () => selectUserChat(u),
+        onClick: (e) => handleSidebarUserClick(u, e),
         isOnline: !!u.online,
         isFavorite: fav,
         searchText: [u.username, u.rank, u.dept, u.floor, u.extNo].filter(Boolean).join(' ')
@@ -6743,7 +6801,7 @@
     function appendCompactConversationItem(container, row) {
       const item = document.createElement('div');
       const active = row.user && isCompactChatActive(row.user.ip);
-      item.className = `compact-list-item compact-list-item-chat${active ? ' is-active' : ''}${row.kind === 'dm' && !row.isOnline ? ' is-offline' : ''}`;
+      item.className = `compact-list-item compact-list-item-chat${row.kind === 'dm' ? ' compact-list-item-user' : ''}${active ? ' is-active' : ''}${row.kind === 'dm' && !row.isOnline ? ' is-offline' : ''}${row.kind === 'dm' && row.user && sidebarSelectedUserIps.has(row.user.ip) ? ' is-multi-selected' : ''}`;
       if (row.kind === 'dm' && row.user && row.user.ip) item.dataset.userIp = row.user.ip;
       const timeLabel = row.createdAtLocal
         ? formatCompactConversationTime(row.createdAtLocal)
@@ -6896,6 +6954,7 @@
 
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       syncCompactFilterChipUi();
+      pruneSidebarUserSelection();
     }
 
     function onCompactSearchInput(v) {
@@ -8355,10 +8414,129 @@
       openGroupChatModal(ctxMenuTargetUser);
     }
 
-    function openGroupChatModal(prefillUser) {
-      groupModalPrefillUser = prefillUser || null;
-      document.getElementById('group-name-input').value = prefillUser ? `${prefillUser.username}님과의 그룹` : '';
-      switchGroupModalMode(myGroupChats.length > 0 && prefillUser ? 'existing' : 'new');
+    function isSelectableSidebarUser(user) {
+      if (!user || !user.ip) return false;
+      if (user.isMe) return false;
+      if (myProfile && user.ip === myProfile.ip) return false;
+      return true;
+    }
+
+    function getVisibleSidebarUserIps() {
+      const ips = [];
+      const seen = new Set();
+      const push = (ip) => {
+        if (!ip || seen.has(ip)) return;
+        seen.add(ip);
+        ips.push(ip);
+      };
+      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip]').forEach((el) => push(el.dataset.userIp));
+      document.querySelectorAll('#compact-friends-list-items .compact-list-item-user[data-user-ip], #compact-list-items .compact-list-item-user[data-user-ip]').forEach((el) => push(el.dataset.userIp));
+      return ips;
+    }
+
+    function syncSidebarUserSelectionUi() {
+      const selected = sidebarSelectedUserIps;
+      document.querySelectorAll('.user-card-item[data-user-ip], .compact-list-item-user[data-user-ip]').forEach((el) => {
+        el.classList.toggle('is-multi-selected', selected.has(el.dataset.userIp));
+      });
+      const n = selected.size;
+      const bar = document.getElementById('user-multi-select-bar');
+      const countEl = document.getElementById('user-multi-select-count');
+      if (bar) bar.classList.toggle('is-visible', n > 0);
+      if (countEl) countEl.textContent = n > 0 ? `${n}명 선택 · 그룹 만들기` : '0명 선택';
+      const cBar = document.getElementById('compact-multi-select-bar');
+      const cCount = document.getElementById('compact-multi-select-count');
+      if (cBar) cBar.classList.toggle('is-visible', n > 0);
+      if (cCount) cCount.textContent = n > 0 ? `${n}명 선택` : '0명 선택';
+    }
+
+    function clearSidebarUserSelection() {
+      sidebarSelectedUserIps.clear();
+      sidebarSelectAnchorIp = null;
+      syncSidebarUserSelectionUi();
+    }
+
+    function toggleSidebarUserSelection(ip, opts) {
+      const user = findUserByIp(ip);
+      if (!isSelectableSidebarUser(user)) return;
+      if (sidebarSelectedUserIps.has(ip)) sidebarSelectedUserIps.delete(ip);
+      else sidebarSelectedUserIps.add(ip);
+      if (!opts || opts.anchor !== false) sidebarSelectAnchorIp = ip;
+      syncSidebarUserSelectionUi();
+    }
+
+    function selectSidebarUserRange(fromIp, toIp) {
+      const ips = getVisibleSidebarUserIps().filter((ip) => {
+        const u = findUserByIp(ip);
+        return isSelectableSidebarUser(u);
+      });
+      const a = ips.indexOf(fromIp);
+      const b = ips.indexOf(toIp);
+      if (a < 0 || b < 0) {
+        toggleSidebarUserSelection(toIp);
+        return;
+      }
+      const start = Math.min(a, b);
+      const end = Math.max(a, b);
+      for (let i = start; i <= end; i++) sidebarSelectedUserIps.add(ips[i]);
+      sidebarSelectAnchorIp = toIp;
+      syncSidebarUserSelectionUi();
+    }
+
+    function handleSidebarUserClick(user, ev) {
+      if (!user || !user.ip) return;
+      const multi = !!(ev && (ev.ctrlKey || ev.metaKey));
+      const range = !!(ev && ev.shiftKey);
+      if (multi) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        toggleSidebarUserSelection(user.ip);
+        return;
+      }
+      if (range && sidebarSelectAnchorIp) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        selectSidebarUserRange(sidebarSelectAnchorIp, user.ip);
+        return;
+      }
+      if (sidebarSelectedUserIps.size > 0) clearSidebarUserSelection();
+      selectUserChat(user);
+    }
+
+    function createGroupFromSidebarSelection() {
+      const users = [...sidebarSelectedUserIps]
+        .map((ip) => findUserByIp(ip))
+        .filter((u) => isSelectableSidebarUser(u));
+      if (users.length === 0) {
+        appAlert('그룹에 초대할 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 여러 명을 고른 뒤 「그룹 만들기」를 눌러 주세요.');
+        return;
+      }
+      openGroupChatModal(users);
+    }
+
+    function openGroupChatModal(prefillUserOrUsers) {
+      groupModalPrefillUser = null;
+      groupModalPrefillIps = new Set();
+      const list = Array.isArray(prefillUserOrUsers)
+        ? prefillUserOrUsers
+        : (prefillUserOrUsers ? [prefillUserOrUsers] : []);
+      list.forEach((u) => {
+        if (isSelectableSidebarUser(u)) groupModalPrefillIps.add(u.ip);
+      });
+      if (list.length === 1 && isSelectableSidebarUser(list[0])) {
+        groupModalPrefillUser = list[0];
+      }
+      const names = [...groupModalPrefillIps]
+        .map((ip) => findUserByIp(ip))
+        .filter(Boolean)
+        .map((u) => profileDisplayName(u) || u.username)
+        .slice(0, 3);
+      let defaultName = '';
+      if (names.length === 1) defaultName = `${names[0]}님과의 그룹`;
+      else if (names.length > 1) {
+        defaultName = names.join(', ') + (groupModalPrefillIps.size > 3 ? ` 외 ${groupModalPrefillIps.size - 3}명` : '');
+      }
+      document.getElementById('group-name-input').value = defaultName;
+      const preferExisting = myGroupChats.length > 0 && !!groupModalPrefillUser && groupModalPrefillIps.size === 1;
+      switchGroupModalMode(preferExisting ? 'existing' : 'new');
       renderGroupMemberChecklist();
       renderGroupExistingSelect();
       document.getElementById('group-chat-modal').style.display = 'flex';
@@ -8382,8 +8560,9 @@
       }
       const sortedUsers = [...allUsers].sort(compareUsersSidebarOrder);
       sortedUsers.forEach(u => {
+        if (!isSelectableSidebarUser(u)) return;
         const id = `group-member-${u.ip.replace(/\./g, '_')}`;
-        const checked = groupModalPrefillUser && groupModalPrefillUser.ip === u.ip ? 'checked' : '';
+        const checked = groupModalPrefillIps.has(u.ip) ? 'checked' : '';
         const label = document.createElement('label');
         label.innerHTML = `<input type="checkbox" value="${u.ip}" id="${id}" ${checked}> ${u.rank} ${u.username} · ${u.floor} ${u.dept}`;
         box.appendChild(label);
@@ -8415,6 +8594,7 @@
         const group = await window.api.createGroupChat(name, checked);
         await refreshGroupChats();
         closeGroupChatModal();
+        clearSidebarUserSelection();
         selectUserChat(makeGroupChannel(group));
       } else {
         const uid = document.getElementById('group-existing-select').value;
@@ -8425,6 +8605,7 @@
         await window.api.addGroupMember(uid, groupModalPrefillUser.ip);
         await refreshGroupChats();
         closeGroupChatModal();
+        clearSidebarUserSelection();
         await appAlert(`${groupModalPrefillUser.username}님을 그룹에 초대했습니다.`);
         return;
       }
@@ -8850,7 +9031,7 @@
       const unread = getUnreadForUser(u);
       const isActive = isSidebarDmCardActive(u.ip);
       const card = document.createElement('div');
-      card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}`;
+      card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}${sidebarSelectedUserIps.has(u.ip) ? ' is-multi-selected' : ''}`;
       card.dataset.userIp = u.ip;
       const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
 
@@ -8870,7 +9051,7 @@
         ${bodyHtml}
         <div class="user-card-unread">${unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : ''}</div>
       `;
-      card.onclick = () => selectUserChat(u);
+      card.onclick = (e) => handleSidebarUserClick(u, e);
       card.oncontextmenu = (e) => showUserContextMenu(e, u);
       bindUserDragSource(card, u);
       return card;
@@ -8902,6 +9083,7 @@
         const unread = getUnreadForUser(u);
         card.classList.toggle('active', isSidebarDmCardActive(u.ip));
         card.classList.toggle('is-offline', !u.online);
+        card.classList.toggle('is-multi-selected', sidebarSelectedUserIps.has(u.ip));
         const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
         const badge = card.querySelector('.avatar-status-badge');
         if (badge) badge.className = `avatar-status-badge status-${userStatus}`;
@@ -8963,6 +9145,7 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      syncSidebarUserSelectionUi();
       return true;
     }
 
@@ -9064,6 +9247,26 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      pruneSidebarUserSelection();
+    }
+
+    function pruneSidebarUserSelection() {
+      if (sidebarSelectedUserIps.size === 0) {
+        syncSidebarUserSelectionUi();
+        return;
+      }
+      let changed = false;
+      [...sidebarSelectedUserIps].forEach((ip) => {
+        const u = findUserByIp(ip);
+        if (!isSelectableSidebarUser(u)) {
+          sidebarSelectedUserIps.delete(ip);
+          changed = true;
+        }
+      });
+      if (changed && sidebarSelectAnchorIp && !sidebarSelectedUserIps.has(sidebarSelectAnchorIp)) {
+        sidebarSelectAnchorIp = [...sidebarSelectedUserIps][0] || null;
+      }
+      syncSidebarUserSelectionUi();
     }
 
     function showGroupHeaderContextMenu(e, groupingKey, groupName, groupUsers) {
@@ -15923,6 +16126,11 @@
         if (document.querySelector('.msg-actions-open')) {
           e.preventDefault();
           closeOpenMsgActions();
+          return;
+        }
+        if (sidebarSelectedUserIps.size > 0) {
+          e.preventDefault();
+          clearSidebarUserSelection();
           return;
         }
         if (await handleEscapeKeyForOverlays(e)) return;
