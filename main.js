@@ -2102,6 +2102,22 @@ db.serialize(() => {
   });
   db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_schedules_at ON deleted_schedules(deleted_at)`, () => {});
 
+  /** 삭제된 공지 UID — NOTICE_SYNC 가 되살리는 것 방지 */
+  db.run(`CREATE TABLE IF NOT EXISTS deleted_notices (
+    uid TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL
+  )`, (err) => {
+    logDbErr(err);
+    db.all(`SELECT uid FROM deleted_notices`, (loadErr, rows) => {
+      if (loadErr) {
+        logDbErr(loadErr);
+        return;
+      }
+      rememberNoticeTombstones((rows || []).map((r) => r && r.uid).filter(Boolean));
+    });
+  });
+  db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_notices_at ON deleted_notices(deleted_at)`, () => {});
+
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     target_ip TEXT,
@@ -3663,7 +3679,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'NOTICE_UPDATE': handleNoticeUpdate(payload.notice); break;
     case 'NOTICE_DELETE': handleNoticeDelete(payload.uid); break;
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
-    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster, payload.deletedScheduleUids); break;
+    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
     case 'OPERATOR_DELETE': handleOperatorDelete(payload.username); break;
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
@@ -4295,28 +4311,40 @@ function handleIncomingBroadcast(payload, senderIP) {
 
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
-  db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
-    if (row) return;
-    db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
-      () => { if (mainWindow) safeWebContentsSend('notices-update'); }
-    );
+  isNoticeTombstoned(n.uid, (tombstoned) => {
+    if (tombstoned) {
+      db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
+      return;
+    }
+    db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
+      if (row) return;
+      db.run(
+        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
+        () => { if (mainWindow) safeWebContentsSend('notices-update'); }
+      );
+    });
   });
 }
 
 function handleNoticeUpdate(n) {
   if (!n || !n.uid) return;
-  db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
-    if (mainWindow) safeWebContentsSend('notices-update');
+  isNoticeTombstoned(n.uid, (tombstoned) => {
+    if (tombstoned) {
+      db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], () => {
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
+      return;
+    }
+    db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
+      if (mainWindow) safeWebContentsSend('notices-update');
+    });
   });
 }
 
 function handleNoticeDelete(uid) {
   if (!uid) return;
-  db.run(`DELETE FROM notices WHERE uid = ?`, [uid], () => {
-    if (mainWindow) safeWebContentsSend('notices-update');
-  });
+  applyLocalNoticeDelete(uid, { notify: true });
 }
 
 function tcpWriteJsonLines(targetIP, payloads) {
@@ -4338,7 +4366,7 @@ function tcpWriteJsonLines(targetIP, payloads) {
   client.on('timeout', () => client.destroy());
 }
 
-function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows, deletedScheduleUids) {
+function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows, deletedScheduleUids, deletedNoticeUids) {
   const chunks = [];
   const baseMeta = {
     type: 'NOTICE_SYNC_RESPONSE',
@@ -4347,6 +4375,7 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     schedules: [],
     profileOverrides: [],
     deletedScheduleUids: [],
+    deletedNoticeUids: [],
     updateSourcePath: updateSourcePath || ''
   };
 
@@ -4365,7 +4394,8 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     notices: notices || [],
     operators: operators || [],
     profileOverrides: profileOverridesRows || [],
-    deletedScheduleUids: deletedScheduleUids || []
+    deletedScheduleUids: deletedScheduleUids || [],
+    deletedNoticeUids: deletedNoticeUids || []
   };
   if (!tryPush(head)) {
     // 극단적으로 크면 필드별로
@@ -4373,11 +4403,20 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     if ((operators || []).length) tryPush({ ...baseMeta, operators });
     if ((profileOverridesRows || []).length) tryPush({ ...baseMeta, profileOverrides: profileOverridesRows });
     if ((deletedScheduleUids || []).length) tryPush({ ...baseMeta, deletedScheduleUids });
+    if ((deletedNoticeUids || []).length) tryPush({ ...baseMeta, deletedNoticeUids });
   }
 
   // 2) 일정은 청크로 (삭제 UID도 함께 실어 청크만 먼저 도착해도 되살림 방지)
   const list = schedules || [];
-  if (!list.length) return chunks.length ? chunks : [{ ...baseMeta, deletedScheduleUids: deletedScheduleUids || [] }];
+  if (!list.length) {
+    return chunks.length
+      ? chunks
+      : [{
+          ...baseMeta,
+          deletedScheduleUids: deletedScheduleUids || [],
+          deletedNoticeUids: deletedNoticeUids || []
+        }];
+  }
 
   let batch = [];
   const flushBatch = () => {
@@ -4434,19 +4473,27 @@ function handleNoticeSyncRequest(senderIP) {
                 `SELECT uid FROM deleted_schedules ORDER BY deleted_at DESC LIMIT 5000`,
                 [],
                 (err7, deletedRows) => {
-                  const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
-                  const chunks = buildNoticeSyncPayloadChunks(
-                    notices || [],
-                    operators || [],
-                    schedules || [],
-                    profileOverridesRows || [],
-                    deletedScheduleUids
+                  db.all(
+                    `SELECT uid FROM deleted_notices ORDER BY deleted_at DESC LIMIT 5000`,
+                    [],
+                    (err8, deletedNoticeRows) => {
+                      const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
+                      const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
+                      const chunks = buildNoticeSyncPayloadChunks(
+                        notices || [],
+                        operators || [],
+                        schedules || [],
+                        profileOverridesRows || [],
+                        deletedScheduleUids,
+                        deletedNoticeUids
+                      );
+                      if (chunks.length) {
+                        chunks[0].chatPins = chatPins || [];
+                        chunks[0].dutyRoster = dutyRoster || [];
+                      }
+                      tcpWriteJsonLines(senderIP, chunks);
+                    }
                   );
-                  if (chunks.length) {
-                    chunks[0].chatPins = chatPins || [];
-                    chunks[0].dutyRoster = dutyRoster || [];
-                  }
-                  tcpWriteJsonLines(senderIP, chunks);
                 }
               );
             });
@@ -4457,16 +4504,19 @@ function handleNoticeSyncRequest(senderIP) {
   });
 }
 
-function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster, deletedScheduleUids) {
-  if (Array.isArray(notices)) {
-    notices.forEach(n => {
-      if (!n || !n.uid) return;
-      db.run(
-        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
-        logDbErr
-      );
+function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster, deletedScheduleUids, deletedNoticeUids) {
+  // 공지 삭제 목록을 INSERT보다 먼저 적용해 되살림 방지
+  if (Array.isArray(deletedNoticeUids) && deletedNoticeUids.length) {
+    rememberNoticeTombstones(deletedNoticeUids);
+    deletedNoticeUids.forEach((uid) => {
+      if (!uid) return;
+      applyLocalNoticeDelete(uid, { notify: false, skipBroadcast: true });
     });
+  }
+  if (Array.isArray(notices)) {
+    notices.forEach((n) => upsertNoticeFromSync(n));
+    if (mainWindow) safeWebContentsSend('notices-update');
+  } else if (Array.isArray(deletedNoticeUids) && deletedNoticeUids.length) {
     if (mainWindow) safeWebContentsSend('notices-update');
   }
   if (Array.isArray(operators)) {
@@ -4759,9 +4809,19 @@ const SCHEDULE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
 /** DB 기록 전에도 동기화 INSERT 레이스를 막기 위한 즉시 기억 */
 const scheduleTombstoneMemory = new Set();
 
+const NOTICE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
+const noticeTombstoneMemory = new Set();
+
 function pruneScheduleTombstones(done) {
   const cutoff = new Date(Date.now() - SCHEDULE_TOMBSTONE_KEEP_MS).toISOString();
   db.run(`DELETE FROM deleted_schedules WHERE deleted_at < ?`, [cutoff], () => {
+    if (typeof done === 'function') done();
+  });
+}
+
+function pruneNoticeTombstones(done) {
+  const cutoff = new Date(Date.now() - NOTICE_TOMBSTONE_KEEP_MS).toISOString();
+  db.run(`DELETE FROM deleted_notices WHERE deleted_at < ?`, [cutoff], () => {
     if (typeof done === 'function') done();
   });
 }
@@ -4781,6 +4841,21 @@ function recordScheduleTombstone(uid, done) {
   );
 }
 
+function recordNoticeTombstone(uid, done) {
+  if (!uid) {
+    if (typeof done === 'function') done();
+    return;
+  }
+  const key = String(uid);
+  noticeTombstoneMemory.add(key);
+  const at = new Date().toISOString();
+  db.run(
+    `INSERT OR REPLACE INTO deleted_notices (uid, deleted_at) VALUES (?, ?)`,
+    [key, at],
+    () => pruneNoticeTombstones(done)
+  );
+}
+
 function isScheduleTombstoned(uid, cb) {
   if (!uid) {
     cb(false);
@@ -4797,9 +4872,31 @@ function isScheduleTombstoned(uid, cb) {
   });
 }
 
+function isNoticeTombstoned(uid, cb) {
+  if (!uid) {
+    cb(false);
+    return;
+  }
+  const key = String(uid);
+  if (noticeTombstoneMemory.has(key)) {
+    cb(true);
+    return;
+  }
+  db.get(`SELECT 1 AS x FROM deleted_notices WHERE uid = ?`, [key], (err, row) => {
+    if (!err && row) noticeTombstoneMemory.add(key);
+    cb(!err && !!row);
+  });
+}
+
 function rememberScheduleTombstones(uids) {
   (uids || []).forEach((uid) => {
     if (uid) scheduleTombstoneMemory.add(String(uid));
+  });
+}
+
+function rememberNoticeTombstones(uids) {
+  (uids || []).forEach((uid) => {
+    if (uid) noticeTombstoneMemory.add(String(uid));
   });
 }
 
@@ -4814,6 +4911,35 @@ function applyLocalScheduleDelete(uid, opts) {
       if (!err && o.notify !== false) notifySchedulesChanged();
       if (typeof o.done === 'function') o.done(err || null);
     });
+  });
+}
+
+function applyLocalNoticeDelete(uid, opts) {
+  const o = opts || {};
+  if (!uid) {
+    if (typeof o.done === 'function') o.done(new Error('uid missing'));
+    return;
+  }
+  recordNoticeTombstone(uid, () => {
+    db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (err) => {
+      if (!err && o.notify !== false && mainWindow) safeWebContentsSend('notices-update');
+      if (typeof o.done === 'function') o.done(err || null);
+    });
+  });
+}
+
+function upsertNoticeFromSync(n) {
+  if (!n || !n.uid) return;
+  isNoticeTombstoned(n.uid, (tombstoned) => {
+    if (tombstoned) {
+      db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
+      return;
+    }
+    db.run(
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
+      logDbErr
+    );
   });
 }
 
@@ -6531,9 +6657,12 @@ ipcMain.handle('update-notice', async (event, { uid, title, content }) => {
 
 ipcMain.handle('delete-notice', async (event, uid) => {
   return new Promise((resolve) => {
-    db.run(`DELETE FROM notices WHERE uid = ?`, [uid], (err) => {
-      if (!err) broadcastToOnlinePeers({ type: 'NOTICE_DELETE', uid });
-      resolve({ success: !err });
+    applyLocalNoticeDelete(uid, {
+      notify: true,
+      done: (err) => {
+        if (!err) broadcastToOnlinePeers({ type: 'NOTICE_DELETE', uid: String(uid) });
+        resolve({ success: !err });
+      }
     });
   });
 });
