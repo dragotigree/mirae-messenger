@@ -603,8 +603,16 @@
       background: rgba(255, 255, 255, 0.98); border: 1px solid rgba(226, 232, 240, 0.95);
       border-radius: 12px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
     }
+    /* 우클릭 시에만 커서 근처 fixed 로 표시 (스크롤 영역에 잘리지 않음) */
     .msg-row.msg-actions-open .msg-action-btns,
-    .msg-row-bubble.msg-actions-open .bubble-action-btns { display: flex; }
+    .msg-row-bubble.msg-actions-open .bubble-action-btns {
+      display: flex !important;
+      position: fixed !important;
+      right: auto !important;
+      bottom: auto !important;
+      z-index: 5000 !important;
+      max-width: min(320px, calc(100vw - 16px));
+    }
     .msg-row.is-me .msg-action-btns, .msg-row-bubble.is-me .bubble-action-btns { justify-content: flex-end; }
     .msg-row.is-other .msg-action-btns, .msg-row-bubble.is-other .bubble-action-btns { justify-content: flex-start; }
     .msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open { z-index: 5; }
@@ -6314,6 +6322,7 @@
 
     /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
     function leaveActiveChatForPrivacy() {
+      try { closeOpenMsgActions(); } catch (_) {}
       try { cancelEditMessage(); } catch (_) {}
       try { cancelReplyMessage(); } catch (_) {}
       try { closeChatSearchBar(); } catch (_) {}
@@ -10435,28 +10444,48 @@
       resizeChatTextarea();
     }
 
+    function findChatMessageRowByUid(msgUid) {
+      const uid = String(msgUid || '');
+      if (!uid) return null;
+      const nodes = document.querySelectorAll('#chat-messages-area [data-msg-uid]');
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute('data-msg-uid') === uid) return nodes[i];
+      }
+      return null;
+    }
+
+    function markChatMessageRowDeleted(row) {
+      if (!row) return;
+      const textEl = row.querySelector('.chat-bubble, .msg-text');
+      if (textEl) {
+        textEl.innerHTML = '<span class="deleted-msg-flag" style="display:none"></span><span style="color:#94a3b8; font-style:italic;">삭제된 메시지입니다.</span>';
+      }
+      row.querySelectorAll(
+        '.msg-edit-btn, .msg-delete-btn, .bubble-edit-btn, .bubble-delete-btn, .msg-edit-controls, .msg-react-btn, .reply-btn, .reaction-add-btn'
+      ).forEach((el) => el.remove());
+    }
+
     async function deleteThisMessage(msgUid) {
+      closeOpenMsgActions();
       if (!await appConfirm('이 메시지를 삭제하시겠습니까?')) return;
       const { targetIP, groupUid } = getEditMessageContext();
       const res = await window.api.editMessage(msgUid, targetIP, groupUid, DELETED_MSG_HTML);
       if (!res || !res.success) { await appAlert('삭제에 실패했습니다.'); return; }
-      const row = document.querySelector(`#chat-messages-area [data-msg-uid="${msgUid}"]`);
-      if (row) {
-        const textEl = row.querySelector('.chat-bubble, .msg-text');
-        if (textEl) textEl.innerHTML = '<span style="color:#94a3b8; font-style:italic;">삭제된 메시지입니다.</span>';
-        row.querySelectorAll('.msg-edit-btn, .msg-delete-btn, .bubble-edit-btn, .bubble-delete-btn, .msg-edit-controls').forEach(el => el.remove());
-      }
+      markChatMessageRowDeleted(findChatMessageRowByUid(msgUid));
+      closeOpenMsgActions();
     }
 
     window.api.onMessageEdited((data) => {
-      const row = document.querySelector(`#chat-messages-area [data-msg-uid="${data.msgUid}"]`);
+      const row = findChatMessageRowByUid(data.msgUid);
       if (!row) return;
       const textEl = row.querySelector('.chat-bubble, .msg-text');
       if (!textEl) return;
       const isDeleted = typeof data.newMessage === 'string' && data.newMessage.indexOf('class="deleted-msg-flag"') !== -1;
-      textEl.innerHTML = isDeleted
-        ? '<span style="color:#94a3b8; font-style:italic;">삭제된 메시지입니다.</span>'
-        : data.newMessage;
+      if (isDeleted) {
+        markChatMessageRowDeleted(row);
+        return;
+      }
+      textEl.innerHTML = data.newMessage;
     });
 
     function toggleUrgentMode() {
@@ -11666,25 +11695,54 @@
     // 채팅 영역 전체에 위임(delegate)해서 클릭된 것이 이미지일 때만 확대창을 연다.
     const chatMessagesAreaEl = document.getElementById('chat-messages-area');
 
+    function resetMsgActionBtnPosition(btns) {
+      if (!btns) return;
+      btns.style.position = '';
+      btns.style.left = '';
+      btns.style.top = '';
+      btns.style.right = '';
+      btns.style.bottom = '';
+      btns.style.zIndex = '';
+      btns.style.maxWidth = '';
+    }
+
     function closeOpenMsgActions() {
       document.querySelectorAll('.msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open').forEach((el) => {
         el.classList.remove('msg-actions-open');
+        resetMsgActionBtnPosition(el.querySelector('.msg-action-btns, .bubble-action-btns'));
+      });
+      // 혹시 클래스가 빠진 채 fixed 스타일만 남은 경우도 정리
+      document.querySelectorAll('#chat-messages-area .msg-action-btns, #chat-messages-area .bubble-action-btns').forEach((btns) => {
+        if (btns.style.position === 'fixed') resetMsgActionBtnPosition(btns);
       });
     }
 
-    function openMsgActionsForRow(row) {
+    function openMsgActionsForRow(row, clientX, clientY) {
       if (!row) return;
       closeOpenMsgActions();
+      const btns = row.querySelector('.msg-action-btns, .bubble-action-btns');
+      if (!btns || !btns.childElementCount) return;
       row.classList.add('msg-actions-open');
+      const pad = 8;
+      const approxW = Math.min(320, Math.max(160, btns.childElementCount * 36));
+      const approxH = 44;
+      let left = Number(clientX) || 0;
+      let top = (Number(clientY) || 0) - approxH - 6;
+      if (top < pad) top = (Number(clientY) || 0) + 6;
+      if (left + approxW > window.innerWidth - pad) left = window.innerWidth - approxW - pad;
+      if (left < pad) left = pad;
+      if (top + approxH > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - approxH - pad);
+      btns.style.left = `${Math.round(left)}px`;
+      btns.style.top = `${Math.round(top)}px`;
     }
 
     chatMessagesAreaEl.addEventListener('contextmenu', (e) => {
-      if (e.target.closest('a, input, textarea, .msg-action-btns, .bubble-action-btns')) return;
+      if (e.target.closest('a, input, textarea')) return;
       const row = e.target.closest('.msg-row, .msg-row-bubble');
       if (!row || !chatMessagesAreaEl.contains(row)) return;
       e.preventDefault();
       e.stopPropagation();
-      openMsgActionsForRow(row);
+      openMsgActionsForRow(row, e.clientX, e.clientY);
     });
 
     chatMessagesAreaEl.addEventListener('scroll', () => { closeOpenMsgActions(); }, { passive: true });
@@ -11692,6 +11750,7 @@
     document.addEventListener('pointerdown', (e) => {
       if (!document.querySelector('.msg-actions-open')) return;
       if (e.target.closest('.msg-action-btns, .bubble-action-btns, #reaction-picker-popover, #reaction-people-popover')) return;
+      // 같은 메시지 우클릭으로 메뉴를 다시 열 수 있게, 닫기는 contextmenu 쪽에서 처리
       if (e.button === 2 && e.target.closest('.msg-row, .msg-row-bubble')) return;
       closeOpenMsgActions();
     }, true);
@@ -11715,16 +11774,17 @@
       if (editBtn) {
         e.preventDefault();
         e.stopPropagation();
-        startEditMessage(editBtn.getAttribute('data-edit-msg'));
         closeOpenMsgActions();
+        startEditMessage(editBtn.getAttribute('data-edit-msg'));
         return;
       }
       const deleteBtn = e.target.closest('[data-delete-msg]');
       if (deleteBtn) {
         e.preventDefault();
         e.stopPropagation();
-        deleteThisMessage(deleteBtn.getAttribute('data-delete-msg'));
+        const uid = deleteBtn.getAttribute('data-delete-msg');
         closeOpenMsgActions();
+        deleteThisMessage(uid);
         return;
       }
       const reactBtn = e.target.closest('.msg-react-btn, .reaction-add-btn');
@@ -11732,6 +11792,7 @@
         e.preventDefault();
         e.stopPropagation();
         openReactionPicker(reactBtn, reactBtn.getAttribute('data-reaction-key'));
+        closeOpenMsgActions();
         return;
       }
       const peopleBtn = e.target.closest('.reaction-people-btn');
