@@ -3814,7 +3814,24 @@ function handleIncomingChat(payload, senderIP) {
     return;
   }
 
-  persist({ showUi: true });
+  // uid 없는 구버전·재전송: 메모리 창 + DB에 이미 있으면 UI/토스트 생략
+  const storedMessage = compactStoredMessageHtml(payload.message);
+  db.get(
+    `SELECT id FROM messages
+     WHERE sender_ip = ? AND receiver_ip = ?
+       AND (message = ? OR message = ?)
+       AND datetime(created_at) >= datetime('now', '-20 minutes')
+     LIMIT 1`,
+    [senderIP, MY_IP, payload.message, storedMessage],
+    (err, row) => {
+      if (err) logDbErr(err);
+      if (row) {
+        if (contentKey) markRecentIncomingChatContent(contentKey);
+        return;
+      }
+      persist({ showUi: true });
+    }
+  );
 }
 
 function handleIncomingDeptMessage(payload, senderIP) {
@@ -3913,7 +3930,8 @@ const incomingChatUidInflight = new Set();
 /** uid 없는 재전송용: sender|message 짧은 창 중복 차단 */
 const recentIncomingChatContent = new Map();
 const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
-const RECENT_CHAT_CONTENT_TTL_MS = 90 * 1000;
+/** uid 없는 재전송: 읽은 뒤에도 다시 토스트/말풍선이 뜨지 않도록 충분히 길게 */
+const RECENT_CHAT_CONTENT_TTL_MS = 20 * 60 * 1000;
 
 function pruneRecentIncomingChatUids(now = Date.now()) {
   if (recentIncomingChatUids.size <= 800) return;

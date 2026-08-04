@@ -1184,7 +1184,7 @@
     /* ========== 3단 상세 패널 ========== */
     #sidebar-right {
       width: var(--sidebar-right-width, 280px);
-      background: var(--surface); padding: 12px 10px; display: flex; flex-direction: column; gap: 12px;
+      background: var(--surface); padding: 10px 8px; display: flex; flex-direction: column; gap: 8px;
       overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0;
       position: relative;
     }
@@ -1241,7 +1241,7 @@
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
     .sidebar-cal-header {
       display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
-      gap: 10px; flex-shrink: 0; min-width: 0;
+      gap: 8px; flex-shrink: 0; min-width: 0;
     }
     .sidebar-cal-header .sidebar-section-title {
       margin: 0; gap: 6px; min-width: 0; flex: none;
@@ -1270,13 +1270,13 @@
     }
     .schedule-box {
       background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%);
-      border: 1px solid #bae6fd; padding: 10px; border-radius: var(--radius-lg);
-      display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow-xs);
+      border: 1px solid #bae6fd; padding: 8px; border-radius: var(--radius-lg);
+      display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-xs);
       min-height: 0; flex: 1;
     }
     .sidebar-calendar-day {
       background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
-      display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1;
+      display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1 1 auto;
     }
     .sidebar-cal-day-duty {
       flex-shrink: 0;
@@ -1284,7 +1284,7 @@
     }
     .sidebar-cal-day-duty:empty { display: none; }
     .sidebar-cal-day-body {
-      flex: 1; min-height: 120px; max-height: none; overflow-y: auto;
+      flex: 1; min-height: 160px; max-height: none; overflow-y: auto;
       padding: 6px; scrollbar-width: thin;
       display: flex; flex-direction: column; gap: 8px;
     }
@@ -1421,13 +1421,13 @@
     #chat-pin-banner .chat-pin-unpin:hover { background: rgba(245, 158, 11, 0.15); }
     .chat-pin-msg-btn { font-size: 12px; }
 
-    .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 14px; padding: 10px; flex-shrink: 0; }
-    .mini-cal-header { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: var(--font-weight-bold); color: #0369a1; margin-bottom: 6px; }
-    .mini-cal-nav { cursor: pointer; padding: 4px 10px; border-radius: 9px; user-select: none; }
+    .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 12px; padding: 6px 7px; flex-shrink: 0; }
+    .mini-cal-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: var(--font-weight-bold); color: #0369a1; margin-bottom: 2px; }
+    .mini-cal-nav { cursor: pointer; padding: 2px 8px; border-radius: 8px; user-select: none; }
     .mini-cal-nav:hover { background: #f0f9ff; }
-    .mini-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10.5px; color: #94a3b8; font-weight: 700; margin-bottom: 4px; }
-    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-    .mini-cal-day { position: relative; text-align: center; font-size: 11.5px; padding: 6px 0 8px; border-radius: 9px; cursor: pointer; color: #1d1c1d; line-height: 1.25; }
+    .mini-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 9.5px; color: #94a3b8; font-weight: 700; margin-bottom: 2px; }
+    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+    .mini-cal-day { position: relative; text-align: center; font-size: 10.5px; padding: 3px 0 7px; border-radius: 7px; cursor: pointer; color: #1d1c1d; line-height: 1.2; }
     .mini-cal-day:hover { background: #f0f9ff; }
     .mini-cal-day.other-month { color: #cbd5e1; }
     .mini-cal-day.today { font-weight: var(--font-weight-bold); color: #0284c7; }
@@ -4983,14 +4983,60 @@
 
     /** 토스트로 방 열 때 DB보다 먼저 도착한 실시간 메시지 보관 */
     const pendingInboundByPeer = new Map();
+    /** uid 없는 재전송이 말풍선/안읽음을 다시 올리지 않도록 */
+    const recentDmUiFingerprints = new Map();
+    const RECENT_DM_UI_TTL_MS = 20 * 60 * 1000;
+
+    function dmContentFingerprint(senderIP, message) {
+      return `${String(senderIP || '')}|${String(message || '').slice(0, 1500)}`;
+    }
+
+    function pruneRecentDmUiFingerprints(now = Date.now()) {
+      if (recentDmUiFingerprints.size <= 300) return;
+      recentDmUiFingerprints.forEach((t, k) => {
+        if (now - t > RECENT_DM_UI_TTL_MS) recentDmUiFingerprints.delete(k);
+      });
+    }
+
+    function wasRecentDmUiFingerprint(fp) {
+      const key = String(fp || '');
+      if (!key) return false;
+      const now = Date.now();
+      pruneRecentDmUiFingerprints(now);
+      const prev = recentDmUiFingerprints.get(key);
+      return !!(prev && (now - prev) < RECENT_DM_UI_TTL_MS);
+    }
+
+    function markRecentDmUiFingerprint(fp) {
+      const key = String(fp || '');
+      if (!key) return;
+      pruneRecentDmUiFingerprints();
+      recentDmUiFingerprints.set(key, Date.now());
+    }
+
+    function chatAreaHasSameMessageText(messageHtml) {
+      const needle = String(messageHtml || '').trim();
+      if (!needle) return false;
+      const bubbles = document.querySelectorAll('#chat-messages-area .msg-text');
+      for (let i = 0; i < bubbles.length; i++) {
+        if (String(bubbles[i].innerHTML || '').trim() === needle) return true;
+      }
+      if (needle.length < 8) return false;
+      const area = document.getElementById('chat-messages-area');
+      return !!(area && area.innerHTML.indexOf(needle.slice(0, 120)) !== -1);
+    }
+
     function rememberPendingInbound(peerIp, data) {
       if (!peerIp || !data) return;
       const list = pendingInboundByPeer.get(peerIp) || [];
       if (data.uid && list.some((m) => m.uid && m.uid === data.uid)) return;
+      if (!data.uid) {
+        const fp = dmContentFingerprint(peerIp, data.message);
+        if (list.some((m) => !m.uid && dmContentFingerprint(peerIp, m.message) === fp)) return;
+      }
       list.push(data);
       if (list.length > 30) list.shift();
       pendingInboundByPeer.set(peerIp, list);
-      (data.aliasIps || []).forEach(() => {});
     }
 
     function drainPendingInboundForActiveChat() {
@@ -5006,6 +5052,8 @@
             if (seen.has(uid)) return;
             seen.add(uid);
             if (document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(uid)}"]`)) return;
+          } else if (chatAreaHasSameMessageText(data.message)) {
+            return;
           }
           appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
         });
@@ -5853,22 +5901,34 @@
     window.api.onReceiveMessage((data) => {
       if (myProfile && data.senderIP === myProfile.ip) return;
 
+      const fp = dmContentFingerprint(data.senderIP, data.message);
+      // uid 없는 재전송: 이미 처리한 내용이면 말풍선·안읽음·대기를 다시 올리지 않음
+      if (!data.uid && wasRecentDmUiFingerprint(fp)) {
+        return;
+      }
+
       if (isChatCurrentlyOpen(data.senderIP)) {
         if (data.uid) {
           const existing = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(data.uid)}"]`);
           if (existing) {
             pendingDmReadPeers.add(data.senderIP);
             if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
+            markRecentDmUiFingerprint(fp);
             return;
           }
+        } else if (chatAreaHasSameMessageText(data.message)) {
+          markRecentDmUiFingerprint(fp);
+          return;
         }
         appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
+        markRecentDmUiFingerprint(fp);
         // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
         pendingDmReadPeers.add(data.senderIP);
         if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
       } else {
         bumpUnread(data.senderIP);
         rememberPendingInbound(data.senderIP, data);
+        markRecentDmUiFingerprint(fp);
       }
       if (data.urgent) playUrgentSound();
     });
