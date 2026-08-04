@@ -197,6 +197,12 @@
     #sidebar-left ::-webkit-scrollbar:horizontal { height: 0; display: none; }
     #sidebar-resize-handle { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 20; transition: background var(--transition-fast); }
     #sidebar-resize-handle:hover, #sidebar-resize-handle.is-dragging { background: rgba(14, 165, 233, 0.35); }
+    #sidebar-right-resize-handle {
+      position: absolute; top: 0; left: -3px; width: 6px; height: 100%;
+      cursor: col-resize; z-index: 20; transition: background var(--transition-fast);
+    }
+    #sidebar-right-resize-handle:hover,
+    #sidebar-right-resize-handle.is-dragging { background: rgba(14, 165, 233, 0.35); }
     
     .app-brand { padding: 16px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .brand-logo-img { height: 30px; width: auto; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
@@ -1176,7 +1182,12 @@
     .msg-row-bubble .chat-file-box { max-width: 240px; }
 
     /* ========== 3단 상세 패널 ========== */
-    #sidebar-right { width: 230px; background: var(--surface); padding: 8px 6px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
+    #sidebar-right {
+      width: var(--sidebar-right-width, 230px);
+      background: var(--surface); padding: 8px 6px; display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0;
+      position: relative;
+    }
     .detail-heading { font-size: 11.5px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.08em; }
     .user-info-modal-card {
       width: min(380px, 94vw); max-height: min(88vh, 720px); overflow-y: auto;
@@ -2836,6 +2847,7 @@
 
   <!-- 3단: 병원 달력 (상세정보는 「정보보기」모달) -->
   <div id="sidebar-right">
+    <div id="sidebar-right-resize-handle" title="너비 조절"></div>
     <div class="sidebar-cal-header">
       <div class="sidebar-section-title">
         <span>📅 병원 달력</span>
@@ -4938,23 +4950,51 @@
     let autoAwayTriggered = false;
     const IDLE_MS = 5 * 60 * 1000;
 
-    // ↔️ 사이드바 크기 조절 (창·대화·상세 패널이 깨지지 않는 범위)
+    // ↔️ 좌·우 사이드바 크기 조절 (창·대화 패널이 깨지지 않는 범위)
     (function initSidebarResize() {
       const SIDEBAR_MIN = 260;
       const SIDEBAR_MAX = 480;
-      const SIDEBAR_RIGHT_WIDTH = 290;
+      const SIDEBAR_RIGHT_MIN = 180;
+      const SIDEBAR_RIGHT_MAX = 420;
       const MAIN_CHAT_MIN_WIDTH = 380;
 
-      function maxSidebarWidthForWindow() {
+      function currentRightSidebarWidth() {
+        const el = document.getElementById('sidebar-right');
+        if (!el || document.body.classList.contains('compact-mode')) return 0;
+        const w = el.getBoundingClientRect().width;
+        return w > 0 ? w : 230;
+      }
+
+      function currentLeftSidebarWidth() {
+        const el = document.getElementById('sidebar-left');
+        if (!el) return 300;
+        const w = el.getBoundingClientRect().width;
+        return w > 0 ? w : 300;
+      }
+
+      function maxLeftSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
-        const cap = w - SIDEBAR_RIGHT_WIDTH - MAIN_CHAT_MIN_WIDTH;
+        const cap = w - currentRightSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
         return Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, cap));
       }
 
+      function maxRightSidebarWidthForWindow() {
+        const w = window.innerWidth || 1200;
+        const cap = w - currentLeftSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
+        return Math.max(SIDEBAR_RIGHT_MIN, Math.min(SIDEBAR_RIGHT_MAX, cap));
+      }
+
       function applySidebarWidth(px) {
-        const maxW = maxSidebarWidthForWindow();
+        const maxW = maxLeftSidebarWidthForWindow();
         const clamped = Math.max(SIDEBAR_MIN, Math.min(maxW, Math.round(px)));
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
+        return clamped;
+      }
+
+      function applyRightSidebarWidth(px) {
+        const maxW = maxRightSidebarWidthForWindow();
+        const clamped = Math.max(SIDEBAR_RIGHT_MIN, Math.min(maxW, Math.round(px)));
+        document.documentElement.style.setProperty('--sidebar-right-width', clamped + 'px');
         return clamped;
       }
 
@@ -4962,29 +5002,67 @@
       if (savedWidth && savedWidth >= SIDEBAR_MIN) {
         applySidebarWidth(savedWidth);
       }
+      const savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
+      if (savedRightWidth && savedRightWidth >= SIDEBAR_RIGHT_MIN) {
+        applyRightSidebarWidth(savedRightWidth);
+      } else {
+        applyRightSidebarWidth(230);
+      }
 
       const handle = document.getElementById('sidebar-resize-handle');
-      if (!handle) return;
+      const rightHandle = document.getElementById('sidebar-right-resize-handle');
       let dragging = false;
-      handle.addEventListener('mousedown', (e) => {
-        if (document.body.classList.contains('compact-mode')) return;
-        dragging = true;
-        handle.classList.add('is-dragging');
-        document.body.style.cursor = 'col-resize';
-        e.preventDefault();
-      });
+      let draggingRight = false;
+
+      if (handle) {
+        handle.addEventListener('mousedown', (e) => {
+          if (document.body.classList.contains('compact-mode')) return;
+          dragging = true;
+          draggingRight = false;
+          handle.classList.add('is-dragging');
+          document.body.style.cursor = 'col-resize';
+          e.preventDefault();
+        });
+      }
+      if (rightHandle) {
+        rightHandle.addEventListener('mousedown', (e) => {
+          if (document.body.classList.contains('compact-mode')) return;
+          draggingRight = true;
+          dragging = false;
+          rightHandle.classList.add('is-dragging');
+          document.body.style.cursor = 'col-resize';
+          e.preventDefault();
+        });
+      }
+
       window.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
-        const sidebarLeft = document.getElementById('sidebar-left').getBoundingClientRect().left;
-        applySidebarWidth(e.clientX - sidebarLeft);
+        if (dragging) {
+          const sidebarLeft = document.getElementById('sidebar-left').getBoundingClientRect().left;
+          applySidebarWidth(e.clientX - sidebarLeft);
+          return;
+        }
+        if (draggingRight) {
+          const right = document.getElementById('sidebar-right');
+          if (!right) return;
+          const rightEdge = right.getBoundingClientRect().right;
+          applyRightSidebarWidth(rightEdge - e.clientX);
+        }
       });
       window.addEventListener('mouseup', () => {
-        if (!dragging) return;
-        dragging = false;
-        handle.classList.remove('is-dragging');
-        document.body.style.cursor = '';
-        const currentWidth = document.getElementById('sidebar-left').getBoundingClientRect().width;
-        localStorage.setItem('sidebarWidth', String(Math.round(currentWidth)));
+        if (dragging) {
+          dragging = false;
+          handle?.classList.remove('is-dragging');
+          document.body.style.cursor = '';
+          const currentWidth = document.getElementById('sidebar-left').getBoundingClientRect().width;
+          localStorage.setItem('sidebarWidth', String(Math.round(currentWidth)));
+        }
+        if (draggingRight) {
+          draggingRight = false;
+          rightHandle?.classList.remove('is-dragging');
+          document.body.style.cursor = '';
+          const currentWidth = document.getElementById('sidebar-right')?.getBoundingClientRect().width || 230;
+          localStorage.setItem('sidebarRightWidth', String(Math.round(currentWidth)));
+        }
       });
 
       let resizeTimer = null;
@@ -4993,10 +5071,17 @@
         resizeTimer = setTimeout(() => {
           if (document.body.classList.contains('compact-mode')) return;
           const sidebar = document.getElementById('sidebar-left');
-          if (!sidebar) return;
-          const w = sidebar.getBoundingClientRect().width;
-          const fixed = applySidebarWidth(w);
-          if (fixed !== w) localStorage.setItem('sidebarWidth', String(fixed));
+          if (sidebar) {
+            const w = sidebar.getBoundingClientRect().width;
+            const fixed = applySidebarWidth(w);
+            if (fixed !== Math.round(w)) localStorage.setItem('sidebarWidth', String(fixed));
+          }
+          const right = document.getElementById('sidebar-right');
+          if (right) {
+            const w = right.getBoundingClientRect().width;
+            const fixed = applyRightSidebarWidth(w);
+            if (fixed !== Math.round(w)) localStorage.setItem('sidebarRightWidth', String(fixed));
+          }
         }, 100);
       });
     })();
