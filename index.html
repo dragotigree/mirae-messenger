@@ -3598,6 +3598,13 @@
         <div id="chat-backup-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
       </div>
 
+      <div style="background:#fff7f7; border:1px solid #fecaca; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:13px; font-weight:700; color:#b91c1c;">🗑️ 대화·로그 전체 삭제</div>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">이 PC에 저장된 <b>모든 대화 메시지</b>, 일별 채팅 로그(<code>chat_logs</code>), 앱 로그를 삭제합니다. 공지·일정·프로필·직원 목록은 유지됩니다. 삭제 전 위에서 백업하는 것을 권장합니다.</div>
+        <button type="button" onclick="clearAllChatHistoryFromSettings()" style="align-self:flex-start; padding:8px 14px; background:#dc2626; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">모든 대화·로그 삭제</button>
+        <div id="chat-clear-all-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
+      </div>
+
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:4px;">
         <div style="font-size:13px; font-weight:700; color:var(--accent); margin-bottom:4px;">📶 네트워크 연결 상태</div>
         <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
@@ -16613,6 +16620,59 @@
       }
     }
 
+    async function clearAllChatHistoryFromSettings() {
+      const el = document.getElementById('chat-clear-all-result');
+      const firstOk = await appConfirm(
+        '이 PC의 모든 대화 내용과 로그를 삭제할까요?\n\n' +
+          '· 저장된 메시지·반응·고정 공지·예약 메시지·읽음 기록이 삭제됩니다.\n' +
+          '· 일별 채팅 로그(chat_logs)와 앱 로그도 함께 삭제됩니다.\n' +
+          '· 공지사항·일정·프로필·직원 목록은 유지됩니다.\n' +
+          '· 다른 PC에 저장된 대화는 영향 없습니다.\n\n' +
+          '삭제 전 「대화 백업 실행」을 권장합니다.',
+        { title: '대화·로그 전체 삭제', confirmText: '계속', cancelText: '취소', variant: 'danger', icon: '⚠️' }
+      );
+      if (!firstOk) return;
+      const secondOk = await appConfirm(
+        '정말 삭제할까요? 이 작업은 되돌릴 수 없습니다.',
+        { title: '최종 확인', confirmText: '영구 삭제', cancelText: '취소', variant: 'danger', icon: '🗑️' }
+      );
+      if (!secondOk) return;
+      if (el) {
+        el.textContent = '삭제 중…';
+        el.style.color = '#64748b';
+      }
+      try {
+        const res = await window.api.clearAllChatHistory();
+        if (!res || !res.success) {
+          if (el) el.textContent = '';
+          await appAlert((res && res.msg) || '삭제에 실패했습니다.');
+          return;
+        }
+        unreadCounts = {};
+        try { saveUnreadCounts(); } catch (_) {}
+        try { leaveActiveChatForPrivacy(); } catch (_) {}
+        try { renderUserListTree(); } catch (_) {}
+        if (document.body.classList.contains('compact-mode')) {
+          try { renderCompactList(); } catch (_) {}
+        }
+        try {
+          if (isFlexOverlay('all-logs-modal')) loadAllChatLogs('');
+        } catch (_) {}
+        try { updateMainPanelVisibility(); } catch (_) {}
+        const summary = `메시지 ${res.messageCount || 0}건 · 채팅 로그 ${res.chatLogFileCount || 0}개 · 앱 로그 ${res.appLogFileCount || 0}개 삭제`;
+        if (el) {
+          el.textContent = `✅ ${summary}`;
+          el.style.color = '#059669';
+        }
+        await appAlert(`대화·로그 삭제가 완료되었습니다.\n\n${summary}`);
+        try { window.api.focusMainWindow(); } catch (_) {}
+      } catch (e) {
+        console.error(e);
+        if (el) el.textContent = '';
+        await appAlert('삭제 중 오류가 발생했습니다.');
+      }
+    }
+
     async function openSettingsModal(opts) {
       const o = opts || {};
       setModalOpenState(true);
@@ -16620,6 +16680,8 @@
       document.getElementById('settings-modal').style.display = 'flex';
       const backupResultEl = document.getElementById('chat-backup-result');
       if (backupResultEl) backupResultEl.textContent = '';
+      const clearAllResultEl = document.getElementById('chat-clear-all-result');
+      if (clearAllResultEl) clearAllResultEl.textContent = '';
       try {
         const p = await window.api.getMyProfile();
         document.getElementById('setting-name').value = p.username || '';

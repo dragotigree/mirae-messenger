@@ -106,6 +106,7 @@ contextBridge.exposeInMainWorld('api', {
   getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
+  clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),
   setNotificationPreviewSetting: (enabled) => ipcRenderer.invoke('set-notification-preview-setting', enabled),
   getMessageNotificationSettings: () => ipcRenderer.invoke('get-message-notification-settings'),

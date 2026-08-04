@@ -8063,6 +8063,76 @@ ipcMain.handle('backup-chat-history', async () => {
   }
 });
 
+function dbRunAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve({ changes: this.changes || 0 });
+    });
+  });
+}
+
+async function deleteFilesInDir(dir, predicate) {
+  let count = 0;
+  try {
+    const names = await fs.promises.readdir(dir);
+    for (const name of names) {
+      if (predicate && !predicate(name)) continue;
+      try {
+        await fs.promises.unlink(path.join(dir, name));
+        count += 1;
+      } catch (e) {
+        console.error('파일 삭제 오류:', name, e.message);
+      }
+    }
+  } catch (e) {
+    if (e && e.code !== 'ENOENT') console.error('폴더 읽기 오류:', dir, e.message);
+  }
+  return count;
+}
+
+/** 이 PC에 저장된 대화·채팅 로그·앱 로그를 전부 삭제 (공지·일정·프로필 등은 유지) */
+ipcMain.handle('clear-all-chat-history', async () => {
+  try {
+    const tables = [
+      'message_reactions',
+      'messages',
+      'chat_view_clears',
+      'chat_pins',
+      'scheduled_messages',
+      'channel_read_cursors'
+    ];
+    const deleted = {};
+    for (const table of tables) {
+      const r = await dbRunAsync(`DELETE FROM ${table}`);
+      deleted[table] = r.changes;
+    }
+    // AUTOINCREMENT 카운터도 초기화해 이후 메시지가 낮은 id부터 다시 쌓이도록 함
+    try {
+      await dbRunAsync(`DELETE FROM sqlite_sequence WHERE name IN ('messages','message_reactions','scheduled_messages')`);
+    } catch (_) { /* sqlite_sequence 없을 수 있음 */ }
+
+    const chatLogFileCount = await deleteFilesInDir(getChatLogDir(), (name) => name.endsWith('.txt'));
+    const appLogFileCount = await deleteFilesInDir(
+      getLogsDir(),
+      (name) => name.startsWith('messenger_') && (name.endsWith('.log') || name.endsWith('.txt'))
+    );
+
+    const messageCount = deleted.messages || 0;
+    writeToLogFile('info', `전체 대화 삭제 완료: 메시지 ${messageCount}건, 채팅로그 ${chatLogFileCount}개, 앱로그 ${appLogFileCount}개`);
+    return {
+      success: true,
+      messageCount,
+      chatLogFileCount,
+      appLogFileCount,
+      deleted
+    };
+  } catch (e) {
+    console.error('전체 대화 삭제 오류:', e.message);
+    return { success: false, msg: e.message || '대화·로그 삭제에 실패했습니다.' };
+  }
+});
+
 const AUTO_BACKUP_RETENTION_DAYS = 14;
 
 async function getAutoBackupDir() {
