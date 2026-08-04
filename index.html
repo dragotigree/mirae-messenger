@@ -3617,6 +3617,14 @@
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">앱을 켤 때와 설정 저장 시 선택한 화면으로 전환됩니다. 사이드바 하단 좁은 창 아이콘으로도 바꿀 수 있습니다.</div>
         <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+          미니 모드에서 직원 클릭 시:
+          <select id="setting-compact-person-click" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
+            <option value="ipmsg">✉️ 쪽지 보내기 (채팅창 없이)</option>
+            <option value="chat">💬 채팅창 열기</option>
+          </select>
+        </label>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">직원 목록·직원 탭에서 사람을 눌렀을 때 동작입니다. 「대화」 탭의 기존 대화는 항상 채팅창으로 열립니다.</div>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
           시스템 폰트:
           <select id="setting-font-family" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
             <option value="suit">수트 (SUIT)</option>
@@ -4853,13 +4861,16 @@
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "compactPersonClickMode": "ipmsg"}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
     }
     if (appSettings.spellcheck === undefined) appSettings.spellcheck = false;
     if (appSettings.showUserListAvatars === undefined) appSettings.showUserListAvatars = true;
+    if (appSettings.compactPersonClickMode !== 'chat' && appSettings.compactPersonClickMode !== 'ipmsg') {
+      appSettings.compactPersonClickMode = 'ipmsg';
+    }
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -7394,7 +7405,7 @@
       const ip = el.dataset.userIp;
       const u = findUserByIp(ip);
       if (!u) return false;
-      selectUserChat(u);
+      openCompactPersonOrChat(u);
       return true;
     }
 
@@ -8839,6 +8850,27 @@
       syncSidebarUserSelectionUi();
     }
 
+    function getCompactPersonClickMode() {
+      return appSettings.compactPersonClickMode === 'chat' ? 'chat' : 'ipmsg';
+    }
+
+    /** 미니 모드 직원 클릭: 설정에 따라 쪽지 또는 채팅 */
+    function openCompactPersonOrChat(user) {
+      if (!user || !user.ip) return;
+      const inCompact = document.body.classList.contains('compact-mode');
+      const wantIpmsg = inCompact
+        && getCompactPersonClickMode() === 'ipmsg'
+        && compactRailTab !== 'chat'
+        && isDirectMessagePeerKey(user.ip)
+        && !user.isMe
+        && !(myProfile && user.ip === myProfile.ip);
+      if (wantIpmsg) {
+        openIpmsgSendModal([user.ip]);
+        return;
+      }
+      selectUserChat(user);
+    }
+
     function handleSidebarUserClick(user, ev) {
       if (!user || !user.ip) return;
       const multi = !!(ev && (ev.ctrlKey || ev.metaKey));
@@ -8854,7 +8886,7 @@
         return;
       }
       if (sidebarSelectedUserIps.size > 0) clearSidebarUserSelection();
-      selectUserChat(user);
+      openCompactPersonOrChat(user);
     }
 
     function createGroupFromSidebarSelection() {
@@ -17108,6 +17140,8 @@
         const chatFontEl = document.getElementById('setting-chat-font-family');
         if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
         document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
+        const compactClickEl = document.getElementById('setting-compact-person-click');
+        if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
         document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
         const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
         if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
@@ -17155,6 +17189,9 @@
     ? (document.getElementById('setting-chat-font-family').value || 'ridiBatang')
     : (appSettings.chatFontFamily || 'ridiBatang');
   const defaultViewMode = document.getElementById('setting-default-view').value || 'normal';
+  const compactPersonClickMode = (document.getElementById('setting-compact-person-click')?.value === 'chat')
+    ? 'chat'
+    : 'ipmsg';
   const userGrouping = document.getElementById('setting-user-grouping').value;
   const autoLaunch = document.getElementById('setting-auto-launch').checked;
   const notificationPreview = document.getElementById('setting-notification-preview').checked;
@@ -17189,7 +17226,7 @@
   const phone = document.getElementById('setting-phone').value.trim();
   const statusState = document.getElementById('setting-my-status').value;
 
-  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars };
+  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars, compactPersonClickMode };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
