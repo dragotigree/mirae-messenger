@@ -3024,8 +3024,8 @@
           </label>
         </div>
         <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#334155; line-height:1.45; cursor:pointer;">
-          <input type="checkbox" id="master-op-can-duty" style="margin-top:2px;">
-          <span><b>당직의·주치의 OFF 관리</b> 권한도 함께 부여 (달력 「일정등록」 버튼 사용)</span>
+          <input type="checkbox" id="master-op-can-duty" checked style="margin-top:2px;">
+          <span><b>당직의·주치의 OFF 관리</b> 권한도 함께 부여 (달력 「일정등록」 버튼 사용) — 기본 체크</span>
         </label>
         <button onclick="addMasterNoticeOperator()" style="padding:11px; background:#2563eb; color:#fff; border:none; border-radius: 15px; font-size:13px; font-weight:700; cursor:pointer; margin-top:4px;">💾 계정 발급 및 저장</button>
       </div>
@@ -4051,16 +4051,15 @@
       } else {
         localStorage.removeItem(NOTICE_OPERATOR_STORAGE_KEY);
       }
-      syncNoticeOperatorSessionToMain();
+      return syncNoticeOperatorSessionToMain();
     }
 
     function syncNoticeOperatorSessionToMain() {
-      if (window.api.setNoticeOperatorSession) {
-        window.api.setNoticeOperatorSession(
-          !!isNoticeOperatorAuthenticated,
-          !!(isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty)
-        ).catch(() => {});
-      }
+      if (!window.api.setNoticeOperatorSession) return Promise.resolve();
+      return window.api.setNoticeOperatorSession(
+        !!isNoticeOperatorAuthenticated,
+        !!(isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty)
+      ).catch(() => {});
     }
 
     function loadNoticeOperatorSession() {
@@ -9637,8 +9636,11 @@
             <div><b>${escapeHtml(o.display_name || '')}</b> <span style="color:#94a3b8; font-size:12px;">(${escapeHtml(o.username || '')})</span></div>
             <label style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:11.5px; color:#475569; cursor:pointer;">
               <input type="checkbox" ${dutyOn ? 'checked' : ''} onchange="toggleOperatorDutyPerm('${uname}', this.checked)">
-              당직의·OFF 관리
+              당직의·OFF 관리 (일정등록)
             </label>
+            <div style="margin-top:4px; font-size:11px; font-weight:700; color:${dutyOn ? '#15803d' : '#b45309'};">
+              ${dutyOn ? '✓ 일정등록 가능' : '⚠ 체크해야 일정등록(당직·OFF) 가능'}
+            </div>
           </div>
           <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; flex-shrink:0;" onclick="removeMasterNoticeOperator('${uname}')">삭제</span>
         `;
@@ -9650,9 +9652,11 @@
       if (!username) return;
       const res = await window.api.setNoticeOperatorDutyPerm({ username, canManageDuty: !!enabled });
       if (!res || !res.success) {
-        await appAlert((res && res.msg) || '권한 변경에 실패했습니다.');
+        await appAlert((res && res.msg) || '권한 변경에 실패했습니다. 마스터로 로그인한 상태인지 확인해 주세요.');
         loadMasterOperatorList();
+        return;
       }
+      loadMasterOperatorList();
     }
 
     async function addMasterNoticeOperator() {
@@ -9751,14 +9755,18 @@
       const res = await window.api.noticeOperatorLogin({ username, password });
       if (res.success) {
         if (wantDuty && !res.canManageDuty) {
-          await appAlert('일정등록 권한이 없는 계정입니다.\n마스터 아이디 또는 권한이 부여된 계정으로 로그인해 주세요.');
+          await appAlert(
+            '이 계정은 공지/일정 작성은 가능하지만, 「당직의·OFF 관리(일정등록)」 권한이 없습니다.\n\n' +
+            '마스터 관리자 화면 → 등록된 작성 권한자 목록에서\n' +
+            '해당 계정의 「당직의·OFF 관리 (일정등록)」 체크를 켠 뒤 다시 로그인해 주세요.'
+          );
           return;
         }
         pendingOpenDutyRosterAfterLogin = false;
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
         noticeOperatorCanManageDuty = !!res.canManageDuty;
-        saveNoticeOperatorSession();
+        await saveNoticeOperatorSession();
         closeOperatorLoginModal();
         refreshNoticePermission();
         updateBoardAuthStatusText();

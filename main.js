@@ -4419,8 +4419,18 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   }
   if (Array.isArray(operators)) {
     operators.forEach(o => {
-      db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-        [o.username, o.password_hash, o.display_name, o.added_at, o.can_manage_duty ? 1 : 0], logDbErr);
+      if (!o || !o.username) return;
+      db.get(`SELECT can_manage_duty FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
+        let dutyFlag = 0;
+        if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
+        else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
+        else if (row && row.can_manage_duty) dutyFlag = 1;
+        db.run(
+          `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
+          [o.username, o.password_hash, o.display_name, o.added_at, dutyFlag],
+          logDbErr
+        );
+      });
     });
     if (mainWindow) safeWebContentsSend('notice-operators-update');
   }
@@ -4468,10 +4478,20 @@ function handleConfigSync(payload) {
 
 function handleOperatorAdd(o) {
   if (!o || !o.username) return;
-  db.run(`INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-    [o.username, o.password_hash, o.display_name, o.added_at, o.can_manage_duty ? 1 : 0], () => {
-      if (mainWindow) safeWebContentsSend('notice-operators-update');
-    });
+  db.get(`SELECT can_manage_duty FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
+    // 원격에 필드가 없으면(구버전 동기화) 기존 권한을 덮어쓰지 않음
+    let dutyFlag = 0;
+    if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
+    else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
+    else if (row && row.can_manage_duty) dutyFlag = 1;
+    db.run(
+      `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
+      [o.username, o.password_hash, o.display_name, o.added_at, dutyFlag],
+      () => {
+        if (mainWindow) safeWebContentsSend('notice-operators-update');
+      }
+    );
+  });
 }
 
 function handleOperatorDutyPerm(payload) {
@@ -6507,10 +6527,14 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
       }
+      const canManageDuty = Number(row.can_manage_duty) === 1 || row.can_manage_duty === true || row.can_manage_duty === '1';
+      // 로그인 성공 시 메인 세션도 바로 맞춤 (렌더러 IPC 레이스 방지)
+      noticeOperatorSessionActive = true;
+      noticeOperatorCanManageDutySession = !!canManageDuty;
       resolve({
         success: true,
         displayName: row.display_name,
-        canManageDuty: !!(row.can_manage_duty)
+        canManageDuty: !!canManageDuty
       });
     });
   });
