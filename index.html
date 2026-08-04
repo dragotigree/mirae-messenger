@@ -1298,8 +1298,35 @@
     .mini-cal-day.other-month { color: #cbd5e1; }
     .mini-cal-day.today { font-weight: var(--font-weight-bold); color: #0284c7; }
     .mini-cal-day.selected { background: var(--accent); color: #fff; font-weight: var(--font-weight-bold); }
-    .mini-cal-day .dot { position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: #ef4444; }
-    .mini-cal-day.selected .dot { background: #fff; }
+    .mini-cal-day .cal-marks {
+      position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 2px; align-items: center; justify-content: center; pointer-events: none;
+    }
+    .mini-cal-day .dot { width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+    .mini-cal-day .dot.is-admit { background: #22c55e; }
+    .mini-cal-day .dot.is-discharge { background: #ef4444; }
+    .mini-cal-day .dot.is-flow { background: #f97316; }
+    .mini-cal-day.selected .dot { background: rgba(255, 255, 255, 0.85); }
+    .mini-cal-day.selected .dot.is-admit { background: #bbf7d0; }
+    .mini-cal-day.selected .dot.is-discharge { background: #fecaca; }
+    .mini-cal-day.selected .dot.is-flow { background: #fed7aa; }
+    .sidebar-cal-day-line .badge-admission,
+    .sidebar-cal-day-line .badge-discharge,
+    .sidebar-cal-day-line .badge-outpatient,
+    .sidebar-cal-day-line .badge-outing,
+    .sidebar-cal-day-line .badge-overnight,
+    .sidebar-cal-day-line .badge-transfer,
+    .sidebar-cal-day-line .badge-exam,
+    .sidebar-cal-day-line .badge-general,
+    .sidebar-cal-day-line .badge-leave {
+      flex-shrink: 0; padding: 2px 5px; font-size: 10px; line-height: 1.2;
+    }
+    .sidebar-cal-day-line.is-admission { background: #f0fdf4; }
+    .sidebar-cal-day-line.is-discharge { background: #fef2f2; }
+    .sidebar-cal-day-line.is-transfer { background: #eff6ff; }
+    .sidebar-cal-day-line.is-admission:hover { background: #dcfce7; }
+    .sidebar-cal-day-line.is-discharge:hover { background: #fee2e2; }
+    .sidebar-cal-day-line.is-transfer:hover { background: #dbeafe; }
     .schedule-item { background: #ffffff; padding: 8px 10px; border-radius: 12px; font-size: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 
     .badge-admission { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
@@ -12436,10 +12463,21 @@
 
     function formatSidebarCalendarDayTime(sch) {
       if (!sch || !sch.time_str) return '';
+      if (isScheduleStartUndecided(sch)) {
+        if (SCHEDULE_RANGE_TYPES.has(sch.type || '') && sch.time_end_str && !isScheduleEndUndecided(sch)) {
+          const end = new Date(sch.time_end_str);
+          if (!Number.isNaN(end.getTime())) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `미정~${pad(end.getHours())}:${pad(end.getMinutes())}`;
+          }
+        }
+        return '미정';
+      }
       const start = new Date(sch.time_str);
       if (Number.isNaN(start.getTime())) return '';
       const pad = (n) => String(n).padStart(2, '0');
       const startLabel = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+      if (isScheduleEndUndecided(sch)) return `${startLabel}~미정`;
       if (!sch.time_end_str) return startLabel;
       const end = new Date(sch.time_end_str);
       if (Number.isNaN(end.getTime())) return startLabel;
@@ -12450,10 +12488,8 @@
       const norm = normalizeSchedulePatient(sch);
       const roomDigits = String(norm.room_no || '').replace(/\D/g, '');
       const name = scheduleBoardPatientLabel(norm.patient_name);
-      const typeMeta = SCHEDULE_TYPE_ORDER.find((m) => m.key === (sch.type || 'GENERAL'));
-      const typeLabel = typeMeta ? typeMeta.label : '';
       const timeLabel = formatSidebarCalendarDayTime(sch);
-      const parts = [roomDigits, name, typeLabel, timeLabel].filter(Boolean);
+      const parts = [roomDigits, name, timeLabel].filter(Boolean);
       if (parts.length) return parts.join(' ');
       return String(sch.title || '').trim() || '일정';
     }
@@ -12466,11 +12502,21 @@
       return '';
     }
 
+    function sidebarCalendarTypeRank(type) {
+      const t = type || 'GENERAL';
+      if (t === 'ADMISSION') return 0;
+      if (t === 'DISCHARGE') return 1;
+      if (t === 'TRANSFER') return 2;
+      const idx = SCHEDULE_TYPE_ORDER.findIndex((m) => m.key === t);
+      return idx >= 0 ? 10 + idx : 99;
+    }
+
     function formatSidebarCalendarDayLineHtml(sch) {
       const norm = normalizeSchedulePatient(sch);
-      const badge = sidebarWardBadgeHtml(norm.ward);
+      const wardBadge = sidebarWardBadgeHtml(norm.ward);
+      const typeBadge = scheduleBadgeHtml(sch.type || 'GENERAL');
       const text = formatSidebarCalendarDayLine(sch);
-      return `${badge}<span class="sidebar-cal-day-text">${escapeHtml(text)}</span>`;
+      return `${wardBadge}${typeBadge}<span class="sidebar-cal-day-text">${escapeHtml(text)}</span>`;
     }
 
     function renderSidebarCalendarDay(dateStr) {
@@ -12516,10 +12562,19 @@
         return;
       }
 
-      const sorted = [...list].sort((a, b) => String(a.time_str || '').localeCompare(String(b.time_str || '')));
+      const sorted = [...list].sort((a, b) => {
+        const ra = sidebarCalendarTypeRank(a.type);
+        const rb = sidebarCalendarTypeRank(b.type);
+        if (ra !== rb) return ra - rb;
+        return String(a.time_str || '').localeCompare(String(b.time_str || ''));
+      });
       sorted.forEach((sch) => {
         const line = document.createElement('div');
-        line.className = 'sidebar-cal-day-line';
+        const t = sch.type || 'GENERAL';
+        line.className = 'sidebar-cal-day-line'
+          + (t === 'ADMISSION' ? ' is-admission' : '')
+          + (t === 'DISCHARGE' ? ' is-discharge' : '')
+          + (t === 'TRANSFER' ? ' is-transfer' : '');
         line.innerHTML = formatSidebarCalendarDayLineHtml(sch);
         bodyEl.appendChild(line);
       });
@@ -13151,7 +13206,6 @@
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const daysInPrevMonth = new Date(year, month, 0).getDate();
       const todayStr = formatDateStr(new Date());
-      const scheduleDates = scheduleBoardDatesWithEvents();
 
       const cells = [];
       for (let i = startWeekday - 1; i >= 0; i--) {
@@ -13173,8 +13227,8 @@
         if (!cell.other && cell.dateStr === todayStr) cls += ' today';
         if (!cell.other && cell.dateStr === scheduleBoardDateStr) cls += ' selected';
         el.className = cls;
-        const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
-        el.innerHTML = `${cell.dayNum}${hasSchedule ? '<span class="dot"></span>' : ''}`;
+        const marks = (!cell.other && cell.dateStr) ? sidebarCalendarMarksHtml(cell.dateStr) : '';
+        el.innerHTML = `${cell.dayNum}${marks}`;
         if (!cell.other) el.onclick = () => scheduleBoardCalSelectDate(cell.dateStr);
         grid.appendChild(el);
       });
@@ -13939,6 +13993,33 @@
       renderMiniCalendar();
     }
 
+    function sidebarCalendarDayMarks(dateStr) {
+      const bucket = schedulesByDateStr.get(dateStr);
+      let hasAdmit = false;
+      let hasDischarge = false;
+      let hasFlow = false;
+      if (bucket && bucket.length) {
+        for (let i = 0; i < bucket.length; i++) {
+          const t = bucket[i].type || 'GENERAL';
+          if (t === 'ADMISSION' || t === 'TRANSFER') hasAdmit = true;
+          else if (t === 'DISCHARGE') hasDischarge = true;
+          else if (SCHEDULE_BOARD_FLOW_TYPES.includes(t) || t === 'EXAM') hasFlow = true;
+          else if (t !== 'GENERAL' && t !== 'LEAVE') hasFlow = true;
+        }
+      }
+      return { hasAdmit, hasDischarge, hasFlow };
+    }
+
+    function sidebarCalendarMarksHtml(dateStr) {
+      const { hasAdmit, hasDischarge, hasFlow } = sidebarCalendarDayMarks(dateStr);
+      if (!hasAdmit && !hasDischarge && !hasFlow) return '';
+      const parts = [];
+      if (hasAdmit) parts.push('<span class="dot is-admit" title="입원·전원"></span>');
+      if (hasDischarge) parts.push('<span class="dot is-discharge" title="퇴원"></span>');
+      if (hasFlow) parts.push('<span class="dot is-flow" title="외진·외출·외박 등"></span>');
+      return `<span class="cal-marks">${parts.join('')}</span>`;
+    }
+
     function renderMiniCalendar() {
       const grid = document.getElementById('mini-cal-grid');
       const titleEl = document.getElementById('mini-cal-title');
@@ -13952,7 +14033,6 @@
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const daysInPrevMonth = new Date(year, month, 0).getDate();
       const todayStr = formatDateStr(new Date());
-      const scheduleDates = scheduleDatesWithEvents;
 
       const cells = [];
       for (let i = startWeekday - 1; i >= 0; i--) {
@@ -13974,9 +14054,9 @@
         if (!cell.other && cell.dateStr === todayStr) cls += ' today';
         if (!cell.other && cell.dateStr === selectedCalendarDateStr) cls += ' selected';
         el.className = cls;
-        const hasSchedule = !cell.other && scheduleDates.has(cell.dateStr);
+        const marks = (!cell.other && cell.dateStr) ? sidebarCalendarMarksHtml(cell.dateStr) : '';
         const hasDuty = !cell.other && dutyRosterDates.has(cell.dateStr);
-        el.innerHTML = `${cell.dayNum}${hasSchedule ? '<span class="dot"></span>' : ''}${hasDuty ? '<span class="duty-mark"></span>' : ''}`;
+        el.innerHTML = `${cell.dayNum}${marks}${hasDuty ? '<span class="duty-mark"></span>' : ''}`;
         if (!cell.other) el.onclick = () => calendarSelectDate(cell.dateStr);
         grid.appendChild(el);
       });
