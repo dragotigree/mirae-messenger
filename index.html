@@ -2326,7 +2326,7 @@
           </span>
         </div>
         <div class="user-search-box" id="user-search-box">
-          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색" oninput="filterUserList(this.value)">
+          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+F)" oninput="filterUserList(this.value)" title="사람 검색 (Ctrl+F)">
         </div>
         <div id="user-list-tree"></div>
       </div>
@@ -2484,7 +2484,7 @@
             <span class="chat-header-tool-icon" aria-hidden="true"></span>
             <span class="chat-header-tool-label">비우기</span>
           </button>
-          <button type="button" class="chat-header-tool-btn chat-header-tool-btn--search" id="chat-search-toggle-btn" onclick="toggleChatSearchBar()" title="대화 내용 검색">
+          <button type="button" class="chat-header-tool-btn chat-header-tool-btn--search" id="chat-search-toggle-btn" onclick="toggleChatSearchBar()" title="대화 내용 검색 (Ctrl+F)">
             <span class="chat-header-tool-icon" aria-hidden="true"></span>
             <span class="chat-header-tool-label">검색</span>
           </button>
@@ -2501,7 +2501,7 @@
       </div>
 
       <div id="chat-search-bar">
-        <input type="text" id="chat-search-input" placeholder="이 대화에서 검색..." oninput="onChatSearchInput(this.value)">
+        <input type="text" id="chat-search-input" placeholder="이 대화에서 검색... (Ctrl+F)" oninput="onChatSearchInput(this.value)" onkeydown="onChatSearchKeyDown(event)">
         <span style="font-size:11px; color:#94a3b8; cursor:pointer;" onclick="closeChatSearchBar()">닫기</span>
       </div>
 
@@ -9398,6 +9398,95 @@
       btn.classList.toggle('is-active', !!open);
     }
 
+    function openChatSearchBarForShortcut() {
+      if (!activeChatUser) return false;
+      const bar = document.getElementById('chat-search-bar');
+      const input = document.getElementById('chat-search-input');
+      if (!bar || !input) return false;
+      bar.style.display = 'flex';
+      input.focus();
+      input.select();
+      syncChatSearchToggleUi();
+      return true;
+    }
+
+    function focusPeopleSearchForShortcut() {
+      if (document.body.classList.contains('compact-mode')) {
+        if (activeChatUser) showCompactList();
+        const friends = document.getElementById('compact-search-input-friends');
+        const mainCompact = document.getElementById('compact-search-input');
+        const input = (friends && friends.offsetParent !== null) ? friends : mainCompact;
+        if (input) {
+          input.focus();
+          input.select();
+          return true;
+        }
+        return false;
+      }
+      const input = document.getElementById('user-search-input');
+      if (!input) return false;
+      input.focus();
+      input.select();
+      return true;
+    }
+
+    function isBlockingOverlayOpenForSearchShortcut() {
+      if (document.getElementById('app-dialog-overlay')?.style.display === 'flex') return true;
+      return [...document.querySelectorAll('.modal-overlay')].some((el) => {
+        if (!el || el.style.display !== 'flex') return false;
+        // 현황판 단독 창은 본 단축키와 무관
+        if (el.id === 'schedule-board-modal' && document.body.classList.contains('schedule-board-standalone')) return false;
+        return true;
+      });
+    }
+
+    function handleCtrlFSearchShortcut(e) {
+      if (!(e.ctrlKey || e.metaKey)) return false;
+      if (e.altKey) return false;
+      const key = String(e.key || '').toLowerCase();
+      if (key !== 'f') return false;
+      if (isBlockingOverlayOpenForSearchShortcut()) return false;
+
+      const active = document.activeElement;
+      const inSidebar = !!(active && active.closest && active.closest('#sidebar-left'));
+      const inChat = !!(active && active.closest && (
+        active.closest('#active-chat-container') ||
+        active.closest('#chat-search-bar') ||
+        active.id === 'chat-textarea' ||
+        active.id === 'chat-search-input'
+      ));
+      const inCompactList = !!(active && active.closest && active.closest('#compact-list-view'));
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 좌측 사이드바(또는 콤팩트 목록) → 사람 검색
+      if (inSidebar || inCompactList) {
+        focusPeopleSearchForShortcut();
+        return true;
+      }
+      // 대화창 → 대화 내용 검색
+      if (inChat && activeChatUser) {
+        openChatSearchBarForShortcut();
+        return true;
+      }
+      // 포커스가 애매하면: 열린 대화가 있으면 대화 검색, 없으면 사람 검색
+      if (activeChatUser && document.getElementById('active-chat-container')?.style.display !== 'none') {
+        openChatSearchBarForShortcut();
+      } else {
+        focusPeopleSearchForShortcut();
+      }
+      return true;
+    }
+
+    function onChatSearchKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeChatSearchBar();
+        document.getElementById('chat-textarea')?.focus();
+      }
+    }
+
     function toggleChatSearchBar() {
       const bar = document.getElementById('chat-search-bar');
       if (!bar) return;
@@ -14167,14 +14256,11 @@
         e.preventDefault();
         openAllLogsModal();
       }
+      if (handleCtrlFSearchShortcut(e)) return;
       if (document.body.classList.contains('compact-mode')) {
         if (e.key === 'Escape' && activeChatUser) {
           e.preventDefault();
           showCompactList();
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f' && !activeChatUser) {
-          e.preventDefault();
-          document.getElementById('compact-search-input')?.focus();
         }
       }
     });
