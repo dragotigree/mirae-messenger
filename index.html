@@ -2806,6 +2806,7 @@
         <div>
           <div style="font-size:16px; font-weight:800; color:#3730a3;">🩺 일정등록</div>
           <div id="duty-roster-date-label" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
+          <div id="duty-roster-auth-status" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
         </div>
         <button type="button" style="padding:6px 10px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;" onclick="closeDutyRosterModal()">✖ 닫기</button>
       </div>
@@ -3214,6 +3215,7 @@
         </div>
         <div class="schedule-board-top-bar-actions">
           <button type="button" id="schedule-board-login-btn" class="schedule-board-add-btn" style="display:none;" onclick="openOperatorLoginModal()">✍️ 작성자 로그인</button>
+          <button type="button" id="schedule-board-logout-btn" class="schedule-board-add-btn" style="display:none; background:#fee2e2; color:#b91c1c;" onclick="logoutScheduleBoardAuth()">🔓 로그아웃</button>
           <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add">+ 빠른 등록</button>
           <button type="button" class="calendar-day-close-btn sb-top-close" onclick="closeScheduleBoardModal()" title="닫기">✕</button>
         </div>
@@ -3853,6 +3855,8 @@
     let isNoticeOperatorAuthenticated = false;
     let currentOperatorName = '';
     let noticeOperatorCanManageDuty = false;
+    /** 일정등록용으로만 마스터 로그인한 경우 — 모달 닫으면 세션 종료 */
+    let dutyOnlyMasterSession = false;
     let dutyRosterCache = [];
     let dutyRosterDates = new Set();
     let activeChatPin = null;
@@ -3910,6 +3914,36 @@
 
     function canManageDutyRoster() {
       return !!(isMasterAuthenticated || (isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty));
+    }
+
+    function dutyRosterAuthLabel() {
+      if (isMasterAuthenticated) return '마스터';
+      if (isNoticeOperatorAuthenticated && currentOperatorName) return currentOperatorName;
+      return '';
+    }
+
+    async function clearMasterAuthSession(opts) {
+      const o = opts || {};
+      isMasterAuthenticated = false;
+      dutyOnlyMasterSession = false;
+      if (window.api.clearMasterSession) {
+        try { await window.api.clearMasterSession(); } catch (e) { /* ignore */ }
+      }
+      closeMasterAdminModal();
+      updateMasterAuthUi();
+      refreshNoticePermission();
+      updateBoardAuthStatusText();
+      refreshScheduleBoardEntryUi();
+      if (!o.keepDutyModal) closeDutyRosterModal({ skipDutyOnlyClear: true });
+      if (o.alert) await appAlert('마스터 계정에서 로그아웃 되었습니다.');
+    }
+
+    function logoutDutyRosterAuth() {
+      if (isMasterAuthenticated) {
+        clearMasterAuthSession({ alert: false });
+        return;
+      }
+      logoutOperator();
     }
 
     function isScheduleBoardContext() {
@@ -4955,12 +4989,14 @@
       const loginHint = document.getElementById('schedule-board-login-hint');
       const addBtn = document.getElementById('schedule-board-add-btn');
       const loginBtn = document.getElementById('schedule-board-login-btn');
+      const logoutBtn = document.getElementById('schedule-board-logout-btn');
       const sbVisible = document.body.classList.contains('schedule-board-standalone') ||
         (document.getElementById('schedule-board-modal')?.style.display === 'flex');
       if (!sbVisible) return;
       const canWrite = canWriteScheduleBoard();
       if (addBtn) addBtn.style.display = canWrite ? 'inline-block' : 'none';
       if (loginBtn) loginBtn.style.display = canWrite ? 'none' : 'inline-block';
+      if (logoutBtn) logoutBtn.style.display = canWrite ? 'inline-block' : 'none';
       if (loginHint) loginHint.style.display = canWrite ? 'none' : 'block';
       if (!canWrite) {
         setScheduleBoardQuickAddPanelVisible(false);
@@ -8695,12 +8731,21 @@
       const el = document.getElementById('board-auth-status');
       if (!el) return;
       if (isMasterAuthenticated) {
-        el.textContent = '🔒 마스터 관리자로 로그인됨';
+        el.innerHTML = `🔒 마스터 관리자로 로그인됨 · <span style="color:#ef4444; cursor:pointer; text-decoration:underline;" onclick="logoutMasterAuth()">로그아웃</span>`;
       } else if (isNoticeOperatorAuthenticated) {
         el.innerHTML = `✍️ ${currentOperatorName}님으로 로그인됨 · <span style="color:#ef4444; cursor:pointer; text-decoration:underline;" onclick="logoutOperator()">로그아웃</span>`;
       } else {
         el.innerHTML = `열람만 가능합니다 · <span style="color:var(--accent); cursor:pointer; text-decoration:underline;" onclick="openOperatorLoginModal()">작성자 로그인</span>`;
       }
+    }
+
+    function logoutScheduleBoardAuth() {
+      if (isMasterAuthenticated) {
+        clearMasterAuthSession({ alert: false, keepDutyModal: true });
+        closeDutyRosterModal();
+        return;
+      }
+      logoutOperator();
     }
 
     /** 공지 작성자 표시: 작성자 로그인 시 관리자 계정「표시 이름」, 그 외 직책+이름 */
@@ -9308,12 +9353,20 @@
 
     async function applyMasterAuthSuccess(opts) {
       const o = opts || {};
+      const wasAuthed = isMasterAuthenticated;
       isMasterAuthenticated = true;
+      // 일정등록만 위해 마스터 로그인한 경우 → 모달 닫을 때 세션 종료
+      if (o.openDutyRoster && o.openAdmin === false && !wasAuthed) {
+        dutyOnlyMasterSession = true;
+      } else if (o.openAdmin !== false) {
+        dutyOnlyMasterSession = false;
+      }
       updateMasterAuthUi();
       const addSchBtn = document.getElementById('add-sch-btn');
       if (addSchBtn) addSchBtn.style.display = 'inline-flex';
       renderSchedules();
       refreshNoticePermission();
+      updateBoardAuthStatusText();
       refreshScheduleBoardEntryUi();
       if (o.openDutyRoster) {
         openDutyRosterModal();
@@ -9379,6 +9432,8 @@
       currentOperatorName = '';
       noticeOperatorCanManageDuty = false;
       saveNoticeOperatorSession();
+      closeDutyRosterModal({ skipDutyOnlyClear: true });
+      setScheduleBoardQuickAddPanelVisible(false);
       refreshNoticePermission();
       updateBoardAuthStatusText();
       refreshScheduleBoardEntryUi();
@@ -11957,6 +12012,17 @@
 
     let pendingOpenDutyRosterAfterLogin = false;
 
+    function updateDutyRosterAuthStatus() {
+      const el = document.getElementById('duty-roster-auth-status');
+      if (!el) return;
+      if (!canManageDutyRoster()) {
+        el.textContent = '';
+        return;
+      }
+      const who = dutyRosterAuthLabel() || '권한자';
+      el.innerHTML = `${escapeHtml(who)} 로그인 중 · <span style="color:#ef4444; cursor:pointer; text-decoration:underline;" onclick="logoutDutyRosterAuth()">로그아웃</span>`;
+    }
+
     function openDutyRosterModal() {
       // 미로그인·무권한이면 로그인부터 (마스터 또는 일정등록 권한자만)
       if (!canManageDutyRoster()) {
@@ -11974,15 +12040,21 @@
       const offNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'off').map((r) => r.name);
       if (dutyInput) dutyInput.value = dutyNames.join(', ');
       if (offInput) offInput.value = offNames.join(', ');
+      updateDutyRosterAuthStatus();
       const modal = document.getElementById('duty-roster-modal');
       if (modal) modal.style.display = 'flex';
       setModalOpenState(true);
     }
 
-    function closeDutyRosterModal() {
+    function closeDutyRosterModal(opts) {
+      const o = opts || {};
       const modal = document.getElementById('duty-roster-modal');
       if (modal) modal.style.display = 'none';
       setModalOpenState(false);
+      // 일정등록용 임시 마스터 세션은 모달을 닫으면 종료 → 다시 열려면 로그인 필요
+      if (!o.skipDutyOnlyClear && dutyOnlyMasterSession) {
+        clearMasterAuthSession({ alert: false, keepDutyModal: true });
+      }
     }
 
     function parseCommaNames(raw) {
@@ -11994,7 +12066,10 @@
 
     async function saveDutyRosterModal() {
       if (!canManageDutyRoster()) {
-        await appAlert('당직·OFF 관리 권한이 없습니다.');
+        closeDutyRosterModal({ skipDutyOnlyClear: true });
+        pendingOpenDutyRosterAfterLogin = true;
+        openOperatorLoginModal();
+        await appAlert('당직·OFF 관리 권한이 없습니다. 로그인한 뒤 다시 시도해 주세요.');
         return;
       }
       const dateStr = (document.getElementById('duty-roster-date-label') || {}).textContent || selectedCalendarDateStr || formatDateStr(new Date());
@@ -14897,14 +14972,7 @@
     }
 
     async function logoutMasterAuth() {
-      isMasterAuthenticated = false;
-      if (window.api.clearMasterSession) await window.api.clearMasterSession();
-      closeMasterAdminModal();
-      updateMasterAuthUi();
-      document.getElementById('add-sch-btn').style.display = 'inline-flex';
-      refreshNoticePermission();
-      await appAlert('마스터 계정에서 로그아웃 되었습니다.');
-      return;
+      await clearMasterAuthSession({ alert: true });
     }
 
     window.addEventListener('keydown', async (e) => {
