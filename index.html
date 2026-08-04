@@ -3305,7 +3305,7 @@
           </div>
         </div>
         <div id="master-online-clients-box" class="master-online-clients-box"></div>
-        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. (대상 PC에도 마스터 비밀번호가 동일해야 하며, 강제 업데이트 기능이 있는 버전이어야 합니다.)</p>
+        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. 「사용 중지」하면 해당 PC는 메신저에 접속할 수 없으며, 마스터 아이디·비밀번호 또는 이 화면의 「사용 허용」으로만 해제됩니다. (대상 PC에도 마스터 비밀번호가 동일해야 합니다.)</p>
       </div>
     </div>
   </div>
@@ -3333,6 +3333,43 @@
       <div style="font-size:28px; margin-bottom:12px;">⚡</div>
       <div style="font-size:18px; font-weight:800; margin-bottom:8px;">강제 업데이트 진행 중</div>
       <div id="force-update-overlay-text" style="font-size:13px; color:#cbd5e1; line-height:1.6;">최신 파일을 적용한 뒤 자동으로 재시작합니다. 창을 닫지 마세요.</div>
+    </div>
+  </div>
+
+  <!-- 🔒 메신저 사용 중지(잠금) 오버레이 — 마스터 아이디·비밀번호로만 해제 -->
+  <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.92); align-items:center; justify-content:center;">
+    <div style="width:min(420px,92vw); background:#fff; border-radius:20px; padding:28px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:14px;">
+      <div style="text-align:center;">
+        <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+        <div style="font-size:18px; font-weight:800; color:#b91c1c;">메신저 사용이 중지되었습니다</div>
+        <div id="usage-lock-overlay-desc" style="font-size:12.5px; color:#64748b; line-height:1.55; margin-top:8px;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
+      </div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 아이디
+        <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+      </label>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 비밀번호
+        <input type="password" id="usage-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') confirmUsageLockUnlock()">
+      </label>
+      <div id="usage-lock-unlock-error" style="font-size:12px; color:#dc2626; min-height:1.2em;"></div>
+      <button type="button" onclick="confirmUsageLockUnlock()" style="padding:12px; background:#2563eb; color:#fff; border:none; border-radius:14px; font-size:13px; font-weight:700; cursor:pointer;">사용 재개 (마스터 인증)</button>
+    </div>
+  </div>
+
+  <!-- 🔒 마스터 — 사용 중지/허용 비밀번호 확인 -->
+  <div id="master-usage-lock-modal" class="modal-overlay" style="z-index:5200;">
+    <div class="modal-card" style="width:420px; gap:12px;">
+      <div id="master-usage-lock-title" style="font-size:16px; font-weight:800; color:#b91c1c;">🔒 사용 중지</div>
+      <div id="master-usage-lock-desc" style="font-size:12.5px; color:#475569; line-height:1.55;"></div>
+      <input type="hidden" id="master-usage-lock-target">
+      <input type="hidden" id="master-usage-lock-disabled" value="1">
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 비밀번호 재확인
+        <input type="password" id="master-usage-lock-pwd" placeholder="마스터 비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') confirmMasterUsageLock()">
+      </label>
+      <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">대상 PC의 마스터 비밀번호가 이 PC와 같아야 적용됩니다. 중지된 PC는 네트워크에 접속되지 않으며, 마스터 인증 또는 이 화면에서 해제할 수 있습니다.</p>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="closeMasterUsageLockModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" id="master-usage-lock-confirm-btn" onclick="confirmMasterUsageLock()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">사용 중지</button>
+      </div>
     </div>
   </div>
 
@@ -6176,6 +6213,8 @@
         { test: () => isFlexOverlay('ipmsg-send-modal'), close: () => closeIpmsgSendModal(), confirm: true, name: '쪽지 보내기' },
         { test: () => isFlexOverlay('transport-request-modal'), close: () => closeTransportRequestModal(), confirm: true, name: '이동기사 요청' },
         { test: () => isFlexOverlay('schedule-board-modal') || document.body.classList.contains('schedule-board-standalone'), close: () => closeScheduleBoardModal(), confirm: true, name: '병동 일정 현황판' },
+        { test: () => isFlexOverlay('master-force-update-modal'), close: () => closeMasterForceUpdateModal(), confirm: false },
+        { test: () => isFlexOverlay('master-usage-lock-modal'), close: () => closeMasterUsageLockModal(), confirm: false },
         { test: () => isFlexOverlay('master-admin-modal'), close: () => closeMasterAdminModal(), confirm: true, name: '관리자' },
         { test: () => isFlexOverlay('settings-modal'), close: () => closeSettingsModal(), confirm: true, name: '환경설정' },
         { test: () => isFlexOverlay('board-modal'), close: () => closeBoardModal(), confirm: true, name: '공지 게시판' },
@@ -10101,17 +10140,24 @@
         const lastSeenText = formatLastSeenRelative(u);
         const lastTitle = formatLastSeenTitle(u);
         const nameText = `${u.rank || ''} ${u.username || '-'}`.trim();
-        return `<tr style="border-top:1px solid #f1f5f9; ${u.online ? '' : 'opacity:.65;'}">
+        const usageDisabled = !!u.usageDisabled;
+        const statusCell = usageDisabled
+          ? '<span style="color:#b91c1c; font-weight:700;">🔒 사용중지</span>'
+          : (masterStatusLabel[statusKey] || statusKey);
+        return `<tr style="border-top:1px solid #f1f5f9; ${u.online && !usageDisabled ? '' : 'opacity:.65;'}">
           <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
           <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
           <td style="font-weight:700; color:${verOutdated ? '#dc2626' : '#15803d'};">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</td>
-          <td>${masterStatusLabel[statusKey] || statusKey}</td>
+          <td>${statusCell}</td>
           <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
           <td style="text-align:right;">
             <div class="master-client-actions">
               <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="border:1px solid #cbd5e1; background:#fff; color:#2563eb;">정보 수정</button>
-              ${u.online ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
+              ${usageDisabled
+                ? `<button type="button" class="master-usage-enable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #86efac; background:#f0fdf4; color:#15803d;">사용 허용</button>`
+                : `<button type="button" class="master-usage-disable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">사용 중지</button>`}
+              ${u.online && !usageDisabled ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
             </div>
           </td>
         </tr>`;
@@ -10126,6 +10172,22 @@
           targetIp: btn.getAttribute('data-ip'),
           name: btn.getAttribute('data-name') || '',
           isMe: btn.getAttribute('data-isme') === '1'
+        }));
+      });
+      box.querySelectorAll('.master-usage-disable-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMasterUsageLockModal({
+          targetIp: btn.getAttribute('data-ip'),
+          name: btn.getAttribute('data-name') || '',
+          isMe: btn.getAttribute('data-isme') === '1',
+          disabled: true
+        }));
+      });
+      box.querySelectorAll('.master-usage-enable-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMasterUsageLockModal({
+          targetIp: btn.getAttribute('data-ip'),
+          name: btn.getAttribute('data-name') || '',
+          isMe: btn.getAttribute('data-isme') === '1',
+          disabled: false
         }));
       });
     }
@@ -10228,6 +10290,162 @@
         }
         renderMasterOnlineClients();
       });
+    }
+
+    let localUsageLocked = false;
+
+    function showUsageLockOverlay(state) {
+      localUsageLocked = true;
+      const el = document.getElementById('usage-lock-overlay');
+      const desc = document.getElementById('usage-lock-overlay-desc');
+      const err = document.getElementById('usage-lock-unlock-error');
+      if (err) err.textContent = '';
+      if (desc && state) {
+        const by = state.disabledByIp ? ` (요청: ${state.disabledByIp})` : '';
+        desc.textContent = `마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다${by}. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.`;
+      }
+      if (el) el.style.display = 'flex';
+      setTimeout(() => document.getElementById('usage-lock-master-id')?.focus(), 80);
+    }
+
+    function hideUsageLockOverlay() {
+      localUsageLocked = false;
+      const el = document.getElementById('usage-lock-overlay');
+      if (el) el.style.display = 'none';
+      const idEl = document.getElementById('usage-lock-master-id');
+      const pwdEl = document.getElementById('usage-lock-master-pwd');
+      const err = document.getElementById('usage-lock-unlock-error');
+      if (idEl) idEl.value = '';
+      if (pwdEl) pwdEl.value = '';
+      if (err) err.textContent = '';
+    }
+
+    function applyUsageLockState(state) {
+      if (state && state.disabled) showUsageLockOverlay(state);
+      else hideUsageLockOverlay();
+      if (document.getElementById('master-admin-modal')?.style.display === 'flex') {
+        try { renderMasterOnlineClients(); } catch (_) {}
+      }
+    }
+
+    async function confirmUsageLockUnlock() {
+      const id = (document.getElementById('usage-lock-master-id')?.value || '').trim();
+      const password = document.getElementById('usage-lock-master-pwd')?.value || '';
+      const err = document.getElementById('usage-lock-unlock-error');
+      if (!id || !password) {
+        if (err) err.textContent = '마스터 아이디와 비밀번호를 모두 입력해 주세요.';
+        return;
+      }
+      const res = await window.api.unlockUsageWithMaster({ id, password });
+      if (!res || !res.success) {
+        if (err) err.textContent = (res && res.msg) || '인증에 실패했습니다.';
+        return;
+      }
+      isMasterAuthenticated = true;
+      hideUsageLockOverlay();
+      await appAlert('사용이 다시 허용되었습니다.');
+      try { window.api.focusMainWindow(); } catch (_) {}
+    }
+
+    function openMasterUsageLockModal(opts) {
+      if (!isMasterAuthenticated) {
+        appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const o = opts || {};
+      const disabled = o.disabled !== false;
+      document.getElementById('master-usage-lock-target').value = o.targetIp || '';
+      document.getElementById('master-usage-lock-disabled').value = disabled ? '1' : '0';
+      const title = document.getElementById('master-usage-lock-title');
+      const desc = document.getElementById('master-usage-lock-desc');
+      const btn = document.getElementById('master-usage-lock-confirm-btn');
+      if (disabled) {
+        if (title) { title.textContent = '🔒 사용 중지'; title.style.color = '#b91c1c'; }
+        if (desc) {
+          desc.textContent = o.isMe
+            ? `이 PC(${o.targetIp})의 메신저 사용을 중지합니다. 중지 후 마스터 아이디·비밀번호로만 다시 열 수 있습니다.`
+            : `${o.name || '대상'} (${o.targetIp}) PC의 메신저 사용을 중지합니다. 해당 PC는 접속할 수 없게 됩니다.`;
+        }
+        if (btn) { btn.textContent = '사용 중지'; btn.style.background = '#dc2626'; }
+      } else {
+        if (title) { title.textContent = '🔓 사용 허용'; title.style.color = '#15803d'; }
+        if (desc) {
+          desc.textContent = o.isMe
+            ? `이 PC(${o.targetIp})의 사용 중지를 해제합니다.`
+            : `${o.name || '대상'} (${o.targetIp}) PC의 사용 중지를 해제합니다.`;
+        }
+        if (btn) { btn.textContent = '사용 허용'; btn.style.background = '#16a34a'; }
+      }
+      document.getElementById('master-usage-lock-pwd').value = '';
+      document.getElementById('master-usage-lock-modal').style.display = 'flex';
+      setTimeout(() => document.getElementById('master-usage-lock-pwd')?.focus(), 50);
+    }
+
+    function closeMasterUsageLockModal() {
+      document.getElementById('master-usage-lock-modal').style.display = 'none';
+    }
+
+    async function confirmMasterUsageLock() {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const targetIp = document.getElementById('master-usage-lock-target').value.trim();
+      const disabled = document.getElementById('master-usage-lock-disabled').value === '1';
+      const password = document.getElementById('master-usage-lock-pwd').value;
+      if (!password) {
+        await appAlert('마스터 비밀번호를 입력해 주세요.');
+        return;
+      }
+      const actionLabel = disabled ? '사용 중지' : '사용 허용';
+      if (!await appConfirm(`정말 ${actionLabel}를 실행할까요?`, {
+        title: actionLabel,
+        confirmText: '실행',
+        cancelText: '취소',
+        variant: disabled ? 'danger' : 'default'
+      })) return;
+
+      const res = await window.api.masterSetClientUsage({ targetIp, disabled, password });
+      closeMasterUsageLockModal();
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || `${actionLabel} 요청에 실패했습니다.`);
+        return;
+      }
+      if (res.local && disabled) {
+        return;
+      }
+      await appAlert(disabled
+        ? `사용 중지 명령을 보냈습니다. (${res.targetIp || targetIp})`
+        : `사용 허용 명령을 보냈습니다. (${res.targetIp || targetIp})`);
+      try { renderMasterOnlineClients(); } catch (_) {}
+    }
+
+    if (window.api.onUsageLockState) {
+      window.api.onUsageLockState((state) => applyUsageLockState(state));
+    }
+    if (window.api.onUsageLockResult) {
+      window.api.onUsageLockResult((data) => {
+        const ok = data && data.success;
+        const label = data && data.disabled ? '사용 중지' : '사용 허용';
+        const tip = document.createElement('div');
+        tip.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:100010; background:#0f172a; color:#fff; padding:10px 14px; border-radius:12px; font-size:12px; max-width:320px; box-shadow:0 8px 24px rgba(0,0,0,.25);';
+        tip.textContent = ok
+          ? `${label} 완료 · ${data.fromIp || ''}`
+          : `${label} 실패 · ${data.msg || ''} (${data.fromIp || ''})`;
+        document.body.appendChild(tip);
+        setTimeout(() => tip.remove(), 5000);
+        try { renderMasterOnlineClients(); } catch (_) {}
+      });
+    }
+    if (window.api.onDisabledClientsUpdated) {
+      window.api.onDisabledClientsUpdated(() => {
+        if (document.getElementById('master-admin-modal')?.style.display === 'flex') {
+          try { renderMasterOnlineClients(); } catch (_) {}
+        }
+      });
+    }
+    if (window.api.getUsageLockState) {
+      window.api.getUsageLockState().then(applyUsageLockState).catch(() => {});
     }
 
     function openMasterUserEditModal(ip) {

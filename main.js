@@ -71,6 +71,11 @@ let scheduleBoardWindow = null;
 let noticeOperatorSessionActive = false;
 /** 마스터 관리자 UI 로그인 (렌더러 verify-master-auth 성공 시) */
 let masterSessionActive = false;
+/** 이 PC 메신저 사용 중지(잠금) — true면 접속·프레즌스 중단, 마스터 인증으로만 해제 */
+let localUsageDisabled = false;
+let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
+/** 마스터가 사용 중지한 다른 PC (IP → meta) — 관리 화면 표시·원격 명령용 */
+const disabledClients = new Map();
 /** 작성자 세션이 당직·주치의 OFF(일정등록) 권한을 갖는지 */
 let noticeOperatorCanManageDutySession = false;
 /** ip → { username, rank, dept, floor, extNo, phone } — 마스터가 지정한 표시 정보 */
@@ -1987,6 +1992,53 @@ db.serialize(() => {
     phone_no TEXT DEFAULT '',
     updated_at TEXT
   )`, logDbErr);
+
+  // 이 PC의 메신저 사용 중지(잠금) 상태 — 재시작 후에도 유지
+  db.run(`CREATE TABLE IF NOT EXISTS usage_lock (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    disabled INTEGER DEFAULT 0,
+    disabled_at TEXT DEFAULT '',
+    disabled_by_ip TEXT DEFAULT '',
+    reason TEXT DEFAULT ''
+  )`, logDbErr);
+  db.run(`INSERT OR IGNORE INTO usage_lock (id, disabled) VALUES (1, 0)`, () => {});
+
+  // 마스터가 다른 PC 사용을 중지한 목록 (관리 화면용)
+  db.run(`CREATE TABLE IF NOT EXISTS disabled_clients (
+    ip TEXT PRIMARY KEY,
+    username TEXT DEFAULT '',
+    disabled_at TEXT DEFAULT '',
+    disabled_by_ip TEXT DEFAULT ''
+  )`, logDbErr);
+
+  db.get(`SELECT disabled, disabled_at, disabled_by_ip, reason FROM usage_lock WHERE id = 1`, (err, row) => {
+    if (!err && row) {
+      localUsageDisabled = !!row.disabled;
+      localUsageLockMeta = {
+        disabledAt: row.disabled_at || '',
+        disabledByIp: row.disabled_by_ip || '',
+        reason: row.reason || ''
+      };
+    }
+    if (localUsageDisabled) {
+      try { broadcastGoodbye(); } catch (_) {}
+      onlineUsers.delete(MY_IP);
+    }
+    try { notifyUsageLockState(); } catch (_) {}
+  });
+  db.all(`SELECT ip, username, disabled_at, disabled_by_ip FROM disabled_clients`, [], (err, rows) => {
+    if (err || !rows) return;
+    rows.forEach((r) => {
+      if (!r || !r.ip) return;
+      disabledClients.set(r.ip, {
+        ip: r.ip,
+        username: r.username || '',
+        disabledAt: r.disabled_at || '',
+        disabledByIp: r.disabled_by_ip || ''
+      });
+    });
+  });
+
   db.all(`SELECT ip, photo FROM known_users WHERE photo IS NOT NULL AND photo != ''`, [], (err, rows) => {
     if (!err && rows) rows.forEach(r => {
       if (isSyntheticReceiverKey(r.ip)) return;
@@ -2420,6 +2472,9 @@ function createWindow() {
   mainWindow.setMenu(null);
   attachEditableContextMenu(mainWindow.webContents);
   mainWindow.loadFile('index.html');
+  mainWindow.webContents.once('did-finish-load', () => {
+    notifyUsageLockState();
+  });
 
   mainWindow.on('hide', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
@@ -2829,6 +2884,16 @@ function registerSelf() {
   // 등록하지 않는다 — 이걸 빠뜨리면 내 사이드바 카드에 "실장 정용범"이 잠깐 보였다가 몇 초 뒤
   // "물리치료실장 정용범"으로 바뀌는 현상이 생긴다.
   if (!profileLoaded) return;
+  if (localUsageDisabled) {
+    // 사용 중지 상태에서는 온라인으로 등록하지 않는다.
+    onlineUsers.delete(MY_IP);
+    const prev = allKnownUsers.get(MY_IP);
+    if (prev) {
+      allKnownUsers.set(MY_IP, { ...prev, online: false, isMe: true });
+    }
+    notifyUserList();
+    return;
+  }
   const now = Date.now();
   const prev = allKnownUsers.get(MY_IP);
   const me = {
@@ -2857,6 +2922,7 @@ function registerSelf() {
 function broadcastPresence(socket) {
   if (!socket) return;
   if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
+  if (localUsageDisabled) return; // 사용 중지 시 접속 신호를 보내지 않음
   const packet = Buffer.from(JSON.stringify({
     type: 'PING',
     username: myProfile.username,
@@ -3447,7 +3513,8 @@ function userListEntryForRenderer(u) {
   return {
     ...rest,
     online: onlineUsers.has(u.ip),
-    hasPhoto: !!photo
+    hasPhoto: !!photo,
+    usageDisabled: disabledClients.has(u.ip) || (u.ip === MY_IP && localUsageDisabled)
   };
 }
 
@@ -3705,6 +3772,27 @@ function routeIncomingPayload(payload, senderIP) {
         fromIp: payload.fromIp || senderIP,
         version: payload.version || ''
       });
+      break;
+    case 'USAGE_DISABLE':
+      handleUsageDisableCommand(payload, senderIP).catch((e) => {
+        console.error('USAGE_DISABLE 처리 오류:', e.message || e);
+      });
+      break;
+    case 'USAGE_ENABLE':
+      handleUsageEnableCommand(payload, senderIP).catch((e) => {
+        console.error('USAGE_ENABLE 처리 오류:', e.message || e);
+      });
+      break;
+    case 'USAGE_LOCK_RESULT':
+      safeWebContentsSend('usage-lock-result', {
+        success: !!payload.success,
+        disabled: !!payload.disabled,
+        msg: payload.msg || '',
+        fromIp: payload.fromIp || senderIP
+      });
+      break;
+    case 'USAGE_LOCK_SYNC':
+      handleUsageLockSync(payload, senderIP);
       break;
     case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
     case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
@@ -5187,6 +5275,7 @@ function syncGroupsWithPeer(peerIP) {
 }
 
 ipcMain.handle('send-file-transfer', async (event, opts) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   try {
     const o = opts || {};
     const fileName = String(o.fileName || 'file').trim() || 'file';
@@ -5296,6 +5385,7 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
 });
 
 ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   return new Promise((resolve) => {
     const client = new net.Socket();
     let isConnected = false;
@@ -5403,6 +5493,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
 });
 
 ipcMain.handle('send-broadcast-message', async (event, message) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   broadcastToOnlinePeers({ type: 'BROADCAST', sender: myProfile.username, message, msgUid });
@@ -5431,6 +5522,7 @@ ipcMain.handle('send-broadcast-message', async (event, message) => {
 });
 
 ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const deptPayload = { type: 'DEPT_MESSAGE', dept, sender: myProfile.username, message, msgUid };
@@ -5487,6 +5579,7 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
 });
 
 ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const floorPayload = { type: 'FLOOR_MESSAGE', floor, sender: myProfile.username, message, msgUid };
@@ -7202,6 +7295,7 @@ ipcMain.handle('leave-group-chat', async (event, { uid }) => {
 });
 
 ipcMain.handle('send-group-message', async (event, { uid, groupName, message }) => {
+  if (localUsageDisabled) return usageLockBlockedResponse();
   return new Promise((resolve) => {
     const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const msgUid = generateMsgUid();
@@ -7696,6 +7790,142 @@ function verifyLocalMasterPassword(password) {
   });
 }
 
+function verifyLocalMasterAuth(id, password) {
+  return new Promise((resolve) => {
+    db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
+      const currentId = row && row.master_id ? String(row.master_id) : 'admin';
+      resolve(!!(row && currentId === String(id || '') && String(row.master_password) === String(password || '')));
+    });
+  });
+}
+
+function persistLocalUsageLock(disabled, meta) {
+  const m = meta || {};
+  const disabledAt = m.disabledAt || (disabled ? new Date().toISOString() : '');
+  const disabledByIp = m.disabledByIp || '';
+  const reason = m.reason || '';
+  localUsageDisabled = !!disabled;
+  localUsageLockMeta = { disabledAt, disabledByIp, reason };
+  db.run(
+    `INSERT INTO usage_lock (id, disabled, disabled_at, disabled_by_ip, reason) VALUES (1, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET disabled = excluded.disabled, disabled_at = excluded.disabled_at,
+       disabled_by_ip = excluded.disabled_by_ip, reason = excluded.reason`,
+    [disabled ? 1 : 0, disabledAt, disabledByIp, reason],
+    logDbErr
+  );
+}
+
+function persistDisabledClient(ip, meta) {
+  const key = String(ip || '').trim();
+  if (!key || key === MY_IP) return;
+  const m = meta || {};
+  const entry = {
+    ip: key,
+    username: m.username || '',
+    disabledAt: m.disabledAt || new Date().toISOString(),
+    disabledByIp: m.disabledByIp || MY_IP
+  };
+  disabledClients.set(key, entry);
+  db.run(
+    `INSERT INTO disabled_clients (ip, username, disabled_at, disabled_by_ip) VALUES (?, ?, ?, ?)
+     ON CONFLICT(ip) DO UPDATE SET username = excluded.username, disabled_at = excluded.disabled_at,
+       disabled_by_ip = excluded.disabled_by_ip`,
+    [entry.ip, entry.username, entry.disabledAt, entry.disabledByIp],
+    logDbErr
+  );
+}
+
+function removeDisabledClient(ip) {
+  const key = String(ip || '').trim();
+  if (!key) return;
+  disabledClients.delete(key);
+  db.run(`DELETE FROM disabled_clients WHERE ip = ?`, [key], logDbErr);
+}
+
+function notifyUsageLockState() {
+  safeWebContentsSend('usage-lock-state', {
+    disabled: localUsageDisabled,
+    disabledAt: localUsageLockMeta.disabledAt || '',
+    disabledByIp: localUsageLockMeta.disabledByIp || '',
+    reason: localUsageLockMeta.reason || '',
+    myIp: MY_IP
+  });
+  notifyUserList();
+}
+
+function applyLocalUsageDisabled(disabled, meta) {
+  const was = localUsageDisabled;
+  persistLocalUsageLock(!!disabled, meta || {});
+  if (disabled) {
+    try { broadcastGoodbye(); } catch (_) {}
+    onlineUsers.delete(MY_IP);
+    registerSelf();
+  } else if (was) {
+    registerSelf();
+    if (globalUdpSocket) broadcastPresence(globalUdpSocket);
+  }
+  notifyUsageLockState();
+  writeToLogFile('info', disabled
+    ? `[사용중지] 이 PC 메신저 사용이 중지되었습니다. (by ${localUsageLockMeta.disabledByIp || '?'})`
+    : '[사용중지] 이 PC 메신저 사용이 다시 허용되었습니다.');
+}
+
+function handleUsageLockSync(payload, senderIP) {
+  const ip = String((payload && payload.ip) || '').trim();
+  if (!ip || ip === MY_IP) return;
+  if (payload && payload.disabled) {
+    persistDisabledClient(ip, {
+      username: (payload && payload.username) || '',
+      disabledAt: (payload && payload.disabledAt) || new Date().toISOString(),
+      disabledByIp: (payload && payload.fromIp) || senderIP || ''
+    });
+  } else {
+    removeDisabledClient(ip);
+  }
+  notifyUserList();
+  safeWebContentsSend('disabled-clients-updated', { ip, disabled: !!(payload && payload.disabled) });
+}
+
+function replyUsageLockResult(senderIP, success, disabled, msg) {
+  if (!senderIP || senderIP === MY_IP) return;
+  sendToIpDirect(senderIP, {
+    type: 'USAGE_LOCK_RESULT',
+    success: !!success,
+    disabled: !!disabled,
+    msg: msg || '',
+    fromIp: MY_IP
+  });
+}
+
+async function handleUsageDisableCommand(payload, senderIP) {
+  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  if (!ok) {
+    replyUsageLockResult(senderIP, false, localUsageDisabled, '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)');
+    return;
+  }
+  applyLocalUsageDisabled(true, {
+    disabledAt: new Date().toISOString(),
+    disabledByIp: (payload && payload.fromIp) || senderIP || '',
+    reason: (payload && payload.reason) || '마스터 관리자에 의해 사용 중지'
+  });
+  replyUsageLockResult(senderIP, true, true, '사용이 중지되었습니다');
+}
+
+async function handleUsageEnableCommand(payload, senderIP) {
+  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  if (!ok) {
+    replyUsageLockResult(senderIP, false, localUsageDisabled, '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)');
+    return;
+  }
+  applyLocalUsageDisabled(false, {});
+  replyUsageLockResult(senderIP, true, false, '사용이 허용되었습니다');
+}
+
+function usageLockBlockedResponse() {
+  const msg = '이 PC의 메신저 사용이 중지된 상태입니다. 마스터 아이디·비밀번호로 해제해 주세요.';
+  return { success: false, status: 'ERROR', msg, error: msg };
+}
+
 let forceUpdateInFlight = false;
 
 async function handleForceUpdateCommand(payload, senderIP) {
@@ -7813,6 +8043,105 @@ ipcMain.handle('master-force-update', async (event, payload) => {
   }
   sendToIps([targetIp], forcePayload);
   return { success: true, targetIp };
+});
+
+ipcMain.handle('get-usage-lock-state', async () => ({
+  disabled: localUsageDisabled,
+  disabledAt: localUsageLockMeta.disabledAt || '',
+  disabledByIp: localUsageLockMeta.disabledByIp || '',
+  reason: localUsageLockMeta.reason || '',
+  myIp: MY_IP
+}));
+
+ipcMain.handle('get-disabled-clients', async () => {
+  if (!masterSessionActive) return [];
+  return Array.from(disabledClients.values());
+});
+
+ipcMain.handle('unlock-usage-with-master', async (event, payload) => {
+  const p = payload || {};
+  const ok = await verifyLocalMasterAuth(p.id, p.password);
+  if (!ok) {
+    return { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
+  }
+  applyLocalUsageDisabled(false, {});
+  removeDisabledClient(MY_IP);
+  broadcastToOnlinePeers({
+    type: 'USAGE_LOCK_SYNC',
+    ip: MY_IP,
+    disabled: false,
+    username: myProfile.username || '',
+    fromIp: MY_IP
+  });
+  masterSessionActive = true;
+  return { success: true };
+});
+
+ipcMain.handle('master-set-client-usage', async (event, payload) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  const p = payload || {};
+  const password = String(p.password || '');
+  if (!(await verifyLocalMasterPassword(password))) {
+    return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
+  }
+  const targetIp = String(p.targetIp || '').trim();
+  const disabled = !!p.disabled;
+  if (!targetIp) return { success: false, msg: '대상 IP가 없습니다.' };
+
+  const known = allKnownUsers.get(targetIp);
+  const username = (known && known.username) || String(p.username || '').trim() || '';
+  const lockPayload = {
+    type: disabled ? 'USAGE_DISABLE' : 'USAGE_ENABLE',
+    masterPassword: password,
+    fromIp: MY_IP,
+    reason: disabled ? '마스터 관리자에 의해 사용 중지' : '',
+    username
+  };
+
+  if (targetIp === MY_IP || targetIp === 'SELF') {
+    applyLocalUsageDisabled(disabled, {
+      disabledAt: new Date().toISOString(),
+      disabledByIp: MY_IP,
+      reason: lockPayload.reason
+    });
+    if (disabled) {
+      // 자기 자신은 disabled_clients에 넣지 않음 (로컬 usage_lock으로 관리)
+    } else {
+      removeDisabledClient(MY_IP);
+    }
+    broadcastToOnlinePeers({
+      type: 'USAGE_LOCK_SYNC',
+      ip: MY_IP,
+      disabled,
+      username: myProfile.username || username,
+      disabledAt: localUsageLockMeta.disabledAt,
+      fromIp: MY_IP
+    });
+    return { success: true, local: true, disabled };
+  }
+
+  if (disabled) {
+    persistDisabledClient(targetIp, {
+      username,
+      disabledAt: new Date().toISOString(),
+      disabledByIp: MY_IP
+    });
+  } else {
+    removeDisabledClient(targetIp);
+  }
+  notifyUserList();
+  broadcastToOnlinePeers({
+    type: 'USAGE_LOCK_SYNC',
+    ip: targetIp,
+    disabled,
+    username,
+    disabledAt: disabled ? new Date().toISOString() : '',
+    fromIp: MY_IP
+  });
+
+  // 사용 중지된 PC는 온라인 목록에서 빠질 수 있으므로 직접 TCP 시도
+  sendToIpDirect(targetIp, lockPayload);
+  return { success: true, targetIp, disabled, sent: true };
 });
 
 async function autoCheckAndApplyUpdate() {
