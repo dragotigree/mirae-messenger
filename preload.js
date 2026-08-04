@@ -176,5 +176,6 @@ contextBridge.exposeInMainWorld('api', {
   getTrayLaunchViewMode: () => ipcRenderer.invoke('get-tray-launch-view-mode'),
   onApplyTrayViewMode: (callback) => ipcRenderer.on('apply-tray-view-mode', (e, mode) => callback(mode)),
   onTrayLaunchViewModeChanged: (callback) => ipcRenderer.on('tray-launch-view-mode-changed', (e, mode) => callback(mode)),
-  onWindowMaximizedState: (callback) => ipcRenderer.on('window-maximized-state', (e, isMax) => callback(isMax))
+  onWindowMaximizedState: (callback) => ipcRenderer.on('window-maximized-state', (e, isMax) => callback(isMax)),
+  onMainWindowHidden: (callback) => ipcRenderer.on('main-window-hidden', () => callback())
 });

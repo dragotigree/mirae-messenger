@@ -5302,6 +5302,11 @@
     window.api.onApplyTrayViewMode((mode) => {
       applyViewMode(mode === 'compact').catch((e) => console.error('트레이 화면 전환 실패:', e));
     });
+    if (window.api && typeof window.api.onMainWindowHidden === 'function') {
+      window.api.onMainWindowHidden(() => {
+        leaveActiveChatForPrivacy();
+      });
+    }
     window.api.onTrayLaunchViewModeChanged((mode) => {
       const next = mode === 'compact' ? 'compact' : 'normal';
       appSettings.defaultViewMode = next;
@@ -6301,6 +6306,32 @@
     function showCompactList() {
       activeChatUser = null;
       renderUserListTree();
+      updateMainPanelVisibility();
+    }
+
+    /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
+    function leaveActiveChatForPrivacy() {
+      try { cancelEditMessage(); } catch (_) {}
+      try { cancelReplyMessage(); } catch (_) {}
+      try { closeChatSearchBar(); } catch (_) {}
+      try { closeChatSharedDrawer(); } catch (_) {}
+      try { hideReadReceiptNote(); } catch (_) {}
+      activeChatUser = null;
+      activeChatPin = null;
+      channelReadNotifyWatermark = '';
+      pendingUnreadScrollCount = 0;
+      const msgsEl = document.getElementById('chat-messages-area');
+      if (msgsEl) msgsEl.innerHTML = '';
+      const ta = document.getElementById('chat-textarea');
+      if (ta) {
+        ta.value = '';
+        try { resizeChatTextarea(); } catch (_) {}
+      }
+      try { syncSidebarSelectionHighlight(); } catch (_) {}
+      try { renderUserListTree(); } catch (_) {}
+      if (document.body.classList.contains('compact-mode')) {
+        try { renderCompactList(); } catch (_) {}
+      }
       updateMainPanelVisibility();
     }
 

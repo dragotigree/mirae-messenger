@@ -2415,6 +2415,8 @@ function createWindow() {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow.hide();
+      // 트레이로 숨길 때 마지막 대화방을 유지하지 않음 (보안)
+      safeWebContentsSend('main-window-hidden');
     }
     return false;
   });
@@ -2576,6 +2578,7 @@ ipcMain.handle('set-main-window-hidden', async (event, hidden) => {
   if (hidden) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.hide();
+    safeWebContentsSend('main-window-hidden');
   } else {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.showInactive();
