@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('api', {
   onForceUpdateResult: (callback) => ipcRenderer.on('force-update-result', (e, data) => callback(data)),
   getNoticeOperators: () => ipcRenderer.invoke('get-notice-operators'),
   addNoticeOperator: (data) => ipcRenderer.invoke('add-notice-operator', data),
+  updateNoticeOperatorDisplayName: (data) => ipcRenderer.invoke('update-notice-operator-display-name', data),
   deleteNoticeOperator: (username) => ipcRenderer.invoke('delete-notice-operator', username),
   setNoticeOperatorDutyPerm: (data) => ipcRenderer.invoke('set-notice-operator-duty-perm', data),
   noticeOperatorLogin: (data) => ipcRenderer.invoke('notice-operator-login', data),

@@ -1453,11 +1453,31 @@ function normalizeRankText(rank) {
   return r;
 }
 
-/** 인코딩 실패 대체 문자() 등 깨진 표시용 문자 제거 */
+/** 잘못된 인코딩으로 저장된 한글 복구 시도 (UTF-8을 Latin-1로 오인한 경우 등) */
+function tryRepairMojibakeText(str) {
+  const s = String(str || '');
+  if (!s) return s;
+  const hasLatin = /[\u00C0-\u00FF]/.test(s);
+  if (!hasLatin) return s;
+  try {
+    const repaired = Buffer.from(s, 'latin1').toString('utf8');
+    if (!repaired || repaired.includes('\uFFFD')) return s;
+    const hangul = (t) => (String(t).match(/[\uAC00-\uD7A3]/g) || []).length;
+    if (hangul(repaired) > hangul(s)) return repaired;
+    if (hangul(repaired) > 0 && hangul(s) === 0) return repaired;
+  } catch (_) { /* ignore */ }
+  return s;
+}
+
+/**
+ * 표시용 문자열 정리.
+ * 1) 복구 가능한 모지베이크는 한글로 되돌림
+ * 2) 복구 불가 대체문자(U+FFFD)만 제거 (성이 통째로 사라진 경우는 복구 불가 → 다시 입력 필요)
+ */
 function scrubBrokenDisplayChars(str) {
-  return String(str || '')
-    .replace(/\uFFFD+/g, '')
+  return tryRepairMojibakeText(str)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/\uFFFD+/g, '')
     .replace(/[ \t\u00A0]{2,}/g, ' ')
     .replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, '');
 }
@@ -2701,7 +2721,7 @@ function startUdpDiscovery() {
     if (rinfo.address === MY_IP) return;
 
     try {
-      const data = JSON.parse(msg.toString());
+      const data = JSON.parse(msg.toString('utf8'));
       if (data.type === 'GOODBYE') {
         const leftAt = Number(data.leftAt) || Date.now();
         if (markPeerOffline(rinfo.address, leftAt)) {
@@ -3578,7 +3598,7 @@ function startTcpServer() {
     };
 
     socket.on('data', (chunk) => {
-      buffer += chunk.toString();
+      buffer += chunk.toString('utf8');
       if (buffer.length > MAX_TCP_LINE_BUFFER) {
         console.error('TCP 수신 버퍼 초과 — 연결을 끊습니다.');
         buffer = '';
@@ -4452,15 +4472,21 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   if (Array.isArray(operators)) {
     operators.forEach(o => {
       if (!o || !o.username) return;
-      db.get(`SELECT can_manage_duty FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
+      db.get(`SELECT can_manage_duty, display_name, password_hash FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
         let dutyFlag = 0;
         if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
         else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
         else if (row && row.can_manage_duty) dutyFlag = 1;
-        const cleanDisplayName = scrubBrokenDisplayChars(o.display_name);
+        const incoming = scrubBrokenDisplayChars(o.display_name);
+        const localName = scrubBrokenDisplayChars(row && row.display_name);
+        const hangul = (t) => (String(t).match(/[\uAC00-\uD7A3]/g) || []).length;
+        // 로컬에 더 온전한 한글 이름이 있으면 유지 (깨진 동기화로 덮어쓰지 않음)
+        const cleanDisplayName = (hangul(localName) > hangul(incoming)) ? localName : (incoming || localName);
+        const passwordHash = o.password_hash || (row && row.password_hash) || '';
+        if (!passwordHash) return;
         db.run(
           `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-          [o.username, o.password_hash, cleanDisplayName, o.added_at, dutyFlag],
+          [o.username, passwordHash, cleanDisplayName, o.added_at || (row && row.added_at) || new Date().toISOString(), dutyFlag],
           logDbErr
         );
       });
@@ -6510,11 +6536,54 @@ ipcMain.handle('delete-notice', async (event, uid) => {
 ipcMain.handle('get-notice-operators', async () => {
   return new Promise((resolve) => {
     db.all(`SELECT username, display_name, added_at, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => {
-      const cleaned = (rows || []).map((row) => ({
-        ...row,
-        display_name: scrubBrokenDisplayChars(row.display_name)
-      }));
+      const cleaned = (rows || []).map((row) => {
+        const raw = String(row.display_name || '');
+        const repaired = tryRepairMojibakeText(raw);
+        const hangul = (t) => (String(t).match(/[\uAC00-\uD7A3]/g) || []).length;
+        // 복구에 성공하면 로컬 DB에만 반영 (비밀번호 없는 불완전 sync 방지). 이후 NOTICE_SYNC로 전파.
+        if (repaired && repaired !== raw && !repaired.includes('\uFFFD') && hangul(repaired) > hangul(raw)) {
+          db.run(`UPDATE notice_operators SET display_name = ? WHERE username = ?`, [repaired, row.username], logDbErr);
+          return { ...row, display_name: repaired };
+        }
+        return { ...row, display_name: scrubBrokenDisplayChars(raw) };
+      });
       resolve(cleaned);
+    });
+  });
+});
+
+ipcMain.handle('update-notice-operator-display-name', async (event, { username, displayName }) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
+  const user = String(username || '').trim();
+  const name = scrubBrokenDisplayChars(displayName);
+  if (!user) return { success: false, msg: '아이디가 없습니다.' };
+  if (!name) return { success: false, msg: '표시 이름을 입력해 주세요.' };
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM notice_operators WHERE username = ?`, [user], (err, row) => {
+      if (err || !row) {
+        resolve({ success: false, msg: '계정을 찾을 수 없습니다.' });
+        return;
+      }
+      db.run(
+        `UPDATE notice_operators SET display_name = ? WHERE username = ?`,
+        [name, user],
+        (updErr) => {
+          if (!updErr) {
+            broadcastToOnlinePeers({
+              type: 'OPERATOR_ADD',
+              operator: {
+                username: row.username,
+                password_hash: row.password_hash,
+                display_name: name,
+                added_at: row.added_at,
+                can_manage_duty: row.can_manage_duty
+              }
+            });
+            if (mainWindow) safeWebContentsSend('notice-operators-update');
+          }
+          resolve({ success: !updErr });
+        }
+      );
     });
   });
 });

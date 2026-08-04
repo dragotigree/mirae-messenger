@@ -10266,15 +10266,39 @@
         const row = document.createElement('div');
         row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: 15px; border:1px solid #e2e8f0;';
         const uname = String(o.username || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const rawName = String(o.display_name || '');
+        const looksBroken = !rawName || hangulCharCount(rawName) < 2;
         row.innerHTML = `
           <div style="min-width:0; flex:1;">
-            <div><b>${escapeHtml(o.display_name || '')}</b> <span style="color:#94a3b8; font-size:12px;">(${escapeHtml(o.username || '')})</span></div>
+            <div><b>${escapeHtml(rawName || '(이름 없음)')}</b> <span style="color:#94a3b8; font-size:12px;">(${escapeHtml(o.username || '')})</span>${looksBroken ? ' <span style="color:#dc2626; font-size:11px; font-weight:700;">이름 확인 필요</span>' : ''}</div>
             <div style="margin-top:6px; font-size:11px; font-weight:700; color:#15803d;">✓ 공지 · 병원일정 · 당직의·OFF(일정등록) 가능</div>
           </div>
-          <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; flex-shrink:0;" onclick="removeMasterNoticeOperator('${uname}')">삭제</span>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <span style="color:#0369a1; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px;" onclick="renameMasterNoticeOperator('${uname}')">이름수정</span>
+            <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px;" onclick="removeMasterNoticeOperator('${uname}')">삭제</span>
+          </div>
         `;
         container.appendChild(row);
       });
+    }
+
+    async function renameMasterNoticeOperator(username) {
+      const current = (await window.api.getNoticeOperators() || []).find((o) => o.username === username);
+      const prev = current ? String(current.display_name || '') : '';
+      const next = window.prompt(`'${username}' 표시 이름을 올바르게 입력하세요.\n깨진 글자가 있으면 전체 이름(예: 홍길동)을 다시 적어 주세요.`, prev);
+      if (next == null) return;
+      const name = String(next).trim();
+      if (!name) {
+        await appAlert('표시 이름을 입력해 주세요.');
+        return;
+      }
+      const res = await window.api.updateNoticeOperatorDisplayName({ username, displayName: name });
+      if (!res || !res.success) {
+        await appAlert(res?.msg || '이름 수정에 실패했습니다.');
+        return;
+      }
+      loadMasterOperatorList();
+      await appAlert(`표시 이름을 [${name}] 으로 저장했습니다.`);
     }
 
     async function addMasterNoticeOperator() {
@@ -10750,19 +10774,66 @@
       return buildReplyQuoteHtml(replyInfo) + bodyHtml;
     }
 
+    function tryRepairMojibakeText(str) {
+      const s = String(str || '');
+      if (!s || !/[\u00C0-\u00FF]/.test(s)) return s;
+      try {
+        const bytes = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff;
+        const repaired = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        if (!repaired || repaired.includes('\uFFFD')) return s;
+        const hangul = (t) => (String(t).match(/[\uAC00-\uD7A3]/g) || []).length;
+        if (hangul(repaired) > hangul(s)) return repaired;
+        if (hangul(repaired) > 0 && hangul(s) === 0) return repaired;
+      } catch (_) { /* ignore */ }
+      return s;
+    }
+
     function scrubBrokenDisplayChars(str) {
-      return String(str || '')
-        // 인코딩 실패로 남은 대체 문자(U+FFFD) — 표시에서 숨김
-        .replace(/\uFFFD+/g, '')
-        // 제어 문자(탭·개행 제외)
+      return tryRepairMojibakeText(str)
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-        // 깨진 뒤 남은 과도한 공백
+        .replace(/\uFFFD+/g, '')
         .replace(/[ \t\u00A0]{2,}/g, ' ')
         .replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, '');
     }
 
     function normalizeDisplayText(str) {
       return scrubBrokenDisplayChars(str).normalize('NFC');
+    }
+
+    function hangulCharCount(str) {
+      return (String(str || '').match(/[\uAC00-\uD7A3]/g) || []).length;
+    }
+
+    function extractPatientNameFromScheduleTitle(title, roomNo) {
+      let stripped = scrubBrokenDisplayChars(title);
+      if (!stripped) return '';
+      if (roomNo) {
+        const move = parseRoomChangeParts(roomNo);
+        if (move) {
+          stripped = stripped.replace(
+            new RegExp('^\\s*' + move.from + '\\s*(?:호)?\\s*(?:→|->|⇒|➜|>)\\s*' + move.to + '\\s*(?:호)?\\s*', 'i'),
+            ''
+          ).trim();
+        } else {
+          const roomDigits = String(roomNo).replace(/\D/g, '');
+          if (roomDigits) {
+            stripped = stripped.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '').trim();
+          } else {
+            const roomCore = String(roomNo).replace(/호\s*$/u, '').trim();
+            const esc = roomCore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (esc) {
+              stripped = stripped.replace(new RegExp('^\\s*' + esc + '\\s*호?\\s*', 'i'), '').trim();
+            }
+          }
+        }
+      } else {
+        stripped = stripped.replace(/^\d{3,4}\s*호?\s*/i, '').trim();
+      }
+      if (stripped && !/^RM\s*\d/i.test(stripped)) {
+        return stripped.split(/[\s,·/]/)[0] || '';
+      }
+      return '';
     }
 
     function plainTextFromMessageBubble(textEl) {
@@ -13290,50 +13361,36 @@
       if (!sch) return { ward: '', rm_team: '', room_no: '', patient_name: '' };
       const hit = _scheduleNormCache.get(sch);
       if (hit) return hit;
+      const rawPatient = String(sch?.patient_name || '');
+      const rawTitle = String(sch?.title || '');
       let ward = scrubBrokenDisplayChars(sch?.ward || '');
       let rm_team = scrubBrokenDisplayChars(sch?.rm_team || '');
       let room_no = scrubBrokenDisplayChars(sch?.room_no || '');
-      let patient_name = scrubBrokenDisplayChars(sch?.patient_name || '');
-      const title = scrubBrokenDisplayChars(sch?.title || '');
-      if (!room_no && title) {
-        const moveInTitle = parseRoomChangeParts(title);
+      let patient_name = scrubBrokenDisplayChars(rawPatient);
+      const title = scrubBrokenDisplayChars(rawTitle);
+      if (!room_no && (title || rawTitle)) {
+        const moveInTitle = parseRoomChangeParts(title || rawTitle);
         if (moveInTitle) {
           room_no = normalizeRoomChangeNo(moveInTitle.from, moveInTitle.to);
         } else {
-          const m = title.match(/(\d{3,4})\s*호?/);
+          const m = (title || rawTitle).match(/(\d{3,4})\s*호?/);
           if (m) room_no = m[1] + '호';
         }
       }
+      // 환자명이 깨졌거나 비었으면 제목에서 온전한 한글 이름을 우선 복구
+      const titlePatient = extractPatientNameFromScheduleTitle(rawTitle || title, room_no);
+      if (/\uFFFD/.test(rawPatient) || !patient_name) {
+        if (titlePatient && hangulCharCount(titlePatient) >= hangulCharCount(patient_name)) {
+          patient_name = titlePatient;
+        }
+      } else if (titlePatient && hangulCharCount(titlePatient) > hangulCharCount(patient_name)) {
+        patient_name = titlePatient;
+      }
       if (!patient_name && title) {
-        let stripped = title;
-        if (room_no) {
-          const move = parseRoomChangeParts(room_no);
-          if (move) {
-            stripped = stripped.replace(
-              new RegExp('^\\s*' + move.from + '\\s*(?:호)?\\s*(?:→|->|⇒|➜|>)\\s*' + move.to + '\\s*(?:호)?\\s*', 'i'),
-              ''
-            ).trim();
-          } else {
-            const roomDigits = room_no.replace(/\D/g, '');
-            if (roomDigits) {
-              stripped = stripped.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '').trim();
-            } else {
-              const roomCore = room_no.replace(/호\s*$/u, '').trim();
-              const esc = roomCore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              if (esc) {
-                stripped = stripped.replace(new RegExp('^\\s*' + esc + '\\s*호?\\s*', 'i'), '').trim();
-              }
-            }
-          }
-        } else {
-          stripped = stripped.replace(/^\d{3,4}\s*호?\s*/i, '').trim();
-        }
-        if (stripped && !/^RM\s*\d/i.test(stripped)) {
-          patient_name = stripped.split(/[\s,·/]/)[0] || '';
-        }
+        patient_name = extractPatientNameFromScheduleTitle(title, room_no);
       }
       if (!rm_team) {
-        const rmM = (title + ' ' + (sch?.title || '')).match(/RM\s*(\d+)/i);
+        const rmM = (title + ' ' + rawTitle).match(/RM\s*(\d+)/i);
         if (rmM) rm_team = 'RM' + rmM[1];
       }
       if (!ward) ward = inferWardFromRoomDigits(room_no);
