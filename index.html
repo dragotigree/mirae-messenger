@@ -1186,6 +1186,12 @@
     .detail-info-row { background: var(--surface-muted); padding: 5px 10px; border-radius: 10px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; }
     .detail-info-row .detail-info-label { color: var(--text-secondary); font-size: 11px; }
     .detail-info-row .detail-info-value { font-weight: 700; color: var(--text-primary); font-size: 12px; text-align: right; }
+    .detail-self-edit-btn {
+      margin-top: 10px; width: 100%; padding: 8px 12px; border: 1px solid #bae6fd;
+      border-radius: 12px; background: #f0f9ff; color: #0369a1; font-size: 12px; font-weight: 700;
+      cursor: pointer; -webkit-app-region: no-drag;
+    }
+    .detail-self-edit-btn:hover { background: #e0f2fe; }
     .group-detail-members { width: 100%; margin-top: 10px; text-align: left; display: flex; flex-direction: column; gap: 6px; }
     .group-detail-members-heading { font-size: 11.5px; color: var(--text-secondary); font-weight: var(--font-weight-bold); text-align: center; width: 100%; margin-bottom: 2px; }
     .group-member-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: 12px; box-sizing: border-box; }
@@ -2813,6 +2819,7 @@
         <div class="detail-info-row"><span class="detail-info-label">휴대폰번호</span><span class="detail-info-value" id="detail-phone">-</span></div>
         <div class="detail-info-row"><span class="detail-info-label">마지막 접속</span><span class="detail-info-value" id="detail-last-seen">-</span></div>
       </div>
+      <button type="button" id="detail-self-edit-btn" class="detail-self-edit-btn" style="display:none;" onclick="ctxEditMyDetails()">✏️ 내 상세정보 수정</button>
     </div>
 
     <div class="detail-profile-card" id="detail-broadcast-section" style="display:none;"></div>
@@ -3499,11 +3506,17 @@
 
   <!-- 🖱 대화상대 우클릭 메뉴 -->
   <div id="dm-context-menu">
-    <div class="ctx-menu-item" id="ctx-favorite-item" onclick="ctxToggleFavorite()">⭐ 즐겨찾기 추가</div>
-    <div class="ctx-menu-item" onclick="ctxOpenIpmsgToUser()">✉️ 쪽지 보내기</div>
-    <div class="ctx-menu-item" onclick="ctxOpenGroupInvite()">👥 그룹대화방 초대</div>
-    <div class="ctx-menu-item" onclick="ctxDmSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
-    <div class="ctx-menu-item" id="ctx-dm-reset-emoji" style="display:none;" onclick="ctxDmClearTitleEmoji()">↩️ 이모티콘 제거</div>
+    <div id="ctx-peer-items">
+      <div class="ctx-menu-item" id="ctx-favorite-item" onclick="ctxToggleFavorite()">⭐ 즐겨찾기 추가</div>
+      <div class="ctx-menu-item" onclick="ctxOpenIpmsgToUser()">✉️ 쪽지 보내기</div>
+      <div class="ctx-menu-item" onclick="ctxOpenGroupInvite()">👥 그룹대화방 초대</div>
+      <div class="ctx-menu-item" onclick="ctxDmSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
+      <div class="ctx-menu-item" id="ctx-dm-reset-emoji" style="display:none;" onclick="ctxDmClearTitleEmoji()">↩️ 이모티콘 제거</div>
+    </div>
+    <div id="ctx-self-items" style="display:none;">
+      <div class="ctx-menu-item" onclick="ctxEditMyProfile()">👤 프로필 수정</div>
+      <div class="ctx-menu-item" onclick="ctxEditMyDetails()">📋 상세정보 수정</div>
+    </div>
   </div>
 
   <div id="dept-floor-context-menu">
@@ -7576,15 +7589,53 @@
       e.preventDefault();
       ctxMenuTargetUser = user;
       const menu = document.getElementById('dm-context-menu');
-      document.getElementById('ctx-favorite-item').textContent = favoriteIps.has(user.ip) ? '⭐ 즐겨찾기 해제' : '⭐ 즐겨찾기 추가';
-      const resetEmojiEl = document.getElementById('ctx-dm-reset-emoji');
-      if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(`DM:${user.ip}`) ? 'block' : 'none';
-      const menuWidth = 200, menuHeight = 150;
+      const isSelf = !!(user && (user.isMe || (myProfile && user.ip && user.ip === myProfile.ip)));
+      const peerItems = document.getElementById('ctx-peer-items');
+      const selfItems = document.getElementById('ctx-self-items');
+      if (peerItems) peerItems.style.display = isSelf ? 'none' : 'block';
+      if (selfItems) selfItems.style.display = isSelf ? 'block' : 'none';
+      if (!isSelf) {
+        document.getElementById('ctx-favorite-item').textContent = favoriteIps.has(user.ip) ? '⭐ 즐겨찾기 해제' : '⭐ 즐겨찾기 추가';
+        const resetEmojiEl = document.getElementById('ctx-dm-reset-emoji');
+        if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(`DM:${user.ip}`) ? 'block' : 'none';
+      }
+      const menuWidth = 200, menuHeight = isSelf ? 90 : 150;
       const x = Math.min(e.clientX, window.innerWidth - menuWidth);
       const y = Math.min(e.clientY, window.innerHeight - menuHeight);
       menu.style.left = x + 'px';
       menu.style.top = y + 'px';
       menu.style.display = 'block';
+    }
+
+    function ctxEditMyProfile() {
+      document.getElementById('dm-context-menu').style.display = 'none';
+      openSettingsModal({ focus: 'profile' });
+    }
+
+    function ctxEditMyDetails() {
+      document.getElementById('dm-context-menu').style.display = 'none';
+      openSettingsModal({ focus: 'details' });
+    }
+
+    function focusSettingsSection(focusKey) {
+      const modal = document.getElementById('settings-modal');
+      if (!modal) return;
+      const profileSection = modal.querySelector('.settings-section');
+      if (focusKey === 'profile') {
+        profileSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          document.getElementById('setting-name')?.focus();
+          document.getElementById('setting-name')?.select?.();
+        }, 80);
+        return;
+      }
+      if (focusKey === 'details') {
+        profileSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          document.getElementById('setting-floor')?.focus();
+          document.getElementById('setting-floor')?.select?.();
+        }, 80);
+      }
     }
     document.addEventListener('click', () => {
       closeScreenCapturePopover();
@@ -9615,6 +9666,11 @@
       if (lastSeenEl) {
         lastSeenEl.textContent = formatLastSeenRelative(u);
         lastSeenEl.title = formatLastSeenTitle(u) || '';
+      }
+      const selfEditBtn = document.getElementById('detail-self-edit-btn');
+      if (selfEditBtn) {
+        const isSelf = !!(u.isMe || (myProfile && u.ip && u.ip === myProfile.ip));
+        selfEditBtn.style.display = isSelf ? 'block' : 'none';
       }
     }
 
@@ -15320,68 +15376,69 @@
       }
     }
 
-    async function openSettingsModal() {
-  setModalOpenState(true);
-  bindModalEditableFocus(document.getElementById('settings-modal'));
-  document.getElementById('settings-modal').style.display = 'flex';
-  const backupResultEl = document.getElementById('chat-backup-result');
-  if (backupResultEl) backupResultEl.textContent = '';
-  try {
-    const p = await window.api.getMyProfile();
-    document.getElementById('setting-name').value = p.username || '';
-    currentProfilePhotoValue = p.photo || '';
-    renderSettingPhotoPreview(p.username, currentProfilePhotoValue);
-    
-    // 추가된 항목 값 불러오기
-    document.getElementById('setting-floor').value = p.floor || '';
-    document.getElementById('setting-dept').value = p.dept || '';
-    document.getElementById('setting-rank').value = p.rank || '';
-    
-    document.getElementById('setting-ext').value = p.extNo || '';
-    document.getElementById('setting-phone').value = p.phone || '';
-    document.getElementById('setting-font-size').value = appSettings.fontSize;
-    document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
-    const chatFontEl = document.getElementById('setting-chat-font-family');
-    if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
-    document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
-    document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
-    const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
-    if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
-    document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
-    document.getElementById('setting-my-status').value = p.statusState || 'ONLINE';
-    document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
-    const msgNotify = await window.api.getMessageNotificationSettings();
-    const incomingEl = document.getElementById('setting-notify-incoming');
-    const readReceiptEl = document.getElementById('setting-notify-read-receipt');
-    const toastDurEl = document.getElementById('setting-toast-duration');
-    if (incomingEl) incomingEl.checked = msgNotify.notifyIncomingMessages !== false;
-    if (readReceiptEl) readReceiptEl.checked = msgNotify.notifyReadReceipts !== false;
-    const mode = msgNotify.incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
-    const modeToastEl = document.getElementById('notify-mode-toast');
-    const modeDesktopEl = document.getElementById('notify-mode-desktop');
-    if (modeToastEl) modeToastEl.checked = mode === 'toast';
-    if (modeDesktopEl) modeDesktopEl.checked = mode === 'desktop';
-    if (toastDurEl) {
-      const secs = parseInt(msgNotify.toastDurationSeconds, 10);
-      toastDurEl.value = String(Number.isFinite(secs) ? Math.max(2, Math.min(60, secs)) : 7);
+    async function openSettingsModal(opts) {
+      const o = opts || {};
+      setModalOpenState(true);
+      bindModalEditableFocus(document.getElementById('settings-modal'));
+      document.getElementById('settings-modal').style.display = 'flex';
+      const backupResultEl = document.getElementById('chat-backup-result');
+      if (backupResultEl) backupResultEl.textContent = '';
+      try {
+        const p = await window.api.getMyProfile();
+        document.getElementById('setting-name').value = p.username || '';
+        currentProfilePhotoValue = p.photo || '';
+        renderSettingPhotoPreview(p.username, currentProfilePhotoValue);
+
+        document.getElementById('setting-floor').value = p.floor || '';
+        document.getElementById('setting-dept').value = p.dept || '';
+        document.getElementById('setting-rank').value = p.rank || '';
+
+        document.getElementById('setting-ext').value = p.extNo || '';
+        document.getElementById('setting-phone').value = p.phone || '';
+        document.getElementById('setting-font-size').value = appSettings.fontSize;
+        document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
+        const chatFontEl = document.getElementById('setting-chat-font-family');
+        if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
+        document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
+        document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
+        const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
+        if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
+        document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
+        document.getElementById('setting-my-status').value = p.statusState || 'ONLINE';
+        document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
+        const msgNotify = await window.api.getMessageNotificationSettings();
+        const incomingEl = document.getElementById('setting-notify-incoming');
+        const readReceiptEl = document.getElementById('setting-notify-read-receipt');
+        const toastDurEl = document.getElementById('setting-toast-duration');
+        if (incomingEl) incomingEl.checked = msgNotify.notifyIncomingMessages !== false;
+        if (readReceiptEl) readReceiptEl.checked = msgNotify.notifyReadReceipts !== false;
+        const mode = msgNotify.incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
+        const modeToastEl = document.getElementById('notify-mode-toast') || document.getElementById('setting-notify-mode-toast');
+        const modeDesktopEl = document.getElementById('notify-mode-desktop') || document.getElementById('setting-notify-mode-desktop');
+        if (modeToastEl) modeToastEl.checked = mode === 'toast';
+        if (modeDesktopEl) modeDesktopEl.checked = mode === 'desktop';
+        if (toastDurEl) {
+          const secs = parseInt(msgNotify.toastDurationSeconds, 10);
+          toastDurEl.value = String(Number.isFinite(secs) ? Math.max(2, Math.min(60, secs)) : 7);
+        }
+        const spellEl = document.getElementById('setting-spellcheck');
+        if (spellEl) spellEl.checked = appSettings.spellcheck === true;
+
+        if (appSettings.fileMode === 'ask') document.getElementById('recv-ask').checked = true;
+        else document.getElementById('recv-auto').checked = true;
+
+        document.getElementById('setting-download-folder').value = await window.api.getDownloadFolder();
+
+        await loadNetworkStatus();
+        await loadUpdatePanel();
+        window.api.focusMainWindow();
+      } catch (e) {
+        console.error('설정 화면을 불러오는 중 오류가 발생했습니다:', e);
+      }
+      if (o.focus) focusSettingsSection(o.focus);
     }
-    const spellEl = document.getElementById('setting-spellcheck');
-    if (spellEl) spellEl.checked = appSettings.spellcheck === true;
 
-    if (appSettings.fileMode === 'ask') document.getElementById('recv-ask').checked = true;
-    else document.getElementById('recv-auto').checked = true;
 
-    document.getElementById('setting-download-folder').value = await window.api.getDownloadFolder();
-
-    await loadNetworkStatus();
-    await loadUpdatePanel();
-    window.api.focusMainWindow();
-  } catch (e) {
-    console.error('설정 화면을 불러오는 중 오류가 발생했습니다:', e);
-  }
-}
-    
-    
     async function saveAppSettings() {
   const fileMode = document.querySelector('input[name="file-recv-mode"]:checked').value;
   const fontSize = document.getElementById('setting-font-size').value;
