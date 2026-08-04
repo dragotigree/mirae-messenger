@@ -12289,57 +12289,19 @@
         ? `${formatMainBoardDayHeader(weekDays[0])} ~ ${formatMainBoardDayHeader(weekDays[weekDays.length - 1])}`
         : '';
 
-      // 특정 병동 선택 시 해당 병동만
-      if (scheduleBoardWardTab !== 'all') {
-        const wardLabel = SCHEDULE_BOARD_WARD_LABELS[scheduleBoardWardTab] || `${scheduleBoardWardTab}병동`;
-        body.innerHTML = buildScheduleBoardMainBoardWrapHtml({
-          wardKey: scheduleBoardWardTab,
-          wardLabel,
-          typeLabelStr,
-          weekRange,
-          list,
-          weekDays
-        });
-        return;
-      }
-
-      // 전체: 병동별로 나눠 표시
-      const parts = [];
-      SCHEDULE_BOARD_WARDS.forEach((w) => {
-        const items = list.filter((sch) => scheduleBoardWardKeyOf(sch) === w);
-        if (!items.length) return;
-        parts.push(buildScheduleBoardMainBoardWrapHtml({
-          wardKey: w,
-          wardLabel: SCHEDULE_BOARD_WARD_LABELS[w] || `${w}병동`,
-          typeLabelStr,
-          weekRange,
-          list: items,
-          weekDays
-        }));
+      // 전체: 한 표에 전 병동 / 사이드바에서 병동 선택 시에만 해당 병동 필터
+      const wardKey = scheduleBoardWardTab !== 'all' ? scheduleBoardWardTab : '';
+      const wardLabel = wardKey
+        ? (SCHEDULE_BOARD_WARD_LABELS[wardKey] || `${wardKey}병동`)
+        : '';
+      body.innerHTML = buildScheduleBoardMainBoardWrapHtml({
+        wardKey,
+        wardLabel,
+        typeLabelStr,
+        weekRange,
+        list,
+        weekDays
       });
-      const other = list.filter((sch) => !SCHEDULE_BOARD_WARDS.includes(scheduleBoardWardKeyOf(sch)));
-      if (other.length) {
-        parts.push(buildScheduleBoardMainBoardWrapHtml({
-          wardKey: 'other',
-          wardLabel: '기타',
-          typeLabelStr,
-          weekRange,
-          list: other,
-          weekDays
-        }));
-      }
-      if (!parts.length) {
-        body.innerHTML = buildScheduleBoardMainBoardWrapHtml({
-          wardKey: '',
-          wardLabel: '',
-          typeLabelStr,
-          weekRange,
-          list: [],
-          weekDays
-        });
-        return;
-      }
-      body.innerHTML = parts.join('');
     }
 
     function formatScheduleModifiedDisplay(modifiedAt) {
