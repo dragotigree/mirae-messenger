@@ -12643,7 +12643,8 @@
       try {
         localStorage.setItem(SB_QUICK_PREFS_KEY, JSON.stringify({
           type: document.getElementById('sb-quick-type')?.value || '',
-          ward: document.getElementById('sb-quick-ward')?.value || '',
+          // 병동은 항상 (자동)이 기본 — 기억하지 않음
+          ward: '',
           doctor: document.getElementById('sb-quick-doctor')?.value || '',
           start: document.getElementById('sb-quick-time-start')?.value || '',
           end: document.getElementById('sb-quick-time-end')?.value || ''
@@ -12659,7 +12660,7 @@
         if (typeSel && [...typeSel.options].some(o => o.value === prefs.type)) typeSel.value = prefs.type;
       }
       const wardSel = document.getElementById('sb-quick-ward');
-      if (prefs.ward && wardSel && !wardSel.value) wardSel.value = prefs.ward;
+      if (wardSel) wardSel.value = ''; // 기본: (자동)
       if (prefs.doctor) {
         ensureAttendingPhysicianSelectOptions(document.getElementById('sb-quick-doctor'), prefs.doctor);
       }
@@ -12692,7 +12693,12 @@
     function collectScheduleBoardQuickSharedFields() {
       const dateStr = scheduleBoardDateStr || formatDateStr(new Date());
       const type = document.getElementById('sb-quick-type')?.value || 'OUTPATIENT';
-      const ward = (document.getElementById('sb-quick-ward')?.value || '').trim();
+      let ward = (document.getElementById('sb-quick-ward')?.value || '').trim();
+      // (자동)이면 호실에서 병동 추정
+      if (!ward) {
+        const roomDigits = String(document.getElementById('sb-quick-room')?.value || '').replace(/\D/g, '');
+        ward = inferWardFromRoomDigits(roomDigits) || '';
+      }
       const doctor = (document.getElementById('sb-quick-doctor')?.value || '').trim();
       const startUndecided = !!document.getElementById('sb-quick-time-start-undecided')?.checked;
       const endUndecided = !!document.getElementById('sb-quick-time-end-undecided')?.checked;
@@ -12811,6 +12817,8 @@
       if (remarkEl) remarkEl.value = '';
       const guardianEl = document.getElementById('sb-quick-guardian-only');
       if (guardianEl) guardianEl.checked = false;
+      const wardSel = document.getElementById('sb-quick-ward');
+      if (wardSel) wardSel.value = ''; // 다음 입력도 (자동)
     }
 
     function focusScheduleBoardQuickRoom() {
@@ -12882,7 +12890,7 @@
       refreshScheduleBoardQuickTypeOptions();
       typeSel.value = defaultScheduleBoardQuickType();
       const wardSel = document.getElementById('sb-quick-ward');
-      if (wardSel && scheduleBoardWardTab !== 'all') wardSel.value = scheduleBoardWardTab;
+      if (wardSel) wardSel.value = ''; // 기본값: (자동)
       applyScheduleBoardQuickPrefs();
       const docSel = document.getElementById('sb-quick-doctor');
       if (docSel) ensureAttendingPhysicianSelectOptions(docSel, docSel.value || '');
@@ -13004,11 +13012,7 @@
     }
 
     function syncScheduleBoardQuickWardFromRoom() {
-      const room = (document.getElementById('sb-quick-room')?.value || '').trim();
-      const digits = room.replace(/\D/g, '');
-      const ward = inferWardFromRoomDigits(digits);
-      const wardSel = document.getElementById('sb-quick-ward');
-      if (ward && wardSel && !wardSel.value) wardSel.value = ward;
+      /* 병동 기본은 (자동) 유지 — 등록 시 호실로 추정 */
     }
 
     function buildQuickScheduleTitle(roomNo, patientName, detail) {
