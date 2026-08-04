@@ -4383,6 +4383,7 @@
     let isMasterAuthenticated = false;
     let isNoticeOperatorAuthenticated = false;
     let currentOperatorName = '';
+    let currentOperatorUsername = '';
     let noticeOperatorCanManageDuty = false;
     /** 일정등록용으로만 마스터 로그인한 경우 — 모달 닫으면 세션 종료 */
     let dutyOnlyMasterSession = false;
@@ -4395,6 +4396,7 @@
       if (isNoticeOperatorAuthenticated && currentOperatorName) {
         localStorage.setItem(NOTICE_OPERATOR_STORAGE_KEY, JSON.stringify({
           displayName: currentOperatorName,
+          username: currentOperatorUsername || '',
           canManageDuty: !!noticeOperatorCanManageDuty,
           at: Date.now()
         }));
@@ -4409,7 +4411,10 @@
       // 작성 권한자 로그인 = 공지·병원일정·당직·OFF 모두 가능
       return window.api.setNoticeOperatorSession(
         !!isNoticeOperatorAuthenticated,
-        !!isNoticeOperatorAuthenticated
+        !!isNoticeOperatorAuthenticated,
+        isNoticeOperatorAuthenticated
+          ? { displayName: currentOperatorName || '', username: currentOperatorUsername || '' }
+          : null
       ).catch(() => {});
     }
 
@@ -4419,6 +4424,7 @@
         if (!raw) {
           isNoticeOperatorAuthenticated = false;
           currentOperatorName = '';
+          currentOperatorUsername = '';
           noticeOperatorCanManageDuty = false;
           syncNoticeOperatorSessionToMain();
           return;
@@ -4427,16 +4433,19 @@
         if (data && data.displayName) {
           isNoticeOperatorAuthenticated = true;
           currentOperatorName = String(data.displayName);
+          currentOperatorUsername = String(data.username || '').trim();
           // 작성 권한자 세션이면 당직·OFF 포함 (구버전 localStorage의 false 무시)
           noticeOperatorCanManageDuty = true;
         } else {
           isNoticeOperatorAuthenticated = false;
           currentOperatorName = '';
+          currentOperatorUsername = '';
           noticeOperatorCanManageDuty = false;
         }
       } catch (e) {
         isNoticeOperatorAuthenticated = false;
         currentOperatorName = '';
+        currentOperatorUsername = '';
         noticeOperatorCanManageDuty = false;
       }
       syncNoticeOperatorSessionToMain();
@@ -4488,17 +4497,42 @@
     }
 
     function isMySchedule(sch) {
-      if (!sch || !myProfile?.ip) return false;
-      if (sch.author_ip && sch.author_ip === myProfile.ip) return true;
+      if (!sch) return false;
+      const authorIp = String(sch.author_ip || '').trim();
+      const authorName = String(sch.author_name || '').trim();
       const uid = String(sch.uid || '');
-      return uid.startsWith(`${myProfile.ip}_`);
+      if (myProfile?.ip && authorIp && authorIp === myProfile.ip) return true;
+      if (myProfile?.ip && uid.startsWith(`${myProfile.ip}_`)) return true;
+      if (authorName && myProfile?.username && authorName === String(myProfile.username).trim()) return true;
+      if (isNoticeOperatorAuthenticated && currentOperatorName && authorName === currentOperatorName) return true;
+      if (isNoticeOperatorAuthenticated && currentOperatorUsername && authorName === currentOperatorUsername) return true;
+      return false;
     }
 
     function canModifySchedule(sch) {
-      // 수정·삭제는 작성 권한 로그인(또는 마스터)이 있어야 함
-      // sch 인자는 호환용(없어도 로그인 여부만 본다)
-      void sch;
-      return !!(isMasterAuthenticated || isNoticeOperatorAuthenticated);
+      // 마스터: 전체 / 작성 권한자: 본인이 작성한 일정(외진 포함)만
+      if (isMasterAuthenticated) return true;
+      if (!isNoticeOperatorAuthenticated) return false;
+      return isMySchedule(sch);
+    }
+
+    function isMyNotice(n) {
+      if (!n) return false;
+      const authorIp = String(n.author_ip || '').trim();
+      const authorName = String(n.author_name || '').trim();
+      const uid = String(n.uid || '');
+      if (myProfile?.ip && authorIp && authorIp === myProfile.ip) return true;
+      if (myProfile?.ip && uid.startsWith(`${myProfile.ip}_`)) return true;
+      if (isNoticeOperatorAuthenticated && currentOperatorName && authorName === currentOperatorName) return true;
+      if (isNoticeOperatorAuthenticated && currentOperatorUsername && authorName === currentOperatorUsername) return true;
+      if (authorName && myProfile?.username && authorName === String(myProfile.username).trim()) return true;
+      return false;
+    }
+
+    function canModifyNotice(n) {
+      if (isMasterAuthenticated) return true;
+      if (!isNoticeOperatorAuthenticated) return false;
+      return isMyNotice(n);
     }
 
     let myProfile = null;
@@ -9887,7 +9921,7 @@
 
       const actionsEl = document.getElementById('board-detail-actions');
       actionsEl.innerHTML = '';
-      if (canManageNotices) {
+      if (canModifyNotice(n)) {
         const editBtn = document.createElement('button');
         editBtn.textContent = '수정';
         editBtn.style.cssText = 'padding:8px 16px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer; color:#475569;';
@@ -9916,6 +9950,12 @@
 
       if (uid) {
         const n = cachedNoticesList.find(x => x.uid === uid);
+        if (!canModifyNotice(n)) {
+          appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
+          if (n) showBoardDetailView(uid);
+          else showBoardListView();
+          return;
+        }
         document.getElementById('board-modal-title').textContent = '✍️ 공지사항 수정';
         document.getElementById('board-write-uid').value = uid;
         document.getElementById('board-write-title').value = n ? n.title : '';
@@ -9947,8 +9987,16 @@
       isSubmittingNotice = true;
       try {
         if (uid) {
+          const existing = (cachedNoticesList || []).find((x) => x.uid === uid);
+          if (!canModifyNotice(existing)) {
+            await appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
+            return;
+          }
           const res = await window.api.updateNotice({ uid, title, content });
-          if (!res || !res.success) { await appAlert('공지사항 수정에 실패했습니다. 다시 시도해 주세요.'); return; }
+          if (!res || !res.success) {
+            await appAlert((res && res.msg) || '공지사항 수정에 실패했습니다. 다시 시도해 주세요.');
+            return;
+          }
           await loadNoticesList();
           showBoardDetailView(uid);
         } else {
@@ -9963,13 +10011,18 @@
     }
 
     async function deleteNoticeItem(uid) {
+      const n = (cachedNoticesList || []).find((x) => x.uid === uid);
+      if (!canModifyNotice(n)) {
+        await appAlert('본인이 작성한 공지만 삭제할 수 있습니다. (마스터는 전체 가능)');
+        return;
+      }
       if (!await appConfirm('이 공지사항을 삭제하시겠습니까?')) return;
       const res = await window.api.deleteNotice(uid);
-      if (res.success) {
+      if (res && res.success) {
         await loadNoticesList();
         showBoardListView();
       } else {
-        await appAlert('삭제에 실패했습니다.');
+        await appAlert((res && res.msg) || '삭제에 실패했습니다.');
         return;
       }
     }
@@ -10817,6 +10870,7 @@
         pendingOpenDutyRosterAfterLogin = false;
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
+        currentOperatorUsername = username;
         // 작성 권한자 = 당직·OFF 포함
         noticeOperatorCanManageDuty = true;
         await saveNoticeOperatorSession();
@@ -10847,6 +10901,7 @@
     function logoutOperator() {
       isNoticeOperatorAuthenticated = false;
       currentOperatorName = '';
+      currentOperatorUsername = '';
       noticeOperatorCanManageDuty = false;
       saveNoticeOperatorSession();
       closeDutyRosterModal({ skipDutyOnlyClear: true });
@@ -13670,8 +13725,8 @@
 
     async function startEditSchedule(sch) {
       if (!canModifySchedule(sch)) {
-        await appAlert('수정 권한이 없습니다. 작성 권한자로 로그인해 주세요.');
-        openOperatorLoginModal();
+        await appAlert('본인이 작성한 일정만 수정할 수 있습니다. (마스터는 전체 가능)');
+        if (!isMasterAuthenticated && !isNoticeOperatorAuthenticated) openOperatorLoginModal();
         return;
       }
       if (!sch || !sch.uid) {
@@ -15099,7 +15154,8 @@
         ward: entry.ward != null ? entry.ward : shared.ward,
         rmTeam: shared.rmTeam,
         roomNo,
-        patientName
+        patientName,
+        authorName: getNoticeAuthorDisplayName()
       }).then((res) => {
         if (res && res.success === false) {
           throw new Error(res.msg || 'denied');
@@ -15373,7 +15429,7 @@
       if (editingUid) {
         const editingSch = findScheduleByUid(editingUid);
         if (!canModifySchedule(editingSch)) {
-          await appAlert('수정 권한이 없습니다.');
+          await appAlert('본인이 작성한 일정만 수정할 수 있습니다. (마스터는 전체 가능)');
           cancelScheduleBoardQuickEdit();
           return;
         }
@@ -16530,9 +16586,10 @@
 
     async function deleteSchedule(uid) {
       if (!uid) return;
-      if (!canModifySchedule()) {
-        await appAlert('삭제 권한이 없습니다. 작성 권한자로 로그인한 뒤 삭제할 수 있습니다.');
-        openOperatorLoginModal();
+      const sch = (hospitalSchedules || []).find((s) => s.uid === uid);
+      if (!canModifySchedule(sch)) {
+        await appAlert('본인이 작성한 일정만 삭제할 수 있습니다. (마스터는 전체 가능)');
+        if (!isMasterAuthenticated && !isNoticeOperatorAuthenticated) openOperatorLoginModal();
         return;
       }
       if (!await appConfirm('해당 일정을 삭제하시겠습니까?')) return;

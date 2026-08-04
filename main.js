@@ -78,6 +78,9 @@ let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
 const disabledClients = new Map();
 /** 작성자 세션이 당직·주치의 OFF(일정등록) 권한을 갖는지 */
 let noticeOperatorCanManageDutySession = false;
+/** 작성 권한자 세션 표시 이름·아이디 — 본인 작성물 수정/삭제 판별용 */
+let noticeOperatorDisplayNameSession = '';
+let noticeOperatorUsernameSession = '';
 /** ip → { username, rank, dept, floor, extNo, phone } — 마스터가 지정한 표시 정보 */
 const profileOverrides = new Map();
 let toastWindow = null;
@@ -6759,6 +6762,10 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName }) => {
 });
 
 ipcMain.handle('update-notice', async (event, { uid, title, content }) => {
+  const allowed = await noticeModifyAllowed(uid);
+  if (!allowed) {
+    return { success: false, msg: '본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)' };
+  }
   return new Promise((resolve) => {
     db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [title, content, uid], (err) => {
       if (!err) broadcastToOnlinePeers({ type: 'NOTICE_UPDATE', notice: { uid, title, content } });
@@ -6768,12 +6775,16 @@ ipcMain.handle('update-notice', async (event, { uid, title, content }) => {
 });
 
 ipcMain.handle('delete-notice', async (event, uid) => {
+  const allowed = await noticeModifyAllowed(uid);
+  if (!allowed) {
+    return { success: false, msg: '본인이 작성한 공지만 삭제할 수 있습니다. (마스터는 전체 가능)' };
+  }
   return new Promise((resolve) => {
     applyLocalNoticeDelete(uid, {
       notify: true,
       done: (err) => {
         if (!err) broadcastToOnlinePeers({ type: 'NOTICE_DELETE', uid: String(uid) });
-        resolve({ success: !err });
+        resolve({ success: !err, msg: err ? (err.message || '삭제 실패') : undefined });
       }
     });
   });
@@ -7047,20 +7058,72 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
   }
 });
 
-ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty) => {
+ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty, meta) => {
   noticeOperatorSessionActive = !!active;
   // 작성 권한자 세션이 활성면 당직·OFF도 허용 (별도 플래그 무시)
   noticeOperatorCanManageDutySession = !!active;
+  if (active) {
+    const m = (meta && typeof meta === 'object') ? meta : {};
+    noticeOperatorDisplayNameSession = String(m.displayName || m.display_name || '').trim();
+    noticeOperatorUsernameSession = String(m.username || '').trim();
+  } else {
+    noticeOperatorDisplayNameSession = '';
+    noticeOperatorUsernameSession = '';
+  }
   return { success: true };
 });
 
+function isAuthorOfRecord(row) {
+  if (!row) return false;
+  const authorIp = String(row.author_ip || '').trim();
+  const authorName = String(row.author_name || '').trim();
+  const uid = String(row.uid || '').trim();
+  if (authorIp && authorIp === MY_IP) return true;
+  if (uid && uid.startsWith(`${MY_IP}_`)) return true;
+  if (authorName && myProfile && myProfile.username && authorName === String(myProfile.username).trim()) return true;
+  if (authorName && noticeOperatorDisplayNameSession && authorName === noticeOperatorDisplayNameSession) return true;
+  if (authorName && noticeOperatorUsernameSession && authorName === noticeOperatorUsernameSession) return true;
+  return false;
+}
+
+/** 마스터는 전체, 작성 권한자는 본인 작성분만 수정·삭제 */
 function scheduleModifyAllowed(uid) {
   return new Promise((resolve) => {
-    if (noticeOperatorSessionActive || masterSessionActive) {
+    if (masterSessionActive) {
       resolve(true);
       return;
     }
-    resolve(false);
+    if (!noticeOperatorSessionActive) {
+      resolve(false);
+      return;
+    }
+    db.get(`SELECT uid, author_ip, author_name FROM hospital_schedules WHERE uid = ?`, [uid], (err, row) => {
+      if (err || !row) {
+        resolve(false);
+        return;
+      }
+      resolve(isAuthorOfRecord(row));
+    });
+  });
+}
+
+function noticeModifyAllowed(uid) {
+  return new Promise((resolve) => {
+    if (masterSessionActive) {
+      resolve(true);
+      return;
+    }
+    if (!noticeOperatorSessionActive) {
+      resolve(false);
+      return;
+    }
+    db.get(`SELECT uid, author_ip, author_name FROM notices WHERE uid = ?`, [uid], (err, row) => {
+      if (err || !row) {
+        resolve(false);
+        return;
+      }
+      resolve(isAuthorOfRecord(row));
+    });
   });
 }
 
@@ -7076,12 +7139,18 @@ ipcMain.handle('add-schedule', async (event, payload) => {
     const meal = scheduleMealCancelFromPayload(p);
     const remark = scheduleRemarkFromPayload(p);
     const guardianOnly = scheduleGuardianOnlyFromPayload(p);
+    const authorName = String(
+      p.authorName ||
+      noticeOperatorDisplayNameSession ||
+      (myProfile && myProfile.username) ||
+      ''
+    ).trim() || (myProfile && myProfile.username) || '';
     const record = {
       uid: `${MY_IP}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: p.type,
       title: p.title,
       time_str: p.timeStr,
-      author_name: myProfile.username,
+      author_name: authorName,
       author_ip: MY_IP,
       created_at: new Date().toISOString(),
       remind_before: p.remindBefore ? 1 : 0,
@@ -7116,7 +7185,7 @@ ipcMain.handle('add-schedule', async (event, payload) => {
 ipcMain.handle('delete-schedule', async (event, uid) => {
   const allowed = await scheduleModifyAllowed(uid);
   if (!allowed) {
-    return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 삭제할 수 있습니다.' };
+    return { success: false, msg: '본인이 작성한 일정만 삭제할 수 있습니다. (마스터는 전체 가능)' };
   }
   if (!uid) return { success: false, msg: '일정 ID가 없습니다.' };
   return new Promise((resolve) => {
@@ -7138,7 +7207,7 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
   if (!uid) return { success: false, msg: '일정 ID가 없습니다.' };
   const allowed = await scheduleModifyAllowed(uid);
   if (!allowed) {
-    return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 수정할 수 있습니다.' };
+    return { success: false, msg: '본인이 작성한 일정만 수정할 수 있습니다. (마스터는 전체 가능)' };
   }
   return new Promise((resolve) => {
     isScheduleTombstoned(uid, (tombstoned) => {
