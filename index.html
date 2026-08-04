@@ -3305,7 +3305,7 @@
           </div>
         </div>
         <div id="master-online-clients-box" class="master-online-clients-box"></div>
-        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. 「사용 중지」하면 해당 PC는 메신저에 접속할 수 없으며, 마스터 아이디·비밀번호 또는 이 화면의 「사용 허용」으로만 해제됩니다. (대상 PC에도 마스터 비밀번호가 동일해야 합니다.)</p>
+        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. 「사용 중지」하면 해당 PC는 메신저에 접속할 수 없으며, 마스터 아이디·비밀번호 또는 이 화면의 「사용 허용」으로만 해제됩니다. 「로그 삭제」는 퇴사자 PC 등에서 대화·채팅 로그·앱 로그·자동 DB 백업을 원격으로 비웁니다. (대상 PC에도 마스터 비밀번호가 동일해야 하며, 메신저가 실행 중이어야 합니다.)</p>
       </div>
     </div>
   </div>
@@ -3323,6 +3323,28 @@
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="closeMasterForceUpdateModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="confirmMasterForceUpdate()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">강제 업데이트 실행</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🗑️ 마스터 — 원격 로그 삭제 -->
+  <div id="master-wipe-logs-modal" class="modal-overlay" style="z-index:5200;">
+    <div class="modal-card" style="width:440px; gap:12px;">
+      <div style="font-size:16px; font-weight:800; color:#b91c1c;">🗑️ 대화·로그 원격 삭제</div>
+      <div id="master-wipe-logs-desc" style="font-size:12.5px; color:#475569; line-height:1.55;"></div>
+      <input type="hidden" id="master-wipe-logs-target">
+      <div style="font-size:11.5px; color:#7f1d1d; background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:10px 12px; line-height:1.5;">
+        삭제 대상: 메시지 DB · 채팅 로그(<code>chat_logs</code>) · 앱 로그 · 자동 DB 백업<br>
+        유지: 공지·일정·프로필·직원 목록<br>
+        ※ 다운로드 폴더의 첨부 파일은 별도입니다. 필요 시 해당 PC에서 직접 확인하세요.
+      </div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 비밀번호 재확인
+        <input type="password" id="master-wipe-logs-pwd" placeholder="마스터 비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') confirmMasterWipeLogs()">
+      </label>
+      <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">대상 PC의 마스터 비밀번호가 이 PC와 같아야 적용됩니다. 되돌릴 수 없으니 퇴사자 PC 정리 등에만 사용하세요.</p>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" onclick="closeMasterWipeLogsModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="confirmMasterWipeLogs()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">영구 삭제 실행</button>
       </div>
     </div>
   </div>
@@ -3637,7 +3659,7 @@
 
       <div style="background:#fff7f7; border:1px solid #fecaca; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
         <div style="font-size:13px; font-weight:700; color:#b91c1c;">🗑️ 대화·로그 전체 삭제</div>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">이 PC에 저장된 <b>모든 대화 메시지</b>, 일별 채팅 로그(<code>chat_logs</code>), 앱 로그를 삭제합니다. 공지·일정·프로필·직원 목록은 유지됩니다. 삭제 전 위에서 백업하는 것을 권장합니다.</div>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">이 PC에 저장된 <b>모든 대화 메시지</b>, 일별 채팅 로그(<code>chat_logs</code>), 앱 로그, 자동 DB 백업을 삭제합니다. 공지·일정·프로필·직원 목록은 유지됩니다. 삭제 전 위에서 백업하는 것을 권장합니다.</div>
         <button type="button" onclick="clearAllChatHistoryFromSettings()" style="align-self:flex-start; padding:8px 14px; background:#dc2626; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">모든 대화·로그 삭제</button>
         <div id="chat-clear-all-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
       </div>
@@ -6215,6 +6237,7 @@
         { test: () => isFlexOverlay('schedule-board-modal') || document.body.classList.contains('schedule-board-standalone'), close: () => closeScheduleBoardModal(), confirm: true, name: '병동 일정 현황판' },
         { test: () => isFlexOverlay('master-force-update-modal'), close: () => closeMasterForceUpdateModal(), confirm: false },
         { test: () => isFlexOverlay('master-usage-lock-modal'), close: () => closeMasterUsageLockModal(), confirm: false },
+        { test: () => isFlexOverlay('master-wipe-logs-modal'), close: () => closeMasterWipeLogsModal(), confirm: false },
         { test: () => isFlexOverlay('master-admin-modal'), close: () => closeMasterAdminModal(), confirm: true, name: '관리자' },
         { test: () => isFlexOverlay('settings-modal'), close: () => closeSettingsModal(), confirm: true, name: '환경설정' },
         { test: () => isFlexOverlay('board-modal'), close: () => closeBoardModal(), confirm: true, name: '공지 게시판' },
@@ -10157,6 +10180,7 @@
               ${usageDisabled
                 ? `<button type="button" class="master-usage-enable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #86efac; background:#f0fdf4; color:#15803d;">사용 허용</button>`
                 : `<button type="button" class="master-usage-disable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">사용 중지</button>`}
+              <button type="button" class="master-wipe-logs-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fdba74; background:#fff7ed; color:#c2410c;">로그 삭제</button>
               ${u.online && !usageDisabled ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
             </div>
           </td>
@@ -10188,6 +10212,13 @@
           name: btn.getAttribute('data-name') || '',
           isMe: btn.getAttribute('data-isme') === '1',
           disabled: false
+        }));
+      });
+      box.querySelectorAll('.master-wipe-logs-btn').forEach(btn => {
+        btn.addEventListener('click', () => openMasterWipeLogsModal({
+          targetIp: btn.getAttribute('data-ip'),
+          name: btn.getAttribute('data-name') || '',
+          isMe: btn.getAttribute('data-isme') === '1'
         }));
       });
     }
@@ -10418,6 +10449,118 @@
         ? `사용 중지 명령을 보냈습니다. (${res.targetIp || targetIp})`
         : `사용 허용 명령을 보냈습니다. (${res.targetIp || targetIp})`);
       try { renderMasterOnlineClients(); } catch (_) {}
+    }
+
+    function openMasterWipeLogsModal(opts) {
+      if (!isMasterAuthenticated) {
+        appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const o = opts || {};
+      document.getElementById('master-wipe-logs-target').value = o.targetIp || '';
+      const desc = document.getElementById('master-wipe-logs-desc');
+      if (desc) {
+        desc.textContent = o.isMe
+          ? `이 PC(${o.targetIp})에 저장된 대화·로그·자동 백업을 지금 삭제합니다.`
+          : `${o.name || '대상'} (${o.targetIp}) PC의 대화·로그·자동 백업을 원격으로 삭제합니다. 퇴사자 PC 정리 등에 사용하세요.`;
+      }
+      document.getElementById('master-wipe-logs-pwd').value = '';
+      document.getElementById('master-wipe-logs-modal').style.display = 'flex';
+      setTimeout(() => document.getElementById('master-wipe-logs-pwd')?.focus(), 50);
+    }
+
+    function closeMasterWipeLogsModal() {
+      document.getElementById('master-wipe-logs-modal').style.display = 'none';
+    }
+
+    async function confirmMasterWipeLogs() {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const targetIp = document.getElementById('master-wipe-logs-target').value.trim();
+      const password = document.getElementById('master-wipe-logs-pwd').value;
+      if (!password) {
+        await appAlert('마스터 비밀번호를 입력해 주세요.');
+        return;
+      }
+      if (!await appConfirm(
+        `대상 PC(${targetIp})의 대화·로그·자동 백업을 영구 삭제할까요?\n\n되돌릴 수 없습니다.`,
+        { title: '원격 로그 삭제', confirmText: '영구 삭제', cancelText: '취소', variant: 'danger', icon: '🗑️' }
+      )) return;
+
+      const res = await window.api.masterWipeClientLogs({
+        targetIp,
+        password,
+        reason: '마스터 관리자 원격 로그 삭제(퇴사자 등)'
+      });
+      closeMasterWipeLogsModal();
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '로그 삭제 요청에 실패했습니다.');
+        return;
+      }
+      if (res.local) {
+        refreshUiAfterChatHistoryWipe();
+        const summary = `메시지 ${res.messageCount || 0}건 · 채팅 로그 ${res.chatLogFileCount || 0}개 · 앱 로그 ${res.appLogFileCount || 0}개 · 자동백업 ${res.backupFileCount || 0}개`;
+        await appAlert(`이 PC의 대화·로그 삭제가 완료되었습니다.\n\n${summary}`);
+        return;
+      }
+      await appAlert(`로그 삭제 명령을 보냈습니다. (${res.targetIp || targetIp})\n\n대상 PC가 응답하면 아래에 결과가 표시됩니다. 메신저가 꺼져 있거나 버전이 낮으면 적용되지 않을 수 있습니다.`);
+    }
+
+    function refreshUiAfterChatHistoryWipe() {
+      unreadCounts = {};
+      try { saveUnreadCounts(); } catch (_) {}
+      try { leaveActiveChatForPrivacy(); } catch (_) {}
+      try { renderUserListTree(); } catch (_) {}
+      if (document.body.classList.contains('compact-mode')) {
+        try { renderCompactList(); } catch (_) {}
+      }
+      try {
+        if (isFlexOverlay('all-logs-modal')) loadAllChatLogs('');
+      } catch (_) {}
+      try { updateMainPanelVisibility(); } catch (_) {}
+    }
+
+    function formatWipeSummary(data) {
+      return `메시지 ${data.messageCount || 0}건 · 채팅 로그 ${data.chatLogFileCount || 0}개 · 앱 로그 ${data.appLogFileCount || 0}개 · 자동백업 ${data.backupFileCount || 0}개`;
+    }
+
+    if (window.api.onChatHistoryWipeStarted) {
+      window.api.onChatHistoryWipeStarted((data) => {
+        const tip = document.createElement('div');
+        tip.id = 'wipe-progress-tip';
+        tip.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:100010; background:#7c2d12; color:#fff; padding:10px 14px; border-radius:12px; font-size:12px; max-width:320px; box-shadow:0 8px 24px rgba(0,0,0,.25);';
+        tip.textContent = data && data.local
+          ? '이 PC 대화·로그를 삭제하는 중…'
+          : `마스터가 보낸 로그 삭제를 적용하는 중… (${data.fromIp || ''})`;
+        document.getElementById('wipe-progress-tip')?.remove();
+        document.body.appendChild(tip);
+      });
+    }
+    if (window.api.onChatHistoryWiped) {
+      window.api.onChatHistoryWiped((data) => {
+        document.getElementById('wipe-progress-tip')?.remove();
+        refreshUiAfterChatHistoryWipe();
+        const tip = document.createElement('div');
+        tip.style.cssText = 'position:fixed; bottom:24px; right:24px; z-index:100010; background:#0f172a; color:#fff; padding:10px 14px; border-radius:12px; font-size:12px; max-width:340px; box-shadow:0 8px 24px rgba(0,0,0,.25);';
+        tip.textContent = data && data.success
+          ? `대화·로그 삭제 완료 · ${formatWipeSummary(data)}`
+          : `대화·로그 삭제 실패 · ${(data && data.msg) || ''}`;
+        document.body.appendChild(tip);
+        setTimeout(() => tip.remove(), 6000);
+      });
+    }
+    if (window.api.onWipeChatHistoryResult) {
+      window.api.onWipeChatHistoryResult(async (data) => {
+        const ip = (data && data.fromIp) || '';
+        if (data && data.success) {
+          await appAlert(`원격 로그 삭제 완료\nIP: ${ip}\n${formatWipeSummary(data)}`);
+        } else {
+          await appAlert(`원격 로그 삭제 실패\nIP: ${ip}\n${(data && data.msg) || '실패'}`);
+        }
+        try { renderMasterOnlineClients(); } catch (_) {}
+      });
     }
 
     if (window.api.onUsageLockState) {
@@ -16843,7 +16986,7 @@
       const firstOk = await appConfirm(
         '이 PC의 모든 대화 내용과 로그를 삭제할까요?\n\n' +
           '· 저장된 메시지·반응·고정 공지·예약 메시지·읽음 기록이 삭제됩니다.\n' +
-          '· 일별 채팅 로그(chat_logs)와 앱 로그도 함께 삭제됩니다.\n' +
+          '· 일별 채팅 로그(chat_logs)·앱 로그·자동 DB 백업도 함께 삭제됩니다.\n' +
           '· 공지사항·일정·프로필·직원 목록은 유지됩니다.\n' +
           '· 다른 PC에 저장된 대화는 영향 없습니다.\n\n' +
           '삭제 전 「대화 백업 실행」을 권장합니다.',
@@ -16866,18 +17009,8 @@
           await appAlert((res && res.msg) || '삭제에 실패했습니다.');
           return;
         }
-        unreadCounts = {};
-        try { saveUnreadCounts(); } catch (_) {}
-        try { leaveActiveChatForPrivacy(); } catch (_) {}
-        try { renderUserListTree(); } catch (_) {}
-        if (document.body.classList.contains('compact-mode')) {
-          try { renderCompactList(); } catch (_) {}
-        }
-        try {
-          if (isFlexOverlay('all-logs-modal')) loadAllChatLogs('');
-        } catch (_) {}
-        try { updateMainPanelVisibility(); } catch (_) {}
-        const summary = `메시지 ${res.messageCount || 0}건 · 채팅 로그 ${res.chatLogFileCount || 0}개 · 앱 로그 ${res.appLogFileCount || 0}개 삭제`;
+        refreshUiAfterChatHistoryWipe();
+        const summary = `메시지 ${res.messageCount || 0}건 · 채팅 로그 ${res.chatLogFileCount || 0}개 · 앱 로그 ${res.appLogFileCount || 0}개 · 자동백업 ${res.backupFileCount || 0}개`;
         if (el) {
           el.textContent = `✅ ${summary}`;
           el.style.color = '#059669';

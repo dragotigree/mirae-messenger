@@ -3794,6 +3794,22 @@ function routeIncomingPayload(payload, senderIP) {
     case 'USAGE_LOCK_SYNC':
       handleUsageLockSync(payload, senderIP);
       break;
+    case 'WIPE_CHAT_HISTORY':
+      handleWipeChatHistoryCommand(payload, senderIP).catch((e) => {
+        console.error('WIPE_CHAT_HISTORY 처리 오류:', e.message || e);
+      });
+      break;
+    case 'WIPE_CHAT_HISTORY_RESULT':
+      safeWebContentsSend('wipe-chat-history-result', {
+        success: !!payload.success,
+        msg: payload.msg || '',
+        fromIp: payload.fromIp || senderIP,
+        messageCount: payload.messageCount || 0,
+        chatLogFileCount: payload.chatLogFileCount || 0,
+        appLogFileCount: payload.appLogFileCount || 0,
+        backupFileCount: payload.backupFileCount || 0
+      });
+      break;
     case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
     case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
     case 'OPERATOR_DUTY_PERM': handleOperatorDutyPerm(payload); break;
@@ -8420,46 +8436,138 @@ async function deleteFilesInDir(dir, predicate) {
   return count;
 }
 
-/** 이 PC에 저장된 대화·채팅 로그·앱 로그를 전부 삭제 (공지·일정·프로필 등은 유지) */
+/** 이 PC에 저장된 대화·채팅 로그·앱 로그·자동 DB 백업을 전부 삭제 (공지·일정·프로필 등은 유지) */
+async function performClearAllChatHistory(opts) {
+  const o = opts || {};
+  const tables = [
+    'message_reactions',
+    'messages',
+    'chat_view_clears',
+    'chat_pins',
+    'scheduled_messages',
+    'channel_read_cursors'
+  ];
+  const deleted = {};
+  for (const table of tables) {
+    const r = await dbRunAsync(`DELETE FROM ${table}`);
+    deleted[table] = r.changes;
+  }
+  try {
+    await dbRunAsync(`DELETE FROM sqlite_sequence WHERE name IN ('messages','message_reactions','scheduled_messages')`);
+  } catch (_) { /* sqlite_sequence 없을 수 있음 */ }
+
+  const chatLogFileCount = await deleteFilesInDir(getChatLogDir(), (name) => name.endsWith('.txt'));
+  const appLogFileCount = await deleteFilesInDir(
+    getLogsDir(),
+    (name) => name.startsWith('messenger_') && (name.endsWith('.log') || name.endsWith('.txt'))
+  );
+  // 퇴사자 유출 방지: 자동 DB 백업에도 대화가 남아 있을 수 있음
+  const backupDir = path.join(app.getPath('userData'), 'backups');
+  const backupFileCount = await deleteFilesInDir(
+    backupDir,
+    (name) => name.startsWith('auto_backup_') && name.endsWith('.db')
+  );
+
+  const messageCount = deleted.messages || 0;
+  const summary = `메시지 ${messageCount}건, 채팅로그 ${chatLogFileCount}개, 앱로그 ${appLogFileCount}개, 자동백업 ${backupFileCount}개`;
+  writeToLogFile('info', `${o.logPrefix || '전체 대화 삭제'} 완료: ${summary}`);
+  return {
+    success: true,
+    messageCount,
+    chatLogFileCount,
+    appLogFileCount,
+    backupFileCount,
+    deleted
+  };
+}
+
 ipcMain.handle('clear-all-chat-history', async () => {
   try {
-    const tables = [
-      'message_reactions',
-      'messages',
-      'chat_view_clears',
-      'chat_pins',
-      'scheduled_messages',
-      'channel_read_cursors'
-    ];
-    const deleted = {};
-    for (const table of tables) {
-      const r = await dbRunAsync(`DELETE FROM ${table}`);
-      deleted[table] = r.changes;
-    }
-    // AUTOINCREMENT 카운터도 초기화해 이후 메시지가 낮은 id부터 다시 쌓이도록 함
-    try {
-      await dbRunAsync(`DELETE FROM sqlite_sequence WHERE name IN ('messages','message_reactions','scheduled_messages')`);
-    } catch (_) { /* sqlite_sequence 없을 수 있음 */ }
-
-    const chatLogFileCount = await deleteFilesInDir(getChatLogDir(), (name) => name.endsWith('.txt'));
-    const appLogFileCount = await deleteFilesInDir(
-      getLogsDir(),
-      (name) => name.startsWith('messenger_') && (name.endsWith('.log') || name.endsWith('.txt'))
-    );
-
-    const messageCount = deleted.messages || 0;
-    writeToLogFile('info', `전체 대화 삭제 완료: 메시지 ${messageCount}건, 채팅로그 ${chatLogFileCount}개, 앱로그 ${appLogFileCount}개`);
-    return {
-      success: true,
-      messageCount,
-      chatLogFileCount,
-      appLogFileCount,
-      deleted
-    };
+    const result = await performClearAllChatHistory({ logPrefix: '전체 대화 삭제' });
+    safeWebContentsSend('chat-history-wiped', result);
+    return result;
   } catch (e) {
     console.error('전체 대화 삭제 오류:', e.message);
     return { success: false, msg: e.message || '대화·로그 삭제에 실패했습니다.' };
   }
+});
+
+async function handleWipeChatHistoryCommand(payload, senderIP) {
+  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  if (!ok) {
+    if (senderIP) {
+      sendToIpDirect(senderIP, {
+        type: 'WIPE_CHAT_HISTORY_RESULT',
+        success: false,
+        msg: '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)',
+        fromIp: MY_IP
+      });
+    }
+    return;
+  }
+  try {
+    safeWebContentsSend('chat-history-wipe-started', {
+      fromIp: (payload && payload.fromIp) || senderIP || '',
+      reason: (payload && payload.reason) || ''
+    });
+    const result = await performClearAllChatHistory({ logPrefix: '마스터 원격 로그 삭제' });
+    safeWebContentsSend('chat-history-wiped', result);
+    if (senderIP) {
+      sendToIpDirect(senderIP, {
+        type: 'WIPE_CHAT_HISTORY_RESULT',
+        success: true,
+        msg: '대화·로그 삭제 완료',
+        fromIp: MY_IP,
+        messageCount: result.messageCount,
+        chatLogFileCount: result.chatLogFileCount,
+        appLogFileCount: result.appLogFileCount,
+        backupFileCount: result.backupFileCount
+      });
+    }
+  } catch (e) {
+    console.error('원격 로그 삭제 오류:', e.message);
+    if (senderIP) {
+      sendToIpDirect(senderIP, {
+        type: 'WIPE_CHAT_HISTORY_RESULT',
+        success: false,
+        msg: e.message || '삭제 실패',
+        fromIp: MY_IP
+      });
+    }
+  }
+}
+
+ipcMain.handle('master-wipe-client-logs', async (event, payload) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  const p = payload || {};
+  const password = String(p.password || '');
+  if (!(await verifyLocalMasterPassword(password))) {
+    return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
+  }
+  const targetIp = String(p.targetIp || '').trim();
+  if (!targetIp) return { success: false, msg: '대상 IP가 없습니다.' };
+
+  const wipePayload = {
+    type: 'WIPE_CHAT_HISTORY',
+    masterPassword: password,
+    fromIp: MY_IP,
+    reason: p.reason || '마스터 관리자 원격 로그 삭제(퇴사자 등)'
+  };
+
+  if (targetIp === MY_IP || targetIp === 'SELF') {
+    try {
+      safeWebContentsSend('chat-history-wipe-started', { fromIp: MY_IP, local: true, reason: wipePayload.reason });
+      const result = await performClearAllChatHistory({ logPrefix: '마스터 로컬 로그 삭제' });
+      safeWebContentsSend('chat-history-wiped', result);
+      return { success: true, local: true, ...result };
+    } catch (e) {
+      return { success: false, msg: e.message || String(e) };
+    }
+  }
+
+  // 사용 중지된 PC도 TCP로 도달할 수 있도록 직접 전송
+  sendToIpDirect(targetIp, wipePayload);
+  return { success: true, targetIp, sent: true };
 });
 
 const AUTO_BACKUP_RETENTION_DAYS = 14;
