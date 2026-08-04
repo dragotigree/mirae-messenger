@@ -12713,7 +12713,8 @@
     function parseRoomChangeParts(roomNo) {
       const raw = String(roomNo || '').trim();
       if (!raw) return null;
-      const m = raw.match(/(\d{2,4})\s*(?:호)?\s*(?:→|->|⇒|➜|>)\s*(\d{2,4})\s*(?:호)?/);
+      // '>' 단독은 오탐이 많아 제외 (→, -> 등만)
+      const m = raw.match(/(\d{2,4})\s*(?:호)?\s*(?:→|->|⇒|➜)\s*(\d{2,4})\s*(?:호)?/);
       if (!m) return null;
       return { from: m[1], to: m[2] };
     }
@@ -13507,10 +13508,10 @@
 
     function formatSidebarCalendarDayLine(sch) {
       const norm = normalizeSchedulePatient(sch);
-      const roomDigits = String(norm.room_no || '').replace(/\D/g, '');
+      const roomLabel = scheduleBoardRoomLabel(norm.room_no);
       const name = scheduleBoardPatientLabel(norm.patient_name);
       const timeLabel = formatSidebarCalendarDayTime(sch);
-      const parts = [roomDigits, name, timeLabel].filter(Boolean);
+      const parts = [roomLabel, name, timeLabel].filter(Boolean);
       if (parts.length) return parts.join(' ');
       return String(sch.title || '').trim() || '일정';
     }
@@ -13546,15 +13547,45 @@
       if (mode !== 'room' && mode !== 'type' && mode !== 'time') return;
       sidebarOtherSortMode = mode;
       try { localStorage.setItem(SIDEBAR_OTHER_SORT_KEY, mode); } catch (e) { /* ignore */ }
+      const wrap = document.querySelector('#sidebar-cal-day-body .sidebar-cal-other-list');
+      if (wrap && Array.isArray(wrap._otherSchedules) && wrap._otherSchedules.length) {
+        renderSidebarOtherListContent(wrap, wrap._otherSchedules);
+        return;
+      }
       renderSidebarCalendarDay(selectedCalendarDateStr || formatDateStr(new Date()));
     }
+    window.setSidebarOtherSortMode = setSidebarOtherSortMode;
 
-    function sidebarOtherRoomSortKey(sch) {
+    /** 화면에 보이는 병실 번호와 같은 기준으로 숫자 추출 (전실은 이동 후 호실) */
+    function sidebarOtherRoomNumber(sch) {
+      if (!sch) return Number.MAX_SAFE_INTEGER;
       const norm = normalizeSchedulePatient(sch);
-      const move = parseRoomChangeParts(norm.room_no || '');
-      const digits = move ? move.to : String(norm.room_no || '').replace(/\D/g, '');
-      if (digits) return digits.padStart(4, '0');
-      return 'zzzz';
+      const labeled = scheduleBoardRoomLabel(norm.room_no || sch.room_no || '');
+      if (labeled) {
+        const move = parseRoomChangeParts(labeled) || parseRoomChangeParts(String(norm.room_no || ''));
+        if (move && move.to) {
+          const n = parseInt(move.to, 10);
+          if (Number.isFinite(n)) return n;
+        }
+        const only = String(labeled).match(/^(\d{2,4})(?:→\d{2,4})?$/);
+        if (only) {
+          const move2 = parseRoomChangeParts(labeled);
+          return parseInt(move2 ? move2.to : only[1], 10);
+        }
+        const mLabel = String(labeled).match(/(\d{3,4})/);
+        if (mLabel) return parseInt(mLabel[1], 10);
+      }
+      const rawRoom = String(norm.room_no || sch.room_no || '').trim();
+      if (rawRoom) {
+        const move = parseRoomChangeParts(rawRoom);
+        if (move && move.to) return parseInt(move.to, 10);
+        const mRoom = rawRoom.match(/(\d{3,4})/);
+        if (mRoom) return parseInt(mRoom[1], 10);
+      }
+      const title = String(sch.title || '');
+      const mTitle = title.match(/(?:^|\s)(\d{3,4})(?:\s*호)?(?=\s|$)/);
+      if (mTitle) return parseInt(mTitle[1], 10);
+      return Number.MAX_SAFE_INTEGER;
     }
 
     function sidebarOtherTypeSortKey(sch) {
@@ -13571,21 +13602,22 @@
       const m = mode || sidebarOtherSortMode || 'time';
       return [...(list || [])].sort((a, b) => {
         if (m === 'room') {
-          const cmp = sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
-          if (cmp !== 0) return cmp;
+          const na = sidebarOtherRoomNumber(a);
+          const nb = sidebarOtherRoomNumber(b);
+          if (na !== nb) return na - nb;
           return sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
         }
         if (m === 'type') {
           const cmp = sidebarOtherTypeSortKey(a) - sidebarOtherTypeSortKey(b);
           if (cmp !== 0) return cmp;
-          const roomCmp = sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
-          if (roomCmp !== 0) return roomCmp;
+          const na = sidebarOtherRoomNumber(a);
+          const nb = sidebarOtherRoomNumber(b);
+          if (na !== nb) return na - nb;
           return sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
         }
-        // time (기본)
         const cmp = sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
         if (cmp !== 0) return cmp;
-        return sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
+        return sidebarOtherRoomNumber(a) - sidebarOtherRoomNumber(b);
       });
     }
 
@@ -13601,17 +13633,28 @@
         `<span class="sidebar-cal-other-sort-label">정렬</span>` +
         `<div class="sidebar-cal-other-sort-btns">` +
         modes.map((m) =>
-          `<button type="button" class="sidebar-cal-other-sort-btn${sidebarOtherSortMode === m.key ? ' active' : ''}" data-sort="${m.key}">${m.label}</button>`
+          `<button type="button" class="sidebar-cal-other-sort-btn${sidebarOtherSortMode === m.key ? ' active' : ''}" data-sort="${m.key}" onclick="event.preventDefault();event.stopPropagation();setSidebarOtherSortMode('${m.key}')">${m.label}</button>`
         ).join('') +
         `</div>`;
-      bar.querySelectorAll('.sidebar-cal-other-sort-btn').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setSidebarOtherSortMode(btn.getAttribute('data-sort'));
-        });
-      });
       return bar;
+    }
+
+    function renderSidebarOtherListContent(otherWrap, others) {
+      if (!otherWrap) return;
+      otherWrap._otherSchedules = others || [];
+      otherWrap.innerHTML = '';
+      otherWrap.appendChild(buildSidebarOtherSortBar());
+      const sorted = sortSidebarOtherSchedules(otherWrap._otherSchedules, sidebarOtherSortMode);
+      sorted.forEach((sch) => {
+        const line = document.createElement('div');
+        const t = sch.type || 'GENERAL';
+        line.className = 'sidebar-cal-day-line'
+          + (t === 'TRANSFER' ? ' is-transfer' : '')
+          + (t === 'ROOM_CHANGE' ? ' is-room-change' : '');
+        line.dataset.roomSort = String(sidebarOtherRoomNumber(sch));
+        line.innerHTML = formatSidebarCalendarDayLineHtml(sch);
+        otherWrap.appendChild(line);
+      });
     }
 
     function formatSidebarCalendarDayLineHtml(sch) {
@@ -13762,17 +13805,7 @@
       if (others.length) {
         const otherWrap = document.createElement('div');
         otherWrap.className = 'sidebar-cal-other-list';
-        otherWrap.appendChild(buildSidebarOtherSortBar());
-        const sorted = sortSidebarOtherSchedules(others, sidebarOtherSortMode);
-        sorted.forEach((sch) => {
-          const line = document.createElement('div');
-          const t = sch.type || 'GENERAL';
-          line.className = 'sidebar-cal-day-line'
-            + (t === 'TRANSFER' ? ' is-transfer' : '')
-            + (t === 'ROOM_CHANGE' ? ' is-room-change' : '');
-          line.innerHTML = formatSidebarCalendarDayLineHtml(sch);
-          otherWrap.appendChild(line);
-        });
+        renderSidebarOtherListContent(otherWrap, others);
         bodyEl.appendChild(otherWrap);
       }
     }
