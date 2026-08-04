@@ -2294,8 +2294,8 @@ async function openScheduleBoardWindow(payload) {
   if (scheduleBoardWindow && !scheduleBoardWindow.isDestroyed()) {
     try {
       const [cw, ch] = scheduleBoardWindow.getSize();
-      if (cw < 1400 || ch < 920) {
-        scheduleBoardWindow.setSize(Math.max(cw, 1400), Math.max(ch, 920));
+      if (cw < 1480 || ch < 920) {
+        scheduleBoardWindow.setSize(Math.max(cw, 1480), Math.max(ch, 920));
       }
     } catch (e) { /* ignore */ }
     scheduleBoardWindow.show();
@@ -2307,9 +2307,9 @@ async function openScheduleBoardWindow(payload) {
   await refreshPreloadScriptCacheIfNeeded();
 
   scheduleBoardWindow = new BrowserWindow({
-    width: 1400,
+    width: 1480,
     height: 920,
-    minWidth: 1100,
+    minWidth: 1180,
     minHeight: 700,
     title: '병동 일정 현황판 — Mirae Messenger',
     icon: getAppNativeIcon(),

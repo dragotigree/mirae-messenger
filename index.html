@@ -1343,7 +1343,7 @@
 
     /* 📋 병동·RM 일정 현황판 */
     .schedule-board-modal-card {
-      width: min(1280px, 98vw); height: min(900px, 94vh); max-height: 94vh;
+      width: min(1440px, 98vw); height: min(900px, 94vh); max-height: 94vh;
       padding: 0; gap: 0; overflow: hidden;
       display: flex; flex-direction: column;
       border-radius: 16px;
@@ -1376,7 +1376,7 @@
       display: flex; flex: 1; min-height: 0; overflow: hidden;
     }
     .sb-board-side {
-      width: 260px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+      width: 320px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
       padding: 10px 10px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
       display: flex; flex-direction: column; gap: 10px;
     }
@@ -1388,7 +1388,10 @@
       font-size: 10px; color: #64748b; line-height: 1.4; padding: 0 1px;
     }
     .sb-board-side .schedule-board-view-tabs { width: 100%; justify-content: stretch; gap: 4px; }
-    .sb-board-side .schedule-board-view-tab { flex: 1; text-align: center; padding: 7px 4px; font-size: 11px; }
+    .sb-board-side .schedule-board-view-tab {
+      flex: 1; text-align: center; padding: 7px 6px; font-size: 11px;
+      white-space: nowrap; letter-spacing: -0.03em;
+    }
     .sb-board-side .sb-date-field { width: 100%; }
     .sb-board-side .schedule-board-date { width: 100%; min-width: 0; font-size: 12px; padding: 6px 8px; }
     .sb-board-side .sb-filter-panel {
@@ -1570,16 +1573,16 @@
     .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-table {
-      width: 100%; min-width: 1020px; border-collapse: collapse; table-layout: fixed; background: #fff;
+      width: 100%; min-width: 1120px; border-collapse: collapse; table-layout: fixed; background: #fff;
     }
-    .schedule-board-table col.sb-c-room { width: 52px; }
-    .schedule-board-table col.sb-c-name { width: 108px; }
-    .schedule-board-table col.sb-c-doctor { width: 118px; }
-    .schedule-board-table col.sb-c-type { width: 128px; }
+    .schedule-board-table col.sb-c-room { width: 56px; }
+    .schedule-board-table col.sb-c-name { width: 112px; }
+    .schedule-board-table col.sb-c-doctor { width: 168px; }
+    .schedule-board-table col.sb-c-type { width: 132px; }
     .schedule-board-table col.sb-c-detail { width: 22%; }
-    .schedule-board-table col.sb-c-remark { width: 20%; }
-    .schedule-board-table col.sb-c-meal { width: 112px; }
-    .schedule-board-table col.sb-c-time { width: 96px; }
+    .schedule-board-table col.sb-c-remark { width: 18%; }
+    .schedule-board-table col.sb-c-meal { width: 116px; }
+    .schedule-board-table col.sb-c-time { width: 100px; }
     .schedule-board-table col.sb-c-btns { width: 108px; }
     .schedule-board-table thead th {
       padding: 10px 8px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
@@ -1747,7 +1750,7 @@
       display: inline-block; box-sizing: border-box; width: auto; max-width: 100%;
       font-size: 11.5px; font-weight: 700; padding: 4px 8px; border-radius: 8px;
       background: #e0f2fe; color: #0369a1; line-height: 1.25; word-break: keep-all;
-      white-space: normal; overflow: hidden;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .schedule-board-detail {
       min-width: 0; color: #334155; font-size: 13.5px; font-weight: 500; line-height: 1.4;
@@ -1983,7 +1986,7 @@
     .schedule-board-top-summary .sb-summary-meta { font-size: 13px; }
     .schedule-board-add-btn { font-size: 12.5px; }
     .schedule-board-view-tab { font-size: 13px; }
-    .sb-board-side .schedule-board-view-tab { font-size: 12px; }
+    .sb-board-side .schedule-board-view-tab { font-size: 12px; white-space: nowrap; }
     .sb-filter-panel .sb-filter-label { font-size: 12px; }
     .schedule-board-chip { font-size: 12.5px; }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 11.5px; }
@@ -2001,7 +2004,7 @@
     .schedule-board-name { font-size: 15.5px; }
     .schedule-board-detail { font-size: 14.5px; line-height: 1.45; }
     .schedule-board-remark { font-size: 13.5px; }
-    .schedule-board-doctor { font-size: 12.5px; }
+    .schedule-board-doctor { font-size: 12.5px; white-space: nowrap; }
     .schedule-board-times { font-size: 14px; }
     .schedule-board-meals { font-size: 13px; }
     .schedule-board-time-cell,
