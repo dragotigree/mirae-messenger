@@ -8572,7 +8572,11 @@
         const id = `group-member-${u.ip.replace(/\./g, '_')}`;
         const checked = groupModalPrefillIps.has(u.ip) ? 'checked' : '';
         const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" value="${u.ip}" id="${id}" ${checked}> ${u.rank} ${u.username} · ${u.floor} ${u.dept}`;
+        const rank = escapeHtmlText(u.rank || '');
+        const uname = escapeHtmlText(u.username || '');
+        const floor = escapeHtmlText(u.floor || '');
+        const dept = escapeHtmlText(u.dept || '');
+        label.innerHTML = `<input type="checkbox" value="${escapeHtmlText(u.ip)}" id="${id}" ${checked}> ${rank} ${uname} · ${floor} ${dept}`;
         box.appendChild(label);
       });
     }
