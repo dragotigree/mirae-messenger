@@ -1453,9 +1453,18 @@ function normalizeRankText(rank) {
   return r;
 }
 
+/** 인코딩 실패 대체 문자() 등 깨진 표시용 문자 제거 */
+function scrubBrokenDisplayChars(str) {
+  return String(str || '')
+    .replace(/\uFFFD+/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/[ \t\u00A0]{2,}/g, ' ')
+    .replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, '');
+}
+
 function displayNameFromParts(rank, username, fallback) {
   const r = normalizeRankText(rank);
-  let n = String(username || '').trim();
+  let n = scrubBrokenDisplayChars(username);
   if (r && n) {
     while (n === r || n.startsWith(`${r} `)) {
       if (n === r) return r;
@@ -4448,9 +4457,10 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
         if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
         else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
         else if (row && row.can_manage_duty) dutyFlag = 1;
+        const cleanDisplayName = scrubBrokenDisplayChars(o.display_name);
         db.run(
           `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-          [o.username, o.password_hash, o.display_name, o.added_at, dutyFlag],
+          [o.username, o.password_hash, cleanDisplayName, o.added_at, dutyFlag],
           logDbErr
         );
       });
@@ -4507,9 +4517,10 @@ function handleOperatorAdd(o) {
     if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
     else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
     else if (row && row.can_manage_duty) dutyFlag = 1;
+    const cleanDisplayName = scrubBrokenDisplayChars(o.display_name);
     db.run(
       `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-      [o.username, o.password_hash, o.display_name, o.added_at, dutyFlag],
+      [o.username, o.password_hash, cleanDisplayName, o.added_at, dutyFlag],
       () => {
         if (mainWindow) safeWebContentsSend('notice-operators-update');
       }
@@ -4676,10 +4687,10 @@ function handleOperatorDelete(username) {
 function schedulePatientMetaFromPayload(p) {
   const o = p || {};
   return {
-    ward: String(o.ward || '').trim(),
-    rm_team: String(o.rmTeam || o.rm_team || '').trim(),
-    room_no: String(o.roomNo || o.room_no || '').trim(),
-    patient_name: String(o.patientName || o.patient_name || '').trim()
+    ward: scrubBrokenDisplayChars(o.ward || ''),
+    rm_team: scrubBrokenDisplayChars(o.rmTeam || o.rm_team || ''),
+    room_no: scrubBrokenDisplayChars(o.roomNo || o.room_no || ''),
+    patient_name: scrubBrokenDisplayChars(o.patientName || o.patient_name || '')
   };
 }
 
@@ -6498,7 +6509,13 @@ ipcMain.handle('delete-notice', async (event, uid) => {
 
 ipcMain.handle('get-notice-operators', async () => {
   return new Promise((resolve) => {
-    db.all(`SELECT username, display_name, added_at, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => resolve(rows || []));
+    db.all(`SELECT username, display_name, added_at, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => {
+      const cleaned = (rows || []).map((row) => ({
+        ...row,
+        display_name: scrubBrokenDisplayChars(row.display_name)
+      }));
+      resolve(cleaned);
+    });
   });
 });
 
@@ -6508,14 +6525,15 @@ ipcMain.handle('add-notice-operator', async (event, { username, password, displa
     const password_hash = hashPassword(password);
     // 미지정·true → 당직·OFF 포함 (작성 권한자 기본)
     const dutyFlag = (canManageDuty === false || canManageDuty === 0 || canManageDuty === '0') ? 0 : 1;
+    const cleanDisplayName = scrubBrokenDisplayChars(displayName);
     db.run(
       `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-      [username, password_hash, displayName, added_at, dutyFlag],
+      [username, password_hash, cleanDisplayName, added_at, dutyFlag],
       (err) => {
         if (!err) {
           broadcastToOnlinePeers({
             type: 'OPERATOR_ADD',
-            operator: { username, password_hash, display_name: displayName, added_at, can_manage_duty: dutyFlag }
+            operator: { username, password_hash, display_name: cleanDisplayName, added_at, can_manage_duty: dutyFlag }
           });
         }
         resolve({ success: !err });

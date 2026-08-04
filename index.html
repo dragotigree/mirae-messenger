@@ -4463,7 +4463,7 @@
 
     function displayNameFromParts(rank, username, fallback) {
       const r = normalizeRankText(rank);
-      let n = String(username || '').trim();
+      let n = scrubBrokenDisplayChars(username);
       if (r && n) {
         while (n === r || n.startsWith(`${r} `)) {
           if (n === r) return r;
@@ -9613,7 +9613,7 @@
     }
 
     function escapeHtml(str) {
-      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return normalizeDisplayText(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     async function loadAllChatLogs(keyword) {
@@ -10750,8 +10750,19 @@
       return buildReplyQuoteHtml(replyInfo) + bodyHtml;
     }
 
+    function scrubBrokenDisplayChars(str) {
+      return String(str || '')
+        // 인코딩 실패로 남은 대체 문자(U+FFFD) — 표시에서 숨김
+        .replace(/\uFFFD+/g, '')
+        // 제어 문자(탭·개행 제외)
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        // 깨진 뒤 남은 과도한 공백
+        .replace(/[ \t\u00A0]{2,}/g, ' ')
+        .replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, '');
+    }
+
     function normalizeDisplayText(str) {
-      return String(str || '').normalize('NFC');
+      return scrubBrokenDisplayChars(str).normalize('NFC');
     }
 
     function plainTextFromMessageBubble(textEl) {
@@ -12821,7 +12832,7 @@
     }
 
     function escapeHtmlText(str) {
-      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return normalizeDisplayText(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     let pendingShareMessage = null;
@@ -13279,11 +13290,11 @@
       if (!sch) return { ward: '', rm_team: '', room_no: '', patient_name: '' };
       const hit = _scheduleNormCache.get(sch);
       if (hit) return hit;
-      let ward = String(sch?.ward || '').trim();
-      let rm_team = String(sch?.rm_team || '').trim();
-      let room_no = String(sch?.room_no || '').trim();
-      let patient_name = String(sch?.patient_name || '').trim();
-      const title = String(sch?.title || '').trim();
+      let ward = scrubBrokenDisplayChars(sch?.ward || '');
+      let rm_team = scrubBrokenDisplayChars(sch?.rm_team || '');
+      let room_no = scrubBrokenDisplayChars(sch?.room_no || '');
+      let patient_name = scrubBrokenDisplayChars(sch?.patient_name || '');
+      const title = scrubBrokenDisplayChars(sch?.title || '');
       if (!room_no && title) {
         const moveInTitle = parseRoomChangeParts(title);
         if (moveInTitle) {
@@ -13788,7 +13799,7 @@
     }
 
     function scheduleBoardPatientLabel(name) {
-      return String(name || '').trim().replace(/[a-z]/g, (ch) => ch.toUpperCase());
+      return scrubBrokenDisplayChars(name).replace(/[a-z]/g, (ch) => ch.toUpperCase());
     }
 
     function scheduleBoardMainEntryHtml(sch) {
