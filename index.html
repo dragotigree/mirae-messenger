@@ -5638,6 +5638,14 @@
       if (myProfile && data.senderIP === myProfile.ip) return;
 
       if (isChatCurrentlyOpen(data.senderIP)) {
+        if (data.uid) {
+          const existing = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(data.uid)}"]`);
+          if (existing) {
+            pendingDmReadPeers.add(data.senderIP);
+            if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
+            return;
+          }
+        }
         appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
         // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
         pendingDmReadPeers.add(data.senderIP);

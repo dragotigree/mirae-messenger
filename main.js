@@ -1118,8 +1118,12 @@ async function handleFileXferEnd(payload, senderIP) {
           `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
           [senderName, senderIP, receiverKey, messageHtml, msgUid],
           (err) => {
-            logDbErr(err);
-            if (!err && msgUid) markIncomingChatUid(msgUid);
+            if (err) {
+              logDbErr(err);
+              finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
+              return;
+            }
+            finishIncomingChatUid(msgUid, true);
           }
         );
         appendChatLog(receiverKey, groupName, entry.sender, messageHtml);
@@ -1150,29 +1154,44 @@ async function handleFileXferEnd(payload, senderIP) {
         `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
         [senderName, senderIP, MY_IP, messageHtml, msgUid],
         (err) => {
-          logDbErr(err);
-          if (err) return;
-          if (msgUid) markIncomingChatUid(msgUid);
+          if (err) {
+            logDbErr(err);
+            if (msgUid && isMsgUidUniqueConflict(err)) {
+              finishIncomingChatUid(msgUid, true);
+              if (msgUid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
+              return;
+            }
+            finishIncomingChatUid(msgUid, false);
+            return;
+          }
+          finishIncomingChatUid(msgUid, true);
           if (msgUid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
         }
       );
     };
-    if (msgUid && hasRememberedIncomingChatUid(msgUid)) {
+    if (msgUid && isIncomingChatUidBusy(msgUid)) {
       db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [msgUid], (err, row) => {
-        if (err) { logDbErr(err); persistDm({ showUi: false }); return; }
+        if (err) { logDbErr(err); return; }
         if (row) {
+          markIncomingChatUid(msgUid);
           sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
           return;
         }
+        if (incomingChatUidInflight.has(String(msgUid))) return;
+        if (!claimIncomingChatUid(msgUid)) return;
         persistDm({ showUi: false });
       });
       return;
     }
     if (msgUid) {
+      if (!claimIncomingChatUid(msgUid)) {
+        sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
+        return;
+      }
       db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [msgUid], (err, row) => {
         if (err) { logDbErr(err); persistDm({ showUi: true }); return; }
         if (row) {
-          markIncomingChatUid(msgUid);
+          finishIncomingChatUid(msgUid, true);
           sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
           return;
         }
@@ -2127,6 +2146,25 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
+  // 동일 msg_uid 중복 INSERT 방지 (재전송 레이스). 기존 중복이 있으면 한 건만 남기고 인덱스 생성.
+  db.run(
+    `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+      AND id NOT IN (
+        SELECT MIN(id) FROM messages
+        WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+        GROUP BY msg_uid
+      )`,
+    (delErr) => {
+      if (delErr) logDbErr(delErr);
+      db.run(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_unique
+         ON messages(msg_uid) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
+        (idxErr) => {
+          if (idxErr) console.error('msg_uid unique index:', idxErr.message || idxErr);
+        }
+      );
+    }
+  );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pending_out ON messages(sender_ip, status, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_scheduled_pending ON scheduled_messages(sent, send_at)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_hospital_schedules_time ON hospital_schedules(time_str)`, logDbErr);
@@ -3664,7 +3702,7 @@ function handleIncomingChat(payload, senderIP) {
     if (uid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: uid });
   };
 
-  // DB INSERT 성공 후에만 UID 기억 + ACK (조기 remember로 유실되면 재전송도 막힘)
+  // ACK·영구 remember는 INSERT 성공 후. inflight는 재전송 레이스의 UI 중복만 막음.
   const persist = ({ showUi }) => {
     if (showUi) {
       const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3693,32 +3731,46 @@ function handleIncomingChat(payload, senderIP) {
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, uid],
       (err) => {
-        logDbErr(err);
-        if (err) return;
-        if (uid) markIncomingChatUid(uid);
+        if (err) {
+          logDbErr(err);
+          if (uid && isMsgUidUniqueConflict(err)) {
+            finishIncomingChatUid(uid, true);
+            ackIfUid();
+            return;
+          }
+          finishIncomingChatUid(uid, false);
+          return;
+        }
+        finishIncomingChatUid(uid, true);
         ackIfUid();
       }
     );
   };
 
-  if (uid && hasRememberedIncomingChatUid(uid)) {
+  if (uid && isIncomingChatUidBusy(uid)) {
     db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
-        persist({ showUi: false });
         return;
       }
       if (row) {
+        markIncomingChatUid(uid);
         ackIfUid();
         return;
       }
-      // 메모리는 있으나 DB 행 없음 → 재저장 후 ACK
+      // INSERT 진행 중 재전송 — UI 없이 대기 (완료 시 첫 처리가 ACK)
+      if (incomingChatUidInflight.has(String(uid))) return;
+      if (!claimIncomingChatUid(uid)) return;
       persist({ showUi: false });
     });
     return;
   }
 
   if (uid) {
+    if (!claimIncomingChatUid(uid)) {
+      ackIfUid();
+      return;
+    }
     db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
@@ -3726,7 +3778,7 @@ function handleIncomingChat(payload, senderIP) {
         return;
       }
       if (row) {
-        markIncomingChatUid(uid);
+        finishIncomingChatUid(uid, true);
         ackIfUid();
         return;
       }
@@ -3769,8 +3821,12 @@ function handleIncomingDeptMessage(payload, senderIP) {
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
-        logDbErr(err);
-        if (!err && msgUid) markIncomingChatUid(msgUid);
+        if (err) {
+          logDbErr(err);
+          finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
+          return;
+        }
+        finishIncomingChatUid(msgUid, true);
       }
     );
     appendChatLog(receiverKey, `부서_${payload.dept}`, payload.sender, payload.message);
@@ -3808,8 +3864,12 @@ function handleIncomingFloorMessage(payload, senderIP) {
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
-        logDbErr(err);
-        if (!err && msgUid) markIncomingChatUid(msgUid);
+        if (err) {
+          logDbErr(err);
+          finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
+          return;
+        }
+        finishIncomingChatUid(msgUid, true);
       }
     );
     appendChatLog(receiverKey, `${payload.floor}`, payload.sender, payload.message);
@@ -3819,8 +3879,10 @@ function handleIncomingFloorMessage(payload, senderIP) {
 /** 1:1 읽음 데스크탑 알림은 상대당 앱 실행 중 딱 1회만 */
 const dmAwaitingReadReceiptNotify = new Map();
 const dmReadReceiptDesktopShown = new Set();
-/** 세션 내 동일 수신 msg_uid — DB INSERT 성공 후에만 기록 */
+/** 세션 내 동일 수신 msg_uid — DB INSERT 성공 후에만 영구 기록 */
 const recentIncomingChatUids = new Map();
+/** INSERT 진행 중 UID — 재전송 레이스로 UI/DB 중복 방지 (실패 시 해제) */
+const incomingChatUidInflight = new Set();
 const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
 
 function pruneRecentIncomingChatUids(now = Date.now()) {
@@ -3844,13 +3906,56 @@ function markIncomingChatUid(uid) {
   recentIncomingChatUids.set(key, Date.now());
 }
 
+function isIncomingChatUidBusy(uid) {
+  const key = String(uid || '').trim();
+  if (!key) return false;
+  return hasRememberedIncomingChatUid(key) || incomingChatUidInflight.has(key);
+}
+
+function claimIncomingChatUid(uid) {
+  const key = String(uid || '').trim();
+  if (!key) return true;
+  if (isIncomingChatUidBusy(key)) return false;
+  incomingChatUidInflight.add(key);
+  return true;
+}
+
+function finishIncomingChatUid(uid, ok) {
+  const key = String(uid || '').trim();
+  if (!key) return;
+  if (ok) markIncomingChatUid(key);
+  incomingChatUidInflight.delete(key);
+}
+
+function isMsgUidUniqueConflict(err) {
+  const msg = String((err && err.message) || err || '');
+  return /UNIQUE/i.test(msg);
+}
+
 function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
   const uid = msgUid ? String(msgUid).trim() : '';
   if (!uid) {
     onUnique();
     return;
   }
-  // 메모리 hit이어도 DB에 없으면 재저장 (조기 remember로 유실된 경우 복구)
+  if (isIncomingChatUidBusy(uid)) {
+    // 이미 수신 중이거나 저장됨 — UI/INSERT 재실행 금지. DB만 없으면 복구 저장.
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      if (row) {
+        markIncomingChatUid(uid);
+        return;
+      }
+      if (incomingChatUidInflight.has(uid)) return;
+      if (!claimIncomingChatUid(uid)) return;
+      onUnique();
+    });
+    return;
+  }
+  if (!claimIncomingChatUid(uid)) return;
   db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
     if (err) {
       logDbErr(err);
@@ -3858,7 +3963,7 @@ function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
       return;
     }
     if (row) {
-      markIncomingChatUid(uid);
+      finishIncomingChatUid(uid, true);
       return;
     }
     onUnique();
@@ -4068,8 +4173,12 @@ function handleIncomingBroadcast(payload, senderIP) {
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
       [senderName, senderIP, storedMessage, msgUid],
       (err) => {
-        logDbErr(err);
-        if (!err && msgUid) markIncomingChatUid(msgUid);
+        if (err) {
+          logDbErr(err);
+          finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
+          return;
+        }
+        finishIncomingChatUid(msgUid, true);
       }
     );
     appendChatLog('BROADCAST', '전체공지', payload.sender, payload.message);
@@ -4673,8 +4782,12 @@ function handleIncomingGroupMessage(payload, senderIP) {
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
-        logDbErr(err);
-        if (!err && msgUid) markIncomingChatUid(msgUid);
+        if (err) {
+          logDbErr(err);
+          finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
+          return;
+        }
+        finishIncomingChatUid(msgUid, true);
       }
     );
     appendChatLog(receiverKey, payload.groupName || '그룹', payload.sender, payload.message);
