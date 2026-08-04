@@ -2362,6 +2362,42 @@
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.2s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.28s var(--ease-spring); }
+    .master-admin-modal-card {
+      width: min(1180px, 96vw);
+      max-width: 96vw;
+      padding: 28px;
+      gap: 20px;
+      max-height: min(94vh, 920px);
+    }
+    .master-online-clients-box {
+      max-height: min(42vh, 380px);
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      background: #fff;
+      min-width: 0;
+    }
+    .master-clients-table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: collapse;
+      font-size: 12px;
+      table-layout: auto;
+    }
+    .master-clients-table th,
+    .master-clients-table td {
+      padding: 8px 10px;
+      vertical-align: middle;
+    }
+    .master-clients-table th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 700;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
     @keyframes modal-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     body.modal-open #custom-titlebar { -webkit-app-region: no-drag; }
     .modal-overlay input, .modal-overlay textarea, .modal-overlay select, .modal-overlay button, .modal-overlay label { -webkit-app-region: no-drag; }
@@ -9384,15 +9420,15 @@
         return;
       }
 
-      const tableHead = `<table class="master-clients-table" style="width:100%; border-collapse:collapse; font-size:11px; table-layout:auto;">
-        <thead><tr style="background:#f1f5f9; color:#475569; text-align:left;">
-          <th style="padding:6px 8px; font-weight:700;">이름</th>
-          <th style="padding:6px 8px; font-weight:700;">부서/층</th>
-          <th style="padding:6px 8px; font-weight:700;">IP</th>
-          <th style="padding:6px 8px; font-weight:700;">버전</th>
-          <th style="padding:6px 8px; font-weight:700;">상태</th>
-          <th style="padding:6px 8px; font-weight:700; width:1%;">마지막</th>
-          <th style="padding:6px 8px; font-weight:700; width:1%;">관리</th>
+      const tableHead = `<table class="master-clients-table">
+        <thead><tr>
+          <th>이름</th>
+          <th>부서/층</th>
+          <th>IP</th>
+          <th>버전</th>
+          <th>상태</th>
+          <th style="width:1%;">마지막</th>
+          <th style="width:1%;">관리</th>
         </tr></thead><tbody>`;
 
       const escAttr = (s) => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -9406,16 +9442,16 @@
         const lastSeenText = formatLastSeenRelative(u);
         const lastTitle = formatLastSeenTitle(u);
         return `<tr style="border-top:1px solid #f1f5f9; ${u.online ? '' : 'opacity:.65;'}">
-          <td style="padding:6px 8px; font-weight:700; color:#0f172a; white-space:nowrap;">${u.rank || ''} ${u.username || '-'}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
-          <td style="padding:6px 8px; color:#64748b; white-space:nowrap;">${deptFloor}</td>
-          <td style="padding:6px 8px; font-family:monospace; color:#334155; white-space:nowrap; font-size:10.5px;">${u.ip || '-'}</td>
-          <td style="padding:6px 8px; font-weight:700; white-space:nowrap; color:${verOutdated ? '#dc2626' : '#15803d'};">${ver}${verOutdated ? ' ⚠' : ''}</td>
-          <td style="padding:6px 8px; white-space:nowrap;">${masterStatusLabel[statusKey] || statusKey}</td>
-          <td style="padding:6px 8px; color:#64748b; white-space:nowrap; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${lastSeenText}</td>
-          <td style="padding:6px 8px; white-space:nowrap; text-align:center;">
+          <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${u.rank || ''} ${u.username || '-'}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
+          <td style="color:#64748b; white-space:nowrap;">${deptFloor}</td>
+          <td style="font-family:monospace; color:#334155; white-space:nowrap; font-size:11.5px;">${u.ip || '-'}</td>
+          <td style="font-weight:700; white-space:nowrap; color:${verOutdated ? '#dc2626' : '#15803d'};">${ver}${verOutdated ? ' ⚠' : ''}</td>
+          <td style="white-space:nowrap;">${masterStatusLabel[statusKey] || statusKey}</td>
+          <td style="color:#64748b; white-space:nowrap; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${lastSeenText}</td>
+          <td style="white-space:nowrap; text-align:center;">
             <div style="display:inline-flex; gap:4px; align-items:center;">
-              <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="padding:4px 8px; font-size:10px; font-weight:700; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#2563eb; cursor:pointer;">정보 수정</button>
-              ${u.online ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr((u.rank || '') + ' ' + (u.username || '')).trim()}" data-isme="${isMe ? '1' : '0'}" style="padding:4px 8px; font-size:10px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fef2f2; color:#b91c1c; cursor:pointer;">강제 업데이트</button>` : ''}
+              <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="padding:5px 9px; font-size:11px; font-weight:700; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#2563eb; cursor:pointer;">정보 수정</button>
+              ${u.online ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr((u.rank || '') + ' ' + (u.username || '')).trim()}" data-isme="${isMe ? '1' : '0'}" style="padding:5px 9px; font-size:11px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fef2f2; color:#b91c1c; cursor:pointer;">강제 업데이트</button>` : ''}
             </div>
           </td>
         </tr>`;
