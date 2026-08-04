@@ -1655,7 +1655,6 @@
     .schedule-board-export-btn.referral-only { display: none; }
     .schedule-board-modal-card.sb-mode-main .schedule-board-export-btn.referral-only { display: inline-block; }
     .schedule-board-modal-card.sb-mode-main .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
-    .schedule-board-modal-card.sb-mode-main #schedule-board-doctor-filter-row,
     .schedule-board-modal-card.sb-mode-main #schedule-board-search-filter-row { display: none !important; }
     .schedule-board-modal-card.sb-mode-admit .schedule-board-subtitle { color: #0369a1; font-weight: 600; }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
@@ -3242,7 +3241,7 @@
               <span class="sb-filter-label">병동</span>
               <div id="schedule-board-ward-chips" class="sb-chip-row"></div>
             </div>
-            <div class="sb-filter-block sb-filter-block--row" id="schedule-board-doctor-filter-row" style="display:none;">
+            <div class="sb-filter-block sb-filter-block--row" id="schedule-board-doctor-filter-row">
               <span class="sb-filter-label">주치의</span>
               <div id="schedule-board-doctor-chips" class="sb-chip-row"></div>
             </div>
@@ -12486,9 +12485,9 @@
       const wardRow = document.getElementById('schedule-board-ward-filter-row');
       const doctorRow = document.getElementById('schedule-board-doctor-filter-row');
       const searchRow = document.getElementById('schedule-board-search-filter-row');
-      // 메인·병동/주치의별·입/퇴원: 병동 칩 표시 / 주치의·검색은 메인 제외
+      // 메인·병동/주치의별·입/퇴원: 병동·주치의 칩 / 검색은 메인 제외
       if (wardRow) wardRow.style.display = (showWardDoctor || isMain) ? 'flex' : 'none';
-      if (doctorRow) doctorRow.style.display = showWardDoctor ? 'flex' : 'none';
+      if (doctorRow) doctorRow.style.display = (showWardDoctor || isMain) ? 'flex' : 'none';
       if (searchRow) searchRow.style.display = isMain ? 'none' : 'flex';
     }
 
@@ -13813,7 +13812,8 @@
             const w = norm.ward || inferWardFromRoomDigits((norm.room_no || '').replace(/\D/g, '')) || 'other';
             if (w !== scheduleBoardWardTab) return false;
           }
-          if (isScheduleBoardWardStyleView() && scheduleBoardDoctorFilter !== 'all') {
+          if ((isScheduleBoardWardStyleView() || scheduleBoardView === 'main')
+            && scheduleBoardDoctorFilter !== 'all') {
             const doc = scheduleBoardAttendingLabel(sch, norm) || '미지정';
             if (doc !== scheduleBoardDoctorFilter) return false;
           }
