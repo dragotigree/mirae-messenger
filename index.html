@@ -1176,16 +1176,16 @@
     .msg-row-bubble .chat-file-box { max-width: 240px; }
 
     /* ========== 3단 상세 패널 ========== */
-    #sidebar-right { width: 300px; background: var(--surface); padding: 10px 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
+    #sidebar-right { width: 230px; background: var(--surface); padding: 8px 6px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
     .detail-heading { font-size: 11.5px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.08em; }
     .detail-profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); gap: 3px; }
-    .detail-avatar { width: 52px; height: 52px; border-radius: 18px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-size: 14px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2); letter-spacing: -0.03em; }
-    .detail-name { font-size: 14px; font-weight: var(--font-weight-bold); color: var(--text-primary); line-height: 1.3; }
-    .detail-dept-line { font-size: 11px; color: var(--text-secondary); line-height: 1.3; }
+    .detail-avatar { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-size: 12px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2); letter-spacing: -0.03em; }
+    .detail-name { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--text-primary); line-height: 1.3; word-break: keep-all; }
+    .detail-dept-line { font-size: 10.5px; color: var(--text-secondary); line-height: 1.3; }
     .detail-info-group { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
-    .detail-info-row { background: var(--surface-muted); padding: 5px 10px; border-radius: 10px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; }
-    .detail-info-row .detail-info-label { color: var(--text-secondary); font-size: 11px; }
-    .detail-info-row .detail-info-value { font-weight: 700; color: var(--text-primary); font-size: 12px; text-align: right; }
+    .detail-info-row { background: var(--surface-muted); padding: 5px 8px; border-radius: 10px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; gap: 6px; }
+    .detail-info-row .detail-info-label { color: var(--text-secondary); font-size: 10px; flex-shrink: 0; }
+    .detail-info-row .detail-info-value { font-weight: 700; color: var(--text-primary); font-size: 11px; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .detail-self-edit-btn {
       margin-top: 10px; width: 100%; padding: 8px 12px; border: 1px solid #bae6fd;
       border-radius: 12px; background: #f0f9ff; color: #0369a1; font-size: 12px; font-weight: 700;
@@ -1205,36 +1205,37 @@
     .group-member-status.is-offline { color: #94a3b8; }
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
     .sidebar-cal-header {
-      display: flex; flex-direction: row; align-items: center; justify-content: space-between;
-      gap: 8px; flex-shrink: 0; min-width: 0;
+      display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+      gap: 6px; flex-shrink: 0; min-width: 0;
     }
     .sidebar-cal-header .sidebar-section-title {
-      margin: 0; gap: 8px; min-width: 0; flex: 1;
+      margin: 0; gap: 6px; min-width: 0; flex: none;
+      font-size: 12px;
     }
     .sidebar-cal-header .sidebar-section-title > span {
       flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .sidebar-cal-actions {
       display: flex; flex-wrap: nowrap; gap: 3px; align-items: center;
-      flex-shrink: 0; margin-left: auto;
+      flex-shrink: 0; margin-left: 0; width: 100%;
     }
     .sidebar-cal-actions button {
-      flex: 0 0 auto; white-space: nowrap; line-height: 1.2;
-      padding: 3px 6px; border-radius: 8px; font-size: 10px; font-weight: 700;
-      cursor: pointer; box-sizing: border-box;
+      flex: 1 1 auto; white-space: nowrap; line-height: 1.2;
+      padding: 4px 4px; border-radius: 7px; font-size: 9.5px; font-weight: 700;
+      cursor: pointer; box-sizing: border-box; min-width: 0;
     }
     .sidebar-cal-actions #sidebar-cal-refresh-btn {
-      background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 3px 6px;
+      background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 4px 5px; flex: 0 0 auto;
     }
     .sidebar-cal-actions #sidebar-cal-board-btn {
       background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd;
     }
     .sidebar-cal-actions #add-sch-btn {
-      display: inline-flex; background: var(--accent); color: #fff; border: none; font-size: 10px;
+      display: inline-flex; justify-content: center; background: var(--accent); color: #fff; border: none; font-size: 9.5px;
     }
     .schedule-box {
       background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%);
-      border: 1px solid #bae6fd; padding: 6px; border-radius: var(--radius-lg);
+      border: 1px solid #bae6fd; padding: 5px; border-radius: var(--radius-lg);
       display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-xs);
       min-height: 0; flex: 1;
     }
@@ -1249,8 +1250,8 @@
     .sidebar-cal-day-duty:empty { display: none; }
     .sidebar-cal-day-body {
       flex: 1; min-height: 80px; max-height: min(52vh, 480px); overflow-y: auto;
-      padding: 8px; scrollbar-width: thin;
-      display: flex; flex-direction: column; gap: 10px;
+      padding: 6px; scrollbar-width: thin;
+      display: flex; flex-direction: column; gap: 8px;
     }
     .sidebar-cal-day-line {
       display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none;
@@ -1299,8 +1300,8 @@
     .sidebar-ad-card.is-admit { border-color: #bfdbfe; }
     .sidebar-ad-card.is-discharge { border-color: #fecaca; }
     .sidebar-ad-card-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      padding: 8px 12px; font-size: 13px; font-weight: 800; letter-spacing: -0.02em;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 6px 8px; font-size: 11.5px; font-weight: 800; letter-spacing: -0.02em;
       white-space: nowrap; flex-shrink: 0;
     }
     .sidebar-ad-card.is-admit .sidebar-ad-card-head { color: #1d4ed8; background: #eff6ff; }
@@ -1308,10 +1309,10 @@
     .sidebar-ad-card-count { font-variant-numeric: tabular-nums; opacity: 0.9; }
     .sidebar-ad-col-head {
       display: grid;
-      grid-template-columns: 44px minmax(0, 1fr) 36px 42px;
-      gap: 4px;
-      padding: 4px 8px;
-      font-size: 10px; font-weight: 700; color: #94a3b8;
+      grid-template-columns: 40px minmax(0, 1fr) 28px 34px;
+      gap: 3px;
+      padding: 3px 6px;
+      font-size: 9.5px; font-weight: 700; color: #94a3b8;
       background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
       white-space: nowrap; flex-shrink: 0;
     }
@@ -1320,11 +1321,11 @@
     .sidebar-ad-rows { display: flex; flex-direction: column; min-width: 0; }
     .sidebar-ad-row {
       display: grid;
-      grid-template-columns: 44px minmax(0, 1fr) 36px 42px;
-      gap: 4px;
+      grid-template-columns: 40px minmax(0, 1fr) 28px 34px;
+      gap: 3px;
       align-items: center;
-      padding: 6px 8px;
-      font-size: 11.5px; font-weight: 600; line-height: 1.3;
+      padding: 5px 6px;
+      font-size: 11px; font-weight: 600; line-height: 1.25;
       white-space: nowrap; min-width: 0;
       border-bottom: 1px solid #f1f5f9;
       box-sizing: border-box;
@@ -13169,9 +13170,9 @@
 
     function formatSidebarAdmitDischargeRoom(sch, norm) {
       const digits = String(norm?.room_no || '').replace(/\D/g, '');
-      if (digits) return `${digits}호`;
+      if (digits) return digits;
       const label = scheduleBoardRoomLabel(norm?.room_no);
-      if (label) return label.includes('호') ? label : `${label}호`;
+      if (label) return label.replace(/호$/, '') || label;
       return '—';
     }
 
@@ -13179,8 +13180,8 @@
       const rm = String(norm?.rm_team || sch?.rm_team || '').trim().toUpperCase().replace(/\s/g, '');
       if (!rm) return '—';
       const m = rm.match(/RM?\s*(\d+)/i) || rm.match(/^(\d+)$/);
-      if (m) return `RM${m[1]}`;
-      return rm.startsWith('RM') ? rm : `RM${rm}`;
+      if (m) return m[1];
+      return rm.replace(/^RM/, '') || rm;
     }
 
     function formatSidebarAdmitDischargeTime(sch) {
@@ -13205,7 +13206,7 @@
       card.appendChild(head);
       const colHead = document.createElement('div');
       colHead.className = 'sidebar-ad-col-head';
-      colHead.innerHTML = '<span>호실</span><span>환자 이름</span><span>RM</span><span>시간</span>';
+      colHead.innerHTML = '<span>호실</span><span>이름</span><span>RM</span><span>시간</span>';
       card.appendChild(colHead);
       const rows = document.createElement('div');
       rows.className = 'sidebar-ad-rows';
