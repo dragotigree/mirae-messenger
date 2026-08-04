@@ -279,9 +279,11 @@
     #sidebar-left-collapse-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
     #sidebar-right-collapse-btn {
       color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0;
-      width: 30px; height: 30px; border-radius: 9px; font-size: 13px;
+      width: 30px; height: 30px; border-radius: 9px; font-size: 0;
     }
     #sidebar-right-collapse-btn:hover { background: #e2e8f0; color: #334155; }
+    #sidebar-right-collapse-btn .icon-glyph { width: 14px; height: 14px; }
+    .sidebar-edge-toggle .icon-glyph { width: 14px; height: 14px; }
     .chat-header-tool-btn--sidebar {
       background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;
       min-width: 36px; padding: 0 10px;
@@ -552,6 +554,7 @@
     .left-footer-btn #toolbar-refresh-btn { --footer-icon: #6ee7b7; --footer-icon-hover: #a7f3d0; }
     .left-footer-btn #compact-mode-btn { --footer-icon: #c4b5fd; --footer-icon-hover: #ddd6fe; }
     .left-footer-btn #toolbar-settings-btn { --footer-icon: #fdba74; --footer-icon-hover: #fed7aa; }
+    .left-footer-btn #sidebar-left-collapse-btn { --footer-icon: #94a3b8; --footer-icon-hover: #e2e8f0; }
     /* ========== 2단 대화 영역 ========== */
     #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 380px; }
     #chat-header { height: 64px; padding: 0 24px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); flex-shrink: 0; }
@@ -2820,7 +2823,7 @@
   </div>
 
   <div id="app-body-row">
-  <button type="button" id="sidebar-left-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarLeft()" title="좌측 목록 열기">›</button>
+  <button type="button" id="sidebar-left-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarLeft()" title="좌측 목록 열기" data-ui-icon="chevronRight"></button>
   <div id="sidebar-left">
     <div id="sidebar-resize-handle" title="너비 조절 · 더블클릭으로 접기"></div>
 
@@ -2887,7 +2890,7 @@
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
         <button class="icon-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
         <button class="icon-btn" id="toolbar-settings-btn" onclick="openSettingsModal()" title="환경 설정"></button>
-        <button type="button" class="icon-btn" id="sidebar-left-collapse-btn" onclick="toggleSidebarLeft()" title="좌측 패널 접기">‹</button>
+        <button type="button" class="icon-btn" id="sidebar-left-collapse-btn" onclick="toggleSidebarLeft()" title="좌측 패널 접기"></button>
       </div>
     </div>
   </div>
@@ -3139,7 +3142,7 @@
     <div class="sidebar-cal-header">
       <div class="sidebar-section-title">
         <span>📅 병원 달력</span>
-        <button type="button" id="sidebar-right-collapse-btn" class="sidebar-panel-collapse-btn" onclick="toggleSidebarRight()" title="우측 패널 접기">›</button>
+        <button type="button" id="sidebar-right-collapse-btn" class="sidebar-panel-collapse-btn" onclick="toggleSidebarRight()" title="우측 패널 접기" data-ui-icon="panelCollapseRight"></button>
       </div>
       <div class="sidebar-cal-actions">
         <button type="button" id="sidebar-cal-refresh-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
@@ -3164,7 +3167,7 @@
       </div>
     </div>
   </div>
-  <button type="button" id="sidebar-right-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarRight()" title="우측 달력 열기">‹</button>
+  <button type="button" id="sidebar-right-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarRight()" title="우측 달력 열기" data-ui-icon="chevronLeft"></button>
 
   <!-- 👤 상세 정보 (좌측 우클릭 → 정보보기) -->
   <div id="user-info-modal" class="modal-overlay" onclick="if(event.target===this) closeUserInfoModal()">
@@ -4266,6 +4269,10 @@
       refresh: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 3.5V6H10" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 12.5V10H6" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.1A4.25 4.25 0 0 1 11.2 4.2L12.5 6M11.4 9.9a4.25 4.25 0 0 1-6.6 1.9L3.5 10" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       panelNarrow: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="2.5" width="6" height="11" rx="1.25" fill="none" stroke="currentColor" stroke-width="1.45"/></svg>',
       panelWide: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.45"/><rect x="7.5" y="2.5" width="6" height="11" rx="1.25" fill="none" stroke="currentColor" stroke-width="1.45"/></svg>',
+      panelCollapseLeft: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M7.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M11.1 5.6L8.5 8l2.6 2.4" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      panelCollapseRight: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M8.75 2.5v11" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M4.9 5.6L7.5 8l-2.6 2.4" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      chevronLeft: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5L5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      chevronRight: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 3.5L11 8l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       settings: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       clearChat: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 2.75h5.5l.65 1.35h2.85a.75.75 0 0 1 0 1.5h-1.05l-.75 7.15a1.15 1.15 0 0 1-1.14 1.03H5.64a1.15 1.15 0 0 1-1.14-1.03L3.75 5.6H2.7a.75.75 0 1 1 0-1.5h2.85l.65-1.35z" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="M6.35 7.1v4.1M9.65 7.1v4.1" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg>',
       search: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7.15" cy="7.15" r="3.65" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-width="1.35"/><path d="M10.1 10.1l2.75 2.75" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
@@ -5709,6 +5716,7 @@
         ['toolbar-refresh-btn', 'refresh'],
         ['toolbar-settings-btn', 'settings'],
         ['toolbar-settings-btn-compact', 'settings'],
+        ['sidebar-left-collapse-btn', 'panelCollapseLeft'],
         ['compact-expand-btn', 'panelWide'],
         ['compact-back-btn', 'back'],
         ['chat-clear-view-btn', 'clearChat'],
