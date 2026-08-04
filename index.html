@@ -1565,7 +1565,10 @@
     .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; background: #eef2f7; }
     .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: #eef2f7; }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
-    .schedule-board-section { border-radius: 14px; overflow-x: auto; overflow-y: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .schedule-board-section {
+      border-radius: 14px; overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1;
+      background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06);
+    }
     .schedule-board-section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
     .schedule-board-section-head .sb-count { font-size: 12.5px; font-weight: 600; opacity: 0.85; margin-left: 6px; }
     .schedule-board-section-head .sb-meal-summary { font-size: 12px; font-weight: 700; color: #b45309; margin-left: 10px; }
@@ -1573,17 +1576,17 @@
     .schedule-board-section-actions button { border: none; background: rgba(255,255,255,.7); padding: 6px 11px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: inherit; }
     .schedule-board-section-actions button:hover { background: #fff; }
     .schedule-board-table {
-      width: 100%; min-width: 1120px; border-collapse: collapse; table-layout: fixed; background: #fff;
+      width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; background: #fff;
     }
     .schedule-board-table col.sb-c-room { width: 56px; }
-    .schedule-board-table col.sb-c-name { width: 112px; }
-    .schedule-board-table col.sb-c-doctor { width: 168px; }
-    .schedule-board-table col.sb-c-type { width: 132px; }
+    .schedule-board-table col.sb-c-name { width: 110px; }
+    .schedule-board-table col.sb-c-doctor { width: 156px; }
+    .schedule-board-table col.sb-c-type { width: 120px; }
     .schedule-board-table col.sb-c-detail { width: 22%; }
-    .schedule-board-table col.sb-c-remark { width: 18%; }
-    .schedule-board-table col.sb-c-meal { width: 116px; }
-    .schedule-board-table col.sb-c-time { width: 100px; }
-    .schedule-board-table col.sb-c-btns { width: 108px; }
+    .schedule-board-table col.sb-c-remark { width: 16%; }
+    .schedule-board-table col.sb-c-meal { width: 108px; }
+    .schedule-board-table col.sb-c-time { width: 108px; }
+    .schedule-board-table col.sb-c-btns { width: 112px; }
     .schedule-board-table thead th {
       padding: 10px 8px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-align: center; vertical-align: middle; letter-spacing: -0.02em;
@@ -1609,8 +1612,9 @@
     }
     .schedule-board-table tbody tr:hover { background: #f8fafc; }
     .schedule-board-table tbody tr.is-editing { background: #eff6ff; box-shadow: inset 0 0 0 1px #93c5fd; }
-    .schedule-board-table td.sb-col-btns { text-align: center; }
+    .schedule-board-table td.sb-col-btns { text-align: center; padding-left: 6px; padding-right: 10px; }
     .schedule-board-table td.sb-col-type { white-space: nowrap; }
+    .schedule-board-table td.sb-col-time { white-space: nowrap; }
     .schedule-board-table td.sb-col-detail,
     .schedule-board-table th.sb-col-detail { min-width: 160px; }
     .schedule-board-table td.sb-col-remark,
@@ -1800,6 +1804,7 @@
       display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px;
       font-size: 13px; color: #0f172a;
       flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.25;
+      max-width: 100%; overflow: hidden;
     }
     .schedule-board-times span { white-space: nowrap; }
     .schedule-board-table .sb-type-cell {
@@ -1807,6 +1812,7 @@
     }
     .schedule-board-table .schedule-board-row-btns {
       display: inline-flex; vertical-align: middle; justify-content: center;
+      max-width: 100%;
     }
     .schedule-board-row-btns { display: flex; gap: 4px; flex-shrink: 0; justify-content: center; align-items: center; }
     .schedule-board-row-btns button {
