@@ -591,10 +591,17 @@
     .msg-bubble-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 100%; }
     .msg-row.is-other .msg-bubble-stack { align-items: flex-start; }
 
-    .msg-action-btns, .bubble-action-btns { display: none; position: static; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 2px; max-width: 100%; }
-    .msg-row:hover .msg-action-btns, .msg-row-bubble:hover .bubble-action-btns { display: flex; }
+    .msg-action-btns, .bubble-action-btns {
+      display: none; position: static; flex-wrap: wrap; align-items: center; gap: 4px;
+      padding: 4px; max-width: 100%;
+      background: rgba(255, 255, 255, 0.98); border: 1px solid rgba(226, 232, 240, 0.95);
+      border-radius: 12px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+    }
+    .msg-row.msg-actions-open .msg-action-btns,
+    .msg-row-bubble.msg-actions-open .bubble-action-btns { display: flex; }
     .msg-row.is-me .msg-action-btns, .msg-row-bubble.is-me .bubble-action-btns { justify-content: flex-end; }
     .msg-row.is-other .msg-action-btns, .msg-row-bubble.is-other .bubble-action-btns { justify-content: flex-start; }
+    .msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open { z-index: 5; }
 
     .pin-btn, .copy-btn, .msg-edit-btn, .msg-delete-btn, .msg-react-btn, .share-btn, .reply-btn,
     .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn {
@@ -11151,7 +11158,39 @@
     }
     // 대화 내용은 계속 새로 그려지므로, 이미지 하나하나에 리스너를 달지 않고
     // 채팅 영역 전체에 위임(delegate)해서 클릭된 것이 이미지일 때만 확대창을 연다.
-    document.getElementById('chat-messages-area').addEventListener('click', (e) => {
+    const chatMessagesAreaEl = document.getElementById('chat-messages-area');
+
+    function closeOpenMsgActions() {
+      document.querySelectorAll('.msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open').forEach((el) => {
+        el.classList.remove('msg-actions-open');
+      });
+    }
+
+    function openMsgActionsForRow(row) {
+      if (!row) return;
+      closeOpenMsgActions();
+      row.classList.add('msg-actions-open');
+    }
+
+    chatMessagesAreaEl.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('a, input, textarea, .msg-action-btns, .bubble-action-btns')) return;
+      const row = e.target.closest('.msg-row, .msg-row-bubble');
+      if (!row || !chatMessagesAreaEl.contains(row)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openMsgActionsForRow(row);
+    });
+
+    chatMessagesAreaEl.addEventListener('scroll', () => { closeOpenMsgActions(); }, { passive: true });
+
+    document.addEventListener('pointerdown', (e) => {
+      if (!document.querySelector('.msg-actions-open')) return;
+      if (e.target.closest('.msg-action-btns, .bubble-action-btns, #reaction-picker-popover, #reaction-people-popover')) return;
+      if (e.button === 2 && e.target.closest('.msg-row, .msg-row-bubble')) return;
+      closeOpenMsgActions();
+    }, true);
+
+    chatMessagesAreaEl.addEventListener('click', (e) => {
       if (e.target.classList.contains('chat-img-preview')) {
         openImageLightbox(e.target.src);
         return;
@@ -11171,6 +11210,7 @@
         e.preventDefault();
         e.stopPropagation();
         startEditMessage(editBtn.getAttribute('data-edit-msg'));
+        closeOpenMsgActions();
         return;
       }
       const deleteBtn = e.target.closest('[data-delete-msg]');
@@ -11178,6 +11218,7 @@
         e.preventDefault();
         e.stopPropagation();
         deleteThisMessage(deleteBtn.getAttribute('data-delete-msg'));
+        closeOpenMsgActions();
         return;
       }
       const reactBtn = e.target.closest('.msg-react-btn, .reaction-add-btn');
@@ -11199,6 +11240,10 @@
         e.preventDefault();
         e.stopPropagation();
         submitMessageReaction(chip.getAttribute('data-reaction-key'), chip.getAttribute('data-reaction-chip'));
+        return;
+      }
+      if (e.target.closest('.msg-action-btns, .bubble-action-btns')) {
+        setTimeout(closeOpenMsgActions, 0);
       }
     });
 
