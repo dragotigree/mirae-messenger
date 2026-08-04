@@ -5786,6 +5786,10 @@
     function setCompactRailTab(tab) {
       compactRailTab = tab;
       localStorage.setItem('compactRailTab', tab);
+      if (tab === 'friends' && compactListFilter === 'unread') {
+        compactListFilter = 'all';
+        localStorage.setItem('compactListFilter', 'all');
+      }
       document.querySelectorAll('.compact-rail-btn[data-rail]').forEach((btn) => {
         btn.classList.toggle('is-active', btn.dataset.rail === tab);
       });
