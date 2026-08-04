@@ -9334,6 +9334,7 @@
       }
       if (res.uid) refreshChannelMessageUnreadCounts();
       textarea.value = '';
+      resizeChatTextarea();
       cancelReplyMessage();
       if (isUrgentMode) toggleUrgentMode();
     }
@@ -9348,6 +9349,7 @@
       const textarea = document.getElementById('chat-textarea');
       textarea.value = plainTextFromMessageBubble(textEl);
       textarea.focus();
+      resizeChatTextarea();
       document.getElementById('edit-mode-banner').style.display = 'flex';
     }
 
@@ -9355,6 +9357,7 @@
       editingMessageUid = null;
       document.getElementById('chat-textarea').value = '';
       document.getElementById('edit-mode-banner').style.display = 'none';
+      resizeChatTextarea();
     }
 
     async function deleteThisMessage(msgUid) {
@@ -14054,9 +14057,29 @@
       }
     }
 
+    function onChatTextareaInput() {
+      resetIdleTimer();
+      resizeChatTextarea();
+    }
+
+    function resizeChatTextarea() {
+      const ta = document.getElementById('chat-textarea');
+      if (!ta) return;
+      const compact = document.body.classList.contains('compact-mode');
+      const minH = compact ? 22 : 44;
+      const maxH = compact ? 120 : 160;
+      ta.style.height = 'auto';
+      const next = Math.min(Math.max(ta.scrollHeight, minH), maxH);
+      ta.style.height = `${next}px`;
+    }
+
     function onChatKeyDown(e) {
       if (e.isComposing || e.keyCode === 229) return;
-      if (e.key === 'Enter' && !e.ctrlKey) { e.preventDefault(); sendChatMessage(); }
+      // Enter: 전송 / Shift+Enter: 줄바꿈
+      if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
     }
 
     function updateMasterAuthUi() {
