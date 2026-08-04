@@ -557,8 +557,8 @@
     .left-footer-btn #toolbar-settings-btn { --footer-icon: #fdba74; --footer-icon-hover: #fed7aa; }
     .left-footer-btn #sidebar-left-collapse-btn { --footer-icon: #94a3b8; --footer-icon-hover: #e2e8f0; }
     /* ========== 2단 대화 영역 ========== */
-    #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 380px; }
-    #chat-header { height: 64px; padding: 0 24px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); flex-shrink: 0; }
+    #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 420px; }
+    #chat-header { height: 64px; padding: 0 24px; border-bottom: 1px solid var(--border-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); flex-shrink: 0; min-width: 0; }
     .chat-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .chat-header-tool-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -682,8 +682,17 @@
       text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;
     }
     .chat-shared-loading { text-align: center; padding: 40px; color: #64748b; font-size: 13px; }
-    .header-user-info { display: flex; align-items: center; gap: 14px; }
-    .header-user-name { font-size: 16px; font-weight: var(--font-weight-bold); color: var(--text-primary); letter-spacing: -0.02em; }
+    .header-user-info { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; overflow: hidden; }
+    .header-user-info > .avatar-wrapper { flex-shrink: 0; }
+    .header-user-text { min-width: 0; flex: 1; overflow: hidden; }
+    .header-user-name {
+      font-size: 16px; font-weight: var(--font-weight-bold); color: var(--text-primary); letter-spacing: -0.02em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #chat-header-status-text {
+      font-size: 12px; color: #64748b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
 
@@ -3013,9 +3022,9 @@
             <div class="avatar-circle" id="chat-header-avatar">상</div>
             <div class="avatar-status-badge status-ONLINE" id="chat-header-status-badge"></div>
           </div>
-          <div>
+          <div class="header-user-text">
             <div class="header-user-name" id="chat-header-title">상대방 이름</div>
-            <div style="font-size:12px; color:#64748b;" id="chat-header-status-text">10층 · 재활치료부</div>
+            <div id="chat-header-status-text">10층 · 재활치료부</div>
           </div>
         </div>
         <div class="chat-header-actions">
@@ -5434,11 +5443,12 @@
 
     // ↔️ 좌·우 사이드바 크기 조절 · 접기/펼치기
     (function initSidebarResize() {
-      const SIDEBAR_MIN = 260;
+      // 목록 글씨는 nowrap+ellipsis 이므로 좁혀도 이중 줄바꿈되지 않음. 채팅 헤더 공간을 위해 최소를 낮춤.
+      const SIDEBAR_MIN = 200;
       const SIDEBAR_MAX = 480;
-      const SIDEBAR_RIGHT_MIN = 200;
+      const SIDEBAR_RIGHT_MIN = 180;
       const SIDEBAR_RIGHT_MAX = 440;
-      const MAIN_CHAT_MIN_WIDTH = 380;
+      const MAIN_CHAT_MIN_WIDTH = 420;
 
       function isLeftCollapsed() {
         return document.body.classList.contains('sidebar-left-collapsed');
