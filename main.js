@@ -772,8 +772,69 @@ function getChatLogDir() {
 }
 
 function sanitizeFileName(name) {
-  const cleaned = String(name).replace(/[\\/:*?"<>|]/g, '_').trim();
+  const cleaned = String(name || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .trim();
   return cleaned || 'unknown';
+}
+
+/** MIME → 확장자. subtype 전체를 확장자로 쓰면 xlsx가 vnd.openxmlformats… 로 깨짐 */
+function extensionFromMime(mimeType) {
+  const mime = String(mimeType || '').toLowerCase().split(';')[0].trim();
+  const map = {
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'application/vnd.ms-excel': 'xls',
+    'application/msword': 'doc',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'application/pdf': 'pdf',
+    'application/zip': 'zip',
+    'application/x-zip-compressed': 'zip',
+    'application/json': 'json',
+    'text/plain': 'txt',
+    'text/csv': 'csv',
+    'text/html': 'html',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'audio/mpeg': 'mp3',
+    'audio/wav': 'wav',
+    'video/mp4': 'mp4',
+    'application/octet-stream': 'bin'
+  };
+  if (map[mime]) return map[mime];
+  const sub = (mime.split('/')[1] || '').trim();
+  if (!sub) return 'bin';
+  // 벤더 MIME subtype은 확장자로 쓰지 않음
+  if (sub.length > 8 || sub.includes('.') || sub.includes('openxmlformats') || sub.startsWith('vnd.')) {
+    return 'bin';
+  }
+  return sub.replace(/[^a-z0-9]+/gi, '') || 'bin';
+}
+
+/** 이미 잘못 저장된 …vnd.openxmlformats… 파일명을 교정 */
+function repairMimeDisguisedFileName(fileName) {
+  let name = String(fileName || '').trim();
+  if (!name) return name;
+  const repairs = [
+    [/\.vnd\.openxmlformats-officedocument\.spreadsheetml(?:\.sheet)?$/i, '.xlsx'],
+    [/\.vnd\.openxmlformats-officedocument\.wordprocessingml(?:\.document)?$/i, '.docx'],
+    [/\.vnd\.openxmlformats-officedocument\.presentationml(?:\.presentation)?$/i, '.pptx'],
+    [/\.vnd\.ms-excel$/i, '.xls'],
+    [/\.msword$/i, '.doc']
+  ];
+  for (const [re, ext] of repairs) {
+    if (re.test(name)) return name.replace(re, ext);
+  }
+  return name;
 }
 
 function getReceivedFilesDir() {
@@ -1137,6 +1198,7 @@ function extractAndSaveAttachments(messageHtml, options) {
   let out = messageHtml;
   const regex = /((?:src|href)=")(data:([^;]+);base64,([^"]+))(")/gi;
   const replacements = [];
+  const downloadPatches = [];
   let match;
   let fileIndex = 0;
   while ((match = regex.exec(messageHtml)) !== null) {
@@ -1146,17 +1208,34 @@ function extractAndSaveAttachments(messageHtml, options) {
     const base64Data = match[4];
     const suffix = match[5];
     let fileName = '';
-    const around = messageHtml.slice(Math.max(0, match.index - 80), match.index + full.length + 120);
-    const altMatch = around.match(/alt="([^"]*)"/i);
-    if (altMatch) fileName = altMatch[1];
+    const before = messageHtml.slice(Math.max(0, match.index - 600), match.index);
+    const after = messageHtml.slice(match.index, Math.min(messageHtml.length, match.index + full.length + 220));
+    const around = before + after;
+    const dlMatch = after.match(/\bdownload="([^"]+)"/i) || before.match(/\bdownload="([^"]+)"/i);
+    if (dlMatch) fileName = dlMatch[1];
     if (!fileName) {
-      const nameMatch = around.match(/font-size:\s*13px;">([^<]+)<\/div>/i);
-      fileName = nameMatch ? nameMatch[1] : `file_${Date.now()}`;
+      const nameMatch =
+        before.match(/class="[^"]*chat-file-name[^"]*"[^>]*>\s*([^<]+?)\s*</i) ||
+        before.match(/chat-file-name[^>]*>\s*([^<]+?)\s*</i);
+      if (nameMatch) fileName = nameMatch[1];
     }
+    if (!fileName) {
+      const altMatch = around.match(/\balt="([^"]*)"/i);
+      if (altMatch) fileName = altMatch[1];
+    }
+    if (!fileName) {
+      // 구버전 인라인 스타일 파일명
+      const legacy = before.match(/font-size:\s*1[23](?:\.\d+)?px;">\s*([^<]+?)\s*</i);
+      if (legacy) fileName = legacy[1];
+    }
+    if (!fileName) fileName = `file_${Date.now()}`;
+    fileName = sanitizeFileName(fileName);
     try {
-      const ext = (mimeType.split('/')[1] || 'bin').split(';')[0] || 'bin';
-      const safeName = sanitizeFileName(fileName);
-      const finalName = safeName.includes('.') ? safeName : `${safeName}.${ext}`;
+      const ext = extensionFromMime(mimeType);
+      const safeName = fileName;
+      const finalName = path.extname(safeName)
+        ? safeName
+        : `${safeName}.${ext}`;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const uidPart = opts.msgUid ? `${sanitizeFileName(String(opts.msgUid).slice(0, 40))}_` : '';
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
@@ -1168,6 +1247,7 @@ function extractAndSaveAttachments(messageHtml, options) {
           from: full,
           to: `${prefix}mirae-file://${encodeURIComponent(storedName)}${suffix}`
         });
+        downloadPatches.push({ storedName, displayName: finalName });
       }
     } catch (e) {
       console.error('첨부파일 처리 오류:', e.message);
@@ -1175,6 +1255,21 @@ function extractAndSaveAttachments(messageHtml, options) {
   }
   if (compact && replacements.length) {
     replacements.forEach((r) => { out = out.split(r.from).join(r.to); });
+    downloadPatches.forEach((p) => {
+      const enc = encodeURIComponent(p.storedName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const safeDl = String(p.displayName).replace(/"/g, '');
+      out = out.replace(
+        new RegExp(`(href="mirae-file://${enc}")(\\s+download="[^"]*")?`, 'i'),
+        (full, hrefPart, dlPart) => {
+          if (!dlPart) return `${hrefPart} download="${safeDl}"`;
+          const cur = (dlPart.match(/download="([^"]*)"/i) || [])[1] || '';
+          if (!cur || cur === 'download' || /\.vnd\.|openxmlformats/i.test(cur)) {
+            return `${hrefPart} download="${safeDl}"`;
+          }
+          return full;
+        }
+      );
+    });
   }
   return out;
 }
@@ -5131,7 +5226,11 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
     const p = payload || {};
     const href = String(p.href || '').trim();
     const ask = !!p.ask;
-    let preferredName = sanitizeFileName(p.fileName || 'download');
+    let preferredName = sanitizeFileName(p.fileName || '');
+    preferredName = repairMimeDisguisedFileName(preferredName);
+    if (!preferredName || preferredName === 'download' || preferredName === 'unknown') {
+      preferredName = '';
+    }
     if (!href) return { success: false, msg: '파일 경로가 없습니다.' };
 
     let sourcePath = '';
@@ -5147,18 +5246,21 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
       if (!fs.existsSync(sourcePath)) {
         return { success: false, msg: '저장된 파일을 찾을 수 없습니다. 다시 받아 주세요.' };
       }
-      if (!preferredName || preferredName === 'download') {
-        // storedName: uid_timestamp_원본이름 → 원본 이름 추정
-        const stripped = storedName.replace(/^[0-9a-f-]{8,}_/i, '').replace(/^\d{4}-\d{2}-\d{2}T[\d-]+Z_(\d+_)?/, '');
+      if (!preferredName) {
+        // storedName: uid_timestamp_idx_원본이름 → 원본 이름 추정
+        let stripped = storedName
+          .replace(/^[0-9a-f-]{8,}_/i, '')
+          .replace(/^\d{4}-\d{2}-\d{2}T[\d-]+Z_(\d+_)?/, '');
+        stripped = repairMimeDisguisedFileName(stripped || storedName);
         preferredName = sanitizeFileName(stripped || storedName);
       }
     } else if (/^data:/i.test(href)) {
       const m = href.match(/^data:([^;]+);base64,(.+)$/i);
       if (!m) return { success: false, msg: '파일 데이터 형식이 올바르지 않습니다.' };
       buffer = Buffer.from(m[2], 'base64');
-      if (!preferredName.includes('.')) {
-        const ext = (m[1].split('/')[1] || 'bin').split(';')[0] || 'bin';
-        preferredName = `${preferredName}.${ext}`;
+      if (!preferredName) preferredName = `file_${Date.now()}`;
+      if (!path.extname(preferredName)) {
+        preferredName = `${preferredName}.${extensionFromMime(m[1])}`;
       }
     } else if (/^file:\/\//i.test(href)) {
       try {
@@ -5169,10 +5271,12 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
       if (!sourcePath || !fs.existsSync(sourcePath)) {
         return { success: false, msg: '로컬 파일을 찾을 수 없습니다.' };
       }
+      if (!preferredName) preferredName = path.basename(sourcePath);
     } else {
       return { success: false, msg: '지원하지 않는 파일 링크입니다.' };
     }
 
+    preferredName = repairMimeDisguisedFileName(sanitizeFileName(preferredName || 'download'));
     const targetDir = getReceivedFilesDir();
     let destPath = uniqueSavePath(targetDir, preferredName);
 

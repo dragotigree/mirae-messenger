@@ -10311,9 +10311,15 @@
       const href = String(
         (anchorOrLike && (anchorOrLike.getAttribute?.('href') || anchorOrLike.href || '')) || ''
       ).trim();
-      const fileName = String(
-        (anchorOrLike && (anchorOrLike.getAttribute?.('download') || anchorOrLike.download || '')) || ''
+      let fileName = String(
+        (anchorOrLike && anchorOrLike.getAttribute?.('download')) || ''
       ).trim();
+      // download 속성이 비면 말풍선에 보이는 파일명 사용
+      if (!fileName || fileName === 'download') {
+        const box = anchorOrLike && anchorOrLike.closest ? anchorOrLike.closest('.chat-file-box') : null;
+        const nameEl = box && box.querySelector('.chat-file-name');
+        if (nameEl) fileName = String(nameEl.textContent || '').trim();
+      }
       if (!href) {
         await appAlert('파일 링크가 없습니다.');
         return;
@@ -14543,7 +14549,8 @@
         if (file.size <= MAX_NON_IMAGE_BYTES) {
           try {
             const fileDataUrl = await readFileAsDataUrl(file);
-            const downloadAttr = (appSettings.fileMode === 'ask') ? '' : `download="${escapeHtmlText(file.name)}"`;
+            // 저장 위치 묻기(ask)와 무관하게 원본 파일명은 항상 넣어 둠
+            const downloadAttr = `download="${escapeHtmlText(file.name)}"`;
             const contentHtml =
               `<div class="chat-file-box"><span class="chat-file-icon" aria-hidden="true">📄</span><div class="chat-file-meta"><div class="chat-file-name">${escapeHtmlText(file.name)}</div><div class="chat-file-size">${(file.size / 1024).toFixed(1)} KB</div></div><a class="chat-file-dl" href="${fileDataUrl}" ${downloadAttr}>받기</a></div>`;
             dispatchOutgoing(contentHtml).then((res) => {
