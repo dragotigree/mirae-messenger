@@ -3931,7 +3931,7 @@
   </div>
 
   <!-- ✏️ 관리자 표시 이름 수정 -->
-  <div id="operator-rename-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeOperatorRenameModal()">
+  <div id="operator-rename-modal" class="modal-overlay" style="display:none; z-index:5200;" onclick="if(event.target===this) closeOperatorRenameModal()">
     <div class="modal-card" style="width:380px;" onclick="event.stopPropagation()">
       <div style="font-size:16px; font-weight:700; color:#1e3a8a;">✏️ 관리자 표시 이름 수정</div>
       <div id="operator-rename-username" style="font-size:12px; color:#64748b; margin-top:4px;"></div>
@@ -10292,8 +10292,8 @@
             <div style="margin-top:6px; font-size:11px; font-weight:700; color:#15803d;">✓ 공지 · 병원일정 · 당직의·OFF(일정등록) 가능</div>
           </div>
           <div style="display:flex; gap:6px; flex-shrink:0;">
-            <span style="color:#0369a1; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px;" onclick="renameMasterNoticeOperator('${uname}')">이름수정</span>
-            <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px;" onclick="removeMasterNoticeOperator('${uname}')">삭제</span>
+            <span style="color:#0369a1; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); renameMasterNoticeOperator('${uname}')">이름수정</span>
+            <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); removeMasterNoticeOperator('${uname}')">삭제</span>
           </div>
         `;
         container.appendChild(row);
