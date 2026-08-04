@@ -5703,6 +5703,60 @@ ipcMain.handle('open-external-url', async (event, url) => {
   }
 });
 
+ipcMain.handle('get-recent-conversations', async () => {
+  const myIp = MY_IP;
+  return new Promise((resolve) => {
+    const sql = `
+      SELECT x.peer_key, m.message, m.sender_name, m.sender_ip, m.id AS last_id,
+             strftime('%Y-%m-%d %H:%M', m.created_at, 'localtime') AS created_at_local
+      FROM (
+        SELECT receiver_ip AS peer_key, MAX(id) AS last_id
+        FROM messages
+        WHERE receiver_ip = 'BROADCAST'
+           OR receiver_ip LIKE 'DEPT:%'
+           OR receiver_ip LIKE 'FLOOR:%'
+           OR receiver_ip LIKE 'GROUP:%'
+        GROUP BY receiver_ip
+        UNION ALL
+        SELECT CASE WHEN sender_ip = ? THEN receiver_ip ELSE sender_ip END AS peer_key,
+               MAX(id) AS last_id
+        FROM messages
+        WHERE (sender_ip = ? OR receiver_ip = ?)
+          AND receiver_ip != 'BROADCAST'
+          AND receiver_ip NOT LIKE 'DEPT:%'
+          AND receiver_ip NOT LIKE 'FLOOR:%'
+          AND receiver_ip NOT LIKE 'GROUP:%'
+          AND receiver_ip NOT LIKE 'BCAST:%'
+          AND receiver_ip NOT LIKE 'DEPTPEER:%'
+          AND receiver_ip NOT LIKE 'FLOORPEER:%'
+          AND sender_ip NOT LIKE 'BCAST:%'
+          AND sender_ip NOT LIKE 'DEPTPEER:%'
+          AND sender_ip NOT LIKE 'FLOORPEER:%'
+        GROUP BY peer_key
+      ) x
+      JOIN messages m ON m.id = x.last_id
+      ORDER BY x.last_id DESC
+      LIMIT 200`;
+    db.all(sql, [myIp, myIp, myIp], (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        resolve([]);
+        return;
+      }
+      const mineLabel = senderLabelForMe();
+      resolve((rows || []).map((r) => ({
+        key: r.peer_key,
+        message: r.message,
+        sender_name: formatSenderDisplay(r.sender_name, r.sender_ip),
+        sender_ip: r.sender_ip,
+        last_id: r.last_id,
+        created_at_local: r.created_at_local,
+        isMe: r.sender_ip === myIp || (mineLabel && r.sender_name === mineLabel)
+      })));
+    });
+  });
+});
+
 ipcMain.handle('get-chat-history', async (event, args) => {
   const targetIP = (args && typeof args === 'object') ? args.targetIP : args;
   const keyword = args && typeof args === 'object' ? args.keyword : null;
