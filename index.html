@@ -2566,11 +2566,35 @@
     #board-write-view, #board-detail-view { display: none; flex-direction: column; gap: 10px; }
     .board-notice-row { background: var(--surface-muted); border: 1px solid var(--border); padding: 14px 16px; border-radius: var(--radius-xl); cursor: pointer; transition: background var(--transition-normal), border-color var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal); }
     .board-notice-row:hover { background: #f0f9ff; border-color: #bae6fd; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-    .board-notice-title { font-weight: var(--font-weight-bold); font-size: 14px; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; }
+    .board-notice-title { font-weight: var(--font-weight-bold); font-size: 14px; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .board-notice-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .board-notice-photo-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #0369a1; background: #e0f2fe; border-radius: 999px; padding: 2px 7px; }
     .board-notice-meta { font-size: 11px; color: var(--text-muted); }
     .board-form-input, .board-form-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 13px; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none; }
     .board-form-input:focus, .board-form-textarea:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
-    .board-form-textarea { min-height: 220px; resize: vertical; line-height: 1.6; }
+    .board-form-textarea { min-height: 180px; resize: vertical; line-height: 1.6; }
+    .board-photo-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+    .board-photo-attach-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #cbd5e1;
+      border-radius: 12px; background: #f8fafc; color: #334155; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .board-photo-attach-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+    .board-photo-hint { font-size: 11px; color: #94a3b8; }
+    .board-photo-preview-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .board-photo-thumb {
+      position: relative; width: 88px; height: 88px; border-radius: 12px; overflow: hidden;
+      border: 1px solid #e2e8f0; background: #f1f5f9; flex-shrink: 0;
+    }
+    .board-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .board-photo-thumb-remove {
+      position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 999px;
+      background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
+    }
+    .board-detail-images { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .board-detail-images img {
+      max-width: 100%; max-height: 360px; width: auto; height: auto; object-fit: contain;
+      border-radius: 14px; border: 1px solid #e2e8f0; cursor: zoom-in; background: #f8fafc;
+    }
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.2s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
@@ -3463,6 +3487,12 @@
         <input type="hidden" id="board-write-uid">
         <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요">
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
+        <div class="board-photo-toolbar">
+          <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
+          <span class="board-photo-hint" id="board-photo-hint">최대 3장 · JPG/PNG</span>
+          <input type="file" id="board-write-photo-input" accept="image/*" multiple style="display:none;" onchange="handleBoardPhotoSelect(event)">
+        </div>
+        <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
           <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
           <button onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
@@ -3477,6 +3507,7 @@
         <div id="board-detail-title" style="font-size:17px; font-weight:700; color:#0f172a; margin-bottom:6px;"></div>
         <div id="board-detail-meta" style="font-size:11px; color:#94a3b8; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid #f1f5f9;"></div>
         <div id="board-detail-content" style="font-size:14px; color:#334155; line-height:1.7; white-space:pre-wrap;"></div>
+        <div id="board-detail-images" class="board-detail-images"></div>
         <div id="board-detail-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;"></div>
       </div>
     </div>
@@ -9944,6 +9975,85 @@
     }
 
 
+    const MAX_NOTICE_IMAGES = 3;
+    let boardWriteImages = [];
+
+    function parseNoticeImages(raw) {
+      if (Array.isArray(raw)) {
+        return raw.filter((s) => typeof s === 'string' && s.indexOf('data:image') === 0).slice(0, MAX_NOTICE_IMAGES);
+      }
+      if (typeof raw === 'string' && raw.trim()) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed
+              .map((item) => (typeof item === 'string' ? item : (item && item.dataUrl) || ''))
+              .filter((s) => typeof s === 'string' && s.indexOf('data:image') === 0)
+              .slice(0, MAX_NOTICE_IMAGES);
+          }
+        } catch (_) { /* ignore */ }
+      }
+      return [];
+    }
+
+    function renderBoardPhotoPreview() {
+      const row = document.getElementById('board-photo-preview-row');
+      const hint = document.getElementById('board-photo-hint');
+      if (!row) return;
+      row.innerHTML = '';
+      boardWriteImages.forEach((src, idx) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'board-photo-thumb';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = `첨부 ${idx + 1}`;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'board-photo-thumb-remove';
+        removeBtn.title = '사진 제거';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          boardWriteImages.splice(idx, 1);
+          renderBoardPhotoPreview();
+        };
+        thumb.appendChild(img);
+        thumb.appendChild(removeBtn);
+        row.appendChild(thumb);
+      });
+      if (hint) hint.textContent = `최대 ${MAX_NOTICE_IMAGES}장 · ${boardWriteImages.length}/${MAX_NOTICE_IMAGES}`;
+    }
+
+    async function handleBoardPhotoSelect(event) {
+      const files = [...(event.target.files || [])];
+      event.target.value = '';
+      if (!files.length) return;
+      const remain = MAX_NOTICE_IMAGES - boardWriteImages.length;
+      if (remain <= 0) {
+        await appAlert(`사진은 최대 ${MAX_NOTICE_IMAGES}장까지 첨부할 수 있습니다.`);
+        return;
+      }
+      const picked = files.filter((f) => f && f.type && f.type.startsWith('image/')).slice(0, remain);
+      if (!picked.length) {
+        await appAlert('이미지 파일만 첨부할 수 있습니다.');
+        return;
+      }
+      for (const file of picked) {
+        try {
+          const raw = await readFileAsDataUrl(file);
+          const compressed = await compressImageDataUrlForNotice(raw, file.name, file.type);
+          if (compressed && compressed.dataUrl) boardWriteImages.push(compressed.dataUrl);
+        } catch (err) {
+          console.error('공지 사진 처리 실패', err);
+        }
+      }
+      renderBoardPhotoPreview();
+      if (files.length > remain) {
+        await appAlert(`사진은 최대 ${MAX_NOTICE_IMAGES}장까지입니다. 앞의 ${remain}장만 추가했습니다.`);
+      }
+    }
+
     async function loadNoticesList() {
       const container = document.getElementById('board-list-container');
       const notices = await window.api.getNotices();
@@ -9960,11 +10070,15 @@
       container.innerHTML = '';
       cachedNoticesList.forEach(n => {
         const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
+        const imgCount = parseNoticeImages(n.images).length;
         const row = document.createElement('div');
         row.className = 'board-notice-row';
         row.innerHTML = `
-          <div class="board-notice-title">${n.title}</div>
-          <div class="board-notice-meta">작성자: ${formatNoticeAuthorName(n)} · ${createdDisplay}</div>
+          <div class="board-notice-title">
+            <span class="board-notice-title-text">${escapeHtml(n.title || '')}</span>
+            ${imgCount ? `<span class="board-notice-photo-badge">📷 ${imgCount}</span>` : ''}
+          </div>
+          <div class="board-notice-meta">작성자: ${escapeHtml(formatNoticeAuthorName(n))} · ${createdDisplay}</div>
         `;
         row.onclick = () => showBoardDetailView(n.uid);
         container.appendChild(row);
@@ -9984,7 +10098,19 @@
       const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
       document.getElementById('board-detail-title').textContent = n.title;
       document.getElementById('board-detail-meta').textContent = `작성자: ${formatNoticeAuthorName(n)} · ${createdDisplay}`;
-      document.getElementById('board-detail-content').textContent = n.content;
+      document.getElementById('board-detail-content').textContent = n.content || '';
+
+      const imagesEl = document.getElementById('board-detail-images');
+      if (imagesEl) {
+        imagesEl.innerHTML = '';
+        parseNoticeImages(n.images).forEach((src) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = '공지 사진';
+          img.onclick = () => openImageLightbox(src);
+          imagesEl.appendChild(img);
+        });
+      }
 
       const actionsEl = document.getElementById('board-detail-actions');
       actionsEl.innerHTML = '';
@@ -10027,16 +10153,21 @@
         document.getElementById('board-write-uid').value = uid;
         document.getElementById('board-write-title').value = n ? n.title : '';
         document.getElementById('board-write-content').value = n ? n.content : '';
+        boardWriteImages = parseNoticeImages(n && n.images);
       } else {
         document.getElementById('board-modal-title').textContent = '✍️ 새 공지사항 작성';
         document.getElementById('board-write-uid').value = '';
         document.getElementById('board-write-title').value = '';
         document.getElementById('board-write-content').value = '';
+        boardWriteImages = [];
       }
+      renderBoardPhotoPreview();
       document.getElementById('board-write-title').focus();
     }
 
     function cancelBoardWrite() {
+      boardWriteImages = [];
+      renderBoardPhotoPreview();
       const uid = document.getElementById('board-write-uid').value;
       if (uid) showBoardDetailView(uid);
       else showBoardListView();
@@ -10048,8 +10179,12 @@
       const uid = document.getElementById('board-write-uid').value;
       const title = document.getElementById('board-write-title').value.trim();
       const content = document.getElementById('board-write-content').value.trim();
+      const images = boardWriteImages.slice(0, MAX_NOTICE_IMAGES);
       if (!title) { await appAlert('제목을 입력해 주세요.'); return; }
-      if (!content) { await appAlert('내용을 입력해 주세요.'); return; }
+      if (!content && images.length === 0) {
+        await appAlert('내용 또는 사진을 한 가지 이상 입력해 주세요.');
+        return;
+      }
 
       isSubmittingNotice = true;
       try {
@@ -10059,16 +10194,18 @@
             await appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
             return;
           }
-          const res = await window.api.updateNotice({ uid, title, content });
+          const res = await window.api.updateNotice({ uid, title, content, images });
           if (!res || !res.success) {
             await appAlert((res && res.msg) || '공지사항 수정에 실패했습니다. 다시 시도해 주세요.');
             return;
           }
+          boardWriteImages = [];
           await loadNoticesList();
           showBoardDetailView(uid);
         } else {
-          const res = await window.api.addNotice({ title, content, authorName: getNoticeAuthorDisplayName() });
+          const res = await window.api.addNotice({ title, content, images, authorName: getNoticeAuthorDisplayName() });
           if (!res || !res.success) { await appAlert('공지사항 등록에 실패했습니다. 다시 시도해 주세요.'); return; }
+          boardWriteImages = [];
           await loadNoticesList();
           showBoardListView();
         }
@@ -12123,6 +12260,50 @@
         img.onerror = () => reject(new Error('IMAGE_LOAD_FAILED'));
         img.src = url;
       });
+    }
+
+    /** 공지 첨부용: TCP 동기화 한도 고려해 채팅보다 더 작게 압축 (장당 ~120KB, 최대 3장) */
+    async function compressImageDataUrlForNotice(dataUrl, fileName, mimeHint) {
+      const MAX_NOTICE_IMAGE_BYTES = 120 * 1024;
+      const mime = mimeHint || (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || 'image/jpeg';
+      const originalBytes = estimateDataUrlBytes(dataUrl);
+      const outName = fileName || 'notice.jpg';
+      if (originalBytes > 0 && originalBytes <= MAX_NOTICE_IMAGE_BYTES) {
+        if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/webp' || mime === 'image/gif') {
+          return { dataUrl, fileName: outName, bytes: originalBytes };
+        }
+      }
+      const img = await loadImageElement(dataUrl);
+      const ow = img.naturalWidth || img.width || 1;
+      const oh = img.naturalHeight || img.height || 1;
+      const drawScaled = (longEdge, quality) => {
+        const long = Math.max(ow, oh);
+        const scale = long > longEdge ? longEdge / long : 1;
+        const w = Math.max(1, Math.round(ow * scale));
+        const h = Math.max(1, Math.round(oh * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const nextUrl = canvas.toDataURL('image/jpeg', quality);
+        return { dataUrl: nextUrl, bytes: estimateDataUrlBytes(nextUrl) };
+      };
+      let longEdge = 1280;
+      let quality = 0.8;
+      let best = drawScaled(longEdge, quality);
+      while (best.bytes > MAX_NOTICE_IMAGE_BYTES && quality > 0.42) {
+        quality = Math.max(0.42, +(quality - 0.08).toFixed(2));
+        best = drawScaled(longEdge, quality);
+      }
+      while (best.bytes > MAX_NOTICE_IMAGE_BYTES && longEdge > 640) {
+        longEdge = Math.max(640, Math.floor(longEdge * 0.75));
+        quality = 0.42;
+        best = drawScaled(longEdge, quality);
+      }
+      return { dataUrl: best.dataUrl, fileName: preferJpegFileName(outName), bytes: best.bytes };
     }
 
     /** 채팅 전송용: 긴 변 축소 + JPEG 품질 하향. 작은 PNG는 유지. 성공 시 조용히 반환. */

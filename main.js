@@ -2057,11 +2057,12 @@ db.serialize(() => {
     content TEXT,
     author_name TEXT,
     author_ip TEXT,
-    created_at TEXT
+    created_at TEXT,
+    images TEXT DEFAULT ''
   )`, logDbErr);
   // 예전 버전에서 이미 notices 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
-  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT'].forEach(colDef => {
+  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT'].forEach(colDef => {
     db.run(`ALTER TABLE notices ADD COLUMN ${colDef}`, () => {});
   });
   setTimeout(() => {
@@ -4420,6 +4421,30 @@ function handleIncomingBroadcast(payload, senderIP) {
   });
 }
 
+/** 공지 사진: JSON 배열 문자열로 정규화 (최대 3장) */
+function normalizeNoticeImagesField(raw) {
+  let list = [];
+  if (Array.isArray(raw)) list = raw;
+  else if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    } catch (_) {
+      list = [];
+    }
+  }
+  return JSON.stringify(
+    list
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item.dataUrl === 'string') return item.dataUrl;
+        return '';
+      })
+      .filter((s) => typeof s === 'string' && s.indexOf('data:image') === 0)
+      .slice(0, 3)
+  );
+}
+
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
   isNoticeTombstoned(n.uid, (tombstoned) => {
@@ -4429,9 +4454,10 @@ function handleNoticeAdd(n) {
     }
     db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
       if (row) return;
+      const images = normalizeNoticeImagesField(n.images);
       db.run(
-        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
+        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images],
         () => { if (mainWindow) safeWebContentsSend('notices-update'); }
       );
     });
@@ -4447,7 +4473,8 @@ function handleNoticeUpdate(n) {
       });
       return;
     }
-    db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
+    const images = normalizeNoticeImagesField(n.images);
+    db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
       if (mainWindow) safeWebContentsSend('notices-update');
     });
   });
@@ -4499,23 +4526,53 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     return false;
   };
 
-  // 1) 공지+작성자+overrides+삭제목록 (보통 작음)
+  // 1) 작성자+overrides+삭제목록 (공지는 사진 때문에 커질 수 있어 별도 청크)
   const head = {
     ...baseMeta,
-    notices: notices || [],
     operators: operators || [],
     profileOverrides: profileOverridesRows || [],
     deletedScheduleUids: deletedScheduleUids || [],
     deletedNoticeUids: deletedNoticeUids || []
   };
   if (!tryPush(head)) {
-    // 극단적으로 크면 필드별로
-    if ((notices || []).length) tryPush({ ...baseMeta, notices });
     if ((operators || []).length) tryPush({ ...baseMeta, operators });
     if ((profileOverridesRows || []).length) tryPush({ ...baseMeta, profileOverrides: profileOverridesRows });
     if ((deletedScheduleUids || []).length) tryPush({ ...baseMeta, deletedScheduleUids });
     if ((deletedNoticeUids || []).length) tryPush({ ...baseMeta, deletedNoticeUids });
   }
+
+  // 1b) 공지 — 사진 포함 시 단건 청크로 나눠 전송
+  const noticeList = notices || [];
+  let noticeBatch = [];
+  const flushNoticeBatch = () => {
+    if (!noticeBatch.length) return;
+    const obj = { ...baseMeta, notices: noticeBatch, deletedNoticeUids: deletedNoticeUids || [] };
+    if (tryPush(obj)) {
+      noticeBatch = [];
+      return;
+    }
+    if (noticeBatch.length === 1) {
+      console.error('공지 단건이 TCP 한도를 초과해 동기화에서 제외:', noticeBatch[0] && noticeBatch[0].uid);
+      noticeBatch = [];
+      return;
+    }
+    const half = noticeBatch.slice(0, Math.ceil(noticeBatch.length / 2));
+    const rest = noticeBatch.slice(Math.ceil(noticeBatch.length / 2));
+    noticeBatch = half;
+    flushNoticeBatch();
+    noticeBatch = rest;
+    flushNoticeBatch();
+  };
+  noticeList.forEach((n) => {
+    noticeBatch.push(n);
+    const probe = { ...baseMeta, notices: noticeBatch, deletedNoticeUids: deletedNoticeUids || [] };
+    if (Buffer.byteLength(JSON.stringify(probe) + '\n', 'utf8') > NOTICE_SYNC_SAFE_LINE_BYTES) {
+      noticeBatch.pop();
+      flushNoticeBatch();
+      noticeBatch.push(n);
+    }
+  });
+  flushNoticeBatch();
 
   // 2) 일정은 청크로 (삭제 UID도 함께 실어 청크만 먼저 도착해도 되살림 방지)
   const list = schedules || [];
@@ -5046,9 +5103,10 @@ function upsertNoticeFromSync(n) {
       db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
       return;
     }
+    const images = normalizeNoticeImagesField(n.images);
     db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at],
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images],
       logDbErr
     );
   });
@@ -6735,20 +6793,22 @@ ipcMain.handle('get-notices', async () => {
   });
 });
 
-ipcMain.handle('add-notice', async (event, { title, content, authorName }) => {
+ipcMain.handle('add-notice', async (event, { title, content, authorName, images }) => {
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
+    const imagesJson = normalizeNoticeImagesField(images);
     const record = {
       uid: generateNoticeUid(),
       title,
       content,
       author_name: (authorName && String(authorName).trim()) || fallbackAuthor,
       author_ip: MY_IP,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      images: imagesJson
     };
     db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.title, record.content, record.author_name, record.author_ip, record.created_at],
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.title, record.content, record.author_name, record.author_ip, record.created_at, record.images],
       (err) => {
         if (err) {
           console.error('공지사항 저장 실패:', err.message);
@@ -6762,14 +6822,15 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName }) => {
   });
 });
 
-ipcMain.handle('update-notice', async (event, { uid, title, content }) => {
+ipcMain.handle('update-notice', async (event, { uid, title, content, images }) => {
   const allowed = await noticeModifyAllowed(uid);
   if (!allowed) {
     return { success: false, msg: '본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)' };
   }
   return new Promise((resolve) => {
-    db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [title, content, uid], (err) => {
-      if (!err) broadcastToOnlinePeers({ type: 'NOTICE_UPDATE', notice: { uid, title, content } });
+    const imagesJson = normalizeNoticeImagesField(images);
+    db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [title, content, imagesJson, uid], (err) => {
+      if (!err) broadcastToOnlinePeers({ type: 'NOTICE_UPDATE', notice: { uid, title, content, images: imagesJson } });
       resolve({ success: !err });
     });
   });
