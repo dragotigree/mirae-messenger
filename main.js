@@ -2059,7 +2059,16 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS deleted_schedules (
     uid TEXT PRIMARY KEY,
     deleted_at TEXT NOT NULL
-  )`, logDbErr);
+  )`, (err) => {
+    logDbErr(err);
+    db.all(`SELECT uid FROM deleted_schedules`, (loadErr, rows) => {
+      if (loadErr) {
+        logDbErr(loadErr);
+        return;
+      }
+      rememberScheduleTombstones((rows || []).map((r) => r && r.uid).filter(Boolean));
+    });
+  });
   db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_schedules_at ON deleted_schedules(deleted_at)`, () => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
@@ -4314,14 +4323,18 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     if ((deletedScheduleUids || []).length) tryPush({ ...baseMeta, deletedScheduleUids });
   }
 
-  // 2) 일정은 청크로
+  // 2) 일정은 청크로 (삭제 UID도 함께 실어 청크만 먼저 도착해도 되살림 방지)
   const list = schedules || [];
   if (!list.length) return chunks.length ? chunks : [{ ...baseMeta, deletedScheduleUids: deletedScheduleUids || [] }];
 
   let batch = [];
   const flushBatch = () => {
     if (!batch.length) return;
-    const obj = { ...baseMeta, schedules: batch };
+    const obj = {
+      ...baseMeta,
+      schedules: batch,
+      deletedScheduleUids: deletedScheduleUids || []
+    };
     if (tryPush(obj)) {
       batch = [];
       return;
@@ -4342,7 +4355,11 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
 
   list.forEach((s) => {
     batch.push(s);
-    const probe = { ...baseMeta, schedules: batch };
+    const probe = {
+      ...baseMeta,
+      schedules: batch,
+      deletedScheduleUids: deletedScheduleUids || []
+    };
     if (Buffer.byteLength(JSON.stringify(probe) + '\n', 'utf8') > NOTICE_SYNC_SAFE_LINE_BYTES) {
       batch.pop();
       flushBatch();
@@ -4350,7 +4367,7 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     }
   });
   flushBatch();
-  return chunks.length ? chunks : [{ ...baseMeta, schedules: list.slice(0, 1) }];
+  return chunks.length ? chunks : [{ ...baseMeta, schedules: list.slice(0, 1), deletedScheduleUids: deletedScheduleUids || [] }];
 }
 
 function handleNoticeSyncRequest(senderIP) {
@@ -4408,7 +4425,9 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     if (mainWindow) safeWebContentsSend('notice-operators-update');
   }
   // 삭제 목록을 일정 INSERT보다 먼저 적용해야 되살림을 막을 수 있음
+  // (DB INSERT는 비동기이므로 메모리 tombstone을 먼저 올려 레이스를 차단)
   if (Array.isArray(deletedScheduleUids) && deletedScheduleUids.length) {
+    rememberScheduleTombstones(deletedScheduleUids);
     deletedScheduleUids.forEach((uid) => {
       if (!uid) return;
       applyLocalScheduleDelete(uid, { notify: false });
@@ -4652,6 +4671,8 @@ function scheduleRemarkFromPayload(p) {
 
 /** 삭제 tombstone 보관 기간 (다른 PC가 오래된 삭제를 영원히 들고 있지 않도록) */
 const SCHEDULE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
+/** DB 기록 전에도 동기화 INSERT 레이스를 막기 위한 즉시 기억 */
+const scheduleTombstoneMemory = new Set();
 
 function pruneScheduleTombstones(done) {
   const cutoff = new Date(Date.now() - SCHEDULE_TOMBSTONE_KEEP_MS).toISOString();
@@ -4665,10 +4686,12 @@ function recordScheduleTombstone(uid, done) {
     if (typeof done === 'function') done();
     return;
   }
+  const key = String(uid);
+  scheduleTombstoneMemory.add(key);
   const at = new Date().toISOString();
   db.run(
     `INSERT OR REPLACE INTO deleted_schedules (uid, deleted_at) VALUES (?, ?)`,
-    [String(uid), at],
+    [key, at],
     () => pruneScheduleTombstones(done)
   );
 }
@@ -4678,8 +4701,20 @@ function isScheduleTombstoned(uid, cb) {
     cb(false);
     return;
   }
-  db.get(`SELECT 1 AS x FROM deleted_schedules WHERE uid = ?`, [String(uid)], (err, row) => {
+  const key = String(uid);
+  if (scheduleTombstoneMemory.has(key)) {
+    cb(true);
+    return;
+  }
+  db.get(`SELECT 1 AS x FROM deleted_schedules WHERE uid = ?`, [key], (err, row) => {
+    if (!err && row) scheduleTombstoneMemory.add(key);
     cb(!err && !!row);
+  });
+}
+
+function rememberScheduleTombstones(uids) {
+  (uids || []).forEach((uid) => {
+    if (uid) scheduleTombstoneMemory.add(String(uid));
   });
 }
 
@@ -4700,7 +4735,10 @@ function applyLocalScheduleDelete(uid, opts) {
 function insertScheduleRowIgnoringTombstone(s, notify) {
   if (!s || !s.uid) return;
   isScheduleTombstoned(s.uid, (tombstoned) => {
-    if (tombstoned) return;
+    if (tombstoned) {
+      db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [String(s.uid)], logDbErr);
+      return;
+    }
     const meta = schedulePatientMetaFromPayload(s);
     const und = scheduleTimeUndecidedFromPayload(s);
     const meal = scheduleMealCancelFromPayload(s);
@@ -4717,7 +4755,10 @@ function insertScheduleRowIgnoringTombstone(s, notify) {
 function upsertScheduleFromSync(s) {
   if (!s || !s.uid) return;
   isScheduleTombstoned(s.uid, (tombstoned) => {
-    if (tombstoned) return;
+    if (tombstoned) {
+      db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [String(s.uid)], logDbErr);
+      return;
+    }
     const meta = schedulePatientMetaFromPayload(s);
     const und = scheduleTimeUndecidedFromPayload(s);
     const meal = scheduleMealCancelFromPayload(s);
@@ -6542,7 +6583,18 @@ ipcMain.handle('get-schedules', async () => {
         resolve([]);
         return;
       }
-      resolve(rows || []);
+      const list = rows || [];
+      // tombstone과 불일치로 남은 행이 있으면 목록에서 제외·정리
+      const visible = [];
+      list.forEach((r) => {
+        if (!r || !r.uid) return;
+        if (scheduleTombstoneMemory.has(String(r.uid))) {
+          db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [String(r.uid)], logDbErr);
+          return;
+        }
+        visible.push(r);
+      });
+      resolve(visible);
     });
   });
 });
