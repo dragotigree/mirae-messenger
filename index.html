@@ -3260,8 +3260,9 @@
             <div id="schedule-board-cal-grid" class="mini-cal-grid"></div>
           </div>
           <div class="schedule-board-export-row sb-side-export">
-            <button type="button" class="schedule-board-export-btn" id="schedule-board-export-all" onclick="exportScheduleBoardExcelAllWards()">전체 병동 엑셀</button>
-            <button type="button" class="schedule-board-export-btn secondary" id="schedule-board-export-filtered" onclick="exportScheduleBoardExcelFiltered()">화면 필터 엑셀</button>
+            <button type="button" class="schedule-board-export-btn" id="schedule-board-export-day" onclick="exportScheduleBoardExcelSelectedDay()">선택된 일자 엑셀 추출</button>
+            <button type="button" class="schedule-board-export-btn secondary" id="schedule-board-export-week" onclick="exportScheduleBoardExcelWeek()">주간 일정 엑셀 추출</button>
+            <button type="button" class="schedule-board-export-btn secondary" id="schedule-board-export-month" onclick="exportScheduleBoardExcelMonth()">월별 엑셀 추출</button>
             <button type="button" class="schedule-board-export-btn secondary referral-only" id="schedule-board-print-referral" onclick="printScheduleBoardReferral()">인쇄</button>
           </div>
         </aside>
@@ -13778,8 +13779,8 @@
       });
     }
 
-    function getScheduleBoardBaseList() {
-      return getSchedulesForDate(scheduleBoardDateStr).filter(s => {
+    function getScheduleBoardBaseListForDate(dateStr) {
+      return getSchedulesForDate(dateStr).filter(s => {
         const t = s.type || 'GENERAL';
         if (scheduleBoardView === 'admit') {
           if (!SCHEDULE_BOARD_ADMIT_TYPES.includes(t)) return false;
@@ -13797,6 +13798,69 @@
         }
         return true;
       });
+    }
+
+    function getScheduleBoardBaseList() {
+      return getScheduleBoardBaseListForDate(scheduleBoardDateStr);
+    }
+
+    function getScheduleBoardMonthDays(anchorDateStr) {
+      if (!anchorDateStr) return [];
+      const parts = String(anchorDateStr).split('-').map(Number);
+      if (parts.length < 2 || !parts[0] || !parts[1]) return [];
+      const y = parts[0];
+      const m = parts[1];
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const days = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        days.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+      }
+      return days;
+    }
+
+    function sortScheduleBoardListMultiDay(list) {
+      return [...list].sort((a, b) => {
+        const ta = new Date(a.time_str) - new Date(b.time_str);
+        if (ta !== 0) return ta;
+        const na = normalizeSchedulePatient(a);
+        const nb = normalizeSchedulePatient(b);
+        const ra = (na.room_no || '').replace(/\D/g, '');
+        const rb = (nb.room_no || '').replace(/\D/g, '');
+        if (ra && rb && ra !== rb) return ra.localeCompare(rb, undefined, { numeric: true });
+        return 0;
+      });
+    }
+
+    function getScheduleBoardWeekExportList() {
+      const weekDays = getScheduleBoardWeekDaysMonSat(scheduleBoardDateStr);
+      const list = [];
+      weekDays.forEach((dateStr) => {
+        getScheduleBoardBaseListForDate(dateStr).forEach((sch) => list.push(sch));
+      });
+      return sortScheduleBoardListMultiDay(filterScheduleBoardList(list, { applyViewFilters: false }));
+    }
+
+    function getScheduleBoardMonthExportList() {
+      const monthDays = getScheduleBoardMonthDays(scheduleBoardDateStr);
+      const list = [];
+      monthDays.forEach((dateStr) => {
+        getScheduleBoardBaseListForDate(dateStr).forEach((sch) => list.push(sch));
+      });
+      return sortScheduleBoardListMultiDay(filterScheduleBoardList(list, { applyViewFilters: false }));
+    }
+
+    function formatScheduleBoardExcelWeekRange(weekDays) {
+      if (!weekDays || !weekDays.length) return '';
+      const a = String(weekDays[0] || '').split('-').map(Number);
+      const b = String(weekDays[weekDays.length - 1] || '').split('-').map(Number);
+      if (!a[0] || !b[0]) return '';
+      return `${a[0]}년 ${a[1]}월 ${a[2]}일~${b[1]}월 ${b[2]}일`;
+    }
+
+    function formatScheduleBoardExcelMonthLabel(dateStr) {
+      const parts = String(dateStr || '').split('-').map(Number);
+      if (!parts[0] || !parts[1]) return dateStr || '';
+      return `${parts[0]}년 ${parts[1]}월`;
     }
 
     function filterScheduleBoardList(list, opts) {
@@ -13854,6 +13918,9 @@
       return sortScheduleBoardList(filterScheduleBoardList(getScheduleBoardBaseList(), { applyViewFilters: false }));
     }
 
+    const SCHEDULE_BOARD_EXCEL_HEADERS = ['RM', '병동', '호실', '환자명', '구분', '목적', '비고', '출발시간', '귀원시간', '등록자'];
+    const SCHEDULE_BOARD_EXCEL_HEADERS_WITH_DATE = ['일자', ...SCHEDULE_BOARD_EXCEL_HEADERS];
+
     function formatScheduleBoardExcelKoreanDate(dateStr) {
       const parts = String(dateStr || '').split('-').map(Number);
       if (parts.length < 3 || !parts[0]) return dateStr || '';
@@ -13873,12 +13940,14 @@
       return '일정';
     }
 
-    function scheduleBoardExcelSheetTitle(scopeLabel) {
-      const datePart = formatScheduleBoardExcelKoreanDate(scheduleBoardDateStr);
+    function scheduleBoardExcelSheetTitle(scopeLabel, opts) {
+      const o = opts || {};
+      const datePart = o.periodLabel || formatScheduleBoardExcelKoreanDate(scheduleBoardDateStr);
       const typePart = scheduleBoardExcelTypePhrase();
       const scope = (scopeLabel || '전체').trim();
-      if (scope === '전체' || scope === '현재목록') {
-        return `${datePart} 전체 병동 ${typePart}`.replace(/\s+/g, ' ').trim();
+      const scopeKind = o.scopeKind || '전체 병동';
+      if (scope === '전체' || scope === '현재목록' || scope === '주간' || scope === '월별') {
+        return `${datePart} ${scopeKind} ${typePart}`.replace(/\s+/g, ' ').trim();
       }
       return `${datePart} ${scope} ${typePart}`.replace(/\s+/g, ' ').trim();
     }
@@ -13890,7 +13959,8 @@
       return `총 ${count}건 · 추출 ${stamp}`;
     }
 
-    function scheduleToExcelRow(sch) {
+    function scheduleToExcelRow(sch, opts) {
+      const o = opts || {};
       const norm = normalizeSchedulePatient(sch);
       const typeLabel = (SCHEDULE_TYPE_ORDER.find(m => m.key === sch.type) || {}).label || '';
       const typeOut = typeLabel
@@ -13904,7 +13974,7 @@
       const mealTxt = formatScheduleMealCancelText(sch);
       const remarkParts = [scheduleBoardRemarkText(sch), mealTxt ? `식사취소 ${mealTxt.replace(/ 취소$/, '')}` : ''].filter(Boolean);
       let room = scheduleBoardRoomLabel(norm.room_no);
-      return {
+      const row = {
         'RM': norm.rm_team || '',
         '병동': wardLabel,
         '호실': room,
@@ -13919,20 +13989,52 @@
         __rmKey: (norm.rm_team || '').trim() || 'other',
         __doctorKey: doctorLabel
       };
+      if (o.includeDate) {
+        const ds = scheduleLocalDateStr(sch);
+        row['일자'] = ds ? formatMainBoardDayHeader(ds) : '';
+      }
+      return row;
     }
 
-    function wrapScheduleExcelSheet(name, list) {
-      const rows = (list || []).map(scheduleToExcelRow);
-      return {
+    function wrapScheduleExcelSheet(name, list, opts) {
+      const o = opts || {};
+      const rows = (list || []).map((sch) => scheduleToExcelRow(sch, o));
+      const sheet = {
         name,
         kind: 'schedule',
-        title: scheduleBoardExcelSheetTitle(name),
+        title: scheduleBoardExcelSheetTitle(name, o),
         exportMeta: scheduleBoardExcelExportMeta(rows.length),
         rows
       };
+      if (o.includeDate) {
+        sheet.headers = SCHEDULE_BOARD_EXCEL_HEADERS_WITH_DATE.slice();
+      }
+      return sheet;
     }
 
-    async function runScheduleBoardExcelExport(sheets) {
+    function buildScheduleBoardExcelWardSheets(list, opts) {
+      const o = opts || {};
+      const sheets = [wrapScheduleExcelSheet(o.rootSheetName || '전체', list, o)];
+      SCHEDULE_BOARD_WARDS.forEach((w) => {
+        const items = list.filter((sch) => normalizeSchedulePatient(sch).ward === w);
+        if (items.length) {
+          sheets.push(wrapScheduleExcelSheet(SCHEDULE_BOARD_WARD_LABELS[w], items, o));
+        }
+      });
+      const other = list.filter((sch) => {
+        const w = normalizeSchedulePatient(sch).ward || '';
+        return w && !SCHEDULE_BOARD_WARDS.includes(w);
+      });
+      const noWard = list.filter((sch) => !normalizeSchedulePatient(sch).ward);
+      const misc = [...other, ...noWard];
+      if (misc.length) {
+        sheets.push(wrapScheduleExcelSheet('기타', misc, o));
+      }
+      return sheets;
+    }
+
+    async function runScheduleBoardExcelExport(sheets, exportOpts) {
+      const eo = exportOpts || {};
       try {
         if (!sheets || !sheets.length) {
           await appAlert('내보낼 일정이 없습니다.');
@@ -13943,10 +14045,14 @@
           await appAlert('내보낼 일정이 없습니다.');
           return;
         }
+        const headers = eo.headers
+          || (sheets.find((s) => s.headers && s.headers.length) || {}).headers
+          || SCHEDULE_BOARD_EXCEL_HEADERS;
         const res = await window.api.exportScheduleBoardExcel({
-          dateFileLabel: (scheduleBoardDateStr || '').replace(/-/g, ''),
+          dateFileLabel: eo.dateFileLabel || (scheduleBoardDateStr || '').replace(/-/g, ''),
           boardDate: scheduleBoardDateStr || '',
           includeSampleSheets: false,
+          headers,
           sheets
         });
         if (!res) {
@@ -13968,30 +14074,55 @@
       }
     }
 
-    async function exportScheduleBoardExcelAllWards() {
+    async function exportScheduleBoardExcelSelectedDay() {
       const list = getScheduleBoardAllWardsExportList();
-      const sheets = [wrapScheduleExcelSheet('전체', list)];
-      SCHEDULE_BOARD_WARDS.forEach(w => {
-        const items = list.filter(sch => normalizeSchedulePatient(sch).ward === w);
-        if (items.length) {
-          sheets.push(wrapScheduleExcelSheet(SCHEDULE_BOARD_WARD_LABELS[w], items));
-        }
+      await runScheduleBoardExcelExport(buildScheduleBoardExcelWardSheets(list, {
+        scopeKind: '선택된 일자 전체 병동'
+      }), {
+        dateFileLabel: (scheduleBoardDateStr || '').replace(/-/g, '')
       });
-      const other = list.filter(sch => {
-        const w = normalizeSchedulePatient(sch).ward || '';
-        return w && !SCHEDULE_BOARD_WARDS.includes(w);
-      });
-      const noWard = list.filter(sch => !normalizeSchedulePatient(sch).ward);
-      const misc = [...other, ...noWard];
-      if (misc.length) {
-        sheets.push(wrapScheduleExcelSheet('기타', misc));
-      }
-      await runScheduleBoardExcelExport(sheets);
     }
 
+    async function exportScheduleBoardExcelWeek() {
+      const weekDays = getScheduleBoardWeekDaysMonSat(scheduleBoardDateStr);
+      const list = getScheduleBoardWeekExportList();
+      const periodLabel = formatScheduleBoardExcelWeekRange(weekDays);
+      const ymd = (scheduleBoardDateStr || '').replace(/-/g, '');
+      await runScheduleBoardExcelExport(buildScheduleBoardExcelWardSheets(list, {
+        includeDate: true,
+        periodLabel,
+        scopeKind: '주간 전체 병동',
+        rootSheetName: '주간'
+      }), {
+        dateFileLabel: `${ymd}_주간`,
+        headers: SCHEDULE_BOARD_EXCEL_HEADERS_WITH_DATE
+      });
+    }
+
+    async function exportScheduleBoardExcelMonth() {
+      const list = getScheduleBoardMonthExportList();
+      const periodLabel = formatScheduleBoardExcelMonthLabel(scheduleBoardDateStr);
+      const parts = String(scheduleBoardDateStr || '').split('-');
+      const ym = parts.length >= 2 ? `${parts[0]}${parts[1]}` : (scheduleBoardDateStr || '').replace(/-/g, '');
+      await runScheduleBoardExcelExport(buildScheduleBoardExcelWardSheets(list, {
+        includeDate: true,
+        periodLabel,
+        scopeKind: '월별 전체 병동',
+        rootSheetName: '월별'
+      }), {
+        dateFileLabel: `${ym}_월별`,
+        headers: SCHEDULE_BOARD_EXCEL_HEADERS_WITH_DATE
+      });
+    }
+
+    /** @deprecated 호환용 — 선택된 일자 추출과 동일 */
+    async function exportScheduleBoardExcelAllWards() {
+      return exportScheduleBoardExcelSelectedDay();
+    }
+
+    /** @deprecated 호환용 — 주간 추출과 동일 */
     async function exportScheduleBoardExcelFiltered() {
-      const list = getScheduleBoardFilteredSortedList();
-      await runScheduleBoardExcelExport([wrapScheduleExcelSheet('현재목록', list)]);
+      return exportScheduleBoardExcelWeek();
     }
 
     async function exportScheduleBoardExcelGroup(groupKey, items) {
@@ -14000,11 +14131,13 @@
       ]);
     }
 
-    function updateScheduleBoardExportLabels(allCount, filteredCount) {
-      const allBtn = document.getElementById('schedule-board-export-all');
-      const filBtn = document.getElementById('schedule-board-export-filtered');
-      if (allBtn) allBtn.textContent = `전체 병동 엑셀 추출 (${allCount}건)`;
-      if (filBtn) filBtn.textContent = `현재 화면 필터 엑셀 (${filteredCount}건)`;
+    function updateScheduleBoardExportLabels(dayCount, weekCount, monthCount) {
+      const dayBtn = document.getElementById('schedule-board-export-day');
+      const weekBtn = document.getElementById('schedule-board-export-week');
+      const monthBtn = document.getElementById('schedule-board-export-month');
+      if (dayBtn) dayBtn.textContent = `선택된 일자 엑셀 추출 (${dayCount}건)`;
+      if (weekBtn) weekBtn.textContent = `주간 일정 엑셀 추출 (${weekCount}건)`;
+      if (monthBtn) monthBtn.textContent = `월별 엑셀 추출 (${monthCount}건)`;
     }
 
     function scheduleBoardGroupKey(sch, norm) {
@@ -14241,7 +14374,11 @@
       const list = scheduleBoardView === 'main'
         ? getScheduleBoardMainFilteredList()
         : sortScheduleBoardList(filterScheduleBoardList(base));
-      updateScheduleBoardExportLabels(allWardsList.length, list.length);
+      updateScheduleBoardExportLabels(
+        allWardsList.length,
+        getScheduleBoardWeekExportList().length,
+        getScheduleBoardMonthExportList().length
+      );
       if (!o.skipCalendar) renderScheduleBoardCalendar();
       updateScheduleBoardDaySummary(list.length);
 

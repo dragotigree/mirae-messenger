@@ -6282,25 +6282,29 @@ ipcMain.handle('get-schedules', async () => {
 
 const SCHEDULE_EXCEL_HEADERS = ['RM', '병동', '호실', '환자명', '구분', '목적', '비고', '출발시간', '귀원시간', '등록자'];
 
-function buildScheduleCsvContent(rows) {
+function buildScheduleCsvContent(rows, headers) {
+  const hdrs = (Array.isArray(headers) && headers.length) ? headers : SCHEDULE_EXCEL_HEADERS;
   const esc = (v) => {
     const s = String(v ?? '');
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const lines = [SCHEDULE_EXCEL_HEADERS.join(',')];
+  const lines = [hdrs.join(',')];
   (rows || []).forEach((r) => {
-    lines.push(SCHEDULE_EXCEL_HEADERS.map((h) => esc(r[h])).join(','));
+    lines.push(hdrs.map((h) => esc(r[h])).join(','));
   });
   return '\uFEFF' + lines.join('\r\n');
 }
 
 ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
-  const { dateFileLabel, sheets, boardDate, includeSampleSheets } = payload || {};
+  const { dateFileLabel, sheets, boardDate, includeSampleSheets, headers: payloadHeaders } = payload || {};
   if (!Array.isArray(sheets) || sheets.length === 0) {
     return { success: false, msg: '내보낼 일정이 없습니다.' };
   }
-  const label = (dateFileLabel || 'export').replace(/[^\d-]/g, '') || 'export';
+  const excelHeaders = (Array.isArray(payloadHeaders) && payloadHeaders.length)
+    ? payloadHeaders
+    : SCHEDULE_EXCEL_HEADERS;
+  const label = (dateFileLabel || 'export').replace(/[^\d가-힣_-]/g, '') || 'export';
   const senderWin = BrowserWindow.fromWebContents(event.sender);
   const dialogParent =
     senderWin && !senderWin.isDestroyed()
@@ -6321,7 +6325,7 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
     const ext = path.extname(filePath).toLowerCase();
     if (ext === '.csv') {
       const allRows = sheets.flatMap((s) => s.rows || []);
-      await fs.promises.writeFile(filePath, buildScheduleCsvContent(allRows), 'utf8');
+      await fs.promises.writeFile(filePath, buildScheduleCsvContent(allRows, excelHeaders), 'utf8');
       return { success: true, path: filePath, format: 'csv' };
     }
     const outPath = ext === '.xlsx' ? filePath : `${filePath}.xlsx`;
@@ -6332,7 +6336,7 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
         msg: '엑셀 생성 파일(lib/minimal-xlsx.js)이 없습니다. 공유폴더에 lib 폴더가 있는지 확인하거나 ZIP으로 다시 설치해 주세요.'
       };
     }
-    const buf = buildXlsxBuffer(sheets, SCHEDULE_EXCEL_HEADERS, {
+    const buf = buildXlsxBuffer(sheets, excelHeaders, {
       boardDate: boardDate || '',
       includeSampleSheets: includeSampleSheets === true
     });
