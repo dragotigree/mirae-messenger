@@ -1176,7 +1176,7 @@
     .msg-row-bubble .chat-file-box { max-width: 240px; }
 
     /* ========== 3단 상세 패널 ========== */
-    #sidebar-right { width: 420px; background: var(--surface); padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
+    #sidebar-right { width: 440px; background: var(--surface); padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0; }
     .detail-heading { font-size: 11.5px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.08em; }
     .detail-profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); gap: 3px; }
     .detail-avatar { width: 52px; height: 52px; border-radius: 18px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-size: 14px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2); letter-spacing: -0.03em; }
@@ -1232,10 +1232,15 @@
     .sidebar-cal-actions #add-sch-btn {
       display: inline-flex; background: var(--accent); color: #fff; border: none; font-size: 11px;
     }
-    .schedule-box { background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%); border: 1px solid #bae6fd; padding: 10px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-xs); min-height: 0; }
+    .schedule-box {
+      background: linear-gradient(180deg, #f0f9ff 0%, #f8fcff 100%);
+      border: 1px solid #bae6fd; padding: 8px; border-radius: var(--radius-lg);
+      display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-xs);
+      min-height: 0; flex: 1;
+    }
     .sidebar-calendar-day {
       background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
-      display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+      display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1;
     }
     .sidebar-cal-day-duty {
       flex-shrink: 0;
@@ -1243,9 +1248,9 @@
     }
     .sidebar-cal-day-duty:empty { display: none; }
     .sidebar-cal-day-body {
-      flex: 1; min-height: 40px; max-height: min(42vh, 320px); overflow-y: auto;
+      flex: 1; min-height: 80px; overflow: visible;
       padding: 8px; scrollbar-width: thin;
-      display: flex; flex-direction: column; gap: 8px;
+      display: flex; flex-direction: column; gap: 10px;
     }
     .sidebar-cal-day-line {
       display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none;
@@ -1274,11 +1279,11 @@
     .sidebar-ward-badge.w-other { background: #94a3b8; }
     .sidebar-cal-day-empty { text-align: center; padding: 16px 12px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
 
-    /* 입원 / 퇴원 2단 카드 */
+    /* 입원 / 퇴원: 세로 스택(전체 폭) — 가로 2단은 이름이 심하게 잘림 */
     .sidebar-admit-discharge-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       min-width: 0;
       flex-shrink: 0;
     }
@@ -1294,8 +1299,8 @@
     .sidebar-ad-card.is-admit { border-color: #bfdbfe; }
     .sidebar-ad-card.is-discharge { border-color: #fecaca; }
     .sidebar-ad-card-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 6px;
-      padding: 7px 9px 6px; font-size: 12px; font-weight: 800; letter-spacing: -0.02em;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 12px; font-size: 13px; font-weight: 800; letter-spacing: -0.02em;
       white-space: nowrap; flex-shrink: 0;
     }
     .sidebar-ad-card.is-admit .sidebar-ad-card-head { color: #1d4ed8; background: #eff6ff; }
@@ -1303,10 +1308,10 @@
     .sidebar-ad-card-count { font-variant-numeric: tabular-nums; opacity: 0.9; }
     .sidebar-ad-col-head {
       display: grid;
-      grid-template-columns: 42px minmax(0, 1.2fr) 36px 40px;
-      gap: 4px;
-      padding: 4px 8px;
-      font-size: 10px; font-weight: 700; color: #94a3b8;
+      grid-template-columns: 56px minmax(0, 1fr) 44px 52px;
+      gap: 8px;
+      padding: 5px 12px;
+      font-size: 11px; font-weight: 700; color: #94a3b8;
       background: #f8fafc; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
       white-space: nowrap; flex-shrink: 0;
     }
@@ -1315,13 +1320,13 @@
     .sidebar-ad-rows { display: flex; flex-direction: column; min-width: 0; }
     .sidebar-ad-row {
       display: grid;
-      grid-template-columns: 42px minmax(0, 1.2fr) 36px 40px;
-      gap: 4px;
+      grid-template-columns: 56px minmax(0, 1fr) 44px 52px;
+      gap: 8px;
       align-items: center;
-      padding: 6px 8px;
-      font-size: 11.5px; font-weight: 600; line-height: 1.25;
+      padding: 7px 12px;
+      font-size: 12.5px; font-weight: 600; line-height: 1.3;
       white-space: nowrap; min-width: 0;
-      border-bottom: 1px solid #f8fafc;
+      border-bottom: 1px solid #f1f5f9;
       box-sizing: border-box;
     }
     .sidebar-ad-row:last-child { border-bottom: none; }
@@ -1331,10 +1336,11 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
     }
     .sidebar-ad-room { font-variant-numeric: tabular-nums; font-weight: 700; }
-    .sidebar-ad-rm { font-size: 10.5px; font-weight: 700; opacity: 0.85; }
-    .sidebar-ad-time { font-variant-numeric: tabular-nums; font-size: 11px; text-align: right; }
+    .sidebar-ad-name { font-weight: 700; letter-spacing: -0.02em; }
+    .sidebar-ad-rm { font-size: 11.5px; font-weight: 700; opacity: 0.9; }
+    .sidebar-ad-time { font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
     .sidebar-ad-empty {
-      padding: 10px 8px; font-size: 11px; font-weight: 600; color: #94a3b8;
+      padding: 12px 10px; font-size: 12px; font-weight: 600; color: #94a3b8;
       text-align: center; white-space: nowrap;
     }
     .sidebar-cal-other-list {
@@ -1371,13 +1377,13 @@
     #chat-pin-banner .chat-pin-unpin:hover { background: rgba(245, 158, 11, 0.15); }
     .chat-pin-msg-btn { font-size: 12px; }
 
-    .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 14px; padding: 8px; }
-    .mini-cal-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: var(--font-weight-bold); color: #0369a1; margin-bottom: 4px; }
+    .mini-calendar { background: #fff; border: 1px solid #bae6fd; border-radius: 12px; padding: 6px 7px; flex-shrink: 0; }
+    .mini-cal-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: var(--font-weight-bold); color: #0369a1; margin-bottom: 2px; }
     .mini-cal-nav { cursor: pointer; padding: 2px 8px; border-radius: 9px; user-select: none; }
     .mini-cal-nav:hover { background: #f0f9ff; }
-    .mini-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10px; color: #94a3b8; font-weight: 700; margin-bottom: 2px; }
-    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-    .mini-cal-day { position: relative; text-align: center; font-size: 10.5px; padding: 4px 0; border-radius: 8px; cursor: pointer; color: #1d1c1d; }
+    .mini-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 9.5px; color: #94a3b8; font-weight: 700; margin-bottom: 1px; }
+    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+    .mini-cal-day { position: relative; text-align: center; font-size: 10px; padding: 3px 0 5px; border-radius: 7px; cursor: pointer; color: #1d1c1d; line-height: 1.2; }
     .mini-cal-day:hover { background: #f0f9ff; }
     .mini-cal-day.other-month { color: #cbd5e1; }
     .mini-cal-day.today { font-weight: var(--font-weight-bold); color: #0284c7; }
@@ -1386,7 +1392,7 @@
       position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
       display: flex; gap: 2px; align-items: center; justify-content: center; pointer-events: none;
     }
-    .mini-cal-day .dot { width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+    .mini-cal-day .dot { width: 3.5px; height: 3.5px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
     .mini-cal-day .dot.is-admit { background: #22c55e; }
     .mini-cal-day .dot.is-discharge { background: #ef4444; }
     .mini-cal-day .dot.is-flow { background: #f97316; }
@@ -13282,7 +13288,7 @@
         return;
       }
 
-      // 입원·퇴원: 항상 두 단으로 나란히 (한 줄 유지)
+      // 입원·퇴원: 세로로 쌓아 전체 폭 사용 (가로 2단은 이름·헤더가 잘림)
       const adRow = document.createElement('div');
       adRow.className = 'sidebar-admit-discharge-row';
       adRow.appendChild(buildSidebarAdmitDischargeCard('ADMISSION', admits));
