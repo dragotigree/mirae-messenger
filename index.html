@@ -748,7 +748,7 @@
     #chat-input-wrapper { position: relative; padding: 12px 20px 18px; background: linear-gradient(180deg, transparent, rgba(248,250,252,0.55)); flex-shrink: 0; }
     .input-box-inner { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     .input-box-inner:focus-within { border-color: rgba(14, 165, 233, 0.4); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.08); }
-    .input-box-inner textarea { width: 100%; height: 44px; border: none; background: transparent; outline: none; resize: none; font-size: var(--chat-font-size); color: var(--text-primary); line-height: 1.5; }
+    .input-box-inner textarea { width: 100%; height: 44px; min-height: 44px; max-height: 160px; border: none; background: transparent; outline: none; resize: none; font-size: var(--chat-font-size); color: var(--text-primary); line-height: 1.5; overflow-y: auto; }
     .input-bottom-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px; }
     .input-bottom-actions > .chat-tool-row { display: flex; flex-wrap: nowrap; gap: 4px; min-width: 0; align-items: center; }
     .chat-tool-btn {
@@ -1039,7 +1039,7 @@
     body.compact-mode #chat-messages-area { padding: 14px 12px; gap: 8px; background: #b2c7d9; }
     body.compact-mode #chat-input-wrapper { padding: 10px 12px 12px; background: #fff; border-top: 1px solid #e4e9f0; }
     body.compact-mode .input-box-inner { border-radius: 18px; padding: 8px 12px 10px; border: 1px solid #e2e8f0; background: #fff; box-shadow: none; }
-    body.compact-mode .input-box-inner textarea { height: 22px; font-size: 14px; }
+    body.compact-mode .input-box-inner textarea { height: 22px; min-height: 22px; max-height: 120px; font-size: 14px; }
     body.compact-mode .input-bottom-actions { gap: 8px; }
     body.compact-mode .input-bottom-actions .btn-send { flex-shrink: 0; margin-left: auto; }
     body.compact-mode .chat-tool-btn,
@@ -2568,7 +2568,7 @@
           </div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력하거나 사진을 붙여넣으세요 (Ctrl+V / Enter)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="resetIdleTimer()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력하세요 (Enter 전송 · Shift+Enter 줄바꿈)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
@@ -5697,9 +5697,12 @@
       }
       updateCompactModeButtonUi();
       const ta = document.getElementById('chat-textarea');
-      if (ta) ta.placeholder = isCompactMode ? '메시지 입력 (Enter)' : '메시지를 입력하거나 사진을 붙여넣으세요 (Ctrl+V / Enter)';
+      if (ta) ta.placeholder = isCompactMode
+        ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
+        : '메시지를 입력하세요 (Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 사진)';
       updateMainPanelVisibility();
       if (activeChatUser) loadChatHistory();
+      resizeChatTextarea();
     }
 
     async function toggleCompactMode() {
