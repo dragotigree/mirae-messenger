@@ -3702,7 +3702,16 @@ function handleIncomingChat(payload, senderIP) {
     if (uid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid: uid });
   };
 
+  // uid 없는 구버전 재전송: 같은 상대·같은 내용 짧은 시간 중복 UI 차단
+  const contentKey = !uid
+    ? `${senderIP}|${String(payload.message || '').slice(0, 2000)}`
+    : '';
+  if (contentKey && wasRecentIncomingChatContent(contentKey)) {
+    return;
+  }
+
   // ACK·영구 remember는 INSERT 성공 후. inflight는 재전송 레이스의 UI 중복만 막음.
+  // 처리 중 재전송에는 즉시 ACK를 보내 발신측 재시도를 멈춘다.
   const persist = ({ showUi }) => {
     if (showUi) {
       const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3724,6 +3733,7 @@ function handleIncomingChat(payload, senderIP) {
         });
       }
       appendChatLog(`DM_${senderIP}`, payload.sender, payload.sender, payload.message);
+      if (contentKey) markRecentIncomingChatContent(contentKey);
     }
 
     const storedMessage = compactStoredMessageHtml(payload.message);
@@ -3751,6 +3761,7 @@ function handleIncomingChat(payload, senderIP) {
     db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
+        ackIfUid();
         return;
       }
       if (row) {
@@ -3758,9 +3769,12 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
-      // INSERT 진행 중 재전송 — UI 없이 대기 (완료 시 첫 처리가 ACK)
-      if (incomingChatUidInflight.has(String(uid))) return;
-      if (!claimIncomingChatUid(uid)) return;
+      // INSERT 진행 중 재전송 — UI 없이 즉시 ACK (발신 재시도 중지)
+      if (incomingChatUidInflight.has(String(uid))) {
+        ackIfUid();
+        return;
+      }
+      incomingChatUidInflight.add(String(uid));
       persist({ showUi: false });
     });
     return;
@@ -3782,6 +3796,8 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
+      // 수락 확정 직후 ACK → INSERT 완료 전 재전송 폭주 방지
+      ackIfUid();
       persist({ showUi: true });
     });
     return;
@@ -3883,7 +3899,10 @@ const dmReadReceiptDesktopShown = new Set();
 const recentIncomingChatUids = new Map();
 /** INSERT 진행 중 UID — 재전송 레이스로 UI/DB 중복 방지 (실패 시 해제) */
 const incomingChatUidInflight = new Set();
+/** uid 없는 재전송용: sender|message 짧은 창 중복 차단 */
+const recentIncomingChatContent = new Map();
 const RECENT_CHAT_UID_TTL_MS = 15 * 60 * 1000;
+const RECENT_CHAT_CONTENT_TTL_MS = 90 * 1000;
 
 function pruneRecentIncomingChatUids(now = Date.now()) {
   if (recentIncomingChatUids.size <= 800) return;
@@ -3904,6 +3923,34 @@ function markIncomingChatUid(uid) {
   if (!key) return;
   pruneRecentIncomingChatUids();
   recentIncomingChatUids.set(key, Date.now());
+}
+
+function pruneRecentIncomingChatContent(now = Date.now()) {
+  if (recentIncomingChatContent.size <= 400) {
+    recentIncomingChatContent.forEach((t, k) => {
+      if (now - t > RECENT_CHAT_CONTENT_TTL_MS) recentIncomingChatContent.delete(k);
+    });
+    return;
+  }
+  recentIncomingChatContent.forEach((t, k) => {
+    if (now - t > RECENT_CHAT_CONTENT_TTL_MS) recentIncomingChatContent.delete(k);
+  });
+}
+
+function wasRecentIncomingChatContent(contentKey) {
+  const key = String(contentKey || '');
+  if (!key) return false;
+  const now = Date.now();
+  pruneRecentIncomingChatContent(now);
+  const prev = recentIncomingChatContent.get(key);
+  return !!(prev && (now - prev) < RECENT_CHAT_CONTENT_TTL_MS);
+}
+
+function markRecentIncomingChatContent(contentKey) {
+  const key = String(contentKey || '');
+  if (!key) return;
+  pruneRecentIncomingChatContent();
+  recentIncomingChatContent.set(key, Date.now());
 }
 
 function isIncomingChatUidBusy(uid) {
