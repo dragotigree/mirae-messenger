@@ -6547,19 +6547,31 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
     return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 수정할 수 있습니다.' };
   }
   return new Promise((resolve) => {
-    const meta = schedulePatientMetaFromPayload(p);
-    const und = scheduleTimeUndecidedFromPayload(p);
-    const meal = scheduleMealCancelFromPayload(p);
-    const remark = scheduleRemarkFromPayload(p);
-    const guardianOnly = scheduleGuardianOnlyFromPayload(p);
-    const attending = p.attendingPhysician || '';
-    const timeEnd = p.timeEndStr || '';
-    const audit = scheduleModificationAudit();
-    db.run(
-      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-      [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
-      (err) => {
-        if (!err) {
+    isScheduleTombstoned(uid, (tombstoned) => {
+      if (tombstoned) {
+        resolve({ success: false, msg: '이미 삭제된 일정입니다.' });
+        return;
+      }
+      const meta = schedulePatientMetaFromPayload(p);
+      const und = scheduleTimeUndecidedFromPayload(p);
+      const meal = scheduleMealCancelFromPayload(p);
+      const remark = scheduleRemarkFromPayload(p);
+      const guardianOnly = scheduleGuardianOnlyFromPayload(p);
+      const attending = p.attendingPhysician || '';
+      const timeEnd = p.timeEndStr || '';
+      const audit = scheduleModificationAudit();
+      db.run(
+        `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+        [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
+        function onEditSchedule(err) {
+          if (err) {
+            resolve({ success: false, msg: err.message || '수정 실패' });
+            return;
+          }
+          if (this.changes === 0) {
+            resolve({ success: false, msg: '일정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.' });
+            return;
+          }
           broadcastToOnlinePeers({
             type: 'SCHEDULE_EDIT',
             schedule: {
@@ -6574,10 +6586,10 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
             }
           });
           notifySchedulesChanged();
+          resolve({ success: true });
         }
-        resolve({ success: !err });
-      }
-    );
+      );
+    });
   });
 });
 
