@@ -244,7 +244,8 @@ const NORMAL_MIN_HEIGHT = 600;
 
 const UDP_PORT = 41234;
 const TCP_PORT = 41235;
-const PRESENCE_STALE_MS = 12000;
+/** UDP PING 간격(4초) 기준 — 연속 2회 이상 없으면 오프라인. 강제 종료·전원 OFF 시 GOODBYE가 없어도 빠르게 반영 */
+const PRESENCE_STALE_MS = 10000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
@@ -2995,17 +2996,10 @@ function markPeerOffline(ip, leftAtHint) {
 }
 
 function touchPeerPresence(ip) {
-  if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
-  if (!onlineUsers.has(ip)) return;
-  const now = Date.now();
-  const u = onlineUsers.get(ip);
-  if (!u) return;
-  const updated = { ...u, lastPingAt: now, online: true };
-  onlineUsers.set(ip, updated);
-  const known = allKnownUsers.get(ip);
-  if (known) {
-    allKnownUsers.set(ip, { ...known, lastPingAt: now, online: true });
-  }
+  // 온라인 판정은 UDP PING만 사용한다.
+  // TCP(채팅·동기화 등)로 lastPingAt을 갱신하면, 상대 PC가 이미 꺼진 뒤에도
+  // 지연·재전송 패킷 때문에 온라인으로 남는 오탐이 생긴다.
+  void ip;
 }
 
 function looksLikeIpv4(value) {
@@ -3177,8 +3171,14 @@ function mergeUserProfile(base, overlay, online) {
   merged.lastPingAt = merged.lastPingAt || 0;
   if (online) {
     // 접속 중에는 lastSeen(종료 시각)을 건드리지 않고 하트비트만 갱신
-    const pingAt = Number(overlay.lastPingAt) || Date.now();
-    merged.lastPingAt = pingAt;
+    // overlay에 lastPingAt이 없으면 Date.now()로 채우지 않음 — 오탐 온라인 방지
+    if (overlay.lastPingAt != null && Number(overlay.lastPingAt) > 0) {
+      merged.lastPingAt = Number(overlay.lastPingAt);
+    } else if (merged.lastPingAt) {
+      // 유지
+    } else {
+      merged.lastPingAt = Date.now();
+    }
   } else if (overlay.presenceLastSeen && overlay.lastSeen) {
     merged.lastSeen = Math.max(merged.lastSeen, overlay.lastSeen);
   } else if (overlay.lastSeen && overlay.lastSeen > 0) {
@@ -3656,17 +3656,18 @@ function startPresenceSweeper() {
 
     onlineUsers.forEach((u, ip) => {
       if (ip === MY_IP) return;
-      const beat = Number(u.lastPingAt || u.lastSeen) || 0;
-      if (now - beat > PRESENCE_STALE_MS) {
+      // lastSeen(마지막 종료 시각)은 온라인 heartbeat가 아님 — lastPingAt(UDP)만 본다
+      const beat = Number(u && u.lastPingAt) || 0;
+      if (!beat || now - beat > PRESENCE_STALE_MS) {
         if (markPeerOffline(ip, beat || now)) {
           changed = true;
-          writeToLogFile('info', `[네트워크] ${u.username || ip}(${ip}) 오프라인 처리됨`);
+          writeToLogFile('info', `[네트워크] ${u.username || ip}(${ip}) 오프라인 처리됨 (PING 없음 ${beat ? Math.round((now - beat) / 1000) : '?'}초)`);
         }
       }
     });
 
     if (changed) notifyUserList();
-  }, 5000);
+  }, 3000);
 }
 
 function startTcpServer() {
