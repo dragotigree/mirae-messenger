@@ -550,6 +550,48 @@
     .left-footer-btn .icon-btn .icon-glyph { opacity: 1; }
     .left-footer-btn #master-lock-btn { --footer-icon: #fbbf24; --footer-icon-hover: #fde68a; }
     .left-footer-btn #master-lock-btn.is-master-authed { --footer-icon: #86efac; --footer-icon-hover: #bbf7d0; color: #86efac; }
+    .left-footer-btn #privacy-lock-btn { --footer-icon: #a5b4fc; --footer-icon-hover: #c7d2fe; }
+    .left-footer-btn #privacy-lock-btn.is-privacy-ready { --footer-icon: #818cf8; --footer-icon-hover: #a5b4fc; }
+
+    /* 🔒 사생활 화면 잠금 (카카오톡식) */
+    #privacy-lock-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100001;
+      background: linear-gradient(165deg, #0b1f36 0%, #102a43 45%, #0f172a 100%);
+      align-items: center; justify-content: center; flex-direction: column;
+      -webkit-app-region: no-drag;
+    }
+    #privacy-lock-overlay.is-open { display: flex; }
+    .privacy-lock-card {
+      width: min(360px, calc(100vw - 40px)); padding: 28px 24px 22px;
+      border-radius: 22px; background: rgba(255,255,255,0.96);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.35); text-align: center;
+    }
+    .privacy-lock-icon {
+      width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 18px;
+      background: #eef2ff; color: #4338ca; display: flex; align-items: center; justify-content: center;
+    }
+    .privacy-lock-icon .icon-glyph { width: 26px; height: 26px; }
+    .privacy-lock-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+    .privacy-lock-sub { font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.5; }
+    .privacy-lock-pin {
+      width: 100%; margin-top: 16px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 14px;
+      font-size: 20px; letter-spacing: 0.28em; text-align: center; font-weight: 700; color: #0f172a;
+    }
+    .privacy-lock-pin:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.18); }
+    .privacy-lock-error { min-height: 1.2em; margin-top: 8px; font-size: 12px; color: #dc2626; }
+    .privacy-lock-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .privacy-lock-actions button {
+      flex: 1; padding: 10px 12px; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .privacy-lock-unlock-btn { background: #4f46e5; color: #fff; }
+    .privacy-lock-unlock-btn:hover { background: #4338ca; }
+    .privacy-lock-master-btn { background: #f1f5f9; color: #475569; }
+    .privacy-lock-master-btn:hover { background: #e2e8f0; }
+    .privacy-lock-master-box { display: none; margin-top: 12px; text-align: left; gap: 8px; flex-direction: column; }
+    .privacy-lock-master-box.is-open { display: flex; }
+    .privacy-lock-master-box input {
+      padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 13px;
+    }
     .left-footer-btn #toolbar-logs-btn { --footer-icon: #67e8f9; --footer-icon-hover: #a5f3fc; }
     .left-footer-btn #toolbar-folder-btn { --footer-icon: #fcd34d; --footer-icon-hover: #fde68a; }
     .left-footer-btn #toolbar-refresh-btn { --footer-icon: #6ee7b7; --footer-icon-hover: #a7f3d0; }
@@ -2919,6 +2961,7 @@
     <div class="left-footer-btn">
       <div class="brand-icons footer-toolbar">
         <button class="icon-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
+        <button class="icon-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (사생활 보호)" data-ui-icon="lock"></button>
         <button class="icon-btn" id="toolbar-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+Alt+E)"></button>
         <button class="icon-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
@@ -3000,6 +3043,7 @@
             <div class="compact-more-grid">
               <button type="button" class="compact-more-cell" onclick="openBoardModal()"><span class="compact-more-cell-icon" data-ui-icon="notice"></span>공지</button>
               <button type="button" class="compact-more-cell" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span class="compact-more-cell-icon" id="compact-master-lock-icon" data-ui-icon="lock"></span>관리</button>
+              <button type="button" class="compact-more-cell" id="compact-privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금"><span class="compact-more-cell-icon" data-ui-icon="lock"></span>잠금</button>
               <button type="button" class="compact-more-cell" onclick="window.api.openFilesFolder()"><span class="compact-more-cell-icon" data-ui-icon="folder"></span>파일</button>
               <button type="button" class="compact-more-cell" onclick="openAllLogsModal()"><span class="compact-more-cell-icon" data-ui-icon="logs"></span>기록</button>
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
@@ -3391,6 +3435,27 @@
     </div>
   </div>
 
+  <!-- 🔒 사생활 화면 잠금 (PIN) -->
+  <div id="privacy-lock-overlay" aria-modal="true" role="dialog" aria-label="화면 잠금">
+    <div class="privacy-lock-card">
+      <div class="privacy-lock-icon" data-ui-icon="lock"></div>
+      <div class="privacy-lock-title">화면이 잠겼습니다</div>
+      <div class="privacy-lock-sub">PIN을 입력하면 대화 내용을 다시 볼 수 있습니다.<br>자리 비울 때 사생활 보호용입니다.</div>
+      <input type="password" id="privacy-lock-pin-input" class="privacy-lock-pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyUnlock();}">
+      <div class="privacy-lock-error" id="privacy-lock-error"></div>
+      <div class="privacy-lock-actions">
+        <button type="button" class="privacy-lock-unlock-btn" onclick="confirmPrivacyUnlock()">잠금 해제</button>
+        <button type="button" class="privacy-lock-master-btn" onclick="togglePrivacyMasterUnlock()">마스터</button>
+      </div>
+      <div class="privacy-lock-master-box" id="privacy-lock-master-box">
+        <div style="font-size:11.5px; color:#64748b; line-height:1.4;">PIN을 잊은 경우 마스터 아이디·비밀번호로 해제할 수 있습니다.</div>
+        <input type="text" id="privacy-lock-master-id" placeholder="마스터 아이디" autocomplete="username">
+        <input type="password" id="privacy-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyMasterUnlock();}">
+        <button type="button" class="privacy-lock-unlock-btn" onclick="confirmPrivacyMasterUnlock()">마스터로 해제</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🔒 메신저 사용 중지(잠금) 오버레이 — 마스터 아이디·비밀번호로만 해제 -->
   <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.92); align-items:center; justify-content:center;">
     <div style="width:min(420px,92vw); background:#fff; border-radius:20px; padding:28px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:14px;">
@@ -3705,6 +3770,38 @@
           <input type="checkbox" id="setting-auto-launch" style="width:16px; height:16px;"> 💻 컴퓨터 부팅 시 메신저 자동 실행
         </label>
         <button onclick="window.api.openUserDataFolder()" style="align-self:flex-start; padding:6px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">📂 데이터 폴더 열기</button>
+      </div>
+
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:13px; font-weight:700; color:var(--accent);">🔒 화면 잠금 (사생활 보호)</div>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">카카오톡처럼 PIN으로 화면을 잠가 대화 내용을 가립니다. 직급자·공용 PC에 권장합니다. 하단 자물쇠 버튼으로 즉시 잠글 수 있습니다.</div>
+        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="setting-privacy-lock-enabled" style="width:16px; height:16px;" onchange="onPrivacyLockEnabledToggle()"> 화면 잠금 사용
+        </label>
+        <div id="privacy-lock-settings-fields" style="display:none; flex-direction:column; gap:8px;">
+          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+            PIN (숫자 4~8자리):
+            <input type="password" id="setting-privacy-lock-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="새 PIN 또는 변경할 PIN" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+          </label>
+          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+            PIN 확인:
+            <input type="password" id="setting-privacy-lock-pin2" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="같은 PIN 다시 입력" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+          </label>
+          <div id="privacy-lock-pin-hint" style="font-size:11px; color:#94a3b8; line-height:1.4;">처음 켤 때는 PIN을 반드시 설정하세요. 이미 설정돼 있으면 비워 두고 저장해도 됩니다.</div>
+          <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="setting-privacy-lock-on-hide" style="width:16px; height:16px;" checked> 창을 닫아 트레이로 숨길 때 자동 잠금
+          </label>
+          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+            자리 비움 후 자동 잠금:
+            <select id="setting-privacy-lock-idle" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:12px; background:#fff;">
+              <option value="0">사용 안 함</option>
+              <option value="1">1분</option>
+              <option value="3">3분</option>
+              <option value="5">5분</option>
+              <option value="10">10분</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
@@ -4909,7 +5006,7 @@
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "compactPersonClickMode": "ipmsg"}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -4920,6 +5017,10 @@
     if (appSettings.compactPersonClickMode !== 'chat' && appSettings.compactPersonClickMode !== 'ipmsg') {
       appSettings.compactPersonClickMode = 'ipmsg';
     }
+    if (appSettings.privacyLockEnabled === undefined) appSettings.privacyLockEnabled = false;
+    if (appSettings.privacyLockOnHide === undefined) appSettings.privacyLockOnHide = true;
+    if (appSettings.privacyLockIdleMinutes === undefined) appSettings.privacyLockIdleMinutes = 0;
+    if (typeof appSettings.privacyLockPinHash !== 'string') appSettings.privacyLockPinHash = '';
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -5762,6 +5863,7 @@
     let pendingUnreadScrollCount = 0;
     if (!appSettings.userGrouping) appSettings.userGrouping = 'floor';
     applyAppSettingsToUI();
+    try { syncPrivacyLockButtonUi(); resetPrivacyIdleTimer(); } catch (_) {}
     syncSpellcheckEngine();
     updateMasterAuthUi();
 
@@ -5793,6 +5895,9 @@
     if (window.api && typeof window.api.onMainWindowHidden === 'function') {
       window.api.onMainWindowHidden(() => {
         leaveActiveChatForPrivacy();
+        if (isPrivacyLockEnabled() && appSettings.privacyLockOnHide !== false) {
+          lockPrivacyScreen({ silent: true });
+        }
       });
     }
     window.api.onTrayLaunchViewModeChanged((mode) => {
@@ -6065,6 +6170,7 @@
           console.error('자리비움 전환 실패:', e);
         }
       }, IDLE_MS);
+      try { resetPrivacyIdleTimer(); } catch (_) {}
     }
     ['mousemove', 'mousedown', 'click', 'keydown', 'wheel'].forEach(evt => {
       window.addEventListener(evt, resetIdleTimer, { passive: true });
@@ -6354,6 +6460,11 @@
 
     async function handleEscapeKeyForOverlays(e) {
       if (e.key !== 'Escape') return false;
+      if (isPrivacyScreenLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        return true;
+      }
       const appDlg = document.getElementById('app-dialog-overlay');
       if (appDlg && appDlg.style.display === 'flex') return false;
 
@@ -6831,6 +6942,228 @@
         try { renderCompactList(); } catch (_) {}
       }
       updateMainPanelVisibility();
+    }
+
+    let isPrivacyScreenLocked = false;
+    let privacyLockPendingChatKey = '';
+    let privacyIdleTimer = null;
+    const PRIVACY_PIN_SALT = 'mirae-privacy-lock-v1:';
+
+    function isPrivacyLockEnabled() {
+      return !!appSettings.privacyLockEnabled && !!appSettings.privacyLockPinHash;
+    }
+
+    function syncPrivacyLockButtonUi() {
+      const btn = document.getElementById('privacy-lock-btn');
+      if (btn) {
+        btn.classList.toggle('is-privacy-ready', isPrivacyLockEnabled());
+        btn.title = isPrivacyLockEnabled()
+          ? '화면 잠금 (사생활 보호)'
+          : '화면 잠금 — 설정에서 PIN을 먼저 켜 주세요';
+      }
+      const fields = document.getElementById('privacy-lock-settings-fields');
+      const enabledEl = document.getElementById('setting-privacy-lock-enabled');
+      if (fields && enabledEl) {
+        fields.style.display = enabledEl.checked ? 'flex' : 'none';
+      }
+    }
+
+    function onPrivacyLockEnabledToggle() {
+      syncPrivacyLockButtonUi();
+      const enabledEl = document.getElementById('setting-privacy-lock-enabled');
+      const hint = document.getElementById('privacy-lock-pin-hint');
+      if (hint && enabledEl) {
+        hint.textContent = appSettings.privacyLockPinHash
+          ? '이미 PIN이 설정되어 있습니다. 바꾸려면 새 PIN을 두 번 입력하세요. 비워 두면 기존 PIN을 유지합니다.'
+          : '처음 켤 때는 PIN(숫자 4~8자리)을 반드시 설정하세요.';
+      }
+    }
+
+    async function hashPrivacyPin(pin) {
+      const raw = PRIVACY_PIN_SALT + String(pin || '');
+      if (window.crypto && window.crypto.subtle) {
+        const buf = new TextEncoder().encode(raw);
+        const digest = await window.crypto.subtle.digest('SHA-256', buf);
+        return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+      }
+      // subtle 미지원 시 약한 폴백 (구형 환경)
+      let h = 2166136261;
+      for (let i = 0; i < raw.length; i++) {
+        h ^= raw.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return `fb_${(h >>> 0).toString(16)}`;
+    }
+
+    function getPrivacyIdleMs() {
+      const mins = parseInt(appSettings.privacyLockIdleMinutes, 10);
+      if (!Number.isFinite(mins) || mins <= 0) return 0;
+      return Math.min(60, mins) * 60 * 1000;
+    }
+
+    function resetPrivacyIdleTimer() {
+      if (privacyIdleTimer) {
+        clearTimeout(privacyIdleTimer);
+        privacyIdleTimer = null;
+      }
+      if (!isPrivacyLockEnabled() || isPrivacyScreenLocked) return;
+      const ms = getPrivacyIdleMs();
+      if (!ms) return;
+      privacyIdleTimer = setTimeout(() => {
+        if (!isPrivacyLockEnabled() || isPrivacyScreenLocked) return;
+        leaveActiveChatForPrivacy();
+        lockPrivacyScreen({ silent: true });
+      }, ms);
+    }
+
+    function lockPrivacyScreen(opts) {
+      const o = opts || {};
+      if (!isPrivacyLockEnabled()) {
+        if (!o.silent) {
+          appAlert('설정에서 화면 잠금을 켜고 PIN을 먼저 저장해 주세요.');
+        }
+        return false;
+      }
+      if (isPrivacyScreenLocked) return true;
+      isPrivacyScreenLocked = true;
+      leaveActiveChatForPrivacy();
+      const overlay = document.getElementById('privacy-lock-overlay');
+      const pinEl = document.getElementById('privacy-lock-pin-input');
+      const errEl = document.getElementById('privacy-lock-error');
+      const masterBox = document.getElementById('privacy-lock-master-box');
+      if (errEl) errEl.textContent = '';
+      if (pinEl) pinEl.value = '';
+      if (masterBox) masterBox.classList.remove('is-open');
+      document.getElementById('privacy-lock-master-id') && (document.getElementById('privacy-lock-master-id').value = '');
+      document.getElementById('privacy-lock-master-pwd') && (document.getElementById('privacy-lock-master-pwd').value = '');
+      if (overlay) overlay.classList.add('is-open');
+      document.body.classList.add('privacy-locked');
+      if (privacyIdleTimer) {
+        clearTimeout(privacyIdleTimer);
+        privacyIdleTimer = null;
+      }
+      setTimeout(() => {
+        try { pinEl?.focus(); } catch (_) {}
+      }, 60);
+      return true;
+    }
+
+    function unlockPrivacyScreen() {
+      isPrivacyScreenLocked = false;
+      const overlay = document.getElementById('privacy-lock-overlay');
+      if (overlay) overlay.classList.remove('is-open');
+      document.body.classList.remove('privacy-locked');
+      const pinEl = document.getElementById('privacy-lock-pin-input');
+      const errEl = document.getElementById('privacy-lock-error');
+      if (pinEl) pinEl.value = '';
+      if (errEl) errEl.textContent = '';
+      const pending = privacyLockPendingChatKey;
+      privacyLockPendingChatKey = '';
+      resetPrivacyIdleTimer();
+      if (pending) {
+        setTimeout(() => openChatFromToastChannelKey(pending), 40);
+      }
+    }
+
+    async function manualPrivacyLock() {
+      if (!isPrivacyLockEnabled()) {
+        await appAlert('설정 → 「화면 잠금 (사생활 보호)」에서 PIN을 켠 뒤 사용할 수 있습니다.');
+        try { openSettingsModal({ focus: 'privacy-lock' }); } catch (_) { openSettingsModal(); }
+        return;
+      }
+      leaveActiveChatForPrivacy();
+      lockPrivacyScreen();
+    }
+
+    async function confirmPrivacyUnlock() {
+      if (!isPrivacyScreenLocked) return;
+      const pinEl = document.getElementById('privacy-lock-pin-input');
+      const errEl = document.getElementById('privacy-lock-error');
+      const pin = String(pinEl?.value || '').trim();
+      if (!/^\d{4,8}$/.test(pin)) {
+        if (errEl) errEl.textContent = 'PIN은 숫자 4~8자리입니다.';
+        return;
+      }
+      const hash = await hashPrivacyPin(pin);
+      if (hash !== appSettings.privacyLockPinHash) {
+        if (errEl) errEl.textContent = 'PIN이 올바르지 않습니다.';
+        if (pinEl) { pinEl.value = ''; pinEl.focus(); }
+        return;
+      }
+      unlockPrivacyScreen();
+    }
+
+    function togglePrivacyMasterUnlock() {
+      const box = document.getElementById('privacy-lock-master-box');
+      if (!box) return;
+      box.classList.toggle('is-open');
+      if (box.classList.contains('is-open')) {
+        setTimeout(() => document.getElementById('privacy-lock-master-id')?.focus(), 40);
+      }
+    }
+
+    async function confirmPrivacyMasterUnlock() {
+      if (!isPrivacyScreenLocked) return;
+      const errEl = document.getElementById('privacy-lock-error');
+      const id = String(document.getElementById('privacy-lock-master-id')?.value || '').trim();
+      const pwd = String(document.getElementById('privacy-lock-master-pwd')?.value || '');
+      if (!id || !pwd) {
+        if (errEl) errEl.textContent = '마스터 아이디와 비밀번호를 입력해 주세요.';
+        return;
+      }
+      try {
+        const res = await window.api.verifyMasterAuth({ id, password: pwd });
+        if (!res || !res.success) {
+          if (errEl) errEl.textContent = (res && res.msg) || '마스터 인증에 실패했습니다.';
+          return;
+        }
+        unlockPrivacyScreen();
+      } catch (e) {
+        if (errEl) errEl.textContent = '마스터 인증 중 오류가 발생했습니다.';
+      }
+    }
+
+    async function applyPrivacyLockSettingsFromForm() {
+      const enabledEl = document.getElementById('setting-privacy-lock-enabled');
+      const onHideEl = document.getElementById('setting-privacy-lock-on-hide');
+      const idleEl = document.getElementById('setting-privacy-lock-idle');
+      const pin1 = String(document.getElementById('setting-privacy-lock-pin')?.value || '').trim();
+      const pin2 = String(document.getElementById('setting-privacy-lock-pin2')?.value || '').trim();
+      const wantEnabled = !!(enabledEl && enabledEl.checked);
+      let pinHash = appSettings.privacyLockPinHash || '';
+
+      if (wantEnabled) {
+        if (pin1 || pin2 || !pinHash) {
+          if (!/^\d{4,8}$/.test(pin1)) {
+            await appAlert('화면 잠금 PIN은 숫자 4~8자리로 입력해 주세요.');
+            document.getElementById('setting-privacy-lock-pin')?.focus();
+            return false;
+          }
+          if (pin1 !== pin2) {
+            await appAlert('PIN 확인이 일치하지 않습니다.');
+            document.getElementById('setting-privacy-lock-pin2')?.focus();
+            return false;
+          }
+          pinHash = await hashPrivacyPin(pin1);
+        }
+        appSettings.privacyLockEnabled = true;
+        appSettings.privacyLockPinHash = pinHash;
+      } else {
+        appSettings.privacyLockEnabled = false;
+        // 기존 PIN 해시는 유지 → 다시 켤 때 재입력 없이 사용 가능
+      }
+
+      appSettings.privacyLockOnHide = !!(onHideEl && onHideEl.checked);
+      const idleMins = parseInt(idleEl?.value || '0', 10);
+      appSettings.privacyLockIdleMinutes = Number.isFinite(idleMins) ? Math.max(0, Math.min(60, idleMins)) : 0;
+
+      const pinInput = document.getElementById('setting-privacy-lock-pin');
+      const pinInput2 = document.getElementById('setting-privacy-lock-pin2');
+      if (pinInput) pinInput.value = '';
+      if (pinInput2) pinInput2.value = '';
+      syncPrivacyLockButtonUi();
+      resetPrivacyIdleTimer();
+      return true;
     }
 
     function setCompactRailTab(tab) {
@@ -7677,7 +8010,12 @@
 
     if (window.api && typeof window.api.onOpenChatFromToast === 'function') {
       window.api.onOpenChatFromToast((data) => {
-        openChatFromToastChannelKey(data && data.channelKey);
+        const key = data && data.channelKey;
+        if (isPrivacyScreenLocked) {
+          privacyLockPendingChatKey = key || '';
+          return;
+        }
+        openChatFromToastChannelKey(key);
       });
     }
 
@@ -8526,6 +8864,12 @@
           document.getElementById('setting-floor')?.focus();
           document.getElementById('setting-floor')?.select?.();
         }, 80);
+        return;
+      }
+      if (focusKey === 'privacy-lock') {
+        const el = document.getElementById('setting-privacy-lock-enabled');
+        el?.closest('div[style*="border-radius: 18px"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => el?.focus(), 80);
       }
     }
     document.addEventListener('click', () => {
@@ -11754,7 +12098,9 @@
     }
 
     function isBlockingOverlayOpenForSearchShortcut() {
+      if (isPrivacyScreenLocked) return true;
       if (document.getElementById('app-dialog-overlay')?.style.display === 'flex') return true;
+      if (document.getElementById('usage-lock-overlay')?.style.display === 'flex') return true;
       return [...document.querySelectorAll('.modal-overlay')].some((el) => {
         if (!el || el.style.display !== 'flex') return false;
         // 현황판 단독 창은 본 단축키와 무관
@@ -17364,6 +17710,17 @@
         const showOfflineEl = document.getElementById('setting-show-offline-users');
         if (showOfflineEl) showOfflineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
         document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
+        const privacyEnabledEl = document.getElementById('setting-privacy-lock-enabled');
+        if (privacyEnabledEl) privacyEnabledEl.checked = !!appSettings.privacyLockEnabled && !!appSettings.privacyLockPinHash;
+        const privacyOnHideEl = document.getElementById('setting-privacy-lock-on-hide');
+        if (privacyOnHideEl) privacyOnHideEl.checked = appSettings.privacyLockOnHide !== false;
+        const privacyIdleEl = document.getElementById('setting-privacy-lock-idle');
+        if (privacyIdleEl) privacyIdleEl.value = String(appSettings.privacyLockIdleMinutes || 0);
+        const privacyPin1 = document.getElementById('setting-privacy-lock-pin');
+        const privacyPin2 = document.getElementById('setting-privacy-lock-pin2');
+        if (privacyPin1) privacyPin1.value = '';
+        if (privacyPin2) privacyPin2.value = '';
+        onPrivacyLockEnabledToggle();
         document.getElementById('setting-my-status').value = p.statusState || 'ONLINE';
         document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
         const msgNotify = await window.api.getMessageNotificationSettings();
@@ -17438,6 +17795,8 @@
     return;
   }
 
+  if (!(await applyPrivacyLockSettingsFromForm())) return;
+
   // 추가된 항목 값 가져오기 (직급·내선·휴대폰은 비워 두어도 됨)
   const floor = document.getElementById('setting-floor').value.trim();
   const dept = document.getElementById('setting-dept').value.trim();
@@ -17447,7 +17806,16 @@
   const phone = document.getElementById('setting-phone').value.trim();
   const statusState = document.getElementById('setting-my-status').value;
 
-  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars, showOfflineUsers, compactPersonClickMode };
+  const privacyLockEnabled = !!appSettings.privacyLockEnabled;
+  const privacyLockPinHash = appSettings.privacyLockPinHash || '';
+  const privacyLockOnHide = appSettings.privacyLockOnHide !== false;
+  const privacyLockIdleMinutes = appSettings.privacyLockIdleMinutes || 0;
+
+  appSettings = {
+    fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
+    spellcheck, showUserListAvatars, showOfflineUsers, compactPersonClickMode,
+    privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes
+  };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
