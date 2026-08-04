@@ -6381,6 +6381,7 @@
     /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
     function leaveActiveChatForPrivacy() {
       try { closeOpenMsgActions(); } catch (_) {}
+      try { clearSidebarUserSelection(); } catch (_) {}
       try { cancelEditMessage(); } catch (_) {}
       try { cancelReplyMessage(); } catch (_) {}
       try { closeChatSearchBar(); } catch (_) {}
@@ -8509,10 +8510,11 @@
         appAlert('그룹에 초대할 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 여러 명을 고른 뒤 「그룹 만들기」를 눌러 주세요.');
         return;
       }
-      openGroupChatModal(users);
+      openGroupChatModal(users, { mode: 'new' });
     }
 
-    function openGroupChatModal(prefillUserOrUsers) {
+    function openGroupChatModal(prefillUserOrUsers, opts) {
+      const options = opts && typeof opts === 'object' ? opts : {};
       groupModalPrefillUser = null;
       groupModalPrefillIps = new Set();
       const list = Array.isArray(prefillUserOrUsers)
@@ -8535,8 +8537,14 @@
         defaultName = names.join(', ') + (groupModalPrefillIps.size > 3 ? ` 외 ${groupModalPrefillIps.size - 3}명` : '');
       }
       document.getElementById('group-name-input').value = defaultName;
-      const preferExisting = myGroupChats.length > 0 && !!groupModalPrefillUser && groupModalPrefillIps.size === 1;
-      switchGroupModalMode(preferExisting ? 'existing' : 'new');
+      let mode = options.mode;
+      if (mode !== 'new' && mode !== 'existing') {
+        // 우클릭「초대」1명: 기존 그룹이 있으면 초대 탭, 그 외(다중선택·+버튼)는 새로 만들기
+        mode = (myGroupChats.length > 0 && !!groupModalPrefillUser && groupModalPrefillIps.size === 1)
+          ? 'existing'
+          : 'new';
+      }
+      switchGroupModalMode(mode);
       renderGroupMemberChecklist();
       renderGroupExistingSelect();
       document.getElementById('group-chat-modal').style.display = 'flex';
@@ -8592,6 +8600,10 @@
         if (!name) { await appAlert('그룹 이름을 입력해 주세요.'); return; }
         if (checked.length === 0) { await appAlert('참여자를 한 명 이상 선택해 주세요.'); return; }
         const group = await window.api.createGroupChat(name, checked);
+        if (!group || !group.uid) {
+          await appAlert('그룹 대화방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          return;
+        }
         await refreshGroupChats();
         closeGroupChatModal();
         clearSidebarUserSelection();
