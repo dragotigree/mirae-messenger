@@ -5709,14 +5709,14 @@ function deliverPendingChatRow(row, targetIP) {
   const releaseInflight = () => pendingResendInflight.delete(inflightKey);
   setTimeout(releaseInflight, 15000);
 
-  if (row.status === 'SENT' && row.msg_uid) {
-    const tries = sentAckRetryCount.get(String(row.msg_uid)) || 0;
-    if (tries >= SENT_ACK_MAX_RETRIES) {
-      releaseInflight();
-      return;
-    }
-    sentAckRetryCount.set(String(row.msg_uid), tries + 1);
+  // SENT·PENDING 모두 재시도 상한 — ACK 실패 시 무한 재전송으로 수신측 폭주 방지
+  const retryKey = row.msg_uid ? String(row.msg_uid) : inflightKey;
+  const tries = sentAckRetryCount.get(retryKey) || 0;
+  if (tries >= SENT_ACK_MAX_RETRIES) {
+    releaseInflight();
+    return;
   }
+  sentAckRetryCount.set(retryKey, tries + 1);
 
   const wireMessage = messageHtmlForWire(row.message);
   const client = new net.Socket();
