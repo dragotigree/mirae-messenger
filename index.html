@@ -3540,6 +3540,14 @@
             <span class="settings-toggle-desc">끄면 사이드바·미니 모드 목록에서 사진·이모지 아바타를 숨깁니다 (채팅 헤더·상세 정보는 유지)</span>
           </span>
         </label>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+          목록에 표시할 직원:
+          <select id="setting-show-offline-users" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
+            <option value="all">온라인 + 오프라인 모두</option>
+            <option value="online">온라인만</option>
+          </select>
+        </label>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">사이드바·미니 모드 직원 목록에 적용됩니다. 「대화」 탭의 기존 대화는 그대로 보입니다.</div>
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
@@ -4870,13 +4878,14 @@
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "compactPersonClickMode": "ipmsg"}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "compactPersonClickMode": "ipmsg"}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
     }
     if (appSettings.spellcheck === undefined) appSettings.spellcheck = false;
     if (appSettings.showUserListAvatars === undefined) appSettings.showUserListAvatars = true;
+    if (appSettings.showOfflineUsers === undefined) appSettings.showOfflineUsers = true;
     if (appSettings.compactPersonClickMode !== 'chat' && appSettings.compactPersonClickMode !== 'ipmsg') {
       appSettings.compactPersonClickMode = 'ipmsg';
     }
@@ -4964,6 +4973,17 @@
     function applyUserListAvatarVisibility() {
       const show = appSettings.showUserListAvatars !== false;
       document.body.classList.toggle('hide-user-list-avatars', !show);
+    }
+
+    function showOfflineUsersInDirectory() {
+      return appSettings.showOfflineUsers !== false;
+    }
+
+    /** 직원 목록(사이드바·미니 직원 탭)에 표시할지 */
+    function isUserVisibleInDirectory(u) {
+      if (!u || !u.ip) return false;
+      if (!showOfflineUsersInDirectory() && !u.online) return false;
+      return true;
     }
 
     function applyAppSettingsToUI() {
@@ -7262,11 +7282,13 @@
       const userPanels = [];
 
       let filtered = allUsers.filter(u =>
+        isUserVisibleInDirectory(u) && (
         !userFilterKeyword ||
         u.username.toLowerCase().includes(userFilterKeyword) ||
         (u.dept || '').toLowerCase().includes(userFilterKeyword) ||
         (u.floor || '').toLowerCase().includes(userFilterKeyword) ||
         (u.rank || '').toLowerCase().includes(userFilterKeyword)
+        )
       );
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
       if (compactListFilter === 'online') filtered = filtered.filter(u => u.online);
@@ -7299,6 +7321,7 @@
         emptyHintEl.className = 'compact-empty-hint';
         emptyHintEl.textContent = compactListFilter === 'online' ? '현재 온라인인 직원이 없습니다.' :
           compactListFilter === 'favorite' ? '즐겨찾기한 직원이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.' :
+          !showOfflineUsersInDirectory() ? '현재 온라인인 직원이 없습니다.' :
           userFilterKeyword ? '검색 결과가 없습니다.' : '표시할 직원이 없습니다.';
       }
 
@@ -9479,7 +9502,7 @@
         const ips = (groups[g] || []).map((u) => u.ip).join(',');
         return `${g}|${collapsedGroups.has(collapseKey) ? 1 : 0}|${ips}`;
       });
-      return [String(userFilterKeyword || ''), groupingKey, favIps, parts.join(';')].join('::');
+      return [String(userFilterKeyword || ''), groupingKey, showOfflineUsersInDirectory() ? 'all' : 'online', favIps, parts.join(';')].join('::');
     }
 
     function patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey) {
@@ -9567,10 +9590,12 @@
       if (!treeEl) return;
 
       const filtered = allUsers.filter(u =>
+        isUserVisibleInDirectory(u) && (
         !userFilterKeyword ||
         u.username.toLowerCase().includes(userFilterKeyword) ||
         (u.dept || '').toLowerCase().includes(userFilterKeyword) ||
         (u.floor || '').toLowerCase().includes(userFilterKeyword)
+        )
       );
 
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
@@ -17155,6 +17180,8 @@
         document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
         const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
         if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
+        const showOfflineEl = document.getElementById('setting-show-offline-users');
+        if (showOfflineEl) showOfflineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
         document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
         document.getElementById('setting-my-status').value = p.statusState || 'ONLINE';
         document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
@@ -17219,6 +17246,9 @@
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
     : true;
+  const showOfflineUsers = document.getElementById('setting-show-offline-users')
+    ? document.getElementById('setting-show-offline-users').value !== 'online'
+    : true;
 
   const username = document.getElementById('setting-name').value.trim();
   if (!username) {
@@ -17236,7 +17266,7 @@
   const phone = document.getElementById('setting-phone').value.trim();
   const statusState = document.getElementById('setting-my-status').value;
 
-  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars, compactPersonClickMode };
+  appSettings = { fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode, spellcheck, showUserListAvatars, showOfflineUsers, compactPersonClickMode };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
@@ -17265,7 +17295,7 @@
     applyCuteAvatarClasses(myAvatarEl, myProfile.username, myProfile.photo, myProfile.ip);
   }
   closeSettingsModal();
-  renderUserListTree();
+  renderUserListTree(true);
   if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
   window.api.focusMainWindow();
   await appAlert('설정이 저장되었습니다.');
