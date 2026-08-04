@@ -303,18 +303,19 @@ let presenceFlushTimersStarted = false;
 const MY_IP = getMyIP();
 
 let myProfile = {
-  username: '홍길동',
-  rank: '사원',
-  dept: '재활치료부',
-  floor: '10층',
-  extNo: '1010',
-  phone: '010-0000-0000',
+  username: '이름없음',
+  rank: '',
+  dept: '',
+  floor: '',
+  extNo: '',
+  phone: '',
   statusState: 'ONLINE',
   photo: ''
 };
 // DB에서 실제 저장된 프로필(직급 등)을 불러오기 전까지는 위 하드코딩된 기본값이 임시로 들어있는
-// 상태다. 이 값이 다른 PC로 전파되면 "실장 정용범"처럼 잘못된 값이 잠깐 보였다가 실제 값(예: 물리
-// 치료실장)으로 바뀌는 것처럼 보이므로, 로딩이 끝나기 전에는 내 정보를 내보내지 않는다.
+// 상태다. 이 값이 다른 PC로 전파되면 잘못된 값이 잠깐 보였다가 실제 값으로 바뀌는 것처럼
+// 보이므로, 로딩이 끝나기 전에는 내 정보를 내보내지 않는다.
+// 직급·내선·휴대폰은 선택 항목 — 비워 둔 채 이름(예: 물리치료실1)만으로도 사용 가능하다.
 let profileLoaded = false;
 
 let showNotificationPreview = true;
@@ -2297,13 +2298,15 @@ db.serialize(() => {
 
   db.get(`SELECT * FROM user_profile WHERE id = 1`, (err, row) => {
     if (row) {
+      // 빈 문자열로 저장한 직급·내선·휴대폰이 기본값으로 되살아나지 않게 nullish만 보정한다.
+      const strOrEmpty = (v) => (v != null ? String(v) : '');
       myProfile = {
-        username: row.username || '홍길동',
-        rank: row.rank != null ? String(row.rank) : '',
-        dept: row.dept || '재활치료부',
-        floor: row.floor || '10층',
-        extNo: row.ext_no || '1010',
-        phone: row.phone_no || '010-0000-0000',
+        username: (row.username && String(row.username).trim()) || '이름없음',
+        rank: strOrEmpty(row.rank),
+        dept: strOrEmpty(row.dept),
+        floor: strOrEmpty(row.floor),
+        extNo: strOrEmpty(row.ext_no),
+        phone: strOrEmpty(row.phone_no),
         statusState: row.status_state || 'ONLINE',
         photo: row.photo || ''
       };

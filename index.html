@@ -3495,14 +3495,15 @@
             </div>
           </div>
         </div>
-        <label class="settings-field">성명<input type="text" id="setting-name"></label>
+        <label class="settings-field">성명<input type="text" id="setting-name" placeholder="예: 물리치료실1"></label>
         <div class="settings-field-row">
-          <label class="settings-field">층<input type="text" id="setting-floor"></label>
-          <label class="settings-field">부서<input type="text" id="setting-dept"></label>
-          <label class="settings-field">직급<input type="text" id="setting-rank"></label>
+          <label class="settings-field">층<input type="text" id="setting-floor" placeholder="선택"></label>
+          <label class="settings-field">부서<input type="text" id="setting-dept" placeholder="선택"></label>
+          <label class="settings-field">직급 (선택)<input type="text" id="setting-rank" placeholder="없으면 비움"></label>
         </div>
-        <label class="settings-field">내선번호<input type="text" id="setting-ext"></label>
-        <label class="settings-field">휴대폰 번호<input type="text" id="setting-phone" placeholder="010-0000-0000"></label>
+        <label class="settings-field">내선번호 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
+        <label class="settings-field">휴대폰 번호 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
+        <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-top:-2px;">성명만 있으면 사용할 수 있습니다. 직급·내선·휴대폰은 비워 두어도 됩니다. (예: 성명에 물리치료실1)</div>
       </div>
 
       <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
@@ -10941,10 +10942,10 @@
       const locLine = `${u.floor || ''} · ${u.dept || ''}`.replace(/^ · | · $|^ · $/, '').trim();
       const hasSavedContact = !!(locLine || (u.extNo && String(u.extNo).trim()) || (u.phone && String(u.phone).trim()) || (u.lastSeen && u.lastSeen > 0));
       document.getElementById('detail-dept').textContent = locLine || (u.online ? '' : (hasSavedContact ? '' : '저장된 연락처 정보 없음 (상대 접속 시 갱신)'));
-      document.getElementById('detail-rank').textContent = u.rank || '-';
-      document.getElementById('detail-dept-val').textContent = u.dept || '-';
-      document.getElementById('detail-ext').textContent = u.extNo || '-';
-      document.getElementById('detail-phone').textContent = u.phone || '-';
+      document.getElementById('detail-rank').textContent = (u.rank && String(u.rank).trim()) || '없음';
+      document.getElementById('detail-dept-val').textContent = (u.dept && String(u.dept).trim()) || '없음';
+      document.getElementById('detail-ext').textContent = (u.extNo && String(u.extNo).trim()) || '없음';
+      document.getElementById('detail-phone').textContent = (u.phone && String(u.phone).trim()) || '없음';
       const lastSeenEl = document.getElementById('detail-last-seen');
       if (lastSeenEl) {
         lastSeenEl.textContent = formatLastSeenRelative(u);
@@ -17116,12 +17117,17 @@
     : true;
 
   const username = document.getElementById('setting-name').value.trim();
-  
-  // 추가된 항목 값 가져오기
+  if (!username) {
+    await appAlert('성명(표시 이름)은 필수입니다.\n예: 물리치료실1');
+    document.getElementById('setting-name')?.focus();
+    return;
+  }
+
+  // 추가된 항목 값 가져오기 (직급·내선·휴대폰은 비워 두어도 됨)
   const floor = document.getElementById('setting-floor').value.trim();
   const dept = document.getElementById('setting-dept').value.trim();
   const rank = document.getElementById('setting-rank').value.trim();
-  
+
   const extNo = document.getElementById('setting-ext').value.trim();
   const phone = document.getElementById('setting-phone').value.trim();
   const statusState = document.getElementById('setting-my-status').value;
