@@ -4537,16 +4537,21 @@ function handleConfigSync(payload) {
 
 function handleOperatorAdd(o) {
   if (!o || !o.username) return;
-  db.get(`SELECT can_manage_duty FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
+  db.get(`SELECT can_manage_duty, display_name, password_hash, added_at FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
     // 원격에 필드가 없으면(구버전 동기화) 기존 권한을 덮어쓰지 않음
     let dutyFlag = 0;
     if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
     else if (o.can_manage_duty === 0 || o.can_manage_duty === false || o.can_manage_duty === '0') dutyFlag = 0;
     else if (row && row.can_manage_duty) dutyFlag = 1;
-    const cleanDisplayName = scrubBrokenDisplayChars(o.display_name);
+    const incoming = scrubBrokenDisplayChars(o.display_name);
+    const localName = scrubBrokenDisplayChars(row && row.display_name);
+    const hangul = (t) => (String(t).match(/[\uAC00-\uD7A3]/g) || []).length;
+    const cleanDisplayName = (hangul(localName) > hangul(incoming)) ? localName : (incoming || localName);
+    const passwordHash = o.password_hash || (row && row.password_hash) || '';
+    if (!passwordHash) return;
     db.run(
       `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
-      [o.username, o.password_hash, cleanDisplayName, o.added_at, dutyFlag],
+      [o.username, passwordHash, cleanDisplayName, o.added_at || (row && row.added_at) || new Date().toISOString(), dutyFlag],
       () => {
         if (mainWindow) safeWebContentsSend('notice-operators-update');
       }

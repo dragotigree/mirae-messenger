@@ -3930,6 +3930,23 @@
     </div>
   </div>
 
+  <!-- ✏️ 관리자 표시 이름 수정 -->
+  <div id="operator-rename-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeOperatorRenameModal()">
+    <div class="modal-card" style="width:380px;" onclick="event.stopPropagation()">
+      <div style="font-size:16px; font-weight:700; color:#1e3a8a;">✏️ 관리자 표시 이름 수정</div>
+      <div id="operator-rename-username" style="font-size:12px; color:#64748b; margin-top:4px;"></div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; margin-top:12px;">
+        표시 이름
+        <input type="text" id="operator-rename-input" placeholder="예: 홍길동" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitOperatorRename()">
+      </label>
+      <p style="font-size:11px; color:#94a3b8; margin:8px 0 0; line-height:1.45;">깨진 글자가 보이면 성까지 포함해 전체 이름을 다시 입력해 주세요.</p>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+        <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="submitOperatorRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 저장</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ✉️ IPmsg 스타일 쪽지 보내기 (1:1 DM, 채팅 UI 없음) -->
   <div id="ipmsg-send-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeIpmsgSendModal()">
     <div class="modal-card ipmsg-modal-card" onclick="event.stopPropagation()">
@@ -6145,6 +6162,7 @@
         { test: () => isFlexOverlay('channel-display-name-modal'), close: () => closeChannelDisplayNameModal(), confirm: false },
         { test: () => isFlexOverlay('channel-title-emoji-modal'), close: () => closeChannelTitleEmojiModal(), confirm: false },
         { test: () => isFlexOverlay('group-rename-modal'), close: () => closeGroupRenameModal(), confirm: false },
+        { test: () => isFlexOverlay('operator-rename-modal'), close: () => closeOperatorRenameModal(), confirm: false },
         { test: () => isFlexOverlay('group-chat-modal'), close: () => closeGroupChatModal(), confirm: false },
         { test: () => isFlexOverlay('share-message-modal'), close: () => closeShareMessageModal(), confirm: true, name: '메시지 전달' },
         { test: () => isFlexOverlay('schedule-msg-modal'), close: () => closeScheduleMessageModal(), confirm: true, name: '예약 메시지' },
@@ -10282,14 +10300,46 @@
       });
     }
 
+    let pendingOperatorRenameUsername = '';
+
     async function renameMasterNoticeOperator(username) {
-      const current = (await window.api.getNoticeOperators() || []).find((o) => o.username === username);
+      pendingOperatorRenameUsername = String(username || '').trim();
+      if (!pendingOperatorRenameUsername) return;
+      const current = (await window.api.getNoticeOperators() || []).find((o) => o.username === pendingOperatorRenameUsername);
       const prev = current ? String(current.display_name || '') : '';
-      const next = window.prompt(`'${username}' 표시 이름을 올바르게 입력하세요.\n깨진 글자가 있으면 전체 이름(예: 홍길동)을 다시 적어 주세요.`, prev);
-      if (next == null) return;
-      const name = String(next).trim();
+      const userLabel = document.getElementById('operator-rename-username');
+      const input = document.getElementById('operator-rename-input');
+      const modal = document.getElementById('operator-rename-modal');
+      if (!modal || !input) return;
+      if (userLabel) userLabel.textContent = `아이디: ${pendingOperatorRenameUsername}`;
+      input.value = prev;
+      modal.style.display = 'flex';
+      setModalOpenState(true);
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 40);
+    }
+
+    function closeOperatorRenameModal() {
+      const modal = document.getElementById('operator-rename-modal');
+      if (modal) modal.style.display = 'none';
+      pendingOperatorRenameUsername = '';
+      // 마스터 관리 화면이 열려 있으면 modal-open 유지
+      if (!isFlexOverlay('master-admin-modal')) setModalOpenState(false);
+    }
+
+    async function submitOperatorRename() {
+      const username = pendingOperatorRenameUsername;
+      const input = document.getElementById('operator-rename-input');
+      const name = String(input && input.value || '').trim();
+      if (!username) {
+        closeOperatorRenameModal();
+        return;
+      }
       if (!name) {
         await appAlert('표시 이름을 입력해 주세요.');
+        input?.focus();
         return;
       }
       const res = await window.api.updateNoticeOperatorDisplayName({ username, displayName: name });
@@ -10297,6 +10347,7 @@
         await appAlert(res?.msg || '이름 수정에 실패했습니다.');
         return;
       }
+      closeOperatorRenameModal();
       loadMasterOperatorList();
       await appAlert(`표시 이름을 [${name}] 으로 저장했습니다.`);
     }
