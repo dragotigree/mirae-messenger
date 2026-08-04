@@ -1535,8 +1535,8 @@
       display: flex; flex: 1; min-height: 0; overflow: hidden;
     }
     .sb-board-side {
-      width: 360px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
-      padding: 10px 10px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
+      width: 300px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+      padding: 10px 8px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
       display: flex; flex-direction: column; gap: 10px;
     }
     .sb-board-content {
@@ -1848,7 +1848,7 @@
     }
     .sb-main-grid th, .sb-main-grid td {
       border-right: 1px solid #e8ecf1; border-bottom: 1px solid #e8ecf1;
-      vertical-align: top; padding: 10px 8px; word-break: break-word;
+      vertical-align: top; padding: 10px 6px; word-break: break-word;
     }
     .sb-main-grid tr th:last-child, .sb-main-grid tr td:last-child { border-right: none; }
     .sb-main-grid tbody tr:last-child td { border-bottom: none; }
@@ -1872,7 +1872,10 @@
       color: #64748b; white-space: pre-wrap; word-break: keep-all; line-height: 1.4;
       max-height: none; overflow: visible;
     }
-    .sb-main-entry .sb-main-time { color: #2563eb; font-weight: 600; font-size: 11px; margin-top: 3px; }
+    .sb-main-entry .sb-main-time {
+      color: #2563eb; font-weight: 600; font-size: 11px; margin-top: 3px;
+      white-space: nowrap; letter-spacing: -0.02em;
+    }
     .sb-main-row-rm4 td { background: #fff; }
     .sb-main-row-rm6 td { background: #fff9e1; }
     .sb-main-row-rm7 td { background: #fdf2ff; }
@@ -2206,7 +2209,7 @@
     .sb-main-grid thead th { font-size: 12.5px; }
     .sb-main-grid .sb-main-rm-label { font-size: 12.5px; width: 60px; }
     .sb-main-entry { font-size: 13.5px; line-height: 1.45; }
-    .sb-main-entry .sb-main-time { font-size: 12.5px; }
+    .sb-main-entry .sb-main-time { font-size: 12px; white-space: nowrap; letter-spacing: -0.03em; }
     .sb-main-board-ward-tag { font-size: 13px; height: 24px; }
     .schedule-board-empty { font-size: 14px; }
     .sb-quick-field label { font-size: 11.5px; }
