@@ -1992,6 +1992,8 @@ db.serialize(() => {
     username TEXT PRIMARY KEY, password_hash TEXT, display_name TEXT, added_at TEXT
   )`, logDbErr);
   db.run(`ALTER TABLE notice_operators ADD COLUMN can_manage_duty INTEGER DEFAULT 0`, () => {});
+  // 작성 권한자 = 당직·OFF 포함 (기존 계정도 일괄 부여)
+  db.run(`UPDATE notice_operators SET can_manage_duty = 1 WHERE COALESCE(can_manage_duty, 0) = 0`, () => {});
 
   // 채널·1:1 대화 상단 공지 고정 (채널당 1개)
   db.run(`CREATE TABLE IF NOT EXISTS chat_pins (
@@ -6483,7 +6485,8 @@ ipcMain.handle('add-notice-operator', async (event, { username, password, displa
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
     const password_hash = hashPassword(password);
-    const dutyFlag = canManageDuty ? 1 : 0;
+    // 미지정·true → 당직·OFF 포함 (작성 권한자 기본)
+    const dutyFlag = (canManageDuty === false || canManageDuty === 0 || canManageDuty === '0') ? 0 : 1;
     db.run(
       `INSERT OR REPLACE INTO notice_operators (username, password_hash, display_name, added_at, can_manage_duty) VALUES (?, ?, ?, ?, ?)`,
       [username, password_hash, displayName, added_at, dutyFlag],
@@ -6527,14 +6530,13 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
       }
-      const canManageDuty = Number(row.can_manage_duty) === 1 || row.can_manage_duty === true || row.can_manage_duty === '1';
-      // 로그인 성공 시 메인 세션도 바로 맞춤 (렌더러 IPC 레이스 방지)
+      // 작성 권한자 로그인 = 당직·OFF(일정등록) 포함
       noticeOperatorSessionActive = true;
-      noticeOperatorCanManageDutySession = !!canManageDuty;
+      noticeOperatorCanManageDutySession = true;
       resolve({
         success: true,
         displayName: row.display_name,
-        canManageDuty: !!canManageDuty
+        canManageDuty: true
       });
     });
   });
@@ -6589,8 +6591,9 @@ ipcMain.handle('get-duty-roster', async (event, dateStr) => {
 });
 
 ipcMain.handle('set-duty-roster-for-date', async (event, payload) => {
-  if (!masterSessionActive && !noticeOperatorCanManageDutySession) {
-    return { success: false, msg: '마스터 또는 일정등록 권한이 있는 계정으로 로그인한 뒤 저장할 수 있습니다.' };
+  // 마스터 또는 작성 권한자 세션이면 당직·OFF 저장 가능
+  if (!masterSessionActive && !noticeOperatorSessionActive) {
+    return { success: false, msg: '마스터 또는 작성 권한자 계정으로 로그인한 뒤 저장할 수 있습니다.' };
   }
   const p = payload || {};
   return replaceDutyRosterForDate(p.dateStr, p.dutyNames || [], p.offNames || [], {
@@ -6692,7 +6695,8 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
 
 ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty) => {
   noticeOperatorSessionActive = !!active;
-  noticeOperatorCanManageDutySession = !!active && !!canManageDuty;
+  // 작성 권한자 세션이 활성면 당직·OFF도 허용 (별도 플래그 무시)
+  noticeOperatorCanManageDutySession = !!active;
   return { success: true };
 });
 
