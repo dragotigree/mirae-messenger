@@ -2356,7 +2356,7 @@ function attachEditableContextMenu(webContents) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 1380,
     height: 800,
     minWidth: NORMAL_MIN_WIDTH,
     minHeight: NORMAL_MIN_HEIGHT,

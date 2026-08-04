@@ -2363,31 +2363,36 @@
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.28s var(--ease-spring); }
     .master-admin-modal-card {
-      width: min(1180px, 96vw);
-      max-width: 96vw;
-      padding: 28px;
-      gap: 20px;
+      width: calc(100vw - 24px);
+      max-width: calc(100vw - 24px);
+      padding: 22px 24px;
+      gap: 16px;
       max-height: min(94vh, 920px);
+      box-sizing: border-box;
     }
     .master-online-clients-box {
       max-height: min(42vh, 380px);
-      overflow: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
       border: 1px solid #e2e8f0;
       border-radius: 14px;
       background: #fff;
       min-width: 0;
+      width: 100%;
     }
     .master-clients-table {
       width: 100%;
-      min-width: 920px;
+      min-width: 0;
       border-collapse: collapse;
       font-size: 12px;
-      table-layout: auto;
+      table-layout: fixed;
     }
     .master-clients-table th,
     .master-clients-table td {
-      padding: 8px 10px;
+      padding: 7px 8px;
       vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .master-clients-table th {
       background: #f1f5f9;
@@ -2397,6 +2402,29 @@
       position: sticky;
       top: 0;
       z-index: 1;
+    }
+    .master-clients-table col.c-name { width: 18%; }
+    .master-clients-table col.c-dept { width: 16%; }
+    .master-clients-table col.c-ip { width: 12%; }
+    .master-clients-table col.c-ver { width: 9%; }
+    .master-clients-table col.c-status { width: 11%; }
+    .master-clients-table col.c-last { width: 10%; }
+    .master-clients-table col.c-actions { width: 24%; }
+    .master-clients-table .master-client-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      justify-content: flex-end;
+      max-width: 100%;
+    }
+    .master-clients-table .master-client-actions button {
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
     }
     @keyframes modal-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     body.modal-open #custom-titlebar { -webkit-app-region: no-drag; }
@@ -9423,14 +9451,18 @@
       }
 
       const tableHead = `<table class="master-clients-table">
+        <colgroup>
+          <col class="c-name"><col class="c-dept"><col class="c-ip"><col class="c-ver">
+          <col class="c-status"><col class="c-last"><col class="c-actions">
+        </colgroup>
         <thead><tr>
           <th>이름</th>
           <th>부서/층</th>
           <th>IP</th>
           <th>버전</th>
           <th>상태</th>
-          <th style="width:1%;">마지막</th>
-          <th style="width:1%;">관리</th>
+          <th>마지막</th>
+          <th>관리</th>
         </tr></thead><tbody>`;
 
       const escAttr = (s) => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -9443,17 +9475,18 @@
         const deptFloor = [u.dept, u.floor].filter(Boolean).join(' · ') || '-';
         const lastSeenText = formatLastSeenRelative(u);
         const lastTitle = formatLastSeenTitle(u);
+        const nameText = `${u.rank || ''} ${u.username || '-'}`.trim();
         return `<tr style="border-top:1px solid #f1f5f9; ${u.online ? '' : 'opacity:.65;'}">
-          <td style="font-weight:700; color:#0f172a; white-space:nowrap;">${u.rank || ''} ${u.username || '-'}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
-          <td style="color:#64748b; white-space:nowrap;">${deptFloor}</td>
-          <td style="font-family:monospace; color:#334155; white-space:nowrap; font-size:11.5px;">${u.ip || '-'}</td>
-          <td style="font-weight:700; white-space:nowrap; color:${verOutdated ? '#dc2626' : '#15803d'};">${ver}${verOutdated ? ' ⚠' : ''}</td>
-          <td style="white-space:nowrap;">${masterStatusLabel[statusKey] || statusKey}</td>
-          <td style="color:#64748b; white-space:nowrap; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${lastSeenText}</td>
-          <td style="white-space:nowrap; text-align:center;">
-            <div style="display:inline-flex; gap:4px; align-items:center;">
-              <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="padding:5px 9px; font-size:11px; font-weight:700; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#2563eb; cursor:pointer;">정보 수정</button>
-              ${u.online ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr((u.rank || '') + ' ' + (u.username || '')).trim()}" data-isme="${isMe ? '1' : '0'}" style="padding:5px 9px; font-size:11px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fef2f2; color:#b91c1c; cursor:pointer;">강제 업데이트</button>` : ''}
+          <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
+          <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
+          <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
+          <td style="font-weight:700; color:${verOutdated ? '#dc2626' : '#15803d'};">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</td>
+          <td>${masterStatusLabel[statusKey] || statusKey}</td>
+          <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
+          <td style="text-align:right;">
+            <div class="master-client-actions">
+              <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="border:1px solid #cbd5e1; background:#fff; color:#2563eb;">정보 수정</button>
+              ${u.online ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
             </div>
           </td>
         </tr>`;
