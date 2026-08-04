@@ -1391,6 +1391,27 @@
       display: flex; flex-direction: column; gap: 2px; min-width: 0;
       border-top: 1px dashed #e2e8f0; padding-top: 6px;
     }
+    .sidebar-cal-other-sort {
+      display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+      padding: 0 2px 6px; min-width: 0;
+    }
+    .sidebar-cal-other-sort-label {
+      font-size: 10px; font-weight: 700; color: #94a3b8; flex-shrink: 0;
+      letter-spacing: -0.02em;
+    }
+    .sidebar-cal-other-sort-btns {
+      display: inline-flex; gap: 3px; flex-wrap: wrap; min-width: 0;
+    }
+    .sidebar-cal-other-sort-btn {
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b;
+      font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 8px;
+      cursor: pointer; line-height: 1.3; letter-spacing: -0.03em;
+      -webkit-app-region: no-drag;
+    }
+    .sidebar-cal-other-sort-btn:hover { background: #f1f5f9; color: #334155; }
+    .sidebar-cal-other-sort-btn.active {
+      background: #e0f2fe; border-color: #7dd3fc; color: #0369a1;
+    }
     .sidebar-duty-block {
       padding: 10px 12px; margin: 0; border-bottom: 1px solid #e2e8f0;
       display: flex; flex-direction: column; gap: 5px; background: #f8fafc;
@@ -13512,6 +13533,87 @@
       return idx >= 0 ? 10 + idx : 99;
     }
 
+    const SIDEBAR_OTHER_SORT_KEY = 'mirae_sidebar_other_sort';
+    let sidebarOtherSortMode = 'time';
+    try {
+      const savedSort = localStorage.getItem(SIDEBAR_OTHER_SORT_KEY);
+      if (savedSort === 'room' || savedSort === 'type' || savedSort === 'time') {
+        sidebarOtherSortMode = savedSort;
+      }
+    } catch (e) { /* ignore */ }
+
+    function setSidebarOtherSortMode(mode) {
+      if (mode !== 'room' && mode !== 'type' && mode !== 'time') return;
+      sidebarOtherSortMode = mode;
+      try { localStorage.setItem(SIDEBAR_OTHER_SORT_KEY, mode); } catch (e) { /* ignore */ }
+      renderSidebarCalendarDay(selectedCalendarDateStr || formatDateStr(new Date()));
+    }
+
+    function sidebarOtherRoomSortKey(sch) {
+      const norm = normalizeSchedulePatient(sch);
+      const move = parseRoomChangeParts(norm.room_no || '');
+      const digits = move ? move.to : String(norm.room_no || '').replace(/\D/g, '');
+      if (digits) return digits.padStart(4, '0');
+      return 'zzzz';
+    }
+
+    function sidebarOtherTypeSortKey(sch) {
+      return sidebarCalendarTypeRank(sch && sch.type);
+    }
+
+    function sidebarOtherTimeSortKey(sch) {
+      if (!sch) return '99:99';
+      if (isScheduleStartUndecided(sch)) return '99:98';
+      return String(sch.time_str || '99:99');
+    }
+
+    function sortSidebarOtherSchedules(list, mode) {
+      const m = mode || sidebarOtherSortMode || 'time';
+      return [...(list || [])].sort((a, b) => {
+        if (m === 'room') {
+          const cmp = sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
+          if (cmp !== 0) return cmp;
+          return sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
+        }
+        if (m === 'type') {
+          const cmp = sidebarOtherTypeSortKey(a) - sidebarOtherTypeSortKey(b);
+          if (cmp !== 0) return cmp;
+          const roomCmp = sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
+          if (roomCmp !== 0) return roomCmp;
+          return sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
+        }
+        // time (기본)
+        const cmp = sidebarOtherTimeSortKey(a).localeCompare(sidebarOtherTimeSortKey(b));
+        if (cmp !== 0) return cmp;
+        return sidebarOtherRoomSortKey(a).localeCompare(sidebarOtherRoomSortKey(b), 'ko');
+      });
+    }
+
+    function buildSidebarOtherSortBar() {
+      const bar = document.createElement('div');
+      bar.className = 'sidebar-cal-other-sort';
+      const modes = [
+        { key: 'room', label: '병실' },
+        { key: 'type', label: '구분' },
+        { key: 'time', label: '시간' }
+      ];
+      bar.innerHTML =
+        `<span class="sidebar-cal-other-sort-label">정렬</span>` +
+        `<div class="sidebar-cal-other-sort-btns">` +
+        modes.map((m) =>
+          `<button type="button" class="sidebar-cal-other-sort-btn${sidebarOtherSortMode === m.key ? ' active' : ''}" data-sort="${m.key}">${m.label}</button>`
+        ).join('') +
+        `</div>`;
+      bar.querySelectorAll('.sidebar-cal-other-sort-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setSidebarOtherSortMode(btn.getAttribute('data-sort'));
+        });
+      });
+      return bar;
+    }
+
     function formatSidebarCalendarDayLineHtml(sch) {
       const norm = normalizeSchedulePatient(sch);
       const wardBadge = sidebarWardBadgeHtml(norm.ward);
@@ -13660,12 +13762,8 @@
       if (others.length) {
         const otherWrap = document.createElement('div');
         otherWrap.className = 'sidebar-cal-other-list';
-        const sorted = [...others].sort((a, b) => {
-          const ra = sidebarCalendarTypeRank(a.type);
-          const rb = sidebarCalendarTypeRank(b.type);
-          if (ra !== rb) return ra - rb;
-          return String(a.time_str || '').localeCompare(String(b.time_str || ''));
-        });
+        otherWrap.appendChild(buildSidebarOtherSortBar());
+        const sorted = sortSidebarOtherSchedules(others, sidebarOtherSortMode);
         sorted.forEach((sch) => {
           const line = document.createElement('div');
           const t = sch.type || 'GENERAL';
