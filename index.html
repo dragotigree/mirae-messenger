@@ -3972,7 +3972,9 @@
     }
 
     function canModifySchedule(sch) {
-      // 수정·삭제도 작성 권한 로그인(또는 마스터)이 있어야 함
+      // 수정·삭제는 작성 권한 로그인(또는 마스터)이 있어야 함
+      // sch 인자는 호환용(없어도 로그인 여부만 본다)
+      void sch;
       return !!(isMasterAuthenticated || isNoticeOperatorAuthenticated);
     }
 
@@ -12153,6 +12155,10 @@
         openOperatorLoginModal();
         return;
       }
+      if (!sch || !sch.uid) {
+        await appAlert('수정할 일정을 찾을 수 없습니다.');
+        return;
+      }
       const d = sch.time_str ? new Date(sch.time_str) : new Date();
       const dateStr = formatDateStr(d);
       openScheduleBoardForQuickAdd(dateStr, { editUid: sch.uid, focusQuickAdd: true });
@@ -14710,15 +14716,29 @@
     }
 
     async function deleteSchedule(uid) {
-      const sch = findScheduleByUid(uid);
-      if (!canModifySchedule(sch)) {
-        await appAlert('삭제 권한이 없습니다. 본인이 작성한 일정만 삭제할 수 있습니다.');
+      if (!uid) return;
+      if (!canModifySchedule()) {
+        await appAlert('삭제 권한이 없습니다. 작성 권한자로 로그인한 뒤 삭제할 수 있습니다.');
+        openOperatorLoginModal();
         return;
       }
       if (!await appConfirm('해당 일정을 삭제하시겠습니까?')) return;
+      // 화면에서 먼저 제거 (동기화로 되살아나는 경우 tombstone이 막음)
+      const prev = hospitalSchedules;
+      hospitalSchedules = (hospitalSchedules || []).filter((s) => s.uid !== uid);
+      rebuildScheduleIndexes();
+      renderSchedules();
+      const sbModal = document.getElementById('schedule-board-modal');
+      const sbOpen = document.body.classList.contains('schedule-board-standalone') ||
+        (sbModal && sbModal.style.display === 'flex');
+      if (sbOpen) renderScheduleBoard();
       const res = await window.api.deleteSchedule(uid);
-      if (res && res.success === false) {
-        await appAlert(res.msg || '삭제에 실패했습니다.');
+      if (!res || res.success === false) {
+        hospitalSchedules = prev;
+        rebuildScheduleIndexes();
+        renderSchedules();
+        if (sbOpen) renderScheduleBoard();
+        await appAlert((res && res.msg) || '삭제에 실패했습니다.');
         return;
       }
       await refreshSchedulesFromServer();

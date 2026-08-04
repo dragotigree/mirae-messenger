@@ -2036,6 +2036,13 @@ db.serialize(() => {
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN remark TEXT DEFAULT ''`, () => {});
   db.run(`ALTER TABLE hospital_schedules ADD COLUMN guardian_only INTEGER DEFAULT 0`, () => {});
 
+  /** 삭제된 일정 UID — 피어 NOTICE_SYNC 가 INSERT OR IGNORE 로 되살리는 것 방지 */
+  db.run(`CREATE TABLE IF NOT EXISTS deleted_schedules (
+    uid TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL
+  )`, logDbErr);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_schedules_at ON deleted_schedules(deleted_at)`, () => {});
+
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     target_ip TEXT,
@@ -3575,7 +3582,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'NOTICE_UPDATE': handleNoticeUpdate(payload.notice); break;
     case 'NOTICE_DELETE': handleNoticeDelete(payload.uid); break;
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
-    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster); break;
+    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster, payload.deletedScheduleUids); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
     case 'OPERATOR_DELETE': handleOperatorDelete(payload.username); break;
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
@@ -4114,7 +4121,7 @@ function tcpWriteJsonLines(targetIP, payloads) {
   client.on('timeout', () => client.destroy());
 }
 
-function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows) {
+function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows, deletedScheduleUids) {
   const chunks = [];
   const baseMeta = {
     type: 'NOTICE_SYNC_RESPONSE',
@@ -4122,6 +4129,7 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     operators: [],
     schedules: [],
     profileOverrides: [],
+    deletedScheduleUids: [],
     updateSourcePath: updateSourcePath || ''
   };
 
@@ -4134,23 +4142,25 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     return false;
   };
 
-  // 1) 공지+작성자+overrides (보통 작음)
+  // 1) 공지+작성자+overrides+삭제목록 (보통 작음)
   const head = {
     ...baseMeta,
     notices: notices || [],
     operators: operators || [],
-    profileOverrides: profileOverridesRows || []
+    profileOverrides: profileOverridesRows || [],
+    deletedScheduleUids: deletedScheduleUids || []
   };
   if (!tryPush(head)) {
     // 극단적으로 크면 필드별로
     if ((notices || []).length) tryPush({ ...baseMeta, notices });
     if ((operators || []).length) tryPush({ ...baseMeta, operators });
     if ((profileOverridesRows || []).length) tryPush({ ...baseMeta, profileOverrides: profileOverridesRows });
+    if ((deletedScheduleUids || []).length) tryPush({ ...baseMeta, deletedScheduleUids });
   }
 
   // 2) 일정은 청크로
   const list = schedules || [];
-  if (!list.length) return chunks.length ? chunks : [{ ...baseMeta }];
+  if (!list.length) return chunks.length ? chunks : [{ ...baseMeta, deletedScheduleUids: deletedScheduleUids || [] }];
 
   let batch = [];
   const flushBatch = () => {
@@ -4195,17 +4205,25 @@ function handleNoticeSyncRequest(senderIP) {
         db.all(`SELECT * FROM user_profile_overrides`, [], (err4, profileOverridesRows) => {
           db.all(`SELECT * FROM chat_pins`, [], (err5, chatPins) => {
             db.all(`SELECT * FROM duty_roster`, [], (err6, dutyRoster) => {
-              const chunks = buildNoticeSyncPayloadChunks(
-                notices || [],
-                operators || [],
-                schedules || [],
-                profileOverridesRows || []
+              db.all(
+                `SELECT uid FROM deleted_schedules ORDER BY deleted_at DESC LIMIT 5000`,
+                [],
+                (err7, deletedRows) => {
+                  const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
+                  const chunks = buildNoticeSyncPayloadChunks(
+                    notices || [],
+                    operators || [],
+                    schedules || [],
+                    profileOverridesRows || [],
+                    deletedScheduleUids
+                  );
+                  if (chunks.length) {
+                    chunks[0].chatPins = chatPins || [];
+                    chunks[0].dutyRoster = dutyRoster || [];
+                  }
+                  tcpWriteJsonLines(senderIP, chunks);
+                }
               );
-              if (chunks.length) {
-                chunks[0].chatPins = chatPins || [];
-                chunks[0].dutyRoster = dutyRoster || [];
-              }
-              tcpWriteJsonLines(senderIP, chunks);
             });
           });
         });
@@ -4214,7 +4232,7 @@ function handleNoticeSyncRequest(senderIP) {
   });
 }
 
-function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster) {
+function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster, deletedScheduleUids) {
   if (Array.isArray(notices)) {
     notices.forEach(n => {
       if (!n || !n.uid) return;
@@ -4233,19 +4251,17 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     });
     if (mainWindow) safeWebContentsSend('notice-operators-update');
   }
-  if (Array.isArray(schedules)) {
-    schedules.forEach(s => {
-      const meta = schedulePatientMetaFromPayload(s);
-      const und = scheduleTimeUndecidedFromPayload(s);
-      const meal = scheduleMealCancelFromPayload(s);
-      const remark = scheduleRemarkFromPayload(s);
-      const guardianOnly = scheduleGuardianOnlyFromPayload(s);
-      db.run(
-        `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly],
-        logDbErr
-      );
+  // 삭제 목록을 일정 INSERT보다 먼저 적용해야 되살림을 막을 수 있음
+  if (Array.isArray(deletedScheduleUids) && deletedScheduleUids.length) {
+    deletedScheduleUids.forEach((uid) => {
+      if (!uid) return;
+      applyLocalScheduleDelete(uid, { notify: false });
     });
+  }
+  if (Array.isArray(schedules)) {
+    schedules.forEach((s) => upsertScheduleFromSync(s));
+    if (mainWindow) notifySchedulesChanged();
+  } else if (Array.isArray(deletedScheduleUids) && deletedScheduleUids.length) {
     if (mainWindow) notifySchedulesChanged();
   }
   if (Array.isArray(remoteProfileOverrides)) {
@@ -4478,42 +4494,133 @@ function scheduleRemarkFromPayload(p) {
   return String(o.remark || o.memo || '').trim();
 }
 
-function handleScheduleAdd(s) {
-  if (!s || !s.uid) return;
-  const meta = schedulePatientMetaFromPayload(s);
-  const und = scheduleTimeUndecidedFromPayload(s);
-  const meal = scheduleMealCancelFromPayload(s);
-  const remark = scheduleRemarkFromPayload(s);
-  const guardianOnly = scheduleGuardianOnlyFromPayload(s);
+/** 삭제 tombstone 보관 기간 (다른 PC가 오래된 삭제를 영원히 들고 있지 않도록) */
+const SCHEDULE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
+
+function pruneScheduleTombstones(done) {
+  const cutoff = new Date(Date.now() - SCHEDULE_TOMBSTONE_KEEP_MS).toISOString();
+  db.run(`DELETE FROM deleted_schedules WHERE deleted_at < ?`, [cutoff], () => {
+    if (typeof done === 'function') done();
+  });
+}
+
+function recordScheduleTombstone(uid, done) {
+  if (!uid) {
+    if (typeof done === 'function') done();
+    return;
+  }
+  const at = new Date().toISOString();
   db.run(
-    `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly],
-    () => { notifySchedulesChanged(); }
+    `INSERT OR REPLACE INTO deleted_schedules (uid, deleted_at) VALUES (?, ?)`,
+    [String(uid), at],
+    () => pruneScheduleTombstones(done)
   );
 }
 
-function handleScheduleDelete(uid) {
-  if (!uid) return;
-  db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [uid], () => {
-    notifySchedulesChanged();
+function isScheduleTombstoned(uid, cb) {
+  if (!uid) {
+    cb(false);
+    return;
+  }
+  db.get(`SELECT 1 AS x FROM deleted_schedules WHERE uid = ?`, [String(uid)], (err, row) => {
+    cb(!err && !!row);
   });
+}
+
+function applyLocalScheduleDelete(uid, opts) {
+  const o = opts || {};
+  if (!uid) {
+    if (typeof o.done === 'function') o.done(new Error('uid missing'));
+    return;
+  }
+  recordScheduleTombstone(uid, () => {
+    db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [String(uid)], (err) => {
+      if (!err && o.notify !== false) notifySchedulesChanged();
+      if (typeof o.done === 'function') o.done(err || null);
+    });
+  });
+}
+
+function insertScheduleRowIgnoringTombstone(s, notify) {
+  if (!s || !s.uid) return;
+  isScheduleTombstoned(s.uid, (tombstoned) => {
+    if (tombstoned) return;
+    const meta = schedulePatientMetaFromPayload(s);
+    const und = scheduleTimeUndecidedFromPayload(s);
+    const meal = scheduleMealCancelFromPayload(s);
+    const remark = scheduleRemarkFromPayload(s);
+    const guardianOnly = scheduleGuardianOnlyFromPayload(s);
+    db.run(
+      `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly],
+      () => { if (notify) notifySchedulesChanged(); }
+    );
+  });
+}
+
+function upsertScheduleFromSync(s) {
+  if (!s || !s.uid) return;
+  isScheduleTombstoned(s.uid, (tombstoned) => {
+    if (tombstoned) return;
+    const meta = schedulePatientMetaFromPayload(s);
+    const und = scheduleTimeUndecidedFromPayload(s);
+    const meal = scheduleMealCancelFromPayload(s);
+    const remark = scheduleRemarkFromPayload(s);
+    const guardianOnly = scheduleGuardianOnlyFromPayload(s);
+    const modAt = s.modified_at || '';
+    const modName = s.modified_by_name || '';
+    const modIp = s.modified_by_ip || '';
+    db.get(`SELECT modified_at FROM hospital_schedules WHERE uid = ?`, [s.uid], (err, row) => {
+      if (err) return;
+      if (!row) {
+        db.run(
+          `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only, modified_at, modified_by_name, modified_by_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp],
+          logDbErr
+        );
+        return;
+      }
+      const localMod = String(row.modified_at || '');
+      const remoteMod = String(modAt || '');
+      // 원격에 수정 시각이 있고 로컬보다 같거나 더 최신이면 반영 (수정 동기화)
+      if (remoteMod && (!localMod || remoteMod >= localMod)) {
+        db.run(
+          `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+          [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
+          logDbErr
+        );
+      }
+    });
+  });
+}
+
+function handleScheduleAdd(s) {
+  if (!s || !s.uid) return;
+  insertScheduleRowIgnoringTombstone(s, true);
+}
+
+function handleScheduleDelete(uid) {
+  applyLocalScheduleDelete(uid, { notify: true });
 }
 
 function handleScheduleEdit(s) {
   if (!s || !s.uid) return;
-  const meta = schedulePatientMetaFromPayload(s);
-  const und = scheduleTimeUndecidedFromPayload(s);
-  const meal = scheduleMealCancelFromPayload(s);
-  const remark = scheduleRemarkFromPayload(s);
-  const guardianOnly = scheduleGuardianOnlyFromPayload(s);
-  const modAt = s.modified_at || '';
-  const modName = s.modified_by_name || '';
-  const modIp = s.modified_by_ip || '';
-  db.run(
-    `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
-    [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
-    () => { notifySchedulesChanged(); }
-  );
+  isScheduleTombstoned(s.uid, (tombstoned) => {
+    if (tombstoned) return;
+    const meta = schedulePatientMetaFromPayload(s);
+    const und = scheduleTimeUndecidedFromPayload(s);
+    const meal = scheduleMealCancelFromPayload(s);
+    const remark = scheduleRemarkFromPayload(s);
+    const guardianOnly = scheduleGuardianOnlyFromPayload(s);
+    const modAt = s.modified_at || '';
+    const modName = s.modified_by_name || '';
+    const modIp = s.modified_by_ip || '';
+    db.run(
+      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+      [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
+      () => { notifySchedulesChanged(); }
+    );
+  });
 }
 
 function handleGroupSync(g) {
@@ -6417,13 +6524,16 @@ ipcMain.handle('delete-schedule', async (event, uid) => {
   if (!allowed) {
     return { success: false, msg: '작성 권한자로 로그인한 뒤 일정을 삭제할 수 있습니다.' };
   }
+  if (!uid) return { success: false, msg: '일정 ID가 없습니다.' };
   return new Promise((resolve) => {
-    db.run(`DELETE FROM hospital_schedules WHERE uid = ?`, [uid], (err) => {
-      if (!err) {
-        broadcastToOnlinePeers({ type: 'SCHEDULE_DELETE', uid });
-        notifySchedulesChanged();
+    applyLocalScheduleDelete(uid, {
+      notify: true,
+      done: (err) => {
+        if (!err) {
+          broadcastToOnlinePeers({ type: 'SCHEDULE_DELETE', uid: String(uid) });
+        }
+        resolve(err ? { success: false, msg: err.message || '삭제 실패' } : { success: true });
       }
-      resolve({ success: !err });
     });
   });
 });
