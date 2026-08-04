@@ -1248,7 +1248,7 @@
     }
     .sidebar-cal-day-duty:empty { display: none; }
     .sidebar-cal-day-body {
-      flex: 1; min-height: 80px; overflow: visible;
+      flex: 1; min-height: 80px; max-height: min(52vh, 480px); overflow-y: auto;
       padding: 8px; scrollbar-width: thin;
       display: flex; flex-direction: column; gap: 10px;
     }
