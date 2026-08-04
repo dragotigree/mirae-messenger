@@ -307,11 +307,12 @@
       width: 28px; height: 22px; border: none; border-radius: 7px;
       background: transparent; color: rgba(255, 255, 255, 0.78);
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-size: 11px; font-weight: 700;
+      cursor: pointer; font-size: 0; font-weight: 700;
       transition: background var(--transition-fast), color var(--transition-fast);
     }
     .titlebar-panel-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
     .titlebar-panel-btn.is-collapsed { color: #7dd3fc; background: rgba(14, 165, 233, 0.18); }
+    .titlebar-panel-btn .icon-glyph { width: 13px; height: 13px; }
 
     .app-brand { padding: 16px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .brand-logo-img { height: 30px; width: auto; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
@@ -2805,8 +2806,8 @@
         <span class="titlebar-app-label-compact">MIRAE MESSENGER</span>
       </div>
       <div id="titlebar-panel-toggles" aria-label="패널 표시">
-        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-left" onclick="toggleSidebarLeft()" title="좌측 목록 패널 열기/닫기">☰</button>
-        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-right" onclick="toggleSidebarRight()" title="우측 달력 패널 열기/닫기">📅</button>
+        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-left" onclick="toggleSidebarLeft()" title="좌측 목록 패널 열기/닫기" data-ui-icon="panelCollapseLeft"></button>
+        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-right" onclick="toggleSidebarRight()" title="우측 달력 패널 열기/닫기" data-ui-icon="panelCollapseRight"></button>
       </div>
       <div id="titlebar-controls">
         <button class="titlebar-btn" id="titlebar-min-btn" onclick="window.api.windowMinimize()" title="최소화">
@@ -3019,10 +3020,10 @@
         </div>
         <div class="chat-header-actions">
           <button type="button" class="chat-header-tool-btn chat-header-tool-btn--sidebar" id="chat-toggle-left-btn" onclick="toggleSidebarLeft()" title="좌측 목록 패널">
-            <span class="chat-header-tool-label">☰</span>
+            <span class="chat-header-tool-icon" data-ui-icon="panelCollapseLeft" aria-hidden="true"></span>
           </button>
           <button type="button" class="chat-header-tool-btn chat-header-tool-btn--sidebar" id="chat-toggle-right-btn" onclick="toggleSidebarRight()" title="우측 달력 패널">
-            <span class="chat-header-tool-label">📅</span>
+            <span class="chat-header-tool-icon" data-ui-icon="panelCollapseRight" aria-hidden="true"></span>
           </button>
           <button type="button" class="chat-header-tool-btn chat-header-tool-btn--archive" id="chat-shared-archive-btn" onclick="toggleChatSharedDrawer()" title="사진·파일·링크 모아보기">
             <span class="chat-header-tool-icon" aria-hidden="true"></span>
