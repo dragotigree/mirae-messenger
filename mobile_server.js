@@ -39,7 +39,7 @@ function getMobilePageHtml(hostIp) {
   <div class="status" id="status">불러오는 중...</div>
   <script>
     const notifiedNoticeIds = new Set();
-    const TYPE_LABEL = { ADMISSION: '입원', DISCHARGE: '퇴원', OUTPATIENT: '외진', OUTING: '외출', OVERNIGHT: '외박', TRANSFER: '전원', EXAM: '검사', LEAVE: '연차', GENERAL: '업무' };
+    const TYPE_LABEL = { ADMISSION: '입원', DISCHARGE: '퇴원', OUTPATIENT: '외진', OUTING: '외출', OVERNIGHT: '외박', ROOM_CHANGE: '전실', TRANSFER: '전원', EXAM: '검사', LEAVE: '연차', GENERAL: '업무' };
 
     function updatePermUi() {
       const box = document.getElementById('perm-box');

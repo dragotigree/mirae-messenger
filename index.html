@@ -86,7 +86,7 @@
     h1, h2, h3, h4 { font-weight: var(--font-weight-semibold); }
     .btn-send, .unread-badge, .urgent-badge, .btn-urgent.active, .net-status-ok, .net-status-bad,
     .read-status, .badge-admission, .badge-discharge, .badge-outpatient, .badge-outing, .badge-overnight,
-    .badge-transfer, .badge-general, .badge-leave, .badge-exam, .msg-sender-name, .msg-avatar, .detail-heading,
+    .badge-transfer, .badge-room-change, .badge-general, .badge-leave, .badge-exam, .msg-sender-name, .msg-avatar, .detail-heading,
     .detail-avatar, .group-member-avatar, .mini-cal-header, .mini-cal-day.today, .mini-cal-day.selected,
     .header-user-name {
       font-weight: var(--font-weight-bold);
@@ -1315,7 +1315,7 @@
     .sidebar-ward-badge.w-other { background: #94a3b8; }
     .sidebar-cal-day-empty { text-align: center; padding: 16px 12px; color: #94a3b8; font-size: 12px; line-height: 1.5; }
 
-    /* 입원 / 퇴원: 세로 스택(전체 폭) — 가로 2단은 이름이 심하게 잘림 */
+    /* 입원 / 퇴원 / 전실: 세로 스택(전체 폭) — 가로 2단은 이름이 심하게 잘림 */
     .sidebar-admit-discharge-row {
       display: flex;
       flex-direction: column;
@@ -1334,6 +1334,7 @@
     }
     .sidebar-ad-card.is-admit { border-color: #bfdbfe; }
     .sidebar-ad-card.is-discharge { border-color: #fecaca; }
+    .sidebar-ad-card.is-room-change { border-color: #a5f3fc; }
     .sidebar-ad-card-head {
       display: flex; align-items: center; justify-content: space-between; gap: 6px;
       padding: 6px 8px; font-size: 11.5px; font-weight: 800; letter-spacing: -0.02em;
@@ -1341,6 +1342,7 @@
     }
     .sidebar-ad-card.is-admit .sidebar-ad-card-head { color: #1d4ed8; background: #eff6ff; }
     .sidebar-ad-card.is-discharge .sidebar-ad-card-head { color: #b91c1c; background: #fef2f2; }
+    .sidebar-ad-card.is-room-change .sidebar-ad-card-head { color: #0e7490; background: #ecfeff; }
     .sidebar-ad-card-count { font-variant-numeric: tabular-nums; opacity: 0.9; }
     .sidebar-ad-col-head {
       display: grid;
@@ -1353,6 +1355,11 @@
     }
     .sidebar-ad-card.is-admit .sidebar-ad-col-head { color: #64748b; background: #f8fbff; }
     .sidebar-ad-card.is-discharge .sidebar-ad-col-head { color: #64748b; background: #fffafa; }
+    .sidebar-ad-card.is-room-change .sidebar-ad-col-head,
+    .sidebar-ad-card.is-room-change .sidebar-ad-row {
+      grid-template-columns: 78px minmax(0, 1fr) 28px 34px;
+    }
+    .sidebar-ad-card.is-room-change .sidebar-ad-col-head { color: #64748b; background: #f0fdfa; }
     .sidebar-ad-rows { display: flex; flex-direction: column; min-width: 0; }
     .sidebar-ad-row {
       display: grid;
@@ -1368,6 +1375,7 @@
     .sidebar-ad-row:last-child { border-bottom: none; }
     .sidebar-ad-card.is-admit .sidebar-ad-row { color: #1e3a8a; }
     .sidebar-ad-card.is-discharge .sidebar-ad-row { color: #7f1d1d; }
+    .sidebar-ad-card.is-room-change .sidebar-ad-row { color: #155e75; }
     .sidebar-ad-row > span {
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
     }
@@ -1431,10 +1439,12 @@
     .mini-cal-day .dot { width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
     .mini-cal-day .dot.is-admit { background: #22c55e; }
     .mini-cal-day .dot.is-discharge { background: #ef4444; }
+    .mini-cal-day .dot.is-room-change { background: #06b6d4; }
     .mini-cal-day .dot.is-flow { background: #f97316; }
     .mini-cal-day.selected .dot { background: rgba(255, 255, 255, 0.85); }
     .mini-cal-day.selected .dot.is-admit { background: #bbf7d0; }
     .mini-cal-day.selected .dot.is-discharge { background: #fecaca; }
+    .mini-cal-day.selected .dot.is-room-change { background: #a5f3fc; }
     .mini-cal-day.selected .dot.is-flow { background: #fed7aa; }
     .sidebar-cal-day-line .badge-admission,
     .sidebar-cal-day-line .badge-discharge,
@@ -1442,6 +1452,7 @@
     .sidebar-cal-day-line .badge-outing,
     .sidebar-cal-day-line .badge-overnight,
     .sidebar-cal-day-line .badge-transfer,
+    .sidebar-cal-day-line .badge-room-change,
     .sidebar-cal-day-line .badge-exam,
     .sidebar-cal-day-line .badge-general,
     .sidebar-cal-day-line .badge-leave {
@@ -1450,9 +1461,11 @@
     .sidebar-cal-day-line.is-admission { background: #f0fdf4; }
     .sidebar-cal-day-line.is-discharge { background: #fef2f2; }
     .sidebar-cal-day-line.is-transfer { background: #eff6ff; }
+    .sidebar-cal-day-line.is-room-change { background: #ecfeff; }
     .sidebar-cal-day-line.is-admission:hover { background: #dcfce7; }
     .sidebar-cal-day-line.is-discharge:hover { background: #fee2e2; }
     .sidebar-cal-day-line.is-transfer:hover { background: #dbeafe; }
+    .sidebar-cal-day-line.is-room-change:hover { background: #cffafe; }
     .schedule-item { background: #ffffff; padding: 8px 10px; border-radius: 12px; font-size: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 
     .badge-admission { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
@@ -1461,6 +1474,7 @@
     .badge-outing { background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
     .badge-overnight { background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
     .badge-transfer { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+    .badge-room-change { background: #cffafe; color: #0e7490; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
     .badge-general { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
     .badge-leave { background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
     .badge-exam { background: #ccfbf1; color: #0f766e; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
@@ -1500,7 +1514,7 @@
       display: flex; flex: 1; min-height: 0; overflow: hidden;
     }
     .sb-board-side {
-      width: 320px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
+      width: 360px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
       padding: 10px 10px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
       display: flex; flex-direction: column; gap: 10px;
     }
@@ -1511,10 +1525,10 @@
     .sb-board-side-hint {
       font-size: 10px; color: #64748b; line-height: 1.4; padding: 0 1px;
     }
-    .sb-board-side .schedule-board-view-tabs { width: 100%; justify-content: stretch; gap: 4px; }
+    .sb-board-side .schedule-board-view-tabs { width: 100%; justify-content: stretch; gap: 3px; }
     .sb-board-side .schedule-board-view-tab {
-      flex: 1; text-align: center; padding: 7px 6px; font-size: 11px;
-      white-space: nowrap; letter-spacing: -0.03em;
+      flex: 1; text-align: center; padding: 7px 4px; font-size: 10.5px;
+      white-space: nowrap; letter-spacing: -0.04em; min-width: 0;
     }
     .sb-board-side .sb-date-field { width: 100%; }
     .sb-board-side .schedule-board-date { width: 100%; min-width: 0; font-size: 12px; padding: 6px 8px; }
@@ -1891,6 +1905,7 @@
     .schedule-board-row .sb-type-cell .badge-outing,
     .schedule-board-row .sb-type-cell .badge-overnight,
     .schedule-board-row .sb-type-cell .badge-transfer,
+    .schedule-board-row .sb-type-cell .badge-room-change,
     .schedule-board-row .sb-type-cell .badge-exam,
     .schedule-board-row .sb-type-cell .badge-leave,
     .schedule-board-row .sb-type-cell .badge-general,
@@ -1900,6 +1915,7 @@
     .schedule-board-table .sb-type-cell .badge-outing,
     .schedule-board-table .sb-type-cell .badge-overnight,
     .schedule-board-table .sb-type-cell .badge-transfer,
+    .schedule-board-table .sb-type-cell .badge-room-change,
     .schedule-board-table .sb-type-cell .badge-exam,
     .schedule-board-table .sb-type-cell .badge-leave,
     .schedule-board-table .sb-type-cell .badge-general {
@@ -2115,7 +2131,7 @@
     .schedule-board-top-summary .sb-summary-meta { font-size: 13px; }
     .schedule-board-add-btn { font-size: 12.5px; }
     .schedule-board-view-tab { font-size: 13px; }
-    .sb-board-side .schedule-board-view-tab { font-size: 12px; white-space: nowrap; }
+    .sb-board-side .schedule-board-view-tab { font-size: 11px; white-space: nowrap; letter-spacing: -0.04em; }
     .sb-filter-panel .sb-filter-label { font-size: 12px; }
     .schedule-board-chip { font-size: 12.5px; }
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 11.5px; }
@@ -2146,6 +2162,7 @@
     .schedule-board-table .sb-type-cell .badge-outing,
     .schedule-board-table .sb-type-cell .badge-overnight,
     .schedule-board-table .sb-type-cell .badge-transfer,
+    .schedule-board-table .sb-type-cell .badge-room-change,
     .schedule-board-table .sb-type-cell .badge-exam,
     .schedule-board-table .sb-type-cell .badge-leave,
     .schedule-board-table .sb-type-cell .badge-general,
@@ -2155,6 +2172,7 @@
     .schedule-board-row .sb-type-cell .badge-outing,
     .schedule-board-row .sb-type-cell .badge-overnight,
     .schedule-board-row .sb-type-cell .badge-transfer,
+    .schedule-board-row .sb-type-cell .badge-room-change,
     .schedule-board-row .sb-type-cell .badge-exam,
     .schedule-board-row .sb-type-cell .badge-leave,
     .schedule-board-row .sb-type-cell .badge-general {
@@ -3423,7 +3441,7 @@
           <div class="schedule-board-view-tabs">
             <button type="button" class="schedule-board-view-tab active" data-sb-view="main" onclick="setScheduleBoardView('main')">메인</button>
             <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')">병동/주치의별</button>
-            <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')">입/퇴원</button>
+            <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')">입/퇴원/전실</button>
           </div>
           <div class="sb-filter-panel">
             <div class="sb-filter-block sb-filter-block--row" id="schedule-board-search-filter-row">
@@ -3495,8 +3513,12 @@
                 <option value="9">9병동</option>
               </select>
             </div>
+            <div class="sb-quick-field sb-quick-field--room" id="sb-quick-room-from-wrap" style="display:none;">
+              <label for="sb-quick-room-from">기존 호실</label>
+              <input type="text" id="sb-quick-room-from" placeholder="705" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onScheduleBoardQuickRoomFromInput()">
+            </div>
             <div class="sb-quick-field sb-quick-field--room">
-              <label for="sb-quick-room">호실</label>
+              <label for="sb-quick-room" id="sb-quick-room-label">호실</label>
               <input type="text" id="sb-quick-room" placeholder="503" inputmode="numeric" pattern="[0-9]*" autocomplete="off" oninput="onScheduleBoardQuickRoomInput()">
             </div>
             <div class="sb-quick-field sb-quick-field--patient">
@@ -4640,12 +4662,13 @@
       { key: 'OVERNIGHT', label: '외박', icon: '🟣', chipClass: 'type-overnight' },
       { key: 'ADMISSION', label: '입원', icon: '🟢', chipClass: 'type-admission' },
       { key: 'DISCHARGE', label: '퇴원', icon: '🔴', chipClass: 'type-discharge' },
+      { key: 'ROOM_CHANGE', label: '전실', icon: '🔷', chipClass: 'type-room-change' },
       { key: 'TRANSFER', label: '전원', icon: '🔵', chipClass: 'type-transfer' },
       { key: 'EXAM', label: '검사', icon: '🩺', chipClass: 'type-exam' },
       { key: 'GENERAL', label: '병원 업무', icon: '🏥', chipClass: 'type-general' },
       { key: 'LEAVE', label: '연차', icon: '🟣', chipClass: 'type-leave' },
     ];
-    const SCHEDULE_PATIENT_TYPES = new Set(['ADMISSION', 'DISCHARGE', 'OUTPATIENT', 'TRANSFER', 'OUTING', 'OVERNIGHT', 'EXAM']);
+    const SCHEDULE_PATIENT_TYPES = new Set(['ADMISSION', 'DISCHARGE', 'OUTPATIENT', 'TRANSFER', 'ROOM_CHANGE', 'OUTING', 'OVERNIGHT', 'EXAM']);
     const SCHEDULE_RANGE_TYPES = new Set(['OUTPATIENT', 'OUTING', 'OVERNIGHT']);
     const SCHEDULE_BOARD_WARDS = ['4', '5', '7', '8', '9'];
     const SCHEDULE_BOARD_WARD_LABELS = { '4': '4병동', '5': '5병동', '7': '7병동', '8': '8병동', '9': '9병동' };
@@ -4660,8 +4683,8 @@
     const SCHEDULE_BOARD_RM_ROW_BG = { '4': 'rm4', '6': 'rm6', '7': 'rm7', '8': 'rm8', '9': 'rm9' };
     /** 메인·병동/주치의별 빠른등록·구분 칩 */
     const SCHEDULE_BOARD_FLOW_TYPES = ['OUTPATIENT', 'OUTING', 'OVERNIGHT'];
-    /** 입/퇴원 탭 빠른등록·구분 칩 */
-    const SCHEDULE_BOARD_ADMIT_TYPES = ['ADMISSION', 'DISCHARGE', 'TRANSFER'];
+    /** 입/퇴원/전실 탭 빠른등록·구분 칩 */
+    const SCHEDULE_BOARD_ADMIT_TYPES = ['ADMISSION', 'DISCHARGE', 'ROOM_CHANGE', 'TRANSFER'];
     const SCHEDULE_BOARD_TYPE_CHIP_KEYS = SCHEDULE_BOARD_FLOW_TYPES.concat(SCHEDULE_BOARD_ADMIT_TYPES);
     let scheduleBoardDateStr = '';
     let scheduleBoardEditingUid = null;
@@ -12597,10 +12620,28 @@
 
 
     function inferWardFromRoomDigits(digits) {
-      const d = String(digits || '').replace(/\D/g, '');
+      const raw = String(digits || '');
+      // 전실(705→706)은 이동 후 호실 기준으로 병동 추정
+      const move = parseRoomChangeParts(raw);
+      const d = String(move ? move.to : raw).replace(/\D/g, '');
       if (!d) return '';
       const first = d.charAt(0);
       return SCHEDULE_BOARD_WARDS.includes(first) ? first : '';
+    }
+
+    function parseRoomChangeParts(roomNo) {
+      const raw = String(roomNo || '').trim();
+      if (!raw) return null;
+      const m = raw.match(/(\d{2,4})\s*(?:호)?\s*(?:→|->|⇒|➜|>)\s*(\d{2,4})\s*(?:호)?/);
+      if (!m) return null;
+      return { from: m[1], to: m[2] };
+    }
+
+    function normalizeRoomChangeNo(fromRoom, toRoom) {
+      const from = String(fromRoom || '').replace(/\D/g, '');
+      const to = String(toRoom || '').replace(/\D/g, '');
+      if (!from || !to) return '';
+      return `${from}→${to}`;
     }
 
     const _scheduleNormCache = new WeakMap();
@@ -12615,20 +12656,33 @@
       let patient_name = String(sch?.patient_name || '').trim();
       const title = String(sch?.title || '').trim();
       if (!room_no && title) {
-        const m = title.match(/(\d{3,4})\s*호?/);
-        if (m) room_no = m[1] + '호';
+        const moveInTitle = parseRoomChangeParts(title);
+        if (moveInTitle) {
+          room_no = normalizeRoomChangeNo(moveInTitle.from, moveInTitle.to);
+        } else {
+          const m = title.match(/(\d{3,4})\s*호?/);
+          if (m) room_no = m[1] + '호';
+        }
       }
       if (!patient_name && title) {
         let stripped = title;
         if (room_no) {
-          const roomDigits = room_no.replace(/\D/g, '');
-          if (roomDigits) {
-            stripped = stripped.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '').trim();
+          const move = parseRoomChangeParts(room_no);
+          if (move) {
+            stripped = stripped.replace(
+              new RegExp('^\\s*' + move.from + '\\s*(?:호)?\\s*(?:→|->|⇒|➜|>)\\s*' + move.to + '\\s*(?:호)?\\s*', 'i'),
+              ''
+            ).trim();
           } else {
-            const roomCore = room_no.replace(/호\s*$/u, '').trim();
-            const esc = roomCore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            if (esc) {
-              stripped = stripped.replace(new RegExp('^\\s*' + esc + '\\s*호?\\s*', 'i'), '').trim();
+            const roomDigits = room_no.replace(/\D/g, '');
+            if (roomDigits) {
+              stripped = stripped.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '').trim();
+            } else {
+              const roomCore = room_no.replace(/호\s*$/u, '').trim();
+              const esc = roomCore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              if (esc) {
+                stripped = stripped.replace(new RegExp('^\\s*' + esc + '\\s*호?\\s*', 'i'), '').trim();
+              }
             }
           }
         } else {
@@ -12642,7 +12696,7 @@
         const rmM = (title + ' ' + (sch?.title || '')).match(/RM\s*(\d+)/i);
         if (rmM) rm_team = 'RM' + rmM[1];
       }
-      if (!ward) ward = inferWardFromRoomDigits(room_no.replace(/\D/g, ''));
+      if (!ward) ward = inferWardFromRoomDigits(room_no);
       if (rm_team && !/^RM/i.test(rm_team)) rm_team = 'RM' + rm_team.replace(/\D/g, '');
       if (rm_team) rm_team = rm_team.toUpperCase().replace(/^RM(\d)$/, 'RM$1').replace(/^RM(\d+)$/, (_, n) => 'RM' + n);
       const out = { ward, rm_team, room_no, patient_name };
@@ -12696,9 +12750,17 @@
       const room = String(norm?.room_no || '').trim();
       const patient = String(norm?.patient_name || '').trim();
       if (room) {
-        const roomDigits = room.replace(/호?$/, '').replace(/\s/g, '');
-        if (roomDigits) {
-          rest = rest.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '');
+        const move = parseRoomChangeParts(room);
+        if (move) {
+          rest = rest.replace(
+            new RegExp('^\\s*' + move.from + '\\s*(?:호)?\\s*(?:→|->|⇒|➜|>)\\s*' + move.to + '\\s*(?:호)?\\s*', 'i'),
+            ''
+          );
+        } else {
+          const roomDigits = room.replace(/호?$/, '').replace(/\s/g, '');
+          if (roomDigits) {
+            rest = rest.replace(new RegExp('^\\s*' + roomDigits.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*호?\\s*', 'i'), '');
+          }
         }
       }
       if (patient) {
@@ -12753,6 +12815,7 @@
         EXAM: '<span class="badge-exam">검사</span>',
         OUTING: '<span class="badge-outing">외출</span>',
         OVERNIGHT: '<span class="badge-overnight">외박</span>',
+        ROOM_CHANGE: '<span class="badge-room-change">전실</span>',
         TRANSFER: '<span class="badge-transfer">전원</span>',
         LEAVE: '<span class="badge-leave">연차</span>',
       };
@@ -13088,6 +13151,8 @@
     function scheduleBoardRoomLabel(roomNo) {
       const raw = String(roomNo || '').trim();
       if (!raw) return '';
+      const move = parseRoomChangeParts(raw);
+      if (move) return `${move.from}→${move.to}`;
       const digits = raw.replace(/\D/g, '');
       if (digits) return digits;
       return raw.replace(/호/g, '').trim();
@@ -13381,7 +13446,8 @@
       const t = type || 'GENERAL';
       if (t === 'ADMISSION') return 0;
       if (t === 'DISCHARGE') return 1;
-      if (t === 'TRANSFER') return 2;
+      if (t === 'ROOM_CHANGE') return 2;
+      if (t === 'TRANSFER') return 3;
       const idx = SCHEDULE_TYPE_ORDER.findIndex((m) => m.key === t);
       return idx >= 0 ? 10 + idx : 99;
     }
@@ -13395,6 +13461,8 @@
     }
 
     function formatSidebarAdmitDischargeRoom(sch, norm) {
+      const move = parseRoomChangeParts(norm?.room_no || sch?.room_no || '');
+      if (move) return `${move.from}→${move.to}`;
       const digits = String(norm?.room_no || '').replace(/\D/g, '');
       if (digits) return digits;
       const label = scheduleBoardRoomLabel(norm?.room_no);
@@ -13421,25 +13489,30 @@
     }
 
     function buildSidebarAdmitDischargeCard(kind, items) {
-      const isAdmit = kind === 'ADMISSION';
-      const title = isAdmit ? '입원 환자' : '퇴원 환자';
+      const meta = {
+        ADMISSION: { title: '입원 환자', empty: '입원 없음', cls: 'is-admit' },
+        DISCHARGE: { title: '퇴원 환자', empty: '퇴원 없음', cls: 'is-discharge' },
+        ROOM_CHANGE: { title: '전실 환자', empty: '전실 없음', cls: 'is-room-change' }
+      }[kind] || { title: kind, empty: '없음', cls: '' };
       const countLabel = `${items.length}명`;
       const card = document.createElement('div');
-      card.className = `sidebar-ad-card ${isAdmit ? 'is-admit' : 'is-discharge'}`;
+      card.className = `sidebar-ad-card ${meta.cls}`.trim();
       const head = document.createElement('div');
       head.className = 'sidebar-ad-card-head';
-      head.innerHTML = `<span>${title}</span><span class="sidebar-ad-card-count">${escapeHtml(countLabel)}</span>`;
+      head.innerHTML = `<span>${meta.title}</span><span class="sidebar-ad-card-count">${escapeHtml(countLabel)}</span>`;
       card.appendChild(head);
       const colHead = document.createElement('div');
       colHead.className = 'sidebar-ad-col-head';
-      colHead.innerHTML = '<span>호실</span><span>이름</span><span>RM</span><span>시간</span>';
+      colHead.innerHTML = kind === 'ROOM_CHANGE'
+        ? '<span>호실이동</span><span>이름</span><span>RM</span><span>시간</span>'
+        : '<span>호실</span><span>이름</span><span>RM</span><span>시간</span>';
       card.appendChild(colHead);
       const rows = document.createElement('div');
       rows.className = 'sidebar-ad-rows';
       if (!items.length) {
         const empty = document.createElement('div');
         empty.className = 'sidebar-ad-empty';
-        empty.textContent = isAdmit ? '입원 없음' : '퇴원 없음';
+        empty.textContent = meta.empty;
         rows.appendChild(empty);
       } else {
         const sorted = [...items].sort((a, b) => String(a.time_str || '').localeCompare(String(b.time_str || '')));
@@ -13497,9 +13570,10 @@
 
       const admits = list.filter((s) => (s.type || '') === 'ADMISSION');
       const discharges = list.filter((s) => (s.type || '') === 'DISCHARGE');
+      const roomChanges = list.filter((s) => (s.type || '') === 'ROOM_CHANGE');
       const others = list.filter((s) => {
         const t = s.type || 'GENERAL';
-        return t !== 'ADMISSION' && t !== 'DISCHARGE';
+        return t !== 'ADMISSION' && t !== 'DISCHARGE' && t !== 'ROOM_CHANGE';
       });
 
       if (list.length === 0) {
@@ -13515,11 +13589,12 @@
         return;
       }
 
-      // 입원·퇴원: 세로로 쌓아 전체 폭 사용 (가로 2단은 이름·헤더가 잘림)
+      // 입원·퇴원·전실: 세로로 쌓아 전체 폭 사용
       const adRow = document.createElement('div');
       adRow.className = 'sidebar-admit-discharge-row';
       adRow.appendChild(buildSidebarAdmitDischargeCard('ADMISSION', admits));
       adRow.appendChild(buildSidebarAdmitDischargeCard('DISCHARGE', discharges));
+      adRow.appendChild(buildSidebarAdmitDischargeCard('ROOM_CHANGE', roomChanges));
       bodyEl.appendChild(adRow);
 
       if (others.length) {
@@ -13535,7 +13610,8 @@
           const line = document.createElement('div');
           const t = sch.type || 'GENERAL';
           line.className = 'sidebar-cal-day-line'
-            + (t === 'TRANSFER' ? ' is-transfer' : '');
+            + (t === 'TRANSFER' ? ' is-transfer' : '')
+            + (t === 'ROOM_CHANGE' ? ' is-room-change' : '');
           line.innerHTML = formatSidebarCalendarDayLineHtml(sch);
           otherWrap.appendChild(line);
         });
@@ -13689,10 +13765,10 @@
       const dateStr = scheduleBoardDateStr || formatDateStr(new Date());
       const type = document.getElementById('sb-quick-type')?.value || 'OUTPATIENT';
       let ward = (document.getElementById('sb-quick-ward')?.value || '').trim();
-      // (자동)이면 호실에서 병동 추정
+      // (자동)이면 호실에서 병동 추정 (전실은 이동 후 호실 기준)
       if (!ward) {
-        const roomDigits = String(document.getElementById('sb-quick-room')?.value || '').replace(/\D/g, '');
-        ward = inferWardFromRoomDigits(roomDigits) || '';
+        const toRoom = String(document.getElementById('sb-quick-room')?.value || '');
+        ward = inferWardFromRoomDigits(toRoom) || '';
       }
       const doctor = (document.getElementById('sb-quick-doctor')?.value || '').trim();
       const startUndecided = !!document.getElementById('sb-quick-time-start-undecided')?.checked;
@@ -13730,16 +13806,29 @@
     function normalizeQuickRoomNo(roomNo) {
       let r = (roomNo || '').trim();
       if (!r) return '';
+      const move = parseRoomChangeParts(r);
+      if (move) return normalizeRoomChangeNo(move.from, move.to);
       const digits = r.replace(/\D/g, '');
       // 숫자 호실만 정규화(503 → 503호). 문자만 있는 값은 호를 붙이지 않음.
       if (digits) return `${digits}호`;
       return r.replace(/\s/g, '');
     }
 
-    function validateScheduleBoardQuickPatientFields(roomNo, patientName, detail) {
+    function validateScheduleBoardQuickPatientFields(roomNo, patientName, detail, opts) {
+      const o = opts || {};
       const room = (roomNo || '').trim();
       const patient = (patientName || '').trim();
       const memo = (detail || '').trim();
+      if (o.isRoomChange) {
+        const fromDigits = String(o.fromRoom || '').replace(/\D/g, '');
+        const move = parseRoomChangeParts(room);
+        const toDigits = move ? move.to : String(room || '').replace(/\D/g, '');
+        if (!patient) return '환자명을 입력해 주세요.';
+        if (!fromDigits) return '기존 호실을 숫자로 입력해 주세요. (예: 705)';
+        if (!toDigits) return '전실 후 호실을 숫자로 입력해 주세요. (예: 706)';
+        if (fromDigits === toDigits) return '기존 호실과 전실 후 호실이 같습니다.';
+        return '';
+      }
       if (!room && !patient && !memo) {
         return '호실·환자명·목적 중 하나 이상 입력해 주세요.';
       }
@@ -13807,6 +13896,8 @@
     function clearScheduleBoardQuickPatientFields() {
       document.getElementById('sb-quick-patient').value = '';
       document.getElementById('sb-quick-room').value = '';
+      const roomFromEl = document.getElementById('sb-quick-room-from');
+      if (roomFromEl) roomFromEl.value = '';
       document.getElementById('sb-quick-detail').value = '';
       const remarkEl = document.getElementById('sb-quick-remark');
       if (remarkEl) remarkEl.value = '';
@@ -13827,6 +13918,7 @@
     const SB_QUICK_ENTER_FIELD_ORDER = [
       'sb-quick-type',
       'sb-quick-ward',
+      'sb-quick-room-from',
       'sb-quick-room',
       'sb-quick-patient',
       'sb-quick-doctor',
@@ -13839,16 +13931,19 @@
       const order = SB_QUICK_ENTER_FIELD_ORDER;
       const idx = order.indexOf(fromId);
       if (idx < 0) return false;
-      if (idx >= order.length - 1) {
-        saveScheduleBoardQuickAdd();
+      for (let i = idx + 1; i < order.length; i++) {
+        const el = document.getElementById(order[i]);
+        if (!el) continue;
+        const wrap = el.closest('.sb-quick-field');
+        if (wrap && wrap.style.display === 'none') continue;
+        if (el.offsetParent === null && el.type !== 'hidden') continue;
+        el.focus();
+        if (typeof el.select === 'function') {
+          try { el.select(); } catch (e) { /* ignore */ }
+        }
         return true;
       }
-      const next = document.getElementById(order[idx + 1]);
-      if (!next || next.disabled) return false;
-      next.focus();
-      if (next.tagName === 'INPUT' && typeof next.select === 'function' && next.type !== 'time') {
-        next.select();
-      }
+      saveScheduleBoardQuickAdd();
       return true;
     }
 
@@ -13913,10 +14008,21 @@
       const guardianWrap = document.getElementById('sb-quick-guardian-wrap');
       const guardianEl = document.getElementById('sb-quick-guardian-only');
       const isOutpatient = type === 'OUTPATIENT';
+      const isRoomChange = type === 'ROOM_CHANGE';
       const quickGrid = document.querySelector('#sb-quick-add-body .sb-quick-grid');
       if (quickGrid) quickGrid.classList.toggle('is-outpatient', isOutpatient);
       if (guardianWrap) guardianWrap.style.display = isOutpatient ? 'flex' : 'none';
       if (!isOutpatient && guardianEl) guardianEl.checked = false;
+      const roomFromWrap = document.getElementById('sb-quick-room-from-wrap');
+      const roomLabel = document.getElementById('sb-quick-room-label');
+      const roomEl = document.getElementById('sb-quick-room');
+      if (roomFromWrap) roomFromWrap.style.display = isRoomChange ? 'flex' : 'none';
+      if (roomLabel) roomLabel.textContent = isRoomChange ? '전실 후 호실' : '호실';
+      if (roomEl) roomEl.placeholder = isRoomChange ? '706' : '503';
+      if (!isRoomChange) {
+        const fromEl = document.getElementById('sb-quick-room-from');
+        if (fromEl) fromEl.value = '';
+      }
       syncScheduleBoardQuickTimeUndecidedUi();
       const editing = !!scheduleBoardEditingUid;
       const saveBtn = document.getElementById('sb-quick-save-btn');
@@ -13934,7 +14040,10 @@
       const wardVal = (sch.ward || norm.ward || '').trim();
       if (wardSel && wardVal) wardSel.value = wardVal;
       const roomEl = document.getElementById('sb-quick-room');
-      if (roomEl) roomEl.value = scheduleBoardRoomLabel(norm.room_no);
+      const roomFromEl = document.getElementById('sb-quick-room-from');
+      const move = parseRoomChangeParts(norm.room_no);
+      if (roomFromEl) roomFromEl.value = move ? move.from : '';
+      if (roomEl) roomEl.value = move ? move.to : scheduleBoardRoomLabel(norm.room_no);
       const patientEl = document.getElementById('sb-quick-patient');
       if (patientEl) patientEl.value = scheduleBoardPatientLabel(norm.patient_name);
       const detailEl = document.getElementById('sb-quick-detail');
@@ -14006,6 +14115,13 @@
       syncScheduleBoardQuickWardFromRoom();
     }
 
+    function onScheduleBoardQuickRoomFromInput() {
+      const el = document.getElementById('sb-quick-room-from');
+      if (!el) return;
+      const digits = String(el.value || '').replace(/\D/g, '');
+      if (el.value !== digits) el.value = digits;
+    }
+
     function syncScheduleBoardQuickWardFromRoom() {
       /* 병동 기본은 (자동) 유지 — 등록 시 호실로 추정 */
     }
@@ -14013,8 +14129,13 @@
     function buildQuickScheduleTitle(roomNo, patientName, detail) {
       const parts = [];
       if (roomNo) {
-        const r = roomNo.includes('호') ? roomNo : `${roomNo.replace(/\s/g, '')}호`;
-        parts.push(r);
+        const move = parseRoomChangeParts(roomNo);
+        if (move) {
+          parts.push(`${move.from}→${move.to}`);
+        } else {
+          const r = roomNo.includes('호') ? roomNo : `${roomNo.replace(/\s/g, '')}호`;
+          parts.push(r);
+        }
       }
       if (patientName) parts.push(patientName.trim());
       if (detail) parts.push(detail.trim());
@@ -14035,16 +14156,25 @@
         openOperatorLoginModal();
         return;
       }
+      const typePreview = document.getElementById('sb-quick-type')?.value || '';
+      const isRoomChange = typePreview === 'ROOM_CHANGE';
       let roomNo = (document.getElementById('sb-quick-room')?.value || '').trim();
+      const roomFrom = (document.getElementById('sb-quick-room-from')?.value || '').trim();
+      if (isRoomChange) {
+        roomNo = normalizeRoomChangeNo(roomFrom, roomNo);
+      }
       const patientName = scheduleBoardPatientLabel(document.getElementById('sb-quick-patient')?.value);
       const detail = (document.getElementById('sb-quick-detail')?.value || '').trim();
-      const fieldErr = validateScheduleBoardQuickPatientFields(roomNo, patientName, detail);
+      const fieldErr = validateScheduleBoardQuickPatientFields(roomNo, patientName, detail, {
+        isRoomChange,
+        fromRoom: roomFrom
+      });
       if (fieldErr) {
         await appAlert(fieldErr);
         if (!patientName) {
           document.getElementById('sb-quick-patient')?.focus();
-        } else if (roomNo && !roomNo.replace(/\D/g, '')) {
-          focusScheduleBoardQuickRoom();
+        } else if (isRoomChange && !String(roomFrom || '').replace(/\D/g, '')) {
+          document.getElementById('sb-quick-room-from')?.focus();
         } else {
           focusScheduleBoardQuickRoom();
         }
@@ -14973,7 +15103,7 @@
 
       if (scheduleBoardView === 'admit') {
         if (list.length === 0) {
-          body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
+          body.innerHTML = '<div class="schedule-board-empty"><div class="schedule-board-empty-icon">📋</div>해당 날짜·조건에 맞는 입·퇴원·전실 일정이 없습니다.<br><span style="font-size:12px; color:#cbd5e1;">작성 권한 로그인 후 상단 <b>+ 빠른 등록</b>으로 추가하거나 필터를 바꿔 보세요.</span></div>';
           return;
         }
         body.innerHTML = '';
@@ -15097,25 +15227,28 @@
       const bucket = schedulesByDateStr.get(dateStr);
       let hasAdmit = false;
       let hasDischarge = false;
+      let hasRoomChange = false;
       let hasFlow = false;
       if (bucket && bucket.length) {
         for (let i = 0; i < bucket.length; i++) {
           const t = bucket[i].type || 'GENERAL';
           if (t === 'ADMISSION' || t === 'TRANSFER') hasAdmit = true;
           else if (t === 'DISCHARGE') hasDischarge = true;
+          else if (t === 'ROOM_CHANGE') hasRoomChange = true;
           else if (SCHEDULE_BOARD_FLOW_TYPES.includes(t) || t === 'EXAM') hasFlow = true;
           else if (t !== 'GENERAL' && t !== 'LEAVE') hasFlow = true;
         }
       }
-      return { hasAdmit, hasDischarge, hasFlow };
+      return { hasAdmit, hasDischarge, hasRoomChange, hasFlow };
     }
 
     function sidebarCalendarMarksHtml(dateStr) {
-      const { hasAdmit, hasDischarge, hasFlow } = sidebarCalendarDayMarks(dateStr);
-      if (!hasAdmit && !hasDischarge && !hasFlow) return '';
+      const { hasAdmit, hasDischarge, hasRoomChange, hasFlow } = sidebarCalendarDayMarks(dateStr);
+      if (!hasAdmit && !hasDischarge && !hasRoomChange && !hasFlow) return '';
       const parts = [];
       if (hasAdmit) parts.push('<span class="dot is-admit" title="입원·전원"></span>');
       if (hasDischarge) parts.push('<span class="dot is-discharge" title="퇴원"></span>');
+      if (hasRoomChange) parts.push('<span class="dot is-room-change" title="전실"></span>');
       if (hasFlow) parts.push('<span class="dot is-flow" title="외진·외출·외박 등"></span>');
       return `<span class="cal-marks">${parts.join('')}</span>`;
     }
@@ -15215,6 +15348,7 @@
           if (sch.type === 'EXAM') prefix = '[🩺 검사 알람]';
           if (sch.type === 'OUTING') prefix = '[🟡 외출 알람]';
           if (sch.type === 'OVERNIGHT') prefix = '[🟣 외박 알람]';
+          if (sch.type === 'ROOM_CHANGE') prefix = '[🔷 환자 전실 알람]';
           if (sch.type === 'TRANSFER') prefix = '[🔵 전원 알람]';
           if (sch.type === 'LEAVE') prefix = '[🟣 연차 알람]';
           const alarmBody = scheduleAlarmBody(sch);
