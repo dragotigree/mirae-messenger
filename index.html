@@ -369,6 +369,10 @@
     .user-card-item { display: flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box; padding: 3px 8px; border-radius: var(--radius-sm); margin: 0 2px 0 2px; cursor: pointer; transition: background var(--transition-fast), opacity var(--transition-fast); min-height: 0; }
     .user-card-item:hover { background: var(--sidebar-hover); }
     .user-card-item.active { background: var(--sidebar-active) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+    .user-card-item.is-search-nav {
+      background: rgba(56, 189, 248, 0.22) !important;
+      box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.55);
+    }
     .user-card-item.is-offline { opacity: 0.5; }
     .user-card-item.is-offline:hover { opacity: 0.82; }
     .user-card-body { flex: 1; min-width: 0; line-height: 1.25; }
@@ -1113,6 +1117,10 @@
     .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
     .compact-list-item:hover { background: #f7f7f7; }
     .compact-list-item.is-active { background: #f0f0f0; }
+    .compact-list-item.is-search-nav {
+      background: #dbeafe !important;
+      box-shadow: inset 3px 0 0 #3b82f6;
+    }
     .compact-list-item.is-offline { opacity: 0.72; }
     .compact-list-item.is-offline .compact-item-name { color: #888; }
     .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
@@ -2326,7 +2334,7 @@
           </span>
         </div>
         <div class="user-search-box" id="user-search-box">
-          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+F)" oninput="filterUserList(this.value)" title="사람 검색 (Ctrl+F)">
+          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
         </div>
         <div id="user-list-tree"></div>
       </div>
@@ -2399,7 +2407,7 @@
           </div>
           <div class="compact-search" id="compact-search-wrap">
             <span class="compact-search-icon" data-ui-icon="search"></span>
-            <input type="text" id="compact-search-input" placeholder="이름, 부서, 층 검색" oninput="onCompactSearchInput(this.value)">
+            <input type="text" id="compact-search-input" placeholder="이름, 부서, 층 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
             <button type="button" class="compact-search-clear" id="compact-search-clear" onclick="clearCompactSearch()" title="검색 지우기">×</button>
           </div>
           <div id="compact-list-items"></div>
@@ -2412,7 +2420,7 @@
           </div>
           <div class="compact-search">
             <span class="compact-search-icon" data-ui-icon="search"></span>
-            <input type="text" id="compact-search-input-friends" placeholder="친구 검색" oninput="onCompactSearchInput(this.value)">
+            <input type="text" id="compact-search-input-friends" placeholder="친구 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
           </div>
           <div id="compact-friends-list-items"></div>
         </div>
@@ -6023,8 +6031,90 @@
       if (compactFriendsInput && compactFriendsInput.value !== v) compactFriendsInput.value = v || '';
       const clearBtn = document.getElementById('compact-search-clear');
       if (clearBtn) clearBtn.style.display = userFilterKeyword ? 'flex' : 'none';
+      sidebarSearchNavIndex = -1;
       renderUserListTree();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+      requestAnimationFrame(() => {
+        if (userFilterKeyword) setSidebarSearchNavIndex(0);
+        else clearSidebarSearchNavHighlight();
+      });
+    }
+
+    let sidebarSearchNavIndex = -1;
+
+    function getSidebarSearchNavTargets() {
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        const friendsHost = document.getElementById('compact-friends-list-items');
+        const mainHost = document.getElementById('compact-list-items');
+        const host = (friendsHost && friendsHost.offsetParent !== null) ? friendsHost : mainHost;
+        if (!host) return [];
+        return [...host.querySelectorAll('.compact-list-item[data-user-ip]')];
+      }
+      const treeEl = document.getElementById('user-list-tree');
+      if (!treeEl) return [];
+      return [...treeEl.querySelectorAll('.user-card-item[data-user-ip]')].filter((el) => {
+        if (el.offsetParent === null) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      });
+    }
+
+    function clearSidebarSearchNavHighlight() {
+      document.querySelectorAll('.user-card-item.is-search-nav, .compact-list-item.is-search-nav')
+        .forEach((el) => el.classList.remove('is-search-nav'));
+    }
+
+    function setSidebarSearchNavIndex(idx) {
+      const items = getSidebarSearchNavTargets();
+      clearSidebarSearchNavHighlight();
+      if (!items.length) {
+        sidebarSearchNavIndex = -1;
+        return;
+      }
+      const n = items.length;
+      sidebarSearchNavIndex = ((idx % n) + n) % n;
+      const el = items[sidebarSearchNavIndex];
+      el.classList.add('is-search-nav');
+      try { el.scrollIntoView({ block: 'nearest' }); } catch (err) { /* ignore */ }
+    }
+
+    function openSidebarSearchNavSelection() {
+      const items = getSidebarSearchNavTargets();
+      if (!items.length) return false;
+      if (sidebarSearchNavIndex < 0 || sidebarSearchNavIndex >= items.length) {
+        setSidebarSearchNavIndex(0);
+      }
+      const el = items[sidebarSearchNavIndex];
+      if (!el) return false;
+      const ip = el.dataset.userIp;
+      const u = findUserByIp(ip);
+      if (!u) return false;
+      selectUserChat(u);
+      return true;
+    }
+
+    function onUserSearchKeyDown(e) {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSidebarSearchNavIndex(sidebarSearchNavIndex < 0 ? 0 : sidebarSearchNavIndex + 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSidebarSearchNavIndex(sidebarSearchNavIndex < 0 ? 0 : sidebarSearchNavIndex - 1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        openSidebarSearchNavSelection();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        filterUserList('');
+        e.target.blur();
+      }
     }
 
     function getDeptList() {
@@ -9419,6 +9509,9 @@
         if (input) {
           input.focus();
           input.select();
+          requestAnimationFrame(() => {
+            if (getSidebarSearchNavTargets().length) setSidebarSearchNavIndex(Math.max(0, sidebarSearchNavIndex));
+          });
           return true;
         }
         return false;
@@ -9427,6 +9520,9 @@
       if (!input) return false;
       input.focus();
       input.select();
+      requestAnimationFrame(() => {
+        if (getSidebarSearchNavTargets().length) setSidebarSearchNavIndex(Math.max(0, sidebarSearchNavIndex));
+      });
       return true;
     }
 
@@ -9447,34 +9543,19 @@
       if (key !== 'f') return false;
       if (isBlockingOverlayOpenForSearchShortcut()) return false;
 
-      const active = document.activeElement;
-      const inSidebar = !!(active && active.closest && active.closest('#sidebar-left'));
-      const inChat = !!(active && active.closest && (
-        active.closest('#active-chat-container') ||
-        active.closest('#chat-search-bar') ||
-        active.id === 'chat-textarea' ||
-        active.id === 'chat-search-input'
-      ));
-      const inCompactList = !!(active && active.closest && active.closest('#compact-list-view'));
+      // Ctrl+Shift+F → 사람 검색
+      if (e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        focusPeopleSearchForShortcut();
+        return true;
+      }
 
+      // Ctrl+F → 대화 내용 검색만 (사이드바 사람 검색은 하지 않음)
       e.preventDefault();
       e.stopPropagation();
-
-      // 좌측 사이드바(또는 콤팩트 목록) → 사람 검색
-      if (inSidebar || inCompactList) {
-        focusPeopleSearchForShortcut();
-        return true;
-      }
-      // 대화창 → 대화 내용 검색
-      if (inChat && activeChatUser) {
-        openChatSearchBarForShortcut();
-        return true;
-      }
-      // 포커스가 애매하면: 열린 대화가 있으면 대화 검색, 없으면 사람 검색
       if (activeChatUser && document.getElementById('active-chat-container')?.style.display !== 'none') {
         openChatSearchBarForShortcut();
-      } else {
-        focusPeopleSearchForShortcut();
       }
       return true;
     }
