@@ -10204,8 +10204,6 @@ function normalizeAutoBackupIntervalHours(raw) {
   const n = parseInt(raw, 10);
   if (!Number.isFinite(n) || n <= 0) return 0;
   if (AUTO_BACKUP_INTERVAL_OPTIONS.includes(n)) return n;
-  // 예전 고정 주기(6시간 검사·일 1회) 호환 → 매일
-  if (n === 6) return 24;
   // 가장 가까운 허용 값
   let best = 24;
   let bestDiff = Infinity;
