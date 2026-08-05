@@ -4,10 +4,22 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:;" />
   <title>그림 그리기 — Mirae Messenger</title>
-  <link rel="stylesheet" href="./lib/excalidraw-app.css" />
   <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #f8fafc; font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-    #app { display: flex; flex-direction: column; height: 100%; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f5f9; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+    #boot {
+      position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center;
+      background: #f8fafc; color: #0f172a;
+    }
+    #boot h1 { margin: 0; font-size: 18px; }
+    #boot p { margin: 0; font-size: 13px; color: #475569; line-height: 1.5; max-width: 420px; }
+    #boot .err { color: #b91c1c; font-weight: 700; white-space: pre-wrap; }
+    #boot .spin {
+      width: 28px; height: 28px; border: 3px solid #cbd5e1; border-top-color: #0284c7;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #app { display: none; flex-direction: column; height: 100%; }
     .excal-topbar {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
       padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #fff;
@@ -21,15 +33,20 @@
     .excal-btn-muted { background: #f1f5f9; color: #475569; }
     .excal-btn-primary { background: #0284c7; color: #fff; }
     .excal-btn:disabled { opacity: 0.55; cursor: wait; }
-    #excal-root { flex: 1; min-height: 0; position: relative; }
+    #excal-root { flex: 1; min-height: 0; position: relative; background: #fff; }
     #excal-status { font-size: 11px; color: #dc2626; min-height: 14px; margin-right: 6px; }
   </style>
   <script>
-    // Excalidraw 폰트·로케일 오프라인 경로 (file:// 기준)
     window.EXCALIDRAW_ASSET_PATH = new URL('./vendor/excalidraw/', window.location.href).href;
   </script>
 </head>
 <body>
+  <div id="boot">
+    <div class="spin" id="boot-spin" aria-hidden="true"></div>
+    <h1 id="boot-title">그림 에디터 불러오는 중…</h1>
+    <p id="boot-msg">잠시만 기다려 주세요. 처음 실행 시 수 초 걸릴 수 있습니다.</p>
+  </div>
+
   <div id="app">
     <div class="excal-topbar">
       <div>
@@ -45,9 +62,14 @@
     </div>
     <div id="excal-root"></div>
   </div>
-  <script src="./lib/excalidraw-app.js"></script>
+
   <script>
     (function () {
+      const boot = document.getElementById('boot');
+      const bootTitle = document.getElementById('boot-title');
+      const bootMsg = document.getElementById('boot-msg');
+      const bootSpin = document.getElementById('boot-spin');
+      const appEl = document.getElementById('app');
       const statusEl = document.getElementById('excal-status');
       const sendBtn = document.getElementById('excal-send-btn');
       const clearBtn = document.getElementById('excal-clear-btn');
@@ -59,8 +81,39 @@
       let purpose = 'chat';
       let busy = false;
 
+      function showBootError(title, msg) {
+        if (bootSpin) bootSpin.style.display = 'none';
+        bootTitle.textContent = title || '에디터를 열 수 없습니다';
+        bootMsg.className = 'err';
+        bootMsg.textContent = msg || '';
+        boot.style.display = 'flex';
+        appEl.style.display = 'none';
+      }
+
       function setStatus(msg) {
         statusEl.textContent = msg || '';
+      }
+
+      function loadCss(href) {
+        return new Promise((resolve) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          link.onload = () => resolve(true);
+          link.onerror = () => resolve(false);
+          document.head.appendChild(link);
+        });
+      }
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = false;
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('파일을 찾지 못했습니다: ' + src));
+          document.head.appendChild(s);
+        });
       }
 
       function blobToDataUrl(blob) {
@@ -82,11 +135,37 @@
           }
         } catch (e) {}
 
-        if (typeof window.mountMiraeExcalidraw !== 'function') {
-          setStatus('에디터 로드 실패');
+        bootMsg.textContent = '스타일·엔진 파일을 불러오는 중…';
+        await loadCss('./lib/excalidraw-app.css');
+
+        try {
+          bootMsg.textContent = '그림 엔진 로딩 중… (수 초 소요될 수 있음)';
+          await loadScript('./lib/excalidraw-app.js');
+        } catch (err) {
+          showBootError(
+            '그림 엔진 파일이 없습니다',
+            'lib/excalidraw-app.js 를 찾지 못했습니다.\n설정 → 프로그램 업데이트로 최신 버전을 다시 받아 주세요.\n(이 파일은 용량이 커서 업데이트가 중간에 실패했을 수 있습니다.)'
+          );
           return;
         }
-        editor = window.mountMiraeExcalidraw(document.getElementById('excal-root'), {});
+
+        if (typeof window.mountMiraeExcalidraw !== 'function') {
+          showBootError(
+            '그림 엔진 로드 실패',
+            'excalidraw-app.js 는 있지만 초기화에 실패했습니다.\n업데이트를 다시 적용하거나 프로그램을 재설치해 주세요.'
+          );
+          return;
+        }
+
+        try {
+          editor = window.mountMiraeExcalidraw(document.getElementById('excal-root'), {});
+        } catch (err) {
+          showBootError('에디터 시작 실패', String(err && err.message ? err.message : err));
+          return;
+        }
+
+        boot.style.display = 'none';
+        appEl.style.display = 'flex';
       }
 
       clearBtn.addEventListener('click', () => {
@@ -117,6 +196,12 @@
         } finally {
           busy = false;
           sendBtn.disabled = false;
+        }
+      });
+
+      window.addEventListener('error', (e) => {
+        if (boot && boot.style.display !== 'none') {
+          showBootError('스크립트 오류', String((e && e.message) || e));
         }
       });
 

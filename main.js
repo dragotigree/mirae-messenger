@@ -541,12 +541,13 @@ function loadGithubUpdateToken() {
   }
 }
 
-function httpsGetBuffer(url, headers = {}) {
+function httpsGetBuffer(url, headers = {}, opts = {}) {
+  const timeoutMs = Math.max(10000, Number(opts.timeoutMs) || 25000);
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers, timeout: 25000 }, (res) => {
+    const req = https.get(url, { headers, timeout: timeoutMs }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        httpsGetBuffer(res.headers.location, headers).then(resolve, reject);
+        httpsGetBuffer(res.headers.location, headers, opts).then(resolve, reject);
         return;
       }
       const chunks = [];
@@ -571,21 +572,49 @@ function httpsGetBuffer(url, headers = {}) {
 async function fetchGithubUpdateFile(meta, relPath) {
   const filePath = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
   const token = loadGithubUpdateToken();
+  const isLargeHint = /excalidraw-app\.(js|css)$/i.test(filePath) || /^vendor\//i.test(filePath);
+  const timeoutMs = isLargeHint ? 180000 : 45000;
+  const ua = { 'User-Agent': 'MiraeMessenger-Updater' };
+
+  // 대용량은 Contents API(1MB 제한/타임아웃)보다 raw URL을 먼저 시도
+  const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}`;
+  const rawHeaders = { ...ua };
+  if (token) rawHeaders.Authorization = `Bearer ${token}`;
+
   const apiUrl = `https://api.github.com/repos/${meta.owner}/${meta.repo}/contents/${filePath}?ref=${encodeURIComponent(meta.ref)}`;
-  const headers = {
-    'User-Agent': 'MiraeMessenger-Updater',
+  const apiHeaders = {
+    ...ua,
     Accept: 'application/vnd.github.raw+json'
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  try {
-    return await httpsGetBuffer(apiUrl, headers);
-  } catch (e) {
-    // API 실패 시 raw URL 재시도 (public 또는 token)
-    const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}`;
-    const rawHeaders = { 'User-Agent': 'MiraeMessenger-Updater' };
-    if (token) rawHeaders.Authorization = `Bearer ${token}`;
-    return httpsGetBuffer(rawUrl, rawHeaders);
+  if (token) apiHeaders.Authorization = `Bearer ${token}`;
+
+  const tryOrder = isLargeHint
+    ? [
+        () => httpsGetBuffer(rawUrl, rawHeaders, { timeoutMs }),
+        () => httpsGetBuffer(apiUrl, apiHeaders, { timeoutMs })
+      ]
+    : [
+        () => httpsGetBuffer(apiUrl, apiHeaders, { timeoutMs }),
+        () => httpsGetBuffer(rawUrl, rawHeaders, { timeoutMs })
+      ];
+
+  let lastErr;
+  for (const run of tryOrder) {
+    try {
+      const buf = await run();
+      // Contents API가 JSON 메타만 주는 경우(대용량 encoding:none) 감지
+      if (buf && buf.length < 4000) {
+        const head = buf.toString('utf8', 0, Math.min(buf.length, 80)).trim();
+        if (head.startsWith('{') && /"encoding"\s*:\s*"none"/.test(buf.toString('utf8'))) {
+          throw new Error('GitHub Contents API가 대용량 파일 본문을 주지 않았습니다.');
+        }
+      }
+      return buf;
+    } catch (e) {
+      lastErr = e;
+    }
   }
+  throw lastErr || new Error('GitHub 파일 다운로드 실패');
 }
 
 async function readUpdateSourceBytes(relPath) {
@@ -2658,6 +2687,39 @@ function getExcalidrawPurposeMeta(purpose) {
   };
 }
 
+function getExcalidrawRequiredFiles() {
+  return [
+    'excalidraw-editor.html',
+    'preload-excalidraw.js',
+    'lib/excalidraw-app.js',
+    'lib/excalidraw-app.css'
+  ];
+}
+
+function inspectExcalidrawInstall() {
+  const missing = [];
+  const details = [];
+  for (const rel of getExcalidrawRequiredFiles()) {
+    const abs = path.join(__dirname, rel);
+    try {
+      const st = fs.statSync(abs);
+      if (!st.isFile() || st.size < 32) {
+        missing.push(rel);
+        details.push(`${rel}(비정상 크기)`);
+        continue;
+      }
+      if (rel.endsWith('excalidraw-app.js') && st.size < 500000) {
+        missing.push(rel);
+        details.push(`${rel}(용량 부족 ${st.size}B — 업데이트 중 손상 가능)`);
+      }
+    } catch (e) {
+      missing.push(rel);
+      details.push(`${rel}(없음)`);
+    }
+  }
+  return { ok: missing.length === 0, missing, details, root: __dirname };
+}
+
 function closeExcalidrawWindow() {
   if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
     try { excalidrawWindow.close(); } catch (e) {}
@@ -2668,6 +2730,21 @@ function closeExcalidrawWindow() {
 function openExcalidrawWindow(purpose) {
   const meta = getExcalidrawPurposeMeta(purpose);
   excalidrawSession = { purpose: meta.purpose, title: meta.title, subtitle: meta.subtitle };
+
+  const install = inspectExcalidrawInstall();
+  if (!install.ok) {
+    const msg = [
+      '그림 그리기 파일이 아직 이 PC에 없습니다.',
+      '',
+      '설정 → 프로그램 업데이트로 최신판을 다시 받아 주세요.',
+      '(lib/excalidraw-app.js 등 용량이 큰 파일이 포함됩니다.)',
+      '',
+      '부족한 파일:',
+      ...install.details.slice(0, 8)
+    ].join('\n');
+    return { success: false, msg };
+  }
+
   if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
     try {
       excalidrawWindow.focus();
@@ -2675,6 +2752,10 @@ function openExcalidrawWindow(purpose) {
     } catch (e) {}
     return { success: true };
   }
+
+  const preloadPath = path.join(__dirname, 'preload-excalidraw.js');
+  const htmlPath = path.join(__dirname, 'excalidraw-editor.html');
+
   excalidrawWindow = new BrowserWindow({
     width: 1180,
     height: 820,
@@ -2683,11 +2764,11 @@ function openExcalidrawWindow(purpose) {
     title: meta.title,
     icon: getAppNativeIcon(),
     frame: true,
+    show: false,
     autoHideMenuBar: true,
-    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
-    modal: false,
+    backgroundColor: '#f8fafc',
     webPreferences: {
-      preload: path.join(__dirname, 'preload-excalidraw.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false,
@@ -2696,7 +2777,55 @@ function openExcalidrawWindow(purpose) {
   });
   excalidrawWindow.setMenu(null);
   attachEditableContextMenu(excalidrawWindow.webContents);
-  excalidrawWindow.loadFile(path.join(__dirname, 'excalidraw-editor.html'));
+
+  const showWin = () => {
+    if (!excalidrawWindow || excalidrawWindow.isDestroyed()) return;
+    try { excalidrawWindow.show(); excalidrawWindow.focus(); } catch (e) {}
+  };
+
+  excalidrawWindow.once('ready-to-show', showWin);
+  // ready-to-show가 늦거나 누락돼도 흰 화면으로 남지 않게
+  setTimeout(showWin, 2500);
+
+  excalidrawWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('[excalidraw] did-fail-load', code, desc, url);
+    try {
+      const safe = String(desc || code || 'load failed').replace(/[<>&]/g, '');
+      excalidrawWindow.loadURL(
+        'data:text/html;charset=utf-8,' +
+        encodeURIComponent(
+          `<!doctype html><meta charset="utf-8"><body style="font-family:Malgun Gothic,sans-serif;padding:28px;background:#f8fafc;color:#0f172a">
+           <h2>그림 창을 불러오지 못했습니다</h2>
+           <p style="color:#b91c1c;font-weight:700">${safe}</p>
+           <p>설정에서 업데이트를 다시 적용한 뒤 재시작해 주세요.</p>
+           <p style="font-size:12px;color:#64748b">${htmlPath}</p></body>`
+        )
+      );
+      showWin();
+    } catch (err) {}
+  });
+
+  excalidrawWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[excalidraw] render-process-gone', details);
+  });
+
+  excalidrawWindow.loadFile(htmlPath).catch((err) => {
+    console.error('[excalidraw] loadFile failed', err);
+    try {
+      const safe = String(err && err.message ? err.message : err).replace(/[<>&]/g, '');
+      excalidrawWindow.loadURL(
+        'data:text/html;charset=utf-8,' +
+        encodeURIComponent(
+          `<!doctype html><meta charset="utf-8"><body style="font-family:Malgun Gothic,sans-serif;padding:28px;background:#f8fafc">
+           <h2>그림 창 HTML을 열 수 없습니다</h2>
+           <p style="color:#b91c1c">${safe}</p>
+           <p style="font-size:12px;color:#64748b">${htmlPath}</p></body>`
+        )
+      );
+      showWin();
+    } catch (e2) {}
+  });
+
   excalidrawWindow.on('closed', () => {
     excalidrawWindow = null;
     excalidrawSession = null;
