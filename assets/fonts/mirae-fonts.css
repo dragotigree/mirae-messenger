@@ -1,0 +1,107 @@
+/* Mirae Messenger — 오프라인·병원망용 로컬 글꼴 (CDN 미사용) */
+
+@font-face {
+  font-family: 'SUIT';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./SUIT-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'SUIT';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./SUIT-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'SUIT';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./SUIT-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./Pretendard-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./Pretendard-Bold.woff2') format('woff2');
+}
+
+/* Gmarket·Spoqa 선택 시에도 네트워크 없이 동일한 로컬 파일 사용 */
+@font-face {
+  font-family: 'Gmarket Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./SUIT-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Gmarket Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./SUIT-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./Pretendard-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Spoqa Han Sans Neo';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./Pretendard-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'RIDIBatang';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./RIDIBatang.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'MaruBuri';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./MaruBuri-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'MaruBuri';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./MaruBuri-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Eulyoo1945';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./Eulyoo1945-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Eulyoo1945';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./Eulyoo1945-SemiBold.woff2') format('woff2');
+}

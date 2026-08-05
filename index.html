@@ -3,20 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Mirae Messenger</title>
-  <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/static/woff2/SUIT.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/leetaewook/gmarket-sans-dynamic-subset/GmarketSans.css">
-  <link href="https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSansNeo.css" rel="stylesheet" type="text/css">
-  <link rel="stylesheet" href="https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css">
-  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/sunghyunzz/eulyoo1945/eulyoo1945.css">
+  <link rel="stylesheet" href="assets/fonts/mirae-fonts.css">
   <style>
-    @font-face {
-      font-family: 'RIDIBatang';
-      src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff');
-      font-weight: normal;
-      font-style: normal;
-      font-display: swap;
-    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 
     :root {
@@ -98,6 +86,11 @@
     #splash-screen { position: fixed; inset: 0; z-index: 9999; background: #ffffff; display: flex; align-items: center; justify-content: center; transition: opacity .4s ease; }
     #splash-screen img { width: 260px; height: auto; animation: splash-fade-in .5s ease; }
     #splash-screen.is-hidden { opacity: 0; pointer-events: none; }
+    #startup-failure-overlay { z-index: 100000; }
+    #startup-failure-detail {
+      margin-top: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 12px;
+      font-size: 11.5px; color: #64748b; line-height: 1.5; word-break: break-all; max-height: 120px; overflow-y: auto;
+    }
     @keyframes splash-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     #app-body-row { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
@@ -3789,6 +3782,15 @@
   <div id="splash-screen">
     <img src="assets/splash.png" alt="미래병원" width="384" height="173" decoding="async">
   </div>
+  <script>
+    (function () {
+      var SPLASH_FORCE_MS = 5000;
+      window.__miraeSplashForceTimer = setTimeout(function () {
+        var s = document.getElementById('splash-screen');
+        if (s && !s.classList.contains('is-hidden')) s.classList.add('is-hidden');
+      }, SPLASH_FORCE_MS);
+    })();
+  </script>
 
   <!-- 🪟 커스텀 타이틀바 (카카오톡 PC 스타일) -->
   <div id="custom-titlebar">
@@ -4919,6 +4921,19 @@
         <h3 class="settings-panel-title">네트워크·업데이트</h3>
         <p class="settings-panel-desc">연결 상태를 확인하고 프로그램 업데이트를 관리합니다.</p>
         <div class="settings-card">
+          <div class="settings-section-title">병원 안정성 모드</div>
+          <label class="settings-toggle-row" for="setting-stability-mode">
+            <input type="checkbox" id="setting-stability-mode" onchange="syncStabilityModeSettingsUi()">
+            <span class="settings-toggle-text">
+              <span class="settings-toggle-title">안정성 모드 (권장)</span>
+              <span class="settings-toggle-desc">수동 업데이트 · UI 애니메이션 Off · 일정 알람 Off를 한 번에 적용</span>
+            </span>
+          </label>
+          <p id="setting-stability-mode-hint" class="settings-field-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;">
+            안정성 모드가 켜져 있으면 위 세 가지가 고정됩니다. 해제 후 개별 설정을 바꿀 수 있습니다.
+          </p>
+        </div>
+        <div class="settings-card">
           <div class="settings-section-title">네트워크</div>
           <div class="net-status-list">
             <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
@@ -5643,11 +5658,79 @@
         <li>설치 경로가 OneDrive 안이면 <b>로컬 폴더(C:\ 등)</b>로 옮기는 것을 권장합니다.</li>
         <li><b>1.0.142</b> 이상이면 preload가 자동으로 로컬 캐시(%AppData%)에 복사되어 재발이 줄어듭니다.</li>
       </ul>
+      <button type="button" class="settings-btn-primary" style="margin-top:16px;width:100%;" onclick="location.reload()">다시 시도</button>
+    </div>
+  </div>
+
+  <div id="startup-failure-overlay" class="modal-overlay" style="display:none; background:rgba(15,23,42,0.92);">
+    <div class="modal-card" style="max-width:520px;">
+      <h2 style="margin:0 0 10px; font-size:18px; font-weight:800; color:#0f172a;">시작 화면을 불러오지 못했습니다</h2>
+      <p id="startup-failure-message" style="font-size:13px; color:#64748b; line-height:1.65; margin:0;">초기화가 끝나지 않았거나 오류가 발생했습니다. 아래 안내를 확인한 뒤 다시 실행해 주세요.</p>
+      <div id="startup-failure-detail" style="display:none;"></div>
+      <ul style="font-size:12px; color:#475569; margin:14px 0 0 18px; line-height:1.75;">
+        <li>트레이 아이콘을 우클릭해 <b>문제 진단</b> 또는 <b>완전 종료</b> 후 재실행해 보세요.</li>
+        <li>백신·OneDrive가 설치 폴더를 검사 중이면 잠시 후 다시 시도해 주세요.</li>
+        <li>계속되면 IT에 <b>%AppData%\\mirae-messenger\\logs</b> 폴더의 오늘 로그를 전달해 주세요.</li>
+      </ul>
+      <button type="button" class="settings-btn-primary" style="margin-top:16px;width:100%;" onclick="location.reload()">다시 시도</button>
     </div>
   </div>
 
   <script>
     const PRELOAD_OK = typeof window.api !== 'undefined' && window.api != null;
+    let appBootMarkedReady = false;
+    const BOOT_WATCHDOG_MS = 12000;
+
+    function dismissStartupSplash() {
+      if (window.__miraeSplashForceTimer) {
+        clearTimeout(window.__miraeSplashForceTimer);
+        window.__miraeSplashForceTimer = null;
+      }
+      const splash = document.getElementById('splash-screen');
+      if (splash && !splash.classList.contains('is-hidden')) {
+        splash.classList.add('is-hidden');
+        setTimeout(() => { try { splash.remove(); } catch (_) {} }, 500);
+      }
+    }
+
+    function markAppBootReady() {
+      if (appBootMarkedReady) return;
+      appBootMarkedReady = true;
+      dismissStartupSplash();
+      const fail = document.getElementById('startup-failure-overlay');
+      if (fail) fail.style.display = 'none';
+    }
+
+    function showStartupFailureOverlay(message, detail) {
+      dismissStartupSplash();
+      const overlay = document.getElementById('startup-failure-overlay');
+      const msgEl = document.getElementById('startup-failure-message');
+      const detailEl = document.getElementById('startup-failure-detail');
+      if (msgEl && message) msgEl.textContent = message;
+      if (detailEl) {
+        const text = (detail != null ? String(detail) : '').trim();
+        if (text) {
+          detailEl.textContent = text;
+          detailEl.style.display = 'block';
+        } else {
+          detailEl.textContent = '';
+          detailEl.style.display = 'none';
+        }
+      }
+      if (overlay) overlay.style.display = 'flex';
+    }
+
+    if (PRELOAD_OK) {
+      setTimeout(() => {
+        if (!appBootMarkedReady) {
+          showStartupFailureOverlay(
+            '시작 화면을 불러오지 못했습니다.',
+            '초기화가 ' + Math.round(BOOT_WATCHDOG_MS / 1000) + '초 안에 끝나지 않았습니다.'
+          );
+        }
+      }, BOOT_WATCHDOG_MS);
+    }
+
     if (!PRELOAD_OK) {
       window.api = new Proxy({}, {
         get(_target, prop) {
@@ -6336,6 +6419,7 @@
     if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
     if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = true;
+    if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = false;
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -6554,6 +6638,51 @@
 
     function applyUiAnimationsSetting() {
       document.documentElement.classList.toggle('ui-animations-off', !isUiAnimationsEnabled());
+    }
+
+    function isStabilityModeEnabled() {
+      return !!appSettings.stabilityModeEnabled;
+    }
+
+    function applyStabilityModePresetToSettingsObject() {
+      appSettings.uiAnimationsEnabled = false;
+      appSettings.scheduleAlarmEnabled = false;
+    }
+
+    async function ensureStabilityModeOnBoot() {
+      if (!isStabilityModeEnabled()) return;
+      applyStabilityModePresetToSettingsObject();
+      localStorage.setItem('appSettings', JSON.stringify(appSettings));
+      applyUiAnimationsSetting();
+      try {
+        if (window.api && window.api.setUpdateMode) {
+          await window.api.setUpdateMode('manual');
+        }
+      } catch (e) {
+        console.warn('안정성 모드 업데이트 설정 동기화 실패:', e);
+      }
+    }
+
+    function syncStabilityModeSettingsUi() {
+      const on = !!document.getElementById('setting-stability-mode')?.checked;
+      const hint = document.getElementById('setting-stability-mode-hint');
+      ['setting-ui-animations-on', 'setting-ui-animations-off', 'setting-schedule-alarm-enabled',
+        'update-mode-auto', 'update-mode-manual'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = on;
+      });
+      if (hint) hint.style.display = on ? 'block' : 'none';
+      if (on) {
+        const offAnim = document.getElementById('setting-ui-animations-off');
+        const alarm = document.getElementById('setting-schedule-alarm-enabled');
+        const manual = document.getElementById('update-mode-manual');
+        const auto = document.getElementById('update-mode-auto');
+        if (offAnim) offAnim.checked = true;
+        if (alarm) alarm.checked = false;
+        if (manual) manual.checked = true;
+        if (auto) auto.checked = false;
+        syncScheduleAlarmSettingsUi();
+      }
     }
 
     const SPELLCHECK_INPUT_SELECTOR = '#chat-textarea, .board-form-textarea, #board-write-content, #sch-msg-content, #sb-quick-remark, .modal-card textarea, .reply-input-row textarea';
@@ -7546,6 +7675,7 @@
     let pendingUnreadScrollCount = 0;
     if (!appSettings.userGrouping) appSettings.userGrouping = 'floor';
     applyAppSettingsToUI();
+    ensureStabilityModeOnBoot().catch((e) => console.warn('안정성 모드 적용 실패:', e));
     syncSidebarListPrefsUi();
     try { syncPrivacyLockButtonUi(); resetPrivacyIdleTimer(); } catch (_) {}
     syncSpellcheckEngine();
@@ -7793,6 +7923,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      try {
       loadNoticeOperatorSession();
       refreshNoticePermission();
       if (window.api && typeof window.api.onExcalidrawPngReady === 'function') {
@@ -7828,13 +7959,14 @@
         });
       }
       updateMainPanelVisibility();
-      setTimeout(() => {
-        const splash = document.getElementById('splash-screen');
-        if (splash) {
-          splash.classList.add('is-hidden');
-          setTimeout(() => splash.remove(), 500);
-        }
-      }, 1200);
+      markAppBootReady();
+      } catch (bootErr) {
+        console.error('앱 초기화 실패:', bootErr);
+        showStartupFailureOverlay(
+          '시작 화면을 불러오지 못했습니다.',
+          bootErr && bootErr.message ? bootErr.message : String(bootErr)
+        );
+      }
     });
 
     function resetIdleTimer() {
@@ -20658,6 +20790,9 @@
         if (isUiAnimationsEnabled()) {
           if (uiAnimOn) uiAnimOn.checked = true;
         } else if (uiAnimOff) uiAnimOff.checked = true;
+        const stabilityEl = document.getElementById('setting-stability-mode');
+        if (stabilityEl) stabilityEl.checked = isStabilityModeEnabled();
+        syncStabilityModeSettingsUi();
         document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
         const compactClickEl = document.getElementById('setting-compact-person-click');
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
@@ -20755,6 +20890,11 @@
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const uiAnimEl = document.querySelector('input[name="setting-ui-animations"]:checked');
   const uiAnimationsEnabled = !uiAnimEl || uiAnimEl.value !== 'off';
+  const stabilityModeEnabled = !!(document.getElementById('setting-stability-mode')
+    && document.getElementById('setting-stability-mode').checked);
+  if (stabilityModeEnabled) {
+    applyStabilityModePresetToSettingsObject();
+  }
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
     : true;
@@ -20788,18 +20928,28 @@
   const privacyLockOnHide = appSettings.privacyLockOnHide !== false;
   const privacyLockIdleMinutes = appSettings.privacyLockIdleMinutes || 0;
 
-  const scheduleAlarmEnabled = !!(document.getElementById('setting-schedule-alarm-enabled')
+  const scheduleAlarmEnabledInput = !!(document.getElementById('setting-schedule-alarm-enabled')
     && document.getElementById('setting-schedule-alarm-enabled').checked);
   const leadRaw = parseInt(document.getElementById('setting-schedule-alarm-lead')?.value, 10);
   const scheduleAlarmLeadMinutes = [0, 5, 10, 15, 30, 60, 1440].includes(leadRaw) ? leadRaw : 0;
   const scheduleAlarmOnEdit = !!(document.getElementById('setting-schedule-alarm-on-edit')
     && document.getElementById('setting-schedule-alarm-on-edit').checked);
+  let scheduleAlarmEnabled = scheduleAlarmEnabledInput;
+  let uiAnimationsEnabledFinal = uiAnimationsEnabled;
+  if (stabilityModeEnabled) {
+    scheduleAlarmEnabled = false;
+    uiAnimationsEnabledFinal = false;
+    if (window.api.setUpdateMode) {
+      try { await window.api.setUpdateMode('manual'); } catch (e) { /* ignore */ }
+    }
+  }
   const wasScheduleAlarmEnabled = !!appSettings.scheduleAlarmEnabled;
   const prevScheduleAlarmLeadMinutes = getScheduleAlarmLeadMinutes();
 
   appSettings = {
     fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
-    spellcheck, uiAnimationsEnabled, showUserListAvatars, showOfflineUsers, showSharedPcs, compactPersonClickMode,
+    spellcheck, uiAnimationsEnabled: uiAnimationsEnabledFinal, stabilityModeEnabled, showUserListAvatars,
+    showOfflineUsers, showSharedPcs, compactPersonClickMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
     scheduleAlarmEnabled, scheduleAlarmLeadMinutes, scheduleAlarmOnEdit
   };
