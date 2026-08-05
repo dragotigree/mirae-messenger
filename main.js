@@ -1651,11 +1651,7 @@ function extractAndSaveAttachments(messageHtml, options) {
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
-      // 동기 write는 폭주 시 이벤트루프를 막음 → 비동기 저장(경로만 먼저 확정)
-      const buf = Buffer.from(base64Data, 'base64');
-      fs.promises.writeFile(filePath, buf).catch((e) => {
-        console.error('첨부파일 비동기 저장 오류:', e && e.message ? e.message : e);
-      });
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
       if (compact) {
         replacements.push({
           from: full,
