@@ -1654,6 +1654,12 @@
     .compact-header-actions .icon-btn-compact { width: 36px; height: 36px; color: #333; background: transparent; border-radius: 8px; opacity: 1; }
     .compact-header-actions .icon-btn-compact:hover { background: #f0f0f0; }
     .compact-header-actions .icon-btn-compact.is-master-authed { color: #059669; }
+    .compact-mode-exit-btn {
+      height: 32px; padding: 0 11px; font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
+      border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; cursor: pointer;
+      flex-shrink: 0; transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .compact-mode-exit-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
 
     .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .compact-pane[hidden] { display: none !important; }
@@ -3843,7 +3849,7 @@
           <div class="compact-header-actions">
             <button class="icon-btn-compact" id="toolbar-settings-btn-compact" onclick="openSettingsModal()" title="설정" style="display:none;"></button>
             <button class="icon-btn-compact" id="compact-header-search-btn" onclick="focusCompactSearchInput()" title="검색"><span data-ui-icon="search"></span></button>
-            <button class="icon-btn-compact" id="compact-expand-btn" onclick="toggleCompactMode()" title="기본 화면으로"></button>
+            <button type="button" class="compact-mode-exit-btn" id="compact-expand-btn" onclick="toggleCompactMode()" title="기본 화면으로">일반</button>
           </div>
         </header>
         <div class="compact-pane" data-compact-pane="chat">
@@ -3891,7 +3897,7 @@
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
               <button type="button" class="compact-more-cell" onclick="openCodeAlertModal()"><span class="compact-more-cell-icon" style="font-size:20px;line-height:1;">🚨</span>코드</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
-              <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="panelWide"></span>일반화면</button>
+              <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
             </div>
             <div class="compact-more-footer">
               <span>Mirae Messenger</span>
@@ -5669,9 +5675,7 @@
       folder: _uiSvg('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'),
       refresh: _uiSvg('<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'),
       panelNarrow: _uiSvg('<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>'),
-      panelWide: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>'),
-      panelCollapseLeft: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/>'),
-      panelCollapseRight: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/>'),
+      monitor: _uiSvg('<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'),
       chevronLeft: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
       chevronRight: _uiSvg('<path d="m9 18 6-6-6-6"/>'),
       settings: _uiSvg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
@@ -7624,7 +7628,6 @@
     startScheduleAlarmChecker();
 
     const COMPACT_MODE_ICON = uiIcon('panelNarrow');
-    const NORMAL_MODE_ICON = uiIcon('panelWide');
 
     function paintUiIcons() {
       const pairs = [
@@ -7633,7 +7636,6 @@
         ['toolbar-refresh-btn', 'refresh'],
         ['toolbar-settings-btn', 'settings'],
         ['toolbar-settings-btn-compact', 'settings'],
-        ['compact-expand-btn', 'panelWide'],
         ['compact-back-btn', 'back'],
         ['chat-clear-view-btn', 'clearChat'],
         ['chat-search-toggle-btn', 'search'],
@@ -7662,7 +7664,7 @@
     function updateCompactModeButtonUi() {
       const btn = document.getElementById('compact-mode-btn');
       if (btn) {
-        btn.innerHTML = isCompactMode ? NORMAL_MODE_ICON : COMPACT_MODE_ICON;
+        btn.innerHTML = COMPACT_MODE_ICON;
         btn.title = isCompactMode ? '일반 모드로 전환' : '미니 모드로 전환';
       }
     }
