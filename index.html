@@ -2316,6 +2316,20 @@
     .schedule-board-top-bar-actions {
       display: flex; gap: 6px; align-items: center; flex-shrink: 0;
     }
+    .schedule-board-auth-user {
+      display: none; align-items: center; gap: 6px;
+      max-width: 200px; padding: 5px 10px; border-radius: 999px;
+      background: #ecfeff; border: 1px solid #a5f3fc;
+      color: #0e7490; font-size: 11.5px; font-weight: 800;
+      letter-spacing: -0.02em; line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .schedule-board-auth-user.is-master {
+      background: #eef2ff; border-color: #c7d2fe; color: #3730a3;
+    }
+    .schedule-board-auth-user .sb-auth-user-label {
+      min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    }
     body.schedule-board-standalone .sb-top-close { display: none; }
     .schedule-board-main {
       display: flex; flex: 1; min-height: 0; overflow: hidden;
@@ -4895,6 +4909,7 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="appearance" onclick="setSettingsTab('appearance')">화면·글꼴</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="files" onclick="setSettingsTab('files')">파일</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="privacy" onclick="setSettingsTab('privacy')">화면 잠금</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
         </nav>
@@ -5165,6 +5180,26 @@
         </div>
       </div>
 
+      <div class="settings-panel" data-settings-panel="auth">
+        <h3 class="settings-panel-title">작성 로그인</h3>
+        <p class="settings-panel-desc">현황판·공지·일정 등록용 작성자 로그인을 관리합니다.</p>
+        <div class="settings-card">
+          <div id="setting-operator-auth-status" class="settings-hint" style="margin-bottom:10px;">현재 로그인: 없음</div>
+          <div style="font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:8px;">메신저 시작 시</div>
+          <div class="settings-radio-group" role="radiogroup" aria-label="작성자 자동 로그인">
+            <label class="settings-radio-row">
+              <input type="radio" name="operator-auto-login" value="off" id="operator-auto-login-off" checked>
+              <span><b>로그인 안 됨</b><small>다시 켤 때마다 로그아웃된 상태 (기본)</small></span>
+            </label>
+            <label class="settings-radio-row">
+              <input type="radio" name="operator-auto-login" value="on" id="operator-auto-login-on">
+              <span><b>자동 로그인</b><small>이전에 로그인한 작성자 계정을 유지</small></span>
+            </label>
+          </div>
+          <p class="settings-hint" style="margin-top:10px;">자동 로그인을 끄면 지금 세션은 유지되지만, 메신저를 종료하면 작성자 로그인이 풀립니다.</p>
+        </div>
+      </div>
+
       <div class="settings-panel" data-settings-panel="data">
         <h3 class="settings-panel-title">데이터</h3>
         <p class="settings-panel-desc">대화 백업과 삭제를 관리합니다.</p>
@@ -5256,6 +5291,7 @@
           <div class="schedule-board-top-summary" id="schedule-board-day-summary">날짜를 선택하세요.</div>
         </div>
         <div class="schedule-board-top-bar-actions">
+          <span id="schedule-board-auth-user" class="schedule-board-auth-user" title=""></span>
           <button type="button" id="schedule-board-login-btn" class="schedule-board-add-btn" style="display:none;" onclick="openOperatorLoginModal()">✍️ 작성자 로그인</button>
           <button type="button" id="schedule-board-logout-btn" class="schedule-board-add-btn" style="display:none; background:#fee2e2; color:#b91c1c;" onclick="logoutScheduleBoardAuth()">🔓 로그아웃</button>
           <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add" title="빠른 등록 (Ctrl+R)">+ 빠른 등록</button>
@@ -6078,17 +6114,51 @@
     let activeChatPin = null;
     const NOTICE_OPERATOR_STORAGE_KEY = 'mirae_notice_operator_session';
 
+    function isOperatorAutoLoginEnabled() {
+      return !!appSettings.operatorAutoLogin;
+    }
+
+    function getScheduleBoardAuthDisplayName() {
+      if (isMasterAuthenticated) return '마스터';
+      if (isNoticeOperatorAuthenticated) {
+        return currentOperatorName || currentOperatorUsername || '작성자';
+      }
+      return '';
+    }
+
+    function syncOperatorAuthSettingsStatusUi() {
+      const el = document.getElementById('setting-operator-auth-status');
+      if (!el) return;
+      if (isMasterAuthenticated) {
+        el.textContent = '현재 로그인: 마스터 관리자';
+        return;
+      }
+      if (isNoticeOperatorAuthenticated) {
+        const name = currentOperatorName || currentOperatorUsername || '작성자';
+        const idPart = currentOperatorUsername ? ` (${currentOperatorUsername})` : '';
+        el.textContent = `현재 로그인: ${name}${idPart}`;
+        return;
+      }
+      el.textContent = '현재 로그인: 없음';
+    }
+
     function saveNoticeOperatorSession() {
       if (isNoticeOperatorAuthenticated && currentOperatorName) {
-        localStorage.setItem(NOTICE_OPERATOR_STORAGE_KEY, JSON.stringify({
-          displayName: currentOperatorName,
-          username: currentOperatorUsername || '',
-          canManageDuty: !!noticeOperatorCanManageDuty,
-          at: Date.now()
-        }));
+        if (isOperatorAutoLoginEnabled()) {
+          localStorage.setItem(NOTICE_OPERATOR_STORAGE_KEY, JSON.stringify({
+            displayName: currentOperatorName,
+            username: currentOperatorUsername || '',
+            canManageDuty: !!noticeOperatorCanManageDuty,
+            at: Date.now()
+          }));
+        } else {
+          // 자동 로그인 OFF: 디스크에 남기지 않음 (이번 실행만 유지)
+          localStorage.removeItem(NOTICE_OPERATOR_STORAGE_KEY);
+        }
       } else {
         localStorage.removeItem(NOTICE_OPERATOR_STORAGE_KEY);
       }
+      syncOperatorAuthSettingsStatusUi();
       return syncNoticeOperatorSessionToMain();
     }
 
@@ -6106,6 +6176,16 @@
 
     function loadNoticeOperatorSession() {
       try {
+        if (!isOperatorAutoLoginEnabled()) {
+          localStorage.removeItem(NOTICE_OPERATOR_STORAGE_KEY);
+          isNoticeOperatorAuthenticated = false;
+          currentOperatorName = '';
+          currentOperatorUsername = '';
+          noticeOperatorCanManageDuty = false;
+          syncNoticeOperatorSessionToMain();
+          syncOperatorAuthSettingsStatusUi();
+          return;
+        }
         const raw = localStorage.getItem(NOTICE_OPERATOR_STORAGE_KEY);
         if (!raw) {
           isNoticeOperatorAuthenticated = false;
@@ -6113,6 +6193,7 @@
           currentOperatorUsername = '';
           noticeOperatorCanManageDuty = false;
           syncNoticeOperatorSessionToMain();
+          syncOperatorAuthSettingsStatusUi();
           return;
         }
         const data = JSON.parse(raw);
@@ -6135,6 +6216,7 @@
         noticeOperatorCanManageDuty = false;
       }
       syncNoticeOperatorSessionToMain();
+      syncOperatorAuthSettingsStatusUi();
     }
 
     function canManageDutyRoster() {
@@ -6720,6 +6802,7 @@
     if (appSettings.privacyLockOnHide === undefined) appSettings.privacyLockOnHide = true;
     if (appSettings.privacyLockIdleMinutes === undefined) appSettings.privacyLockIdleMinutes = 0;
     if (typeof appSettings.privacyLockPinHash !== 'string') appSettings.privacyLockPinHash = '';
+    if (appSettings.operatorAutoLogin === undefined) appSettings.operatorAutoLogin = false;
     if (appSettings.scheduleAlarmEnabled === undefined) appSettings.scheduleAlarmEnabled = false;
     if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
@@ -7996,6 +8079,7 @@
       const addBtn = document.getElementById('schedule-board-add-btn');
       const loginBtn = document.getElementById('schedule-board-login-btn');
       const logoutBtn = document.getElementById('schedule-board-logout-btn');
+      const authUserEl = document.getElementById('schedule-board-auth-user');
       const sbVisible = document.body.classList.contains('schedule-board-standalone') ||
         (document.getElementById('schedule-board-modal')?.style.display === 'flex');
       if (!sbVisible) return;
@@ -8004,6 +8088,23 @@
       if (loginBtn) loginBtn.style.display = canWrite ? 'none' : 'inline-block';
       if (logoutBtn) logoutBtn.style.display = canWrite ? 'inline-block' : 'none';
       if (loginHint) loginHint.style.display = canWrite ? 'none' : 'block';
+      if (authUserEl) {
+        if (canWrite) {
+          const name = getScheduleBoardAuthDisplayName();
+          const isMaster = !!isMasterAuthenticated;
+          authUserEl.style.display = 'inline-flex';
+          authUserEl.classList.toggle('is-master', isMaster);
+          authUserEl.innerHTML = `<span class="sb-auth-user-label">${escapeHtml(isMaster ? '마스터' : name)}</span>`;
+          authUserEl.title = isMaster
+            ? '마스터 관리자로 로그인됨'
+            : `${name}${currentOperatorUsername ? ` (${currentOperatorUsername})` : ''}으로 로그인됨`;
+        } else {
+          authUserEl.style.display = 'none';
+          authUserEl.innerHTML = '';
+          authUserEl.title = '';
+        }
+      }
+      syncOperatorAuthSettingsStatusUi();
       if (!canWrite) {
         setScheduleBoardQuickAddPanelVisible(false);
         return;
@@ -21449,6 +21550,13 @@
         if (privacyPin1) privacyPin1.value = '';
         if (privacyPin2) privacyPin2.value = '';
         onPrivacyLockEnabledToggle();
+        const opAutoOn = document.getElementById('operator-auto-login-on');
+        const opAutoOff = document.getElementById('operator-auto-login-off');
+        if (opAutoOn && opAutoOff) {
+          if (appSettings.operatorAutoLogin) opAutoOn.checked = true;
+          else opAutoOff.checked = true;
+        }
+        syncOperatorAuthSettingsStatusUi();
         document.getElementById('setting-my-status').value = normalizeSelectableStatusState(p.statusState);
         document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
         const msgNotify = await window.api.getMessageNotificationSettings();
@@ -21561,6 +21669,8 @@
   const privacyLockPinHash = appSettings.privacyLockPinHash || '';
   const privacyLockOnHide = appSettings.privacyLockOnHide !== false;
   const privacyLockIdleMinutes = appSettings.privacyLockIdleMinutes || 0;
+  const operatorAutoLoginEl = document.querySelector('input[name="operator-auto-login"]:checked');
+  const operatorAutoLogin = !!(operatorAutoLoginEl && operatorAutoLoginEl.value === 'on');
 
   const scheduleAlarmEnabledInput = !!(document.getElementById('setting-schedule-alarm-enabled')
     && document.getElementById('setting-schedule-alarm-enabled').checked);
@@ -21585,9 +21695,13 @@
     spellcheck, uiAnimationsEnabled: uiAnimationsEnabledFinal, stabilityModeEnabled, showUserListAvatars,
     showOfflineUsers, showSharedPcs, compactPersonClickMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
+    operatorAutoLogin,
     scheduleAlarmEnabled, scheduleAlarmLeadMinutes, scheduleAlarmOnEdit
   };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
+  // 자동 로그인 on/off에 맞춰 작성자 세션 저장 여부 즉시 반영
+  try { await saveNoticeOperatorSession(); } catch (_) {}
+  refreshScheduleBoardEntryUi();
   // 방금 켰거나 알림 시점을 바꾼 경우: 이미 지난 트리거는 한꺼번에 울리지 않도록 맞춤
   if (scheduleAlarmEnabled && (!wasScheduleAlarmEnabled || scheduleAlarmLeadMinutes !== prevScheduleAlarmLeadMinutes)) {
     seedScheduleAlarmNotifiedForPastDue();
