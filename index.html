@@ -945,6 +945,33 @@
     }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
+    .chat-date-sep {
+      display: flex; align-items: center; gap: 12px;
+      margin: 12px 4px 8px; flex-shrink: 0; user-select: none;
+    }
+    .chat-date-sep::before,
+    .chat-date-sep::after {
+      content: ''; flex: 1; height: 1px;
+      background: rgba(148, 163, 184, 0.4);
+    }
+    .chat-date-sep span {
+      font-size: 11.5px; font-weight: 700; color: #64748b;
+      letter-spacing: -0.02em; white-space: nowrap;
+      padding: 4px 12px; border-radius: 99px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #e8edf2;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+    body.compact-mode .chat-date-sep { margin: 10px 2px 6px; }
+    body.compact-mode .chat-date-sep::before,
+    body.compact-mode .chat-date-sep::after {
+      background: rgba(255, 255, 255, 0.4);
+    }
+    body.compact-mode .chat-date-sep span {
+      background: rgba(255, 255, 255, 0.55);
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #334155;
+    }
 
     .msg-row { display: flex; gap: 12px; padding: 8px 12px 10px; border-radius: var(--radius-md); position: relative; align-items: flex-start; transition: background var(--transition-fast); max-width: 82%; }
     .msg-row.is-other { align-self: flex-start; margin-right: auto; }
@@ -15389,7 +15416,8 @@
             ? true
             : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
           const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
-          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true });
+          const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey });
         });
         pendingUnreadScrollCount = 0;
         if (unreadStartIndex >= 0 && unreadStartIndex < history.length) {
@@ -17574,6 +17602,62 @@
       return html.replace(/(<div[^>]*class="[^"]*chat-file-box[^"]*"[^>]*>[\s\S]*?<a\b[^>]*>)\s*다운로드\s*(<\/a>)/gi, '$1받기$2');
     }
 
+    function resolveChatDateKey(sentAtFull, opts) {
+      if (opts && opts.dateKey) {
+        const k = String(opts.dateKey).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(k)) return k;
+      }
+      const full = String(sentAtFull || '').trim();
+      const m = full.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+      // 실시간 수신 등은 시각만 오므로 오늘로 취급
+      return formatDateStr(new Date());
+    }
+
+    function formatChatDateSepLabel(dateKey) {
+      const m = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return String(dateKey || '');
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      const d = parseInt(m[3], 10);
+      const dt = new Date(y, mo - 1, d);
+      const today = formatDateStr(new Date());
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = formatDateStr(yesterdayDate);
+      if (dateKey === today) return '오늘';
+      if (dateKey === yesterday) return '어제';
+      const wd = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+      const thisYear = new Date().getFullYear();
+      if (y === thisYear) return `${mo}월 ${d}일 (${wd})`;
+      return `${y}년 ${mo}월 ${d}일 (${wd})`;
+    }
+
+    function getPreviousChatDateKey(container, beforeNode) {
+      if (!container) return '';
+      const kids = container.children;
+      let i = beforeNode
+        ? Array.prototype.indexOf.call(kids, beforeNode) - 1
+        : kids.length - 1;
+      for (; i >= 0; i--) {
+        const el = kids[i];
+        if (!el || !el.getAttribute) continue;
+        const key = el.getAttribute('data-chat-date-key');
+        if (key) return key;
+      }
+      return '';
+    }
+
+    function insertChatDateSeparatorIfNeeded(container, dateKey) {
+      if (!container || !dateKey) return;
+      if (getPreviousChatDateKey(container) === dateKey) return;
+      const sep = document.createElement('div');
+      sep.className = 'chat-date-sep';
+      sep.setAttribute('data-chat-date-key', dateKey);
+      sep.innerHTML = `<span>${escapeHtml(formatChatDateSepLabel(dateKey))}</span>`;
+      container.appendChild(sep);
+    }
+
     function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
       const options = opts || {};
       const skipStatusUpdate = !!options.skipStatusUpdate;
@@ -17581,16 +17665,29 @@
       const container = document.getElementById('chat-messages-area');
       if (!container) return;
       const wasNearBottom = isMe || isNearChatBottom();
+      const dateKey = resolveChatDateKey(sentAtLabelForPending, options);
 
       // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 제한 (예: 300개)
       if (container.children.length > 300) {
         container.removeChild(container.firstChild);
+        // 맨 위가 날짜선만 남지 않도록 정리
+        while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
+          const next = container.children[1];
+          if (next && next.getAttribute && next.getAttribute('data-chat-date-key') === container.firstChild.getAttribute('data-chat-date-key')) break;
+          if (next && next.classList && next.classList.contains('chat-date-sep')) {
+            container.removeChild(container.firstChild);
+            continue;
+          }
+          break;
+        }
       }
 
       // 그룹 이름 변경 등 "시스템 알림"은 말풍선이 아니라 가운데 정렬된 안내문으로 표시한다.
       if (typeof msg === 'string' && msg.indexOf('class="system-notice-flag"') !== -1) {
+        insertChatDateSeparatorIfNeeded(container, dateKey);
         const noticeText = msg.replace(/<span class="system-notice-flag"[^>]*><\/span>/, '');
         const noticeRow = document.createElement('div');
+        noticeRow.setAttribute('data-chat-date-key', dateKey);
         noticeRow.style.cssText = 'text-align:center; margin:10px 0;';
         noticeRow.innerHTML = `<span style="display:inline-block; background:#eef2f7; color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: 18px;">${noticeText}</span>`;
         container.appendChild(noticeRow);
@@ -17605,6 +17702,8 @@
         row.setAttribute('data-msg-uid', msgUid);
       }
       if (messageId) row.setAttribute('data-msg-id', String(messageId));
+      if (dateKey) row.setAttribute('data-chat-date-key', dateKey);
+      insertChatDateSeparatorIfNeeded(container, dateKey);
       const isGroupChannel = activeChatUser && (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup);
       if (isMe && !isGroupChannel) {
         row.setAttribute('data-outbound-status', outboundStatus === 'PENDING' ? 'PENDING' : 'SENT');

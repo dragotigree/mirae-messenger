@@ -7272,7 +7272,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   const scope = chatHistoryScopeSql(targetIP);
 
   return new Promise((resolve) => {
-    let sql = `SELECT DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full FROM messages WHERE ${scope.where}`;
+    let sql = `SELECT DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key FROM messages WHERE ${scope.where}`;
     const params = [...scope.params];
 
     if (hideUpToId > 0) {
