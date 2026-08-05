@@ -2940,82 +2940,193 @@
     .calendar-day-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
     /* 📜 전체 대화 기록 모달 */
-    .modal-card.all-logs-modal-card { width: 640px; height: 620px; max-height: 90vh; padding: 0; gap: 0; overflow: hidden; }
-    .all-logs-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px 16px; border-bottom: 1px solid #eef2f6; flex-shrink: 0; }
-    .all-logs-header-title { display: flex; align-items: center; gap: 12px; }
-    .all-logs-header-icon { width: 40px; height: 40px; border-radius: 14px; background: linear-gradient(145deg, #e0f2fe, #bae6fd); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-    .all-logs-title { font-size: 16px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.25; }
-    .all-logs-subtitle { font-size: 11.5px; color: #94a3b8; margin-top: 2px; font-weight: 400; }
-    .all-logs-close-btn { width: 32px; height: 32px; border: none; background: #f1f5f9; border-radius: 10px; font-size: 14px; color: #64748b; cursor: pointer; transition: background 0.12s, color 0.12s; flex-shrink: 0; }
+    .modal-card.all-logs-modal-card {
+      width: min(720px, 94vw); height: min(720px, 90vh); max-height: 90vh;
+      padding: 0; gap: 0; overflow: hidden;
+      border-radius: 18px;
+      box-shadow: 0 28px 64px rgba(15, 23, 42, 0.18);
+      background: #fff;
+      display: flex; flex-direction: column;
+    }
+    .all-logs-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 22px 14px;
+      background:
+        radial-gradient(120% 80% at 0% 0%, rgba(14, 165, 233, 0.10), transparent 55%),
+        linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+      border-bottom: 1px solid #eef2f6;
+      flex-shrink: 0;
+    }
+    .all-logs-header-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .all-logs-header-icon {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(145deg, #0ea5e9, #0284c7);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+      box-shadow: 0 8px 18px rgba(14, 165, 233, 0.28);
+    }
+    .all-logs-title { font-size: 16.5px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; line-height: 1.25; }
+    .all-logs-subtitle { font-size: 11.5px; color: #64748b; margin-top: 3px; font-weight: 500; }
+    .all-logs-subtitle b { color: #0284c7; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .all-logs-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .all-logs-folder-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 34px; padding: 0 12px;
+      background: rgba(255,255,255,0.85); border: 1px solid #e2e8f0; border-radius: 11px;
+      font-size: 11.5px; font-weight: 700; cursor: pointer; color: #475569;
+      white-space: nowrap; transition: background 0.15s, border-color 0.15s, color 0.15s;
+      font-family: inherit;
+    }
+    .all-logs-folder-btn:hover { background: #fff; border-color: #cbd5e1; color: #0f172a; }
+    .all-logs-close-btn {
+      width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: 11px;
+      font-size: 14px; color: #64748b; cursor: pointer;
+      transition: background 0.12s, color 0.12s; flex-shrink: 0;
+    }
     .all-logs-close-btn:hover { background: #e2e8f0; color: #334155; }
-    .all-logs-toolbar { display: flex; gap: 8px; padding: 14px 22px 10px; background: #fafbfc; border-bottom: none; flex-shrink: 0; }
-    .all-logs-search-wrap { flex: 1; position: relative; }
-    .all-logs-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.4; pointer-events: none; }
-    .all-logs-search-wrap input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12.5px; outline: none; background: #fff; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box; }
-    .all-logs-search-wrap input:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
-    .all-logs-folder-btn { padding: 9px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 11.5px; font-weight: 600; cursor: pointer; color: #475569; white-space: nowrap; transition: background 0.12s; flex-shrink: 0; }
-    .all-logs-folder-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
-    .all-logs-filterbar {
-      display: flex; align-items: center; gap: 2px; padding: 0 22px 12px; background: #fafbfc;
+    .all-logs-controls {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 12px 20px 12px; background: #fff;
       border-bottom: 1px solid #eef2f6; flex-shrink: 0;
     }
+    .all-logs-search-wrap { position: relative; }
+    .all-logs-search-icon {
+      position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+      font-size: 13px; opacity: 0.45; pointer-events: none;
+    }
+    .all-logs-search-wrap input {
+      width: 100%; padding: 11px 14px 11px 36px;
+      border: 1px solid #e2e8f0; border-radius: 13px; font-size: 13px;
+      outline: none; background: #f8fafc; font-family: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      box-sizing: border-box; color: #0f172a;
+    }
+    .all-logs-search-wrap input::placeholder { color: #94a3b8; }
+    .all-logs-search-wrap input:focus {
+      background: #fff; border-color: rgba(14, 165, 233, 0.5);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+    }
+    .all-logs-filterbar {
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px; background: #f1f5f9; border-radius: 12px;
+    }
     .all-logs-filter-tab {
-      padding: 8px 12px; border: none; background: transparent; font-size: 12.5px; font-weight: 600;
-      color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit;
+      flex: 1; min-width: 0; padding: 8px 10px; border: none; background: transparent;
+      font-size: 12.5px; font-weight: 700; color: #64748b; cursor: pointer;
+      border-radius: 9px; font-family: inherit; letter-spacing: -0.02em;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     }
-    .all-logs-filter-tab:hover { color: #475569; }
-    .all-logs-filter-tab.is-active { color: #0f172a; border-bottom-color: #0f172a; }
-    .all-logs-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; box-sizing: border-box; }
-    .all-logs-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.65; }
+    .all-logs-filter-tab:hover { color: #334155; }
+    .all-logs-filter-tab.is-active {
+      color: #0c4a6e; background: #fff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(14, 165, 233, 0.12);
+    }
+    .all-logs-list {
+      flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+      padding: 10px 14px 18px; display: flex; flex-direction: column; gap: 4px;
+      background:
+        linear-gradient(180deg, #f4f7fb 0%, #f8fafc 48px);
+      box-sizing: border-box;
+    }
+    .all-logs-list::-webkit-scrollbar { width: 7px; }
+    .all-logs-list::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 99px; }
+    .all-logs-date-sep {
+      display: flex; align-items: center; gap: 10px;
+      margin: 10px 4px 6px; color: #94a3b8; font-size: 11px; font-weight: 700;
+      letter-spacing: -0.01em; user-select: none;
+    }
+    .all-logs-date-sep::before,
+    .all-logs-date-sep::after {
+      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+    }
+    .all-logs-date-sep span {
+      padding: 3px 10px; border-radius: 99px; background: #fff;
+      border: 1px solid #e8edf2; color: #64748b;
+    }
+    .all-logs-empty {
+      text-align: center; padding: 64px 28px; color: #94a3b8;
+      font-size: 13px; line-height: 1.7; margin: auto 0;
+    }
+    .all-logs-empty-icon {
+      width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; background: #fff; border: 1px solid #e8edf2;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    }
     .log-card-item {
-      width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e8edf2;
-      border-radius: 12px; padding: 12px 14px; display: flex; align-items: flex-start; gap: 12px;
-      flex-shrink: 0; border-left-width: 3px;
+      width: 100%; box-sizing: border-box;
+      background: #fff; border: 1px solid transparent;
+      border-radius: 12px; padding: 10px 12px;
+      display: flex; align-items: flex-start; gap: 10px;
+      flex-shrink: 0; position: relative;
+      transition: background 0.14s, border-color 0.14s, transform 0.14s, box-shadow 0.14s;
+      animation: all-logs-row-in 0.22s var(--ease-out);
     }
-    .log-card-item.is-received { background: #fff; border-left-color: #94a3b8; }
-    .log-card-item.is-sent {
-      background: #f8fcff; border-color: #dbeafe; border-left-color: #0284c7;
+    @keyframes all-logs-row-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
+    .log-card-item:hover {
+      border-color: #e2e8f0;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+      transform: translateY(-1px);
+    }
+    .log-card-item.is-received { background: rgba(255,255,255,0.92); }
+    .log-card-item.is-sent { background: linear-gradient(90deg, rgba(240, 249, 255, 0.95), #fff 42%); }
+    .log-card-rail {
+      width: 3px; align-self: stretch; border-radius: 99px; flex-shrink: 0;
+      margin: 2px 0; min-height: 28px;
+    }
+    .log-card-item.is-sent .log-card-rail { background: #0ea5e9; }
+    .log-card-item.is-received .log-card-rail { background: #cbd5e1; }
     /* 채팅창과 동일: 전체 대화 기록에서도 이름 이니셜 아바타 숨김 */
     .log-card-avatar { display: none !important; }
     .log-card-thumb {
-      width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+      width: 52px; height: 52px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
       background: #e2e8f0; border: 1px solid #e8edf2;
     }
     .log-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .log-card-file-icon {
-      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center;
-      justify-content: center; font-size: 22px; background: #f1f5f9; border: 1px solid #e8edf2;
+      width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      background: #f8fafc; border: 1px solid #e8edf2; color: #64748b;
     }
-    .log-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .log-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
     .log-card-top {
       display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; flex-wrap: nowrap;
     }
     .log-card-sender {
-      font-weight: 600; font-size: 13px; color: #0f172a; min-width: 0; flex: 1;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-weight: 700; font-size: 12.5px; color: #0f172a; min-width: 0; flex: 1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.02em;
     }
     .log-card-direction {
-      font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 99px; line-height: 1.2;
+      font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; line-height: 1.25;
       flex-shrink: 0; letter-spacing: -0.02em;
     }
-    .log-card-direction.is-sent { background: #0284c7; color: #fff; }
-    .log-card-direction.is-received { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-    .log-card-type { font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 99px; line-height: 1.2; flex-shrink: 0; white-space: nowrap; }
-    .log-card-type.is-dm { background: #e0f2fe; color: #0369a1; }
+    .log-card-direction.is-sent { background: rgba(14, 165, 233, 0.12); color: #0369a1; }
+    .log-card-direction.is-received { background: #f1f5f9; color: #64748b; }
+    .log-card-type {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+      line-height: 1.25; flex-shrink: 0; white-space: nowrap; max-width: 120px;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .log-card-type.is-dm { background: #f1f5f9; color: #475569; }
     .log-card-type.is-broadcast { background: #eef2ff; color: #4338ca; }
     .log-card-type.is-dept, .log-card-type.is-floor { background: #ecfdf5; color: #059669; }
-    .log-card-type.is-group { background: #fffbeb; color: #d97706; }
+    .log-card-type.is-group { background: #fff7ed; color: #c2410c; }
     .log-card-time {
-      margin-left: auto; font-size: 11px; color: #64748b; white-space: nowrap; flex-shrink: 0;
-      font-variant-numeric: tabular-nums; padding-left: 8px;
+      margin-left: auto; font-size: 11px; color: #94a3b8; white-space: nowrap; flex-shrink: 0;
+      font-variant-numeric: tabular-nums; padding-left: 6px; font-weight: 600;
     }
     .log-card-body {
       font-size: 12.5px; color: #475569; line-height: 1.5; word-break: break-word;
       overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; width: 100%; padding-left: 2px;
+      -webkit-box-orient: vertical; width: 100%;
     }
-    .log-card-item.is-sent .log-card-body { color: #0c4a6e; }
+    .log-card-item.is-sent .log-card-body { color: #334155; }
+    .log-card-item.is-clickable { cursor: pointer; }
+    .log-card-item.is-clickable:hover { border-color: #bae6fd; }
 
     /* 💬 앱 공통 알림/확인 다이얼로그 */
     #app-dialog-overlay {
@@ -3263,6 +3374,7 @@
     html.ui-animations-off .modal-overlay,
     html.ui-animations-off .modal-card,
     html.ui-animations-off .app-dialog-card,
+    html.ui-animations-off .log-card-item,
     html.ui-animations-off #dm-context-menu,
     html.ui-animations-off #quick-phrase-popover,
     html.ui-animations-off #chat-slash-popover {
@@ -3276,7 +3388,8 @@
     html.ui-animations-off .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
     html.ui-animations-off .sidebar-quick-actions .sidebar-code-alert-btn:hover,
     html.ui-animations-off .settings-nav-btn.active,
-    html.ui-animations-off .sidebar-pref-chip.is-active {
+    html.ui-animations-off .sidebar-pref-chip.is-active,
+    html.ui-animations-off .log-card-item:hover {
       transform: none !important;
     }
     .master-admin-modal-card {
@@ -4195,26 +4308,28 @@
     <div class="modal-card all-logs-modal-card">
       <div class="all-logs-header">
         <div class="all-logs-header-title">
-          <div class="all-logs-header-icon">📜</div>
+          <div class="all-logs-header-icon" aria-hidden="true">📜</div>
           <div>
             <div class="all-logs-title">전체 대화 기록</div>
-            <div class="all-logs-subtitle">송수신 로그 · <span id="all-logs-count">0</span>건</div>
+            <div class="all-logs-subtitle">송수신 로그 · <b id="all-logs-count">0</b>건 · Ctrl+2</div>
           </div>
         </div>
-        <button type="button" class="all-logs-close-btn" onclick="closeAllLogsModal()" title="닫기">✕</button>
-      </div>
-      <div class="all-logs-toolbar">
-        <div class="all-logs-search-wrap">
-          <span class="all-logs-search-icon">🔍</span>
-          <input type="text" id="all-logs-search-input" placeholder="대화 내용 또는 보낸 사람 검색..." oninput="onAllLogsSearchInput(this.value)">
+        <div class="all-logs-header-actions">
+          <button type="button" class="all-logs-folder-btn" onclick="window.api.openUserDataFolder()" title="로그 폴더 열기">📂 폴더</button>
+          <button type="button" class="all-logs-close-btn" onclick="closeAllLogsModal()" title="닫기">✕</button>
         </div>
-        <button type="button" class="all-logs-folder-btn" onclick="window.api.openUserDataFolder()">📂 로그 폴더</button>
       </div>
-      <div class="all-logs-filterbar" role="tablist" aria-label="대화 기록 종류">
-        <button type="button" class="all-logs-filter-tab is-active" data-all-logs-filter="all" onclick="setAllLogsFilter('all')">전체</button>
-        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="photo" onclick="setAllLogsFilter('photo')">사진</button>
-        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="file" onclick="setAllLogsFilter('file')">파일</button>
-        <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
+      <div class="all-logs-controls">
+        <div class="all-logs-search-wrap">
+          <span class="all-logs-search-icon" aria-hidden="true">🔍</span>
+          <input type="text" id="all-logs-search-input" placeholder="이름·내용으로 검색..." autocomplete="off" spellcheck="false" oninput="onAllLogsSearchInput(this.value)">
+        </div>
+        <div class="all-logs-filterbar" role="tablist" aria-label="대화 기록 종류">
+          <button type="button" class="all-logs-filter-tab is-active" data-all-logs-filter="all" onclick="setAllLogsFilter('all')">전체</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="photo" onclick="setAllLogsFilter('photo')">사진</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="file" onclick="setAllLogsFilter('file')">파일</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
+        </div>
       </div>
       <div id="all-logs-container" class="all-logs-list"></div>
     </div>
@@ -12483,6 +12598,7 @@
       document.getElementById('all-logs-search-input').value = '';
       loadAllChatLogs('');
       document.getElementById('all-logs-modal').style.display = 'flex';
+      setTimeout(() => document.getElementById('all-logs-search-input')?.focus(), 40);
     }
 
     function closeAllLogsModal() {
@@ -12510,8 +12626,42 @@
       if (receiverIp === 'BROADCAST') return { label: '전체공지', class: 'is-broadcast' };
       if (receiverIp.startsWith('DEPT:')) return { label: receiverIp.replace('DEPT:', ''), class: 'is-dept' };
       if (receiverIp.startsWith('FLOOR:')) return { label: receiverIp.replace('FLOOR:', ''), class: 'is-floor' };
-      if (receiverIp.startsWith('GROUP:')) return { label: '그룹대화', class: 'is-group' };
-      return { label: '1:1 대화', class: 'is-dm' };
+      if (receiverIp.startsWith('GROUP:')) {
+        const uid = receiverIp.slice(6);
+        const g = (myGroupChats || []).find((x) => String(x.uid) === String(uid));
+        return { label: (g && g.name) ? g.name : '그룹대화', class: 'is-group' };
+      }
+      return { label: '1:1', class: 'is-dm' };
+    }
+
+    function resolveAllLogPeerLabel(item, isSent) {
+      const receiverIp = String(item.receiver_ip || '');
+      if (receiverIp === 'BROADCAST' || receiverIp.startsWith('DEPT:') || receiverIp.startsWith('FLOOR:') || receiverIp.startsWith('GROUP:')) {
+        return getLogTypeMeta(receiverIp).label;
+      }
+      const peerIp = isSent ? receiverIp : String(item.sender_ip || '');
+      const peer = peerIp ? findUserByIp(peerIp) : null;
+      if (peer) {
+        const name = profileDisplayName(peer) || peer.username || '';
+        if (name) return name;
+      }
+      if (!isSent && item.sender_name) return String(item.sender_name);
+      return peerIp || '1:1';
+    }
+
+    function formatAllLogTimeParts(createdTime) {
+      const raw = String(createdTime || '').trim();
+      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
+      if (!m) return { dateKey: raw.slice(0, 10) || '기타', dateLabel: raw.slice(0, 10) || '기타', timeLabel: raw };
+      const dateKey = `${m[1]}-${m[2]}-${m[3]}`;
+      const today = formatDateStr(new Date());
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterday = formatDateStr(yesterdayDate);
+      let dateLabel = `${m[1]}.${m[2]}.${m[3]}`;
+      if (dateKey === today) dateLabel = '오늘';
+      else if (dateKey === yesterday) dateLabel = '어제';
+      return { dateKey, dateLabel, timeLabel: m[4] };
     }
 
     function logMessagePreview(html) {
@@ -12590,16 +12740,31 @@
       }
 
       container.innerHTML = '';
-      logs.forEach(item => {
+      let lastDateKey = '';
+      logs.forEach((item, idx) => {
         const typeMeta = getLogTypeMeta(item.receiver_ip || '');
         const isSent = item.isMe === true || isMessageFromMe(item.sender_ip, item.sender_name);
         const dirClass = isSent ? 'is-sent' : 'is-received';
+        const timeParts = formatAllLogTimeParts(item.created_time);
+        if (timeParts.dateKey !== lastDateKey) {
+          lastDateKey = timeParts.dateKey;
+          const sep = document.createElement('div');
+          sep.className = 'all-logs-date-sep';
+          sep.innerHTML = `<span>${escapeHtml(timeParts.dateLabel)}</span>`;
+          container.appendChild(sep);
+        }
+
         const card = document.createElement('div');
         card.className = `log-card-item ${typeMeta.class} ${dirClass}`;
+        card.style.animationDelay = `${Math.min(idx, 12) * 12}ms`;
         const senderName = item.sender_name || '익명';
+        const peerLabel = resolveAllLogPeerLabel(item, isSent);
         const media = extractAllLogMediaMeta(item.message, kind === 'all' ? '' : kind);
         const preview = media.preview || logMessagePreview(item.message);
         const dirLabel = isSent ? '보냄' : '받음';
+        const contextLabel = typeMeta.class === 'is-dm'
+          ? (isSent ? peerLabel : '1:1')
+          : typeMeta.label;
 
         let sideHtml = '';
         if (kind === 'photo' && media.thumbSrc) {
@@ -12611,27 +12776,28 @@
         }
 
         card.innerHTML = `
+          <div class="log-card-rail" aria-hidden="true"></div>
           ${sideHtml}
           <div class="log-card-main">
             <div class="log-card-top">
               <span class="log-card-direction ${dirClass}">${dirLabel}</span>
-              <span class="log-card-sender">${escapeHtml(senderName)}</span>
-              <span class="log-card-type ${typeMeta.class}">${escapeHtml(typeMeta.label)}</span>
-              <span class="log-card-time">${escapeHtml(item.created_time)}</span>
+              <span class="log-card-sender" title="${escapeHtml(senderName)}">${escapeHtml(senderName)}</span>
+              <span class="log-card-type ${typeMeta.class}" title="${escapeHtml(contextLabel)}">${escapeHtml(contextLabel)}</span>
+              <span class="log-card-time" title="${escapeHtml(item.created_time || '')}">${escapeHtml(timeParts.timeLabel)}</span>
             </div>
             <div class="log-card-body">${escapeHtml(preview)}</div>
           </div>
         `;
 
         if (kind === 'link' && media.url) {
-          card.style.cursor = 'pointer';
+          card.classList.add('is-clickable');
           card.title = media.url;
           card.addEventListener('click', () => {
             if (window.api && typeof window.api.openExternalUrl === 'function') window.api.openExternalUrl(media.url);
             else window.open(media.url, '_blank', 'noopener,noreferrer');
           });
         } else if (kind === 'photo' && media.thumbSrc) {
-          card.style.cursor = 'pointer';
+          card.classList.add('is-clickable');
           card.addEventListener('click', () => {
             if (typeof openImageLightbox === 'function') openImageLightbox(media.thumbSrc);
             else window.open(media.thumbSrc, '_blank');
