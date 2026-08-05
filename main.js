@@ -7332,31 +7332,34 @@ ipcMain.handle('get-chat-history', async (event, args) => {
           finishFromAnchor(row.minId, dateStr);
           return;
         }
-        // 해당일에 없으면 그 이전 가장 가까운 대화일로 이동
-        let nearSql = `SELECT id, strftime('%Y-%m-%d', created_at, 'localtime') AS date_key FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') <= ?`;
-        const nearParams = [...scope.params, dateStr];
-        if (hideUpToId > 0) {
-          nearSql += ` AND id > ?`;
-          nearParams.push(hideUpToId);
-        }
-        nearSql += ` ORDER BY id DESC LIMIT 1`;
-        db.get(nearSql, nearParams, (errNear, nearRow) => {
-          if (errNear) logDbErr(errNear);
-          if (nearRow && nearRow.id) {
-            // 그 날의 첫 메시지로 맞춤
-            let dayStartSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
-            const dayStartParams = [...scope.params, nearRow.date_key];
-            if (hideUpToId > 0) {
-              dayStartSql += ` AND id > ?`;
-              dayStartParams.push(hideUpToId);
-            }
-            db.get(dayStartSql, dayStartParams, (err3, dayRow) => {
-              finishFromAnchor((dayRow && dayRow.minId) || nearRow.id, nearRow.date_key);
-            });
-            return;
+        // 해당일에 없으면 이전 → 없으면 이후 가장 가까운 대화일로 이동
+        const findNearestDay = (cmp, order, next) => {
+          let nearSql = `SELECT id, strftime('%Y-%m-%d', created_at, 'localtime') AS date_key FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') ${cmp} ?`;
+          const nearParams = [...scope.params, dateStr];
+          if (hideUpToId > 0) {
+            nearSql += ` AND id > ?`;
+            nearParams.push(hideUpToId);
           }
-          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
-        });
+          nearSql += ` ORDER BY id ${order} LIMIT 1`;
+          db.get(nearSql, nearParams, (errNear, nearRow) => {
+            if (errNear) logDbErr(errNear);
+            if (nearRow && nearRow.id) {
+              let dayStartSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
+              const dayStartParams = [...scope.params, nearRow.date_key];
+              if (hideUpToId > 0) {
+                dayStartSql += ` AND id > ?`;
+                dayStartParams.push(hideUpToId);
+              }
+              db.get(dayStartSql, dayStartParams, (err3, dayRow) => {
+                finishFromAnchor((dayRow && dayRow.minId) || nearRow.id, nearRow.date_key);
+              });
+              return;
+            }
+            if (typeof next === 'function') next();
+            else resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+          });
+        };
+        findNearestDay('<=', 'DESC', () => findNearestDay('>=', 'ASC'));
       });
     });
   }
@@ -7537,7 +7540,7 @@ ipcMain.handle('verify-master-password', async (event, inputPassword) => {
 });
 
 function normalizeNewPassword(raw) {
-  const pw = String(raw == null ? '' : raw);
+  const pw = String(raw == null ? '' : raw).trim();
   if (pw.length < 4) return { ok: false, msg: '새 비밀번호는 4자 이상이어야 합니다.' };
   if (pw.length > 64) return { ok: false, msg: '새 비밀번호는 64자 이하여야 합니다.' };
   return { ok: true, password: pw };
@@ -7548,7 +7551,7 @@ ipcMain.handle('change-master-password', async (event, payload) => {
   if (!masterSessionActive) {
     return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
   }
-  const currentPassword = String((payload && payload.currentPassword) || '');
+  const currentPassword = String((payload && payload.currentPassword) || '').trim();
   const normalized = normalizeNewPassword(payload && payload.newPassword);
   if (!normalized.ok) return { success: false, msg: normalized.msg };
   if (normalized.password === currentPassword) {
@@ -7560,7 +7563,7 @@ ipcMain.handle('change-master-password', async (event, payload) => {
         resolve({ success: false, msg: '마스터 설정을 찾을 수 없습니다.' });
         return;
       }
-      if (String(row.master_password) !== currentPassword) {
+      if (String(row.master_password || '').trim() !== currentPassword) {
         resolve({ success: false, msg: '현재 비밀번호가 올바르지 않습니다.' });
         return;
       }
@@ -7920,7 +7923,8 @@ ipcMain.handle('delete-notice-operator', async (event, username) => {
 
 ipcMain.handle('notice-operator-login', async (event, { username, password }) => {
   return new Promise((resolve) => {
-    db.get(`SELECT * FROM notice_operators WHERE username = ?`, [username], (err, row) => {
+    const user = String(username || '').trim();
+    db.get(`SELECT * FROM notice_operators WHERE username = ?`, [user], (err, row) => {
       if (!row || row.password_hash !== hashPassword(password)) {
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
@@ -7928,9 +7932,12 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
       // 작성 권한자 로그인 = 당직·OFF(일정등록) 포함
       noticeOperatorSessionActive = true;
       noticeOperatorCanManageDutySession = true;
+      noticeOperatorDisplayNameSession = String(row.display_name || '').trim();
+      noticeOperatorUsernameSession = user;
       resolve({
         success: true,
         displayName: row.display_name,
+        username: user,
         canManageDuty: true
       });
     });

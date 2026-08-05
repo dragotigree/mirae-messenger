@@ -15631,12 +15631,15 @@
           return;
         }
 
-        if (aroundDate) {
+        if (keyword) {
+          // 검색 중에는 날짜 점프 배너를 잠시 숨김 (검색 종료 시 최신/점프 상태 재결정)
+          setChatDateJumpBanner(null);
+        } else if (aroundDate) {
           setChatDateJumpBanner(jumpedDate || aroundDate, {
             requested: aroundDate,
             redirected: !!(jumpedDate && jumpedDate !== aroundDate)
           });
-        } else if (!keyword) {
+        } else {
           setChatDateJumpBanner(null);
         }
 
@@ -15850,15 +15853,7 @@
 
     async function jumpChatToDate(dateStr) {
       if (!activeChatUser || !dateStr) return;
-      const area = document.getElementById('chat-messages-area');
-      const existingSep = area && area.querySelector(`.chat-date-sep[data-chat-date-key="${dateStr}"]`);
-      if (existingSep && !chatDateJumpActive) {
-        chatCalendarSelectedDate = dateStr;
-        closeChatCalendarPopover();
-        scrollChatToDateSeparator(dateStr);
-        setChatDateJumpBanner(dateStr);
-        return;
-      }
+      // 항상 해당일 기준으로 다시 로드 (최근 200건에 날짜선만 있어도 앞부분이 잘릴 수 있음)
       closeChatCalendarPopover();
       await loadChatHistory(null, { aroundDate: dateStr, scrollToDate: dateStr });
     }
@@ -17478,8 +17473,12 @@
       setScheduleSendAt(d);
     }
 
-    function openScheduleMessageModal() {
+    async function openScheduleMessageModal() {
       if (!activeChatUser) return;
+      if (activeChatUser.isGroup || activeChatUser.isDept || activeChatUser.isFloor) {
+        await appAlert('예약 전송은 1:1 대화와 전체 공지에서만 사용할 수 있습니다.');
+        return;
+      }
       ensureScheduleTimeSelects();
       const suggested = new Date();
       suggested.setMinutes(suggested.getMinutes() + 5);
@@ -17508,6 +17507,10 @@
         return;
       }
       if (!activeChatUser) return;
+      if (activeChatUser.isGroup || activeChatUser.isDept || activeChatUser.isFloor) {
+        await appAlert('예약 전송은 1:1 대화와 전체 공지에서만 사용할 수 있습니다.');
+        return;
+      }
 
       const result = await window.api.scheduleMessage({
         targetIP: activeChatUser.ip,
@@ -18709,11 +18712,17 @@
     async function refreshDutyRosterFromServer() {
       if (!window.api.getDutyRoster) return;
       try {
-        dutyRosterCache = await window.api.getDutyRoster() || [];
+        const rows = await window.api.getDutyRoster();
+        if (!Array.isArray(rows)) {
+          console.error('당직 불러오기 실패: 잘못된 응답');
+          return;
+        }
+        dutyRosterCache = rows;
         dutyRosterDates = new Set(dutyRosterCache.map((r) => r.date_str).filter(Boolean));
       } catch (e) {
-        dutyRosterCache = [];
-        dutyRosterDates = new Set();
+        console.error('당직 불러오기 실패:', e);
+        // 기존 캐시 유지 (빈 목록으로 덮어쓰지 않음)
+        return;
       }
       renderSchedules();
     }
@@ -19192,29 +19201,34 @@
         btn.innerHTML = `<span class="sb-refresh-spin" aria-hidden="true">🔄</span><span class="sb-refresh-label"> 새로고침</span>`;
       }
       scheduleBoardRefreshInFlight = (async () => {
+        let ok = true;
         try {
+          const beforeCount = Array.isArray(hospitalSchedules) ? hospitalSchedules.length : 0;
           await Promise.all([
             refreshSchedulesFromServer(),
             (typeof refreshDutyRosterFromServer === 'function')
               ? refreshDutyRosterFromServer()
               : Promise.resolve()
           ]);
-          // refreshSchedulesFromServer가 현황판을 다시 그리지만, 당직 반영 보장을 위해 한 번 더
           const sbModal = document.getElementById('schedule-board-modal');
           const sbOpen = document.body.classList.contains('schedule-board-standalone') ||
             (sbModal && sbModal.style.display === 'flex');
           if (sbOpen) renderScheduleBoard();
+          // refreshSchedulesFromServer는 실패해도 throw하지 않으므로, 배열 유지 여부로만 가볍게 확인
+          if (!Array.isArray(hospitalSchedules)) ok = false;
+          void beforeCount;
         } catch (e) {
+          ok = false;
           console.error('현황판 새로고침 실패:', e);
-          await appAlert('현황판을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
           if (btn) {
             btn.disabled = false;
             btn.classList.remove('is-busy');
-            btn.innerHTML = prevHtml || '🔄 새로고침';
+            btn.innerHTML = prevHtml || '<span aria-hidden="true">🔄</span><span class="sb-refresh-label"> 새로고침</span>';
           }
           scheduleBoardRefreshInFlight = null;
         }
+        if (!ok) await appAlert('현황판을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요.');
       })();
       return scheduleBoardRefreshInFlight;
     }
