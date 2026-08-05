@@ -20967,6 +20967,7 @@
         return;
       }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'w' || e.key === 'W' || e.code === 'KeyW')) {
+        if (document.body.classList.contains('schedule-board-standalone')) return;
         e.preventDefault();
         e.stopPropagation();
         if (window.api && typeof window.api.windowClose === 'function') window.api.windowClose();
