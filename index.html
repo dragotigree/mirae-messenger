@@ -785,14 +785,33 @@
     #sidebar-left .subsection-label .unread-badge { min-width: 16px; height: 16px; font-size: 9px; padding: 0 4px; box-shadow: none; }
 
     .left-footer-btn { padding: 6px 8px 8px; display: flex; align-items: center; justify-content: center; border: none; box-shadow: none; background: transparent; flex-shrink: 0; }
-    .left-footer-btn .footer-toolbar { justify-content: center; gap: 3px; }
-    .left-footer-btn .icon-btn { color: var(--footer-icon, rgba(255,255,255,0.92)); }
-    .left-footer-btn .icon-btn:hover { color: var(--footer-icon-hover, var(--footer-icon, #fff)); filter: brightness(1.1); }
-    .left-footer-btn .icon-btn .icon-glyph { opacity: 1; }
-    .left-footer-btn #master-lock-btn { --footer-icon: #fbbf24; --footer-icon-hover: #fde68a; }
-    .left-footer-btn #master-lock-btn.is-master-authed { --footer-icon: #86efac; --footer-icon-hover: #bbf7d0; color: #86efac; }
-    .left-footer-btn #privacy-lock-btn { --footer-icon: #a5b4fc; --footer-icon-hover: #c7d2fe; }
-    .left-footer-btn #privacy-lock-btn.is-privacy-ready { --footer-icon: #818cf8; --footer-icon-hover: #a5b4fc; }
+    .left-footer-btn .footer-toolbar { justify-content: center; gap: 4px; }
+    .left-footer-btn .icon-btn {
+      width: 30px; height: 30px; border-radius: 9px;
+      color: rgba(226, 232, 240, 0.88);
+      background: rgba(255,255,255,0.06);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+    }
+    .left-footer-btn .icon-btn:hover {
+      color: #fff;
+      background: rgba(255,255,255,0.14);
+      filter: none;
+    }
+    .left-footer-btn .icon-btn .icon-glyph { width: 15px; height: 15px; opacity: 1; }
+    .left-footer-btn #master-lock-btn.is-master-authed {
+      color: #86efac;
+      background: rgba(74, 222, 128, 0.14);
+      box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.35);
+    }
+    .left-footer-btn #master-lock-btn.is-master-authed:hover {
+      color: #bbf7d0;
+      background: rgba(74, 222, 128, 0.22);
+    }
+    .left-footer-btn #privacy-lock-btn.is-privacy-ready {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.14);
+      box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.3);
+    }
 
     /* 업데이트 진행 오버레이 */
     .app-update-progress {
@@ -893,12 +912,6 @@
     .privacy-lock-master-box input {
       padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 13px;
     }
-    .left-footer-btn #toolbar-logs-btn { --footer-icon: #67e8f9; --footer-icon-hover: #a5f3fc; }
-    .left-footer-btn #toolbar-folder-btn { --footer-icon: #fcd34d; --footer-icon-hover: #fde68a; }
-    .left-footer-btn #toolbar-refresh-btn { --footer-icon: #6ee7b7; --footer-icon-hover: #a7f3d0; }
-    .left-footer-btn #compact-mode-btn { --footer-icon: #c4b5fd; --footer-icon-hover: #ddd6fe; }
-    .left-footer-btn #toolbar-settings-btn { --footer-icon: #fdba74; --footer-icon-hover: #fed7aa; }
-    .left-footer-btn #sidebar-left-collapse-btn { --footer-icon: #94a3b8; --footer-icon-hover: #e2e8f0; }
     /* ========== 2단 대화 영역 ========== */
     #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 420px; }
     #chat-header {
@@ -5445,32 +5458,33 @@
     const BROADCAST_CHANNEL = { ip: 'BROADCAST', username: '전체 공지', rank: '', dept: '전 직원 대상', floor: '', extNo: '', isBroadcast: true };
     const DELETED_MSG_HTML = '<span class="deleted-msg-flag" style="display:none"></span>삭제된 메시지입니다.';
 
+    const _uiSvg = (inner) =>
+      `<svg class="icon-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
     const UI_SVG = {
-      lock: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0V7" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
-      lockOpen: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.25" y="7" width="9.5" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M5.25 7V5.25a2.75 2.75 0 0 1 5.5 0" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
-      logs: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1.75h4.5L13 5.25v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M8 1.75v3.5h3.25M5 8.25h5.5M5 10.75h3.5" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
-      pin: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.75v7.5M5.5 9.25h5l-.85 3.4H6.35L5.5 9.25z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round" stroke-linecap="round"/></svg>',
-      folder: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.25 4.75A1 1 0 0 1 3.25 3.75h3l1.25 1.25H12.75A1 1 0 0 1 13.75 5v7a1 1 0 0 1-1 1H3.25a1 1 0 0 1-1-1v-6.25z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/></svg>',
-      refresh: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M12.5 3.5V6H10" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 12.5V10H6" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 6.1A4.25 4.25 0 0 1 11.2 4.2L12.5 6M11.4 9.9a4.25 4.25 0 0 1-6.6 1.9L3.5 10" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      panelNarrow: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="2.5" width="6" height="11" rx="1.25" fill="none" stroke="currentColor" stroke-width="1.45"/></svg>',
-      panelWide: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.45"/><rect x="7.5" y="2.5" width="6" height="11" rx="1.25" fill="none" stroke="currentColor" stroke-width="1.45"/></svg>',
-      panelCollapseLeft: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M7.25 2.5v11" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M11.1 5.6L8.5 8l2.6 2.4" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      panelCollapseRight: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M8.75 2.5v11" fill="none" stroke="currentColor" stroke-width="1.45"/><path d="M4.9 5.6L7.5 8l-2.6 2.4" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      chevronLeft: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5L5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      chevronRight: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 3.5L11 8l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      settings: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      clearChat: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.25 2.75h5.5l.65 1.35h2.85a.75.75 0 0 1 0 1.5h-1.05l-.75 7.15a1.15 1.15 0 0 1-1.14 1.03H5.64a1.15 1.15 0 0 1-1.14-1.03L3.75 5.6H2.7a.75.75 0 1 1 0-1.5h2.85l.65-1.35z" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="M6.35 7.1v4.1M9.65 7.1v4.1" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg>',
-      search: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7.15" cy="7.15" r="3.65" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-width="1.35"/><path d="M10.1 10.1l2.75 2.75" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
-      mediaArchive: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="2.25" width="4.75" height="4.75" rx="1" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.2"/><rect x="8.75" y="2.25" width="4.75" height="4.75" rx="1" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.2"/><rect x="2.25" y="8.75" width="4.75" height="4.75" rx="1" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.2"/><rect x="8.75" y="8.75" width="4.75" height="4.75" rx="1" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.2"/></svg>',
-      back: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5L5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-      ipmsg: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.25A1.25 1.25 0 0 1 3.75 3h8.5a1.25 1.25 0 0 1 1.25 1.25v5.5A1.25 1.25 0 0 1 12.25 11H6.1L3.35 13.1a.65.65 0 0 1-1.05-.5V4.25z" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="M4.25 6.25h7.5M4.25 8.35h5.2" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>',
-      notice: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5v3a1 1 0 0 0 1 1h1.2l2.8 2.5V3l-2.8 2.5H4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M11.5 5.5a3 3 0 0 1 0 5M12.75 3.25a5.25 5.25 0 0 1 0 9.5" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
-      users: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
-      chatBubble: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H9l-4.5 3.5V5.5z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      moreDots: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.75" fill="currentColor"/><circle cx="12" cy="12" r="1.75" fill="currentColor"/><circle cx="18" cy="12" r="1.75" fill="currentColor"/></svg>',
-      calendar: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="3.25" width="11.5" height="10.5" rx="2" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.3"/><path d="M2.25 6.25h11.5M5.25 2.25v2.5M10.75 2.25v2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="8" cy="9.1" r="0.85" fill="currentColor"/><circle cx="10.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="5.5" cy="11.5" r="0.85" fill="currentColor"/><circle cx="8" cy="11.5" r="0.85" fill="currentColor"/></svg>',
-      /* Flaticon/Heroicons 계열 라인 스타일 — 툴바 아이콘과 선 굵기·라운드 통일 */
-      question: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.75"/><path d="M9.9 9.2a2.55 2.55 0 0 1 4.2 1.95c0 1.15-.7 1.7-1.45 2.15-.55.35-.9.7-.9 1.35" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17.15" r="1.15" fill="currentColor"/></svg>'
+      lock: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+      lockOpen: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
+      logs: _uiSvg('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
+      pin: _uiSvg('<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>'),
+      folder: _uiSvg('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'),
+      refresh: _uiSvg('<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'),
+      panelNarrow: _uiSvg('<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>'),
+      panelWide: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>'),
+      panelCollapseLeft: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/>'),
+      panelCollapseRight: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/>'),
+      chevronLeft: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
+      chevronRight: _uiSvg('<path d="m9 18 6-6-6-6"/>'),
+      settings: _uiSvg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
+      clearChat: _uiSvg('<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>'),
+      search: _uiSvg('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
+      mediaArchive: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'),
+      back: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
+      ipmsg: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>'),
+      notice: _uiSvg('<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19 7a9 9 0 0 1 0 10"/>'),
+      users: _uiSvg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+      chatBubble: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
+      moreDots: _uiSvg('<circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/>'),
+      calendar: _uiSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
+      question: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
