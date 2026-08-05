@@ -1420,67 +1420,185 @@
     .ipmsg-send-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(14, 165, 233, 0.42); }
     .ipmsg-send-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
-    /* ⌨️ 채팅 빠른 전환 (Ctrl+1) */
+    /* ⌨️ 채팅 빠른 전환 (Ctrl+1) — Alfred 스타일 */
     #chat-quick-switcher-overlay {
       display: none; position: fixed; inset: 0; z-index: 12050;
-      background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(4px);
-      align-items: flex-start; justify-content: center; padding: 12vh 16px 24px;
+      background: rgba(15, 23, 42, 0.38);
+      backdrop-filter: blur(10px) saturate(1.1);
+      -webkit-backdrop-filter: blur(10px) saturate(1.1);
+      align-items: flex-start; justify-content: center;
+      padding: max(10vh, 48px) 16px 32px;
+      animation: cqs-overlay-in 0.18s var(--ease-out);
     }
     #chat-quick-switcher-overlay.is-open { display: flex; }
+    @keyframes cqs-overlay-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes cqs-panel-in {
+      from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
     .chat-quick-switcher-panel {
-      width: min(480px, 96vw); max-height: min(70vh, 520px);
-      background: #fff; border-radius: 16px; box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
-      border: 1px solid rgba(148, 163, 184, 0.35);
+      width: min(560px, 94vw); max-height: min(72vh, 580px);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, #fff 48%);
+      border-radius: 20px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.65) inset,
+        0 1px 0 rgba(255,255,255,0.8) inset,
+        0 28px 80px rgba(15, 23, 42, 0.28),
+        0 8px 24px rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.28);
       display: flex; flex-direction: column; overflow: hidden;
+      animation: cqs-panel-in 0.22s var(--ease-spring);
     }
     .chat-quick-switcher-head {
-      padding: 12px 14px 8px; border-bottom: 1px solid #eef2f6; flex-shrink: 0;
+      padding: 14px 14px 10px; flex-shrink: 0;
+      background:
+        radial-gradient(90% 120% at 10% 0%, rgba(14, 165, 233, 0.08), transparent 55%),
+        linear-gradient(180deg, #f8fbff 0%, #fff 100%);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.85);
     }
-    .chat-quick-switcher-title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; }
-    .chat-quick-switcher-hint { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
+    .chat-quick-switcher-head-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 10px; padding: 0 2px;
+    }
+    .chat-quick-switcher-title {
+      font-size: 12px; font-weight: 800; color: #64748b;
+      letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px;
+    }
+    .chat-quick-switcher-title-mark {
+      width: 18px; height: 18px; border-radius: 6px;
+      background: linear-gradient(145deg, #0ea5e9, #0284c7);
+      color: #fff; font-size: 10px; font-weight: 900;
+      display: inline-flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 10px rgba(14, 165, 233, 0.28);
+    }
+    .chat-quick-switcher-kbds {
+      display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .chat-quick-switcher-kbd {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 700; color: #64748b;
+      padding: 3px 6px; border-radius: 7px;
+      background: rgba(241, 245, 249, 0.95);
+      border: 1px solid #e2e8f0;
+      letter-spacing: -0.02em;
+    }
+    .chat-quick-switcher-kbd b {
+      font-size: 10px; font-weight: 800; color: #334155;
+      min-width: 14px; text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .chat-quick-switcher-search-wrap { position: relative; }
+    .chat-quick-switcher-search-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 15px; opacity: 0.45; pointer-events: none;
+    }
     .chat-quick-switcher-search {
-      margin-top: 8px; width: 100%; box-sizing: border-box; padding: 8px 11px;
-      border: 1px solid #e2e8f0; border-radius: 10px; font-size: 13px; outline: none;
+      width: 100%; box-sizing: border-box;
+      padding: 14px 14px 14px 42px;
+      border: 1px solid #e2e8f0; border-radius: 14px;
+      font-size: 16px; font-weight: 600; letter-spacing: -0.03em;
+      outline: none; background: #fff; color: #0f172a;
+      font-family: inherit;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .chat-quick-switcher-search:focus { border-color: #7dd3fc; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+    .chat-quick-switcher-search::placeholder {
+      color: #94a3b8; font-weight: 500;
+    }
+    .chat-quick-switcher-search:focus {
+      border-color: rgba(14, 165, 233, 0.55);
+      box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
+    }
     .chat-quick-switcher-list {
-      flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 10px;
+      flex: 1; min-height: 0; overflow: auto; padding: 8px 8px 6px;
+      background: linear-gradient(180deg, #f8fafc 0%, #fff 40px);
+    }
+    .chat-quick-switcher-list::-webkit-scrollbar { width: 7px; }
+    .chat-quick-switcher-list::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4); border-radius: 99px;
     }
     .chat-quick-switcher-section {
-      font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;
-      letter-spacing: 0.04em; padding: 8px 8px 4px;
+      font-size: 10.5px; font-weight: 800; color: #94a3b8;
+      letter-spacing: 0.02em; padding: 10px 12px 5px;
     }
     .chat-quick-switcher-item {
-      display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px;
-      cursor: pointer; border: 1px solid transparent; transition: background 0.1s, border-color 0.1s;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 14px;
+      cursor: pointer; border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
     }
-    .chat-quick-switcher-item:hover { background: #f8fafc; }
+    .chat-quick-switcher-item:hover { background: rgba(248, 250, 252, 0.95); }
     .chat-quick-switcher-item.is-active {
-      background: #eff6ff; border-color: #bfdbfe;
-      box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.08);
+      background: linear-gradient(90deg, #eff8ff 0%, #f0f9ff 100%);
+      border-color: rgba(125, 211, 252, 0.65);
+      box-shadow: 0 6px 16px rgba(14, 165, 233, 0.08);
+      transform: translateY(-0.5px);
     }
-    .chat-quick-switcher-item.is-current { font-weight: 700; }
+    .chat-quick-switcher-item.is-current .chat-quick-switcher-name { font-weight: 800; }
     .chat-quick-switcher-icon {
-      width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+      width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 15px; background: #f1f5f9; color: #334155; overflow: hidden;
+      font-size: 17px; background: #f1f5f9; color: #334155; overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
     }
     .chat-quick-switcher-icon.avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .chat-quick-switcher-icon.compact-avatar-broadcast,
+    .chat-quick-switcher-icon.compact-avatar-group,
+    .chat-quick-switcher-icon.compact-avatar-dept,
+    .chat-quick-switcher-icon.compact-avatar-floor {
+      color: #fff; box-shadow: none;
+    }
     .chat-quick-switcher-body { min-width: 0; flex: 1; }
     .chat-quick-switcher-name {
-      font-size: 13px; font-weight: 600; color: #0f172a; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
+      font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.03em;
+    }
+    .chat-quick-switcher-name mark {
+      background: rgba(14, 165, 233, 0.18); color: #0369a1;
+      border-radius: 3px; padding: 0 1px; font-weight: 800;
     }
     .chat-quick-switcher-sub {
-      font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+      font-size: 11.5px; color: #64748b; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.3;
+    }
+    .chat-quick-switcher-sub mark {
+      background: rgba(14, 165, 233, 0.14); color: #0284c7;
+      border-radius: 3px; padding: 0 1px;
+    }
+    .chat-quick-switcher-meta {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
     }
     .chat-quick-switcher-badge {
-      flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
-      background: #e0f2fe; color: #0369a1;
+      font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 99px;
+      background: #e0f2fe; color: #0369a1; letter-spacing: -0.02em;
     }
+    .chat-quick-switcher-enter {
+      opacity: 0; font-size: 10px; font-weight: 800; color: #0284c7;
+      padding: 3px 7px; border-radius: 7px;
+      background: rgba(224, 242, 254, 0.9); border: 1px solid #bae6fd;
+      transition: opacity 0.12s;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .chat-quick-switcher-item.is-active .chat-quick-switcher-enter { opacity: 1; }
     .chat-quick-switcher-empty {
-      text-align: center; color: #94a3b8; font-size: 12px; padding: 24px 12px;
+      text-align: center; color: #94a3b8; font-size: 13px; padding: 40px 16px; line-height: 1.6;
     }
+    .chat-quick-switcher-empty-icon {
+      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+      background: #fff; border: 1px solid #e8edf2;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    }
+    .chat-quick-switcher-foot {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 8px 14px 10px;
+      border-top: 1px solid #eef2f6; background: #fafbfc;
+      font-size: 10.5px; color: #94a3b8; font-weight: 600;
+    }
+    .chat-quick-switcher-foot-count b { color: #0284c7; font-weight: 800; }
 
     .btn-schedule, .btn-quickphrase, .btn-capture, .btn-urgent {
       display: inline-flex; align-items: center; justify-content: center;
@@ -3375,6 +3493,8 @@
     html.ui-animations-off .modal-card,
     html.ui-animations-off .app-dialog-card,
     html.ui-animations-off .log-card-item,
+    html.ui-animations-off #chat-quick-switcher-overlay,
+    html.ui-animations-off .chat-quick-switcher-panel,
     html.ui-animations-off #dm-context-menu,
     html.ui-animations-off #quick-phrase-popover,
     html.ui-animations-off #chat-slash-popover {
@@ -3389,7 +3509,8 @@
     html.ui-animations-off .sidebar-quick-actions .sidebar-code-alert-btn:hover,
     html.ui-animations-off .settings-nav-btn.active,
     html.ui-animations-off .sidebar-pref-chip.is-active,
-    html.ui-animations-off .log-card-item:hover {
+    html.ui-animations-off .log-card-item:hover,
+    html.ui-animations-off .chat-quick-switcher-item.is-active {
       transform: none !important;
     }
     .master-admin-modal-card {
@@ -4547,11 +4668,27 @@
   <div id="chat-quick-switcher-overlay" class="chat-quick-switcher-overlay" aria-hidden="true" onclick="if(event.target===this) closeChatQuickSwitcher()">
     <div class="chat-quick-switcher-panel" role="dialog" aria-modal="true" aria-labelledby="chat-quick-switcher-title" onclick="event.stopPropagation()">
       <div class="chat-quick-switcher-head">
-        <div class="chat-quick-switcher-title" id="chat-quick-switcher-title">채널 · 대화방 이동</div>
-        <div class="chat-quick-switcher-hint">↑↓ 이동 · Enter 열기 · Esc 닫기</div>
-        <input type="text" id="chat-quick-switcher-search" class="chat-quick-switcher-search" placeholder="이름·채널 검색..." autocomplete="off" spellcheck="false" oninput="onChatQuickSwitcherFilterInput(this.value)">
+        <div class="chat-quick-switcher-head-top">
+          <div class="chat-quick-switcher-title" id="chat-quick-switcher-title">
+            <span class="chat-quick-switcher-title-mark" aria-hidden="true">1</span>
+            채널 · 대화방 이동
+          </div>
+          <div class="chat-quick-switcher-kbds" aria-hidden="true">
+            <span class="chat-quick-switcher-kbd"><b>↑↓</b>이동</span>
+            <span class="chat-quick-switcher-kbd"><b>↵</b>열기</span>
+            <span class="chat-quick-switcher-kbd"><b>esc</b>닫기</span>
+          </div>
+        </div>
+        <div class="chat-quick-switcher-search-wrap">
+          <span class="chat-quick-switcher-search-icon" aria-hidden="true">🔍</span>
+          <input type="text" id="chat-quick-switcher-search" class="chat-quick-switcher-search" placeholder="이름·채널·대화 검색..." autocomplete="off" spellcheck="false" oninput="onChatQuickSwitcherFilterInput(this.value)">
+        </div>
       </div>
       <div class="chat-quick-switcher-list" id="chat-quick-switcher-list" role="listbox" aria-label="채널 및 대화방"></div>
+      <div class="chat-quick-switcher-foot">
+        <span>Ctrl+1 · 바로 이동</span>
+        <span class="chat-quick-switcher-foot-count"><b id="chat-quick-switcher-count">0</b>개</span>
+      </div>
     </div>
   </div>
 
@@ -10109,15 +10246,46 @@
       chatQuickSwitcher.index = Math.max(0, Math.min(idx, chatQuickSwitcher.filtered.length - 1));
     }
 
+    function highlightChatQuickSwitcherText(text, query) {
+      const raw = String(text || '');
+      const q = String(query || '').trim();
+      if (!q) return escapeHtml(raw);
+      const lower = raw.toLowerCase();
+      const ql = q.toLowerCase();
+      let out = '';
+      let cursor = 0;
+      let hit = lower.indexOf(ql, cursor);
+      while (hit !== -1) {
+        out += escapeHtml(raw.slice(cursor, hit));
+        out += `<mark>${escapeHtml(raw.slice(hit, hit + q.length))}</mark>`;
+        cursor = hit + q.length;
+        hit = lower.indexOf(ql, cursor);
+      }
+      out += escapeHtml(raw.slice(cursor));
+      return out;
+    }
+
+    function updateChatQuickSwitcherCount() {
+      const el = document.getElementById('chat-quick-switcher-count');
+      if (el) el.textContent = String(chatQuickSwitcher.filtered.length || 0);
+    }
+
     function renderChatQuickSwitcherList() {
       const host = document.getElementById('chat-quick-switcher-list');
       if (!host) return;
       const list = chatQuickSwitcher.filtered;
+      updateChatQuickSwitcherCount();
       if (!list.length) {
-        host.innerHTML = '<div class="chat-quick-switcher-empty">일치하는 채널·대화가 없습니다.</div>';
+        host.innerHTML = `
+          <div class="chat-quick-switcher-empty">
+            <div class="chat-quick-switcher-empty-icon">🔎</div>
+            일치하는 채널·대화가 없습니다.<br>
+            <span style="font-size:11.5px; color:#cbd5e1;">다른 이름이나 채널로 검색해 보세요.</span>
+          </div>`;
         return;
       }
       const activeKey = getActiveChatChannelKey();
+      const q = String(chatQuickSwitcher.filter || '').trim();
       let lastSection = '';
       let html = '';
       list.forEach((it, i) => {
@@ -10130,10 +10298,13 @@
         html += `<div class="chat-quick-switcher-item${isSel ? ' is-active' : ''}${isCur ? ' is-current' : ''}" role="option" aria-selected="${isSel}" data-switcher-index="${i}">
           <div class="chat-quick-switcher-icon ${(it.iconClass || '').replace(/"/g, '')}">${it.iconHtml || '💬'}</div>
           <div class="chat-quick-switcher-body">
-            <div class="chat-quick-switcher-name">${escapeHtml(it.title)}</div>
-            ${it.subtitle ? `<div class="chat-quick-switcher-sub">${escapeHtml(it.subtitle)}</div>` : ''}
+            <div class="chat-quick-switcher-name">${highlightChatQuickSwitcherText(it.title, q)}</div>
+            ${it.subtitle ? `<div class="chat-quick-switcher-sub">${highlightChatQuickSwitcherText(it.subtitle, q)}</div>` : ''}
           </div>
-          ${isCur ? '<span class="chat-quick-switcher-badge">현재</span>' : ''}
+          <div class="chat-quick-switcher-meta">
+            ${isCur ? '<span class="chat-quick-switcher-badge">현재</span>' : ''}
+            <span class="chat-quick-switcher-enter" aria-hidden="true">↵</span>
+          </div>
         </div>`;
       });
       host.innerHTML = html;
@@ -10146,7 +10317,11 @@
           const i = Number(el.getAttribute('data-switcher-index'));
           if (!Number.isNaN(i) && i !== chatQuickSwitcher.index) {
             chatQuickSwitcher.index = i;
-            renderChatQuickSwitcherList();
+            host.querySelectorAll('.chat-quick-switcher-item').forEach((row) => {
+              const ri = Number(row.getAttribute('data-switcher-index'));
+              row.classList.toggle('is-active', ri === i);
+              row.setAttribute('aria-selected', ri === i ? 'true' : 'false');
+            });
           }
         });
       });
