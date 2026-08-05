@@ -1,6 +1,6 @@
 {
   "name": "mirae-messenger",
-  "version": "1.0.452",
+  "version": "1.0.453",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,7 +10,12 @@
     "publish:github": "powershell -ExecutionPolicy Bypass -File scripts\\publish-to-github.ps1",
     "build:excalidraw": "node scripts/build-excalidraw.mjs",
     "stress:hospital": "node scripts/stress-hospital-load-suite.js --users=500",
-    "stress:hospital:quick": "node scripts/stress-hospital-load-suite.js --users=500 --quick"
+    "stress:hospital:quick": "node scripts/stress-hospital-load-suite.js --users=500 --quick",
+    "stress:s13": "node scripts/stress-scenarios-1-3-suite.js --users=200",
+    "stress:s13:quick": "node scripts/stress-scenarios-1-3-suite.js --users=80 --quick",
+    "stress:traffic": "node scripts/stress-concurrent-traffic.js --users=200",
+    "stress:file-cross": "node scripts/stress-file-cross-subnet.js",
+    "stress:db-conc": "node scripts/stress-db-concurrency.js"
   },
   "dependencies": {
     "sqlite3": "^5.1.7"
