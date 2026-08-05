@@ -281,6 +281,10 @@ const FILE_XFER_CHUNK_RAW_BYTES = 280 * 1024;
 const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 8 * 60 * 1000;
 /** 전송 TCP 타임아웃 (피어당, 50MB 여유) */
 const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
+/** 동시에 조립 중인 수신 파일 상한 (다수 대용량 동시 수신 시 RAM 보호) */
+const MAX_PENDING_FILE_XFERS = 24;
+/** 조립 중 파일 합계 바이트 상한 (~256MB) */
+const MAX_PENDING_FILE_XFER_BYTES = 256 * 1024 * 1024;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
@@ -1142,6 +1146,32 @@ async function writeReceivedFileAsync(storedName, buffer) {
   return filePath;
 }
 
+function pendingFileXferTotalBytes() {
+  let n = 0;
+  pendingFileXfers.forEach((e) => {
+    n += Number(e && e.size) || 0;
+  });
+  return n;
+}
+
+function canAcceptFileXfer(sizeBytes) {
+  const size = Number(sizeBytes) || 0;
+  if (pendingFileXfers.size >= MAX_PENDING_FILE_XFERS) return false;
+  if (pendingFileXferTotalBytes() + size > MAX_PENDING_FILE_XFER_BYTES) return false;
+  return true;
+}
+
+function replyFileXferOnSocket(socket, senderIP, payload) {
+  const line = JSON.stringify(payload) + '\n';
+  try {
+    if (socket && !socket.destroyed && socket.writable) {
+      socket.write(line);
+      return;
+    }
+  } catch (e) { /* fall through */ }
+  if (senderIP) sendToIpDirect(senderIP, payload);
+}
+
 function writeJsonLinesToIp(ip, payloads, timeoutMs) {
   return new Promise((resolve) => {
     if (!ip || ip === MY_IP) {
@@ -1178,6 +1208,96 @@ function writeJsonLinesToIp(ip, payloads, timeoutMs) {
         else setImmediate(writeNext);
       };
       writeNext();
+    });
+    client.on('close', () => done(success));
+    client.on('error', () => done(false));
+    client.on('timeout', () => done(false));
+  });
+}
+
+/**
+ * FILE_XFER: START 후 수신측 ACCEPT를 같은 소켓으로 기다린 뒤 청크 전송.
+ * (수신 폭주 시 ABORT → 송신 실패로 정확히 반영)
+ */
+function writeFileXferToIp(ip, buf, meta, timeoutMs) {
+  return new Promise((resolve) => {
+    if (!ip || ip === MY_IP || !buf || !meta || !meta.xferUid) {
+      resolve(false);
+      return;
+    }
+    const payloads = buildFileXferPayloads(buf, meta);
+    if (payloads.length < 2) {
+      resolve(false);
+      return;
+    }
+    const startPayload = payloads[0];
+    const restPayloads = payloads.slice(1);
+    const client = new net.Socket();
+    let settled = false;
+    let success = false;
+    let phase = 'wait-accept';
+    let recvBuf = '';
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      try { client.destroy(); } catch (e) { /* ignore */ }
+      resolve(!!ok);
+    };
+    const writeRest = () => {
+      let i = 0;
+      const writeNext = () => {
+        if (settled) return;
+        if (i >= restPayloads.length) {
+          success = true;
+          phase = 'done';
+          client.end();
+          return;
+        }
+        const line = JSON.stringify(restPayloads[i++]) + '\n';
+        if (Buffer.byteLength(line, 'utf8') > MAX_TCP_LINE_BUFFER - 2048) {
+          done(false);
+          return;
+        }
+        const ok = client.write(line);
+        if (!ok) client.once('drain', () => setImmediate(writeNext));
+        else setImmediate(writeNext);
+      };
+      writeNext();
+    };
+    client.setTimeout(timeoutMs || FILE_XFER_SEND_TIMEOUT_MS);
+    client.connect(TCP_PORT, ip, () => {
+      const startLine = JSON.stringify(startPayload) + '\n';
+      client.write(startLine);
+    });
+    client.on('data', (chunk) => {
+      if (settled || phase !== 'wait-accept') return;
+      recvBuf += chunk.toString('utf8');
+      if (recvBuf.length > MAX_TCP_LINE_BUFFER) {
+        done(false);
+        return;
+      }
+      let idx;
+      while ((idx = recvBuf.indexOf('\n')) !== -1) {
+        const line = recvBuf.slice(0, idx);
+        recvBuf = recvBuf.slice(idx + 1);
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg && msg.xferUid && msg.xferUid !== meta.xferUid) continue;
+          if (msg && msg.type === 'FILE_XFER_ACCEPT') {
+            phase = 'sending';
+            writeRest();
+            return;
+          }
+          if (msg && msg.type === 'FILE_XFER_ABORT') {
+            done(false);
+            return;
+          }
+        } catch (e) {
+          done(false);
+          return;
+        }
+      }
     });
     client.on('close', () => done(success));
     client.on('error', () => done(false));
@@ -1266,13 +1386,18 @@ function buildFileXferPayloads(buf, meta) {
   return payloads;
 }
 
-function handleFileXferStart(payload, senderIP) {
+function handleFileXferStart(payload, senderIP, socket) {
   const xferUid = payload && payload.xferUid;
   if (!xferUid || !senderIP) return;
   const size = Number(payload.size) || 0;
   const totalChunks = Number(payload.totalChunks) || 0;
   if (size <= 0 || size > MAX_FILE_XFER_BYTES || totalChunks <= 0 || totalChunks > 512) {
-    sendToIpDirect(senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'size_or_chunks' });
+    replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'size_or_chunks' });
+    return;
+  }
+  if (!canAcceptFileXfer(size)) {
+    writeToLogFile('warn', `[FILE_XFER] 수신 상한 초과로 거절 uid=${xferUid} from=${senderIP} pending=${pendingFileXfers.size}`);
+    replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'receiver_busy' });
     return;
   }
   clearPendingFileXfer(xferUid);
@@ -1293,6 +1418,7 @@ function handleFileXferStart(payload, senderIP) {
     clearPendingFileXfer(xferUid);
   }, FILE_XFER_ASSEMBLE_TIMEOUT_MS);
   pendingFileXfers.set(xferUid, entry);
+  replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ACCEPT', xferUid });
 }
 
 function handleFileXferChunk(payload, senderIP) {
@@ -4522,13 +4648,13 @@ function parseAndRoute(line, socket) {
     const payload = JSON.parse(line);
     const senderIP = (socket.remoteAddress || '').replace('::ffff:', '');
     if (!senderIP) return;
-    routeIncomingPayload(payload, senderIP);
+    routeIncomingPayload(payload, senderIP, socket);
   } catch (e) {
     console.error('TCP 페이로드 파싱 오류:', e.message);
   }
 }
 
-function routeIncomingPayload(payload, senderIP) {
+function routeIncomingPayload(payload, senderIP, socket) {
   try {
     touchPeerPresence(senderIP);
     const type = payload.type || 'CHAT';
@@ -4622,7 +4748,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'PROFILE_PHOTO_SYNC': handleProfilePhotoSync(payload.ip || senderIP, payload.photo); break;
     case 'PROFILE_PHOTO_REQUEST': handleProfilePhotoRequest(senderIP); break;
     case 'PROFILE_OVERRIDE_SYNC': handleProfileOverrideSync(payload); break;
-    case 'FILE_XFER_START': handleFileXferStart(payload, senderIP); break;
+    case 'FILE_XFER_START': handleFileXferStart(payload, senderIP, socket); break;
     case 'FILE_XFER_CHUNK': handleFileXferChunk(payload, senderIP); break;
     case 'FILE_XFER_END':
       handleFileXferEnd(payload, senderIP).catch((e) => {
@@ -4630,6 +4756,7 @@ function routeIncomingPayload(payload, senderIP) {
       });
       break;
     case 'FILE_XFER_ABORT': handleFileXferAbort(payload); break;
+    case 'FILE_XFER_ACCEPT': break; // 송신측 전용 응답
     default: break;
     }
   } catch (e) {
@@ -6241,24 +6368,27 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
       ? { kind: 'group', groupUid: chatTarget.groupUid, groupName: targets.groupName || chatTarget.groupName || '그룹' }
       : { kind: 'dm' };
 
-    const payloads = buildFileXferPayloads(buf, {
+    const xferMeta = {
       xferUid,
       fileName,
       mime,
       chatTarget: wireChatTarget,
       sender: myProfile.username,
       msgUid
-    });
+    };
 
     let okCount = 0;
     for (const ip of targets.ips) {
-      const ok = await writeJsonLinesToIp(ip, payloads, FILE_XFER_SEND_TIMEOUT_MS);
+      const ok = await writeFileXferToIp(ip, buf, xferMeta, FILE_XFER_SEND_TIMEOUT_MS);
       if (ok) okCount += 1;
       await new Promise((r) => setImmediate(r));
     }
 
     if (okCount === 0) {
-      return { status: 'ERROR', error: '파일 전송에 실패했습니다. 상대가 오프라인이거나 연결할 수 없습니다.' };
+      return {
+        status: 'ERROR',
+        error: '파일 전송에 실패했습니다. 상대가 바쁘거나(동시 수신 한도) 오프라인일 수 있습니다. 잠시 후 다시 시도해 주세요.'
+      };
     }
 
     const sentAt = new Date();
