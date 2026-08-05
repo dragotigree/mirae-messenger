@@ -651,8 +651,14 @@
       letter-spacing: -0.03em; margin: 0 0 6px;
     }
     .app-update-progress-desc {
-      font-size: 12.5px; color: #64748b; line-height: 1.7; margin: 0 0 18px;
-      white-space: pre-line; letter-spacing: -0.02em;
+      font-size: 12.5px; color: #64748b; line-height: 1.55; margin: 0 0 18px;
+      letter-spacing: -0.02em;
+    }
+    .app-update-progress-desc .app-update-progress-line {
+      display: block; margin: 0;
+    }
+    .app-update-progress-desc .app-update-progress-gap {
+      display: block; height: 0.7em;
     }
     .app-update-progress-bar {
       height: 4px; border-radius: 999px; background: #e2e8f0; overflow: hidden;
@@ -11829,20 +11835,28 @@
       }
     }
 
-    function showAppUpdateProgress(title, desc) {
-      const el = document.getElementById('app-update-progress');
-      const titleEl = document.getElementById('app-update-progress-title');
-      const descEl = document.getElementById('app-update-progress-desc');
-      if (titleEl) titleEl.textContent = title || '업데이트 중';
-      if (descEl) {
-        descEl.textContent = desc || [
+    function formatAppUpdateProgressDesc(desc) {
+      const raw = (desc == null || desc === '')
+        ? [
           '최신 파일을 받아 적용하고 있습니다.',
           '',
           '곧 자동으로 재시작 됩니다.',
           '',
           '프로그램을 닫지 말아주세요.'
-        ].join('\n');
-      }
+        ].join('\n')
+        : String(desc);
+      return raw.split(/\n/).map((line) => {
+        if (!String(line).trim()) return '<span class="app-update-progress-gap" aria-hidden="true"></span>';
+        return `<span class="app-update-progress-line">${escapeHtml(line)}</span>`;
+      }).join('');
+    }
+
+    function showAppUpdateProgress(title, desc) {
+      const el = document.getElementById('app-update-progress');
+      const titleEl = document.getElementById('app-update-progress-title');
+      const descEl = document.getElementById('app-update-progress-desc');
+      if (titleEl) titleEl.textContent = title || '업데이트 중';
+      if (descEl) descEl.innerHTML = formatAppUpdateProgressDesc(desc);
       if (el) {
         el.hidden = false;
         el.classList.add('is-visible');
@@ -11897,9 +11911,7 @@
         showAppUpdateProgress('재시작 준비', [
           '업데이트가 적용되었습니다.',
           '',
-          '프로그램을 다시 여는 중입니다.',
-          '',
-          '프로그램을 닫지 말아주세요.'
+          '프로그램을 다시 여는 중입니다.'
         ].join('\n'));
       } catch (e) {
         hideAppUpdateProgress();
