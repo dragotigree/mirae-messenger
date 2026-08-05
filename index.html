@@ -3909,7 +3909,7 @@
         <button class="titlebar-btn" id="titlebar-max-btn" onclick="window.api.windowMaximizeToggle()" title="최대화">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/></svg>
         </button>
-        <button class="titlebar-btn titlebar-close-btn" id="titlebar-close-btn" onclick="window.api.windowClose()" title="닫기">
+        <button class="titlebar-btn titlebar-close-btn" id="titlebar-close-btn" onclick="window.api.windowClose()" title="트레이로 숨기기 (Ctrl+W)">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="currentColor" stroke-width="1.05" stroke-linecap="round"/></svg>
         </button>
       </div>
@@ -20964,6 +20964,12 @@
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '3' || e.code === 'Digit3')) {
         e.preventDefault();
         if (!isPrivacyScreenLocked) openScheduleBoardModal();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'w' || e.key === 'W' || e.code === 'KeyW')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.api && typeof window.api.windowClose === 'function') window.api.windowClose();
         return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
