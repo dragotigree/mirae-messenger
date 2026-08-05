@@ -1,6 +1,6 @@
 {
   "name": "mirae-messenger",
-  "version": "1.0.454",
+  "version": "1.0.455",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -20,7 +20,9 @@
     "stress:db-conc": "node scripts/stress-db-concurrency.js",
     "stress:reconnect": "node scripts/stress-reconnect-resilience.js",
     "stress:memory": "node --expose-gc scripts/stress-memory-churn.js",
-    "stress:scheduled": "node scripts/stress-scheduled-automation.js"
+    "stress:scheduled": "node scripts/stress-scheduled-automation.js",
+    "stress:cpu-mem": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500",
+    "stress:cpu-mem:quick": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500 --quick"
   },
   "dependencies": {
     "sqlite3": "^5.1.7"

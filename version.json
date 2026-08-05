@@ -1,4 +1,4 @@
 {
-  "version": "1.0.454",
-  "notes": "시나리오4–6 부하검사 + ACK 재시도 상한 후 PENDING 복귀(단절 유실 방지)"
+  "version": "1.0.455",
+  "notes": "메모리·CPU 폭주 검사 스크립트 추가 (stress:cpu-mem) — 500대 동시 부하에서 RSS·이벤트루프·CPU 측정"
 }
