@@ -908,17 +908,17 @@
     /* ========== 2단 대화 영역 ========== */
     #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 420px; }
     #chat-header {
-      height: auto; min-height: 0;
-      padding: 10px 16px 10px;
+      height: 56px; min-height: 56px;
+      padding: 0 16px;
       border-bottom: 1px solid var(--border-soft);
-      display: flex; flex-direction: column; align-items: stretch;
-      justify-content: flex-start; gap: 8px;
+      display: flex; flex-direction: row; align-items: center;
+      justify-content: space-between; gap: 10px;
       background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
       flex-shrink: 0; min-width: 0;
     }
     .chat-header-actions {
       display: flex; align-items: center; justify-content: flex-end;
-      gap: 6px; flex-shrink: 0; flex-wrap: wrap; width: 100%;
+      gap: 6px; flex-shrink: 0; flex-wrap: nowrap;
     }
     .chat-header-tool-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -1042,7 +1042,7 @@
       text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 13px; line-height: 1.6;
     }
     .chat-shared-loading { text-align: center; padding: 40px; color: #64748b; font-size: 13px; }
-    .header-user-info { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; overflow: hidden; }
+    .header-user-info { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; overflow: hidden; }
     .header-user-info > .avatar-wrapper { flex-shrink: 0; }
     .header-user-text { min-width: 0; flex: 1; overflow: hidden; }
     .header-user-name {
@@ -1701,7 +1701,8 @@
     body.compact-mode #sidebar-right { display: none; }
     body.compact-mode #main-chat-panel { border-right: none; width: 100%; background: #fff; min-width: 480px; }
     body.compact-mode #chat-header {
-      height: auto; padding: 8px 12px 8px; gap: 6px;
+      height: 52px; min-height: 52px; padding: 0 12px; gap: 8px;
+      flex-direction: row; align-items: center;
       background: #fff; border-bottom: 1px solid #e4e9f0; box-shadow: none;
     }
     body.compact-mode .chat-header-actions { justify-content: flex-end; gap: 6px; }
