@@ -5091,16 +5091,16 @@
         <div class="schedule-board-top-bar-actions">
           <button type="button" id="schedule-board-login-btn" class="schedule-board-add-btn" style="display:none;" onclick="openOperatorLoginModal()">✍️ 작성자 로그인</button>
           <button type="button" id="schedule-board-logout-btn" class="schedule-board-add-btn" style="display:none; background:#fee2e2; color:#b91c1c;" onclick="logoutScheduleBoardAuth()">🔓 로그아웃</button>
-          <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add">+ 빠른 등록</button>
+          <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add" title="빠른 등록 (Ctrl+R)">+ 빠른 등록</button>
           <button type="button" class="calendar-day-close-btn sb-top-close" onclick="closeScheduleBoardModal()" title="닫기">✕</button>
         </div>
       </div>
       <div class="schedule-board-main">
         <aside class="sb-board-side">
           <div class="schedule-board-view-tabs">
-            <button type="button" class="schedule-board-view-tab active" data-sb-view="main" onclick="setScheduleBoardView('main')">메인</button>
-            <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')">병동/주치의별</button>
-            <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')">입/퇴원/전실</button>
+            <button type="button" class="schedule-board-view-tab active" data-sb-view="main" onclick="setScheduleBoardView('main')" title="메인 (Ctrl+1)">메인</button>
+            <button type="button" class="schedule-board-view-tab" data-sb-view="ward" onclick="setScheduleBoardView('ward')" title="병동/주치의별 (Ctrl+2)">병동/주치의별</button>
+            <button type="button" class="schedule-board-view-tab" data-sb-view="admit" onclick="setScheduleBoardView('admit')" title="입/퇴원/전실 (Ctrl+3)">입/퇴원/전실</button>
           </div>
           <div class="sb-filter-panel">
             <div class="sb-filter-block sb-filter-block--row" id="schedule-board-search-filter-row">
@@ -6008,6 +6008,45 @@
     function isScheduleBoardContext() {
       return document.body.classList.contains('schedule-board-standalone') ||
         document.getElementById('schedule-board-modal')?.style.display === 'flex';
+    }
+
+    /** 현황판이 열려 있을 때 Ctrl+1/2/3/R 단축키 처리. 처리하면 true. */
+    function handleScheduleBoardShortcuts(e) {
+      if (!isScheduleBoardContext()) return false;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+      const key = e.key;
+      const code = e.code;
+      if (key === '1' || code === 'Digit1') {
+        e.preventDefault();
+        e.stopPropagation();
+        setScheduleBoardView('main');
+        return true;
+      }
+      if (key === '2' || code === 'Digit2') {
+        e.preventDefault();
+        e.stopPropagation();
+        setScheduleBoardView('ward');
+        return true;
+      }
+      if (key === '3' || code === 'Digit3') {
+        e.preventDefault();
+        e.stopPropagation();
+        setScheduleBoardView('admit');
+        return true;
+      }
+      if (key === 'r' || key === 'R' || code === 'KeyR') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!canWriteScheduleBoard()) {
+          openOperatorLoginModal();
+          return true;
+        }
+        if (scheduleBoardEditingUid) cancelScheduleBoardQuickEdit();
+        initScheduleBoardQuickAddUi();
+        focusScheduleBoardQuickAddPanel();
+        return true;
+      }
+      return false;
     }
 
     function canWriteScheduleBoard() {
@@ -7763,7 +7802,7 @@
       panel.style.display = show ? 'block' : 'none';
       if (addBtn && canWrite) {
         addBtn.classList.toggle('is-active', show);
-        addBtn.title = show ? '빠른 등록 닫기' : '빠른 등록 열기';
+        addBtn.title = show ? '빠른 등록 닫기 (Ctrl+R)' : '빠른 등록 열기 (Ctrl+R)';
         addBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
       }
     }
@@ -20951,6 +20990,7 @@
         e.preventDefault();
         if (!isPrivacyScreenLocked) openAllLogsModal();
       }
+      if (handleScheduleBoardShortcuts(e)) return;
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '1' || e.code === 'Digit1')) {
         e.preventDefault();
         openChatQuickSwitcher();
