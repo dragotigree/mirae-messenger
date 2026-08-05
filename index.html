@@ -531,14 +531,27 @@
     .user-card-item { display: flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box; padding: 3px 8px; border-radius: var(--radius-sm); margin: 0 2px 0 2px; cursor: pointer; transition: background var(--transition-fast), opacity var(--transition-fast); min-height: 0; }
     .user-card-item:hover { background: var(--sidebar-hover); }
     .user-card-item.active { background: var(--sidebar-active) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+    /* 다중선택 중에는 ‘현재 대화’ 강조를 약하게 — 선택과 헷갈리지 않게 */
+    body.has-sidebar-user-selection .user-card-item.active:not(.is-multi-selected) {
+      background: rgba(255,255,255,0.06) !important;
+      box-shadow: inset 3px 0 0 rgba(148, 163, 184, 0.7);
+    }
     .user-card-item.is-multi-selected {
       background: rgba(56, 189, 248, 0.22) !important;
       box-shadow: inset 0 0 0 1.5px rgba(125, 211, 252, 0.85);
     }
     .user-card-item.is-multi-selected:hover { background: rgba(56, 189, 248, 0.3) !important; }
+    .user-card-item.active.is-multi-selected {
+      background: rgba(56, 189, 248, 0.28) !important;
+      box-shadow: inset 0 0 0 1.5px rgba(125, 211, 252, 0.95);
+    }
     .compact-list-item-user.is-multi-selected {
       background: #e0f2fe !important;
       box-shadow: inset 3px 0 0 #0ea5e9;
+    }
+    body.has-sidebar-user-selection .compact-list-item-user.is-active:not(.is-multi-selected) {
+      background: #f1f5f9 !important;
+      box-shadow: inset 3px 0 0 #94a3b8;
     }
     /* 검색 포커스는 다중선택과 헷갈리지 않게 다른 스타일 */
     .user-card-item.is-search-nav {
@@ -550,38 +563,43 @@
       box-shadow: inset 3px 0 0 #f59e0b;
     }
     #user-multi-select-bar {
-      display: none; flex-shrink: 0; align-items: center; gap: 8px; flex-wrap: wrap;
+      display: none; flex-shrink: 0; align-items: center; gap: 6px; flex-wrap: wrap;
       margin: 0 8px 8px; padding: 8px 10px; border-radius: 12px;
       background: rgba(14, 165, 233, 0.16); border: 1px solid rgba(125, 211, 252, 0.35);
     }
     #user-multi-select-bar.is-visible { display: flex; }
     #user-multi-select-count {
-      flex: 1; min-width: 0; font-size: 11.5px; font-weight: 700; color: #e0f2fe; letter-spacing: -0.02em;
+      flex: 1; min-width: 72px; font-size: 11.5px; font-weight: 700; color: #e0f2fe; letter-spacing: -0.02em;
     }
     #user-multi-select-bar .ums-btn {
-      border: none; border-radius: 9px; padding: 6px 10px; font-size: 11px; font-weight: 700;
+      border: none; border-radius: 9px; padding: 6px 9px; font-size: 11px; font-weight: 700;
       cursor: pointer; white-space: nowrap; transition: background 0.12s, transform 0.12s;
     }
     #user-multi-select-bar .ums-btn:hover { transform: translateY(-1px); }
     #user-multi-select-bar .ums-btn-clear {
       background: rgba(255,255,255,0.12); color: #e2e8f0;
     }
+    #user-multi-select-bar .ums-btn-msg {
+      background: rgba(255,255,255,0.14); color: #e0f2fe; border: 1px solid rgba(125, 211, 252, 0.45);
+    }
+    #user-multi-select-bar .ums-btn-msg:hover { background: rgba(14, 165, 233, 0.35); }
     #user-multi-select-bar .ums-btn-group {
       background: #0ea5e9; color: #fff;
     }
     .compact-multi-select-bar {
-      display: none; flex-shrink: 0; align-items: center; gap: 8px; flex-wrap: wrap;
+      display: none; flex-shrink: 0; align-items: center; gap: 6px; flex-wrap: wrap;
       margin: 0 12px 10px; padding: 8px 10px; border-radius: 12px;
       background: #e0f2fe; border: 1px solid #bae6fd;
     }
     .compact-multi-select-bar.is-visible { display: flex; }
     .compact-multi-select-bar .ums-count {
-      flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: #0369a1;
+      flex: 1; min-width: 64px; font-size: 12px; font-weight: 700; color: #0369a1;
     }
     .compact-multi-select-bar .ums-btn {
-      border: none; border-radius: 9px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+      border: none; border-radius: 9px; padding: 6px 9px; font-size: 11.5px; font-weight: 700; cursor: pointer;
     }
     .compact-multi-select-bar .ums-btn-clear { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+    .compact-multi-select-bar .ums-btn-msg { background: #fff; color: #0369a1; border: 1px solid #7dd3fc; }
     .compact-multi-select-bar .ums-btn-group { background: #0284c7; color: #fff; }
     .user-card-item.is-offline { opacity: 0.5; }
     .user-card-item.is-offline:hover { opacity: 0.82; }
@@ -3349,7 +3367,8 @@
         <div id="user-multi-select-bar" aria-live="polite">
           <span id="user-multi-select-count">0명 선택</span>
           <button type="button" class="ums-btn ums-btn-clear" onclick="clearSidebarUserSelection()">해제</button>
-          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹 만들기</button>
+          <button type="button" class="ums-btn ums-btn-msg" onclick="sendMessageFromSidebarSelection()" title="선택한 직원에게 쪽지 보내기">✉️ 메시지</button>
+          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹</button>
         </div>
       </div>
 
@@ -3469,7 +3488,8 @@
         <div id="compact-multi-select-bar" class="compact-multi-select-bar" aria-live="polite">
           <span class="ums-count" id="compact-multi-select-count">0명 선택</span>
           <button type="button" class="ums-btn ums-btn-clear" onclick="clearSidebarUserSelection()">해제</button>
-          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹 만들기</button>
+          <button type="button" class="ums-btn ums-btn-msg" onclick="sendMessageFromSidebarSelection()" title="선택한 직원에게 쪽지 보내기">✉️ 메시지</button>
+          <button type="button" class="ums-btn ums-btn-group" onclick="createGroupFromSidebarSelection()">👥 그룹</button>
         </div>
       </div>
     </div>
@@ -10045,13 +10065,20 @@
       return Array.isArray(u.aliasIps) && u.aliasIps.some((a) => sidebarSelectedUserIps.has(a));
     }
 
-    function getSidebarSelectionCount() {
+    function getSidebarSelectedUsers() {
       const seen = new Set();
+      const users = [];
       [...sidebarSelectedUserIps].forEach((ip) => {
-        const canon = canonicalSidebarUserIp(ip);
-        if (canon) seen.add(canon);
+        const u = findUserByIp(ip);
+        if (!isSelectableSidebarUser(u) || seen.has(u.ip)) return;
+        seen.add(u.ip);
+        users.push(u);
       });
-      return seen.size;
+      return users;
+    }
+
+    function getSidebarSelectionCount() {
+      return getSidebarSelectedUsers().length;
     }
 
     function getVisibleSidebarUserIps() {
@@ -10075,7 +10102,15 @@
     }
 
     function syncSidebarUserSelectionUi() {
-      const n = getSidebarSelectionCount();
+      // 세트에 별칭·중복 IP가 남아 있으면 대표 IP만 남긴다
+      const users = getSidebarSelectedUsers();
+      const normalized = new Set(users.map((u) => u.ip));
+      if (normalized.size !== sidebarSelectedUserIps.size
+        || [...sidebarSelectedUserIps].some((ip) => !normalized.has(canonicalSidebarUserIp(ip)))) {
+        sidebarSelectedUserIps = normalized;
+      }
+      const n = users.length;
+      document.body.classList.toggle('has-sidebar-user-selection', n > 0);
       if (n > 0) clearSidebarSearchNavHighlight();
       document.querySelectorAll('.user-card-item[data-user-ip], .compact-list-item-user[data-user-ip]').forEach((el) => {
         el.classList.toggle('is-multi-selected', isSidebarIpSelected(el.dataset.userIp));
@@ -10083,7 +10118,7 @@
       const bar = document.getElementById('user-multi-select-bar');
       const countEl = document.getElementById('user-multi-select-count');
       if (bar) bar.classList.toggle('is-visible', n > 0);
-      if (countEl) countEl.textContent = n > 0 ? `${n}명 선택 · 그룹 만들기` : '0명 선택';
+      if (countEl) countEl.textContent = n > 0 ? `${n}명 선택` : '0명 선택';
       const cBar = document.getElementById('compact-multi-select-bar');
       const cCount = document.getElementById('compact-multi-select-count');
       if (cBar) cBar.classList.toggle('is-visible', n > 0);
@@ -10173,24 +10208,32 @@
         selectSidebarUserRange(sidebarSelectAnchorIp, user.ip);
         return;
       }
-      if (sidebarSelectedUserIps.size > 0) clearSidebarUserSelection();
+      // 이미 다중선택 중이면 일반 클릭도 선택 토글 (현재 대화 강조와 혼동 방지)
+      if (sidebarSelectedUserIps.size > 0) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        clearSidebarSearchNavHighlight();
+        toggleSidebarUserSelection(user.ip);
+        return;
+      }
       openCompactPersonOrChat(user);
     }
 
     function createGroupFromSidebarSelection() {
-      const seen = new Set();
-      const users = [];
-      [...sidebarSelectedUserIps].forEach((ip) => {
-        const u = findUserByIp(ip);
-        if (!isSelectableSidebarUser(u) || seen.has(u.ip)) return;
-        seen.add(u.ip);
-        users.push(u);
-      });
+      const users = getSidebarSelectedUsers();
       if (users.length === 0) {
-        appAlert('그룹에 초대할 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 여러 명을 고른 뒤 「그룹 만들기」를 눌러 주세요.');
+        appAlert('그룹에 초대할 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 여러 명을 고른 뒤 「그룹」을 눌러 주세요.');
         return;
       }
       openGroupChatModal(users, { mode: 'new' });
+    }
+
+    function sendMessageFromSidebarSelection() {
+      const users = getSidebarSelectedUsers();
+      if (users.length === 0) {
+        appAlert('메시지를 보낼 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 고른 뒤 「메시지」를 눌러 주세요.');
+        return;
+      }
+      openIpmsgSendModal(users.map((u) => u.ip));
     }
 
     function openGroupChatModal(prefillUserOrUsers, opts) {
