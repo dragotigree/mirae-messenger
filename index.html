@@ -4612,6 +4612,7 @@
           <button type="button" class="settings-nav-btn active" data-master-tab="operators" onclick="setMasterAdminTab('operators')">운영자 계정</button>
           <button type="button" class="settings-nav-btn" data-master-tab="clients" onclick="setMasterAdminTab('clients')">접속 PC</button>
           <button type="button" class="settings-nav-btn" data-master-tab="pause" onclick="setMasterAdminTab('pause')">전체 일시중지</button>
+          <button type="button" class="settings-nav-btn" data-master-tab="security" onclick="setMasterAdminTab('security')">비밀번호</button>
         </nav>
         <div class="settings-panels">
 
@@ -4682,6 +4683,21 @@
               </label>
               <div id="master-service-pause-status" style="font-size:11.5px; color:#9a3412; min-height:1.2em;"></div>
               <button type="button" onclick="saveMasterServicePause()" style="padding:11px; background:#ea580c; color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">💾 일시 중지 설정 저장 · 전체 적용</button>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-master-panel="security">
+            <h3 class="settings-panel-title">비밀번호</h3>
+            <p class="settings-panel-desc">마스터 비밀번호를 바꾸거나, 작성 권한자가 비밀번호를 잊었을 때 재설정합니다.</p>
+            <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:13px; font-weight:700; color:#1e3a8a;">🔑 마스터 비밀번호 변경</div>
+              <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">이 PC에 저장된 마스터 비밀번호를 변경합니다. 원격 사용중지·로그삭제 등은 다른 PC도 같은 마스터 비밀번호여야 하므로, 변경 후 다른 PC에서도 맞춰 주세요.</p>
+              <button type="button" onclick="openPasswordChangeModal({ mode: 'master-self' })" style="padding:11px; background:#2563eb; color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">마스터 비밀번호 변경</button>
+            </div>
+            <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:13px; font-weight:700; color:#1e293b;">✍️ 작성 권한자 비밀번호 재설정</div>
+              <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">비밀번호를 잊은 작성 권한자 계정을 골라 새 비밀번호를 지정합니다. 「운영자 계정」 목록의 <b>비밀번호</b> 버튼으로도 동일하게 할 수 있습니다.</p>
+              <div id="master-operator-reset-hint" style="font-size:11.5px; color:#64748b;">운영자 계정 탭에서 계정을 확인한 뒤 재설정해 주세요.</div>
             </div>
           </div>
 
@@ -5256,6 +5272,10 @@
         <p class="settings-panel-desc">현황판·공지·일정 등록용 작성자 로그인을 관리합니다.</p>
         <div class="settings-card">
           <div id="setting-operator-auth-status" class="settings-hint" style="margin-bottom:10px;">현재 로그인: 없음</div>
+          <div id="setting-password-change-wrap" style="display:none; margin-bottom:14px;">
+            <button type="button" class="settings-btn-secondary" id="setting-password-change-btn" onclick="openPasswordChangeFromSettings()">비밀번호 변경</button>
+            <p class="settings-hint" style="margin-top:8px;" id="setting-password-change-hint"></p>
+          </div>
           <div style="font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:8px;">메신저 시작 시</div>
           <div class="settings-radio-group" role="radiogroup" aria-label="작성자 자동 로그인">
             <label class="settings-radio-row">
@@ -5676,6 +5696,31 @@
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
         <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitOperatorRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔑 비밀번호 변경 / 재설정 -->
+  <div id="password-change-modal" class="modal-overlay" style="display:none; z-index:5300;" onclick="if(event.target===this) closePasswordChangeModal()">
+    <div class="modal-card" style="width:400px; gap:10px;" onclick="event.stopPropagation()">
+      <div style="font-size:16px; font-weight:700; color:#1e3a8a;" id="password-change-title">🔑 비밀번호 변경</div>
+      <div id="password-change-subtitle" style="font-size:12px; color:#64748b; line-height:1.5; margin-top:-2px;"></div>
+      <label id="password-change-current-wrap" style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; margin-top:6px;">
+        현재 비밀번호
+        <input type="password" id="password-change-current" placeholder="현재 비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') document.getElementById('password-change-new').focus()">
+      </label>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+        새 비밀번호
+        <input type="password" id="password-change-new" placeholder="4자 이상" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') document.getElementById('password-change-confirm').focus()">
+      </label>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
+        새 비밀번호 확인
+        <input type="password" id="password-change-confirm" placeholder="한 번 더 입력" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitPasswordChange()">
+      </label>
+      <div id="password-change-error" style="display:none; color:#ef4444; font-size:11.5px; font-weight:600;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
+        <button type="button" onclick="closePasswordChangeModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" id="password-change-submit-btn" onclick="submitPasswordChange()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
     </div>
   </div>
@@ -6203,18 +6248,43 @@
 
     function syncOperatorAuthSettingsStatusUi() {
       const el = document.getElementById('setting-operator-auth-status');
-      if (!el) return;
+      const wrap = document.getElementById('setting-password-change-wrap');
+      const btn = document.getElementById('setting-password-change-btn');
+      const hint = document.getElementById('setting-password-change-hint');
+      if (el) {
+        if (isMasterAuthenticated) {
+          el.textContent = '현재 로그인: 마스터 관리자';
+        } else if (isNoticeOperatorAuthenticated) {
+          const name = currentOperatorName || currentOperatorUsername || '작성자';
+          const idPart = currentOperatorUsername ? ` (${currentOperatorUsername})` : '';
+          el.textContent = `현재 로그인: ${name}${idPart}`;
+        } else {
+          el.textContent = '현재 로그인: 없음';
+        }
+      }
+      if (wrap && btn) {
+        if (isMasterAuthenticated) {
+          wrap.style.display = 'block';
+          btn.textContent = '마스터 비밀번호 변경';
+          if (hint) hint.textContent = '이 PC의 마스터 비밀번호를 변경합니다. 다른 PC도 같은 비밀번호로 맞춰 주세요.';
+        } else if (isNoticeOperatorAuthenticated && currentOperatorUsername) {
+          wrap.style.display = 'block';
+          btn.textContent = '내 비밀번호 변경';
+          if (hint) hint.textContent = '비밀번호를 잊었다면 마스터 관리자에게 재설정을 요청하세요.';
+        } else {
+          wrap.style.display = 'none';
+        }
+      }
+    }
+
+    function openPasswordChangeFromSettings() {
       if (isMasterAuthenticated) {
-        el.textContent = '현재 로그인: 마스터 관리자';
+        openPasswordChangeModal({ mode: 'master-self' });
         return;
       }
-      if (isNoticeOperatorAuthenticated) {
-        const name = currentOperatorName || currentOperatorUsername || '작성자';
-        const idPart = currentOperatorUsername ? ` (${currentOperatorUsername})` : '';
-        el.textContent = `현재 로그인: ${name}${idPart}`;
-        return;
+      if (isNoticeOperatorAuthenticated && currentOperatorUsername) {
+        openPasswordChangeModal({ mode: 'operator-self', username: currentOperatorUsername });
       }
-      el.textContent = '현재 로그인: 없음';
     }
 
     function saveNoticeOperatorSession() {
@@ -6314,6 +6384,7 @@
       }
       closeMasterAdminModal();
       updateMasterAuthUi();
+      syncOperatorAuthSettingsStatusUi();
       refreshNoticePermission();
       updateBoardAuthStatusText();
       refreshScheduleBoardEntryUi();
@@ -8696,6 +8767,7 @@
         { test: () => isFlexOverlay('channel-title-emoji-modal'), close: () => closeChannelTitleEmojiModal(), confirm: false },
         { test: () => isFlexOverlay('group-rename-modal'), close: () => closeGroupRenameModal(), confirm: false },
         { test: () => isFlexOverlay('operator-rename-modal'), close: () => closeOperatorRenameModal(), confirm: false },
+        { test: () => isFlexOverlay('password-change-modal'), close: () => closePasswordChangeModal(), confirm: false },
         { test: () => isFlexOverlay('group-chat-modal'), close: () => closeGroupChatModal(), confirm: false },
         { test: () => isFlexOverlay('share-message-modal'), close: () => closeShareMessageModal(), confirm: true, name: '메시지 전달' },
         { test: () => isFlexOverlay('schedule-msg-modal'), close: () => closeScheduleMessageModal(), confirm: true, name: '예약 메시지' },
@@ -14780,6 +14852,7 @@
           </div>
           <div style="display:flex; gap:6px; flex-shrink:0;">
             <span style="color:#0369a1; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); renameMasterNoticeOperator('${uname}')">이름수정</span>
+            <span style="color:#7c3aed; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); openPasswordChangeModal({ mode: 'operator-reset', username: '${uname}' })">비밀번호</span>
             <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); removeMasterNoticeOperator('${uname}')">삭제</span>
           </div>
         `;
@@ -14837,6 +14910,135 @@
       closeOperatorRenameModal();
       loadMasterOperatorList();
       await appAlert(`표시 이름을 [${name}] 으로 저장했습니다.`);
+    }
+
+    let passwordChangeContext = { mode: '', username: '' };
+
+    function openPasswordChangeModal(opts) {
+      const o = opts || {};
+      const mode = o.mode || 'operator-self';
+      const username = String(o.username || '').trim();
+      passwordChangeContext = { mode, username };
+      const modal = document.getElementById('password-change-modal');
+      const titleEl = document.getElementById('password-change-title');
+      const subEl = document.getElementById('password-change-subtitle');
+      const currentWrap = document.getElementById('password-change-current-wrap');
+      const errEl = document.getElementById('password-change-error');
+      const submitBtn = document.getElementById('password-change-submit-btn');
+      const currentInput = document.getElementById('password-change-current');
+      const newInput = document.getElementById('password-change-new');
+      const confirmInput = document.getElementById('password-change-confirm');
+      if (!modal) return;
+      if (currentInput) currentInput.value = '';
+      if (newInput) newInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+
+      if (mode === 'master-self') {
+        if (titleEl) titleEl.textContent = '🔑 마스터 비밀번호 변경';
+        if (subEl) subEl.textContent = '현재 마스터 비밀번호를 확인한 뒤 새 비밀번호를 설정합니다.';
+        if (currentWrap) currentWrap.style.display = 'flex';
+        if (submitBtn) submitBtn.textContent = '✔ 변경';
+      } else if (mode === 'operator-reset') {
+        if (titleEl) titleEl.textContent = '🔑 작성 권한자 비밀번호 재설정';
+        if (subEl) subEl.textContent = username
+          ? `아이디 [${username}] 의 새 비밀번호를 지정합니다. (비밀번호를 잊었을 때 사용)`
+          : '작성 권한자 계정의 새 비밀번호를 지정합니다.';
+        if (currentWrap) currentWrap.style.display = 'none';
+        if (submitBtn) submitBtn.textContent = '✔ 재설정';
+      } else {
+        if (titleEl) titleEl.textContent = '🔑 내 비밀번호 변경';
+        if (subEl) subEl.textContent = username
+          ? `아이디 [${username}] 계정 비밀번호를 변경합니다.`
+          : '현재 비밀번호를 확인한 뒤 새 비밀번호를 설정합니다.';
+        if (currentWrap) currentWrap.style.display = 'flex';
+        if (submitBtn) submitBtn.textContent = '✔ 변경';
+      }
+
+      modal.style.display = 'flex';
+      setModalOpenState(true);
+      setTimeout(() => {
+        const focusEl = (mode === 'operator-reset') ? newInput : currentInput;
+        if (focusEl) focusEl.focus();
+      }, 40);
+    }
+
+    function closePasswordChangeModal() {
+      const modal = document.getElementById('password-change-modal');
+      if (modal) modal.style.display = 'none';
+      passwordChangeContext = { mode: '', username: '' };
+      if (!isFlexOverlay('master-admin-modal') && !isFlexOverlay('settings-modal')) {
+        setModalOpenState(false);
+      }
+    }
+
+    async function submitPasswordChange() {
+      const mode = passwordChangeContext.mode;
+      const username = passwordChangeContext.username;
+      const currentPassword = document.getElementById('password-change-current')?.value || '';
+      const newPassword = document.getElementById('password-change-new')?.value || '';
+      const confirmPassword = document.getElementById('password-change-confirm')?.value || '';
+      const errEl = document.getElementById('password-change-error');
+      const showErr = async (msg) => {
+        if (errEl) {
+          errEl.textContent = msg;
+          errEl.style.display = 'block';
+        } else {
+          await appAlert(msg);
+        }
+      };
+
+      if (!newPassword || newPassword.length < 4) {
+        await showErr('새 비밀번호는 4자 이상이어야 합니다.');
+        document.getElementById('password-change-new')?.focus();
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        await showErr('새 비밀번호 확인이 일치하지 않습니다.');
+        document.getElementById('password-change-confirm')?.focus();
+        return;
+      }
+
+      let res = null;
+      if (mode === 'master-self') {
+        if (!currentPassword) {
+          await showErr('현재 비밀번호를 입력해 주세요.');
+          document.getElementById('password-change-current')?.focus();
+          return;
+        }
+        res = await window.api.changeMasterPassword({ currentPassword, newPassword });
+      } else if (mode === 'operator-reset') {
+        if (!username) {
+          await showErr('대상 계정이 없습니다.');
+          return;
+        }
+        res = await window.api.resetNoticeOperatorPassword({ username, newPassword });
+      } else {
+        if (!currentPassword) {
+          await showErr('현재 비밀번호를 입력해 주세요.');
+          document.getElementById('password-change-current')?.focus();
+          return;
+        }
+        res = await window.api.changeNoticeOperatorPassword({
+          username: username || currentOperatorUsername,
+          currentPassword,
+          newPassword
+        });
+      }
+
+      if (!res || !res.success) {
+        await showErr((res && res.msg) || '비밀번호 변경에 실패했습니다.');
+        return;
+      }
+
+      closePasswordChangeModal();
+      if (mode === 'operator-reset') {
+        await appAlert(`아이디 [${username}] 비밀번호를 재설정했습니다.\n새 비밀번호로 로그인해 주세요.`);
+      } else if (mode === 'master-self') {
+        await appAlert('마스터 비밀번호를 변경했습니다.\n다른 PC에서도 같은 비밀번호로 맞춰 주세요.');
+      } else {
+        await appAlert('비밀번호를 변경했습니다.');
+      }
     }
 
     async function addMasterNoticeOperator() {
@@ -14900,6 +15102,7 @@
         dutyOnlyMasterSession = false;
       }
       updateMasterAuthUi();
+      syncOperatorAuthSettingsStatusUi();
       const addSchBtn = document.getElementById('add-sch-btn');
       if (addSchBtn) addSchBtn.style.display = 'inline-flex';
       renderSchedules();

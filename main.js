@@ -7423,6 +7423,150 @@ ipcMain.handle('verify-master-password', async (event, inputPassword) => {
   });
 });
 
+function normalizeNewPassword(raw) {
+  const pw = String(raw == null ? '' : raw);
+  if (pw.length < 4) return { ok: false, msg: '새 비밀번호는 4자 이상이어야 합니다.' };
+  if (pw.length > 64) return { ok: false, msg: '새 비밀번호는 64자 이하여야 합니다.' };
+  return { ok: true, password: pw };
+}
+
+/** 마스터 로그인 상태에서 본인 비밀번호 변경 (이 PC의 master_config) */
+ipcMain.handle('change-master-password', async (event, payload) => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  }
+  const currentPassword = String((payload && payload.currentPassword) || '');
+  const normalized = normalizeNewPassword(payload && payload.newPassword);
+  if (!normalized.ok) return { success: false, msg: normalized.msg };
+  if (normalized.password === currentPassword) {
+    return { success: false, msg: '새 비밀번호는 현재 비밀번호와 달라야 합니다.' };
+  }
+  return new Promise((resolve) => {
+    db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
+      if (err || !row) {
+        resolve({ success: false, msg: '마스터 설정을 찾을 수 없습니다.' });
+        return;
+      }
+      if (String(row.master_password) !== currentPassword) {
+        resolve({ success: false, msg: '현재 비밀번호가 올바르지 않습니다.' });
+        return;
+      }
+      db.run(
+        `UPDATE master_config SET master_password = ? WHERE id = 1`,
+        [normalized.password],
+        (updErr) => {
+          if (updErr) {
+            logDbErr(updErr);
+            resolve({ success: false, msg: '비밀번호 변경에 실패했습니다.' });
+            return;
+          }
+          writeToLogFile('info', '[마스터] 비밀번호 변경됨');
+          resolve({ success: true });
+        }
+      );
+    });
+  });
+});
+
+/** 작성 권한자: 본인 비밀번호 변경 (현재 비밀번호 확인) */
+ipcMain.handle('change-notice-operator-password', async (event, payload) => {
+  if (!noticeOperatorSessionActive) {
+    return { success: false, msg: '작성 권한자로 로그인한 뒤 변경할 수 있습니다.' };
+  }
+  const username = String((payload && payload.username) || noticeOperatorUsernameSession || '').trim();
+  if (!username || username !== noticeOperatorUsernameSession) {
+    return { success: false, msg: '본인 계정만 비밀번호를 변경할 수 있습니다.' };
+  }
+  const currentPassword = String((payload && payload.currentPassword) || '');
+  const normalized = normalizeNewPassword(payload && payload.newPassword);
+  if (!normalized.ok) return { success: false, msg: normalized.msg };
+  const currentHash = hashPassword(currentPassword);
+  const newHash = hashPassword(normalized.password);
+  if (currentHash === newHash) {
+    return { success: false, msg: '새 비밀번호는 현재 비밀번호와 달라야 합니다.' };
+  }
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM notice_operators WHERE username = ?`, [username], (err, row) => {
+      if (err || !row) {
+        resolve({ success: false, msg: '계정을 찾을 수 없습니다.' });
+        return;
+      }
+      if (row.password_hash !== currentHash) {
+        resolve({ success: false, msg: '현재 비밀번호가 올바르지 않습니다.' });
+        return;
+      }
+      db.run(
+        `UPDATE notice_operators SET password_hash = ? WHERE username = ?`,
+        [newHash, username],
+        (updErr) => {
+          if (updErr) {
+            logDbErr(updErr);
+            resolve({ success: false, msg: '비밀번호 변경에 실패했습니다.' });
+            return;
+          }
+          broadcastToOnlinePeers({
+            type: 'OPERATOR_ADD',
+            operator: {
+              username: row.username,
+              password_hash: newHash,
+              display_name: row.display_name,
+              added_at: row.added_at,
+              can_manage_duty: row.can_manage_duty
+            }
+          });
+          if (mainWindow) safeWebContentsSend('notice-operators-update');
+          writeToLogFile('info', `[작성권한] ${username} 비밀번호 변경됨`);
+          resolve({ success: true });
+        }
+      );
+    });
+  });
+});
+
+/** 마스터: 작성 권한자 비밀번호 재설정 (분실 시) */
+ipcMain.handle('reset-notice-operator-password', async (event, payload) => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  }
+  const username = String((payload && payload.username) || '').trim();
+  if (!username) return { success: false, msg: '아이디가 없습니다.' };
+  const normalized = normalizeNewPassword(payload && payload.newPassword);
+  if (!normalized.ok) return { success: false, msg: normalized.msg };
+  const newHash = hashPassword(normalized.password);
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM notice_operators WHERE username = ?`, [username], (err, row) => {
+      if (err || !row) {
+        resolve({ success: false, msg: '계정을 찾을 수 없습니다.' });
+        return;
+      }
+      db.run(
+        `UPDATE notice_operators SET password_hash = ? WHERE username = ?`,
+        [newHash, username],
+        (updErr) => {
+          if (updErr) {
+            logDbErr(updErr);
+            resolve({ success: false, msg: '비밀번호 재설정에 실패했습니다.' });
+            return;
+          }
+          broadcastToOnlinePeers({
+            type: 'OPERATOR_ADD',
+            operator: {
+              username: row.username,
+              password_hash: newHash,
+              display_name: row.display_name,
+              added_at: row.added_at,
+              can_manage_duty: row.can_manage_duty
+            }
+          });
+          if (mainWindow) safeWebContentsSend('notice-operators-update');
+          writeToLogFile('info', `[마스터] 작성권한 ${username} 비밀번호 재설정`);
+          resolve({ success: true, displayName: row.display_name || username });
+        }
+      );
+    });
+  });
+});
+
 ipcMain.handle('clear-master-session', async () => {
   masterSessionActive = false;
   return { success: true };

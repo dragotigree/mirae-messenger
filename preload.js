@@ -77,6 +77,9 @@ contextBridge.exposeInMainWorld('api', {
   // 🔒 마스터 관리자 및 공지·일정 작성 권한 계정(아이디/비밀번호) 관리
   verifyMasterAuth: (data) => ipcRenderer.invoke('verify-master-auth', data),
   verifyMasterPassword: (password) => ipcRenderer.invoke('verify-master-password', password),
+  changeMasterPassword: (data) => ipcRenderer.invoke('change-master-password', data),
+  changeNoticeOperatorPassword: (data) => ipcRenderer.invoke('change-notice-operator-password', data),
+  resetNoticeOperatorPassword: (data) => ipcRenderer.invoke('reset-notice-operator-password', data),
   clearMasterSession: () => ipcRenderer.invoke('clear-master-session'),
   masterUpdateUserProfile: (payload) => ipcRenderer.invoke('master-update-user-profile', payload),
   masterForceUpdate: (payload) => ipcRenderer.invoke('master-force-update', payload),
