@@ -2170,6 +2170,20 @@ db.serialize(() => {
       }
       try { notifyUsageLockState(); } catch (_) {}
       try { notifyServicePauseState(); } catch (_) {}
+      try {
+        if (isServicePausePeriod()) {
+          const ms = SERVICE_PAUSE_UNTIL.getTime() - Date.now() + 1000;
+          if (ms > 0 && ms < 2147483647) {
+            setTimeout(() => {
+              notifyServicePauseState();
+              if (!localUsageDisabled) {
+                registerSelf();
+                if (globalUdpSocket) broadcastPresence(globalUdpSocket);
+              }
+            }, ms);
+          }
+        }
+      } catch (_) {}
     });
   });
   db.all(`SELECT ip, username, disabled_at, disabled_by_ip FROM disabled_clients`, [], (err, rows) => {
