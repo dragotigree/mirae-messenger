@@ -6680,7 +6680,20 @@
         isNoticeOperatorAuthenticated
           ? { displayName: currentOperatorName || '', username: currentOperatorUsername || '' }
           : null
-      ).catch(() => {});
+      ).then((res) => {
+        // main이 DB에 없는 계정이면 거부 — 로컬 위조/만료 세션 정리
+        if (isNoticeOperatorAuthenticated && res && res.success === false) {
+          isNoticeOperatorAuthenticated = false;
+          currentOperatorName = '';
+          currentOperatorUsername = '';
+          noticeOperatorCanManageDuty = false;
+          try { localStorage.removeItem(NOTICE_OPERATOR_STORAGE_KEY); } catch (_) { /* ignore */ }
+          syncOperatorAuthSettingsStatusUi();
+        } else if (res && res.success && res.displayName) {
+          currentOperatorName = res.displayName;
+          if (res.username) currentOperatorUsername = res.username;
+        }
+      }).catch(() => {});
     }
 
     function loadNoticeOperatorSession() {
@@ -9263,7 +9276,13 @@
           markRecentDmUiFingerprint(fp);
           return;
         }
-        appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
+        void appendLiveMessageSafely(() => {
+          if (data.uid) {
+            const existing = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(data.uid)}"]`);
+            if (existing) return;
+          }
+          appendMessageRow(data.message, data.createdAt, data.senderName, false, data.urgent, data.uid, undefined, data.senderIP);
+        });
         markRecentDmUiFingerprint(fp);
         // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
         pendingDmReadPeers.add(data.senderIP);
@@ -9284,8 +9303,10 @@
       if (codeType) playCodeAlertSound();
       else if (urgent) playUrgentSound();
       if (activeChatUser && activeChatUser.isBroadcast) {
-        appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), urgent, data.msgUid, data.messageId, data.senderIP);
-        afterChannelMessageVisible(data.msgUid);
+        void appendLiveMessageSafely(() => {
+          appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), urgent, data.msgUid, data.messageId, data.senderIP);
+          afterChannelMessageVisible(data.msgUid);
+        });
       } else {
         bumpUnread('BROADCAST');
       }
@@ -9294,8 +9315,10 @@
     window.api.onReceiveDeptMessage((data) => {
       const key = `DEPT:${data.dept}`;
       if (activeChatUser && activeChatUser.isDept && activeChatUser.ip === key) {
-        appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
-        afterChannelMessageVisible(data.msgUid);
+        void appendLiveMessageSafely(() => {
+          appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
+          afterChannelMessageVisible(data.msgUid);
+        });
       } else {
         bumpUnread(key);
       }
@@ -9304,8 +9327,10 @@
     window.api.onReceiveFloorMessage((data) => {
       const key = `FLOOR:${data.floor}`;
       if (activeChatUser && activeChatUser.isFloor && activeChatUser.ip === key) {
-        appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
-        afterChannelMessageVisible(data.msgUid);
+        void appendLiveMessageSafely(() => {
+          appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
+          afterChannelMessageVisible(data.msgUid);
+        });
       } else {
         bumpUnread(key);
       }
@@ -9314,8 +9339,10 @@
     window.api.onReceiveGroupMessage((data) => {
       const key = `GROUP:${data.uid}`;
       if (activeChatUser && activeChatUser.isGroup && activeChatUser.ip === key) {
-        appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
-        afterChannelMessageVisible(data.msgUid);
+        void appendLiveMessageSafely(() => {
+          appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
+          afterChannelMessageVisible(data.msgUid);
+        });
       } else {
         bumpUnread(key);
       }
@@ -9913,7 +9940,7 @@
         return;
       }
       try {
-        const res = await window.api.verifyMasterAuth({ id, password: pwd });
+        const res = await window.api.verifyMasterAuth({ id, password: pwd, elevateSession: false });
         if (!res || !res.success) {
           if (errEl) errEl.textContent = (res && res.msg) || '마스터 인증에 실패했습니다.';
           return;
@@ -15779,6 +15806,8 @@
       if (!activeChatUser) return;
       const msgsEl = document.getElementById('chat-messages-area');
       if (!msgsEl) return;
+      const loadForIp = activeChatUser.ip;
+      const loadGen = ++chatHistoryLoadGen;
       const aroundDate = opts && opts.aroundDate ? String(opts.aroundDate).trim() : null;
       const scrollToDate = opts && opts.scrollToDate ? String(opts.scrollToDate).trim() : aroundDate;
       chatHistoryLoadingOlder = false;
@@ -15787,10 +15816,11 @@
       try {
         msgsEl.innerHTML = '<div id="chat-history-load-older" class="chat-history-load-older" hidden>이전 대화 불러오는 중…</div>';
         const result = await window.api.getChatHistory({
-          targetIP: activeChatUser.ip,
+          targetIP: loadForIp,
           dateStr: aroundDate || null,
           keyword: keyword || null
         });
+        if (loadGen !== chatHistoryLoadGen || !activeChatUser || activeChatUser.ip !== loadForIp) return;
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         const jumpedDate = (!Array.isArray(result) && result && result.jumpedDate) ? result.jumpedDate : null;
         if (!Array.isArray(result) && result) {
@@ -15854,10 +15884,12 @@
           const urgent = codeType
             ? true
             : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
-          const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
+          const peerIp = activeChatUser && activeChatUser.ip;
+          const pendingStatus = row.isMe && row.status === 'PENDING' && peerIp && isDirectMessagePeerKey(peerIp) ? 'PENDING' : null;
           const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
           appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey, skipDomPrune: true });
         });
+        if (loadGen !== chatHistoryLoadGen || !activeChatUser || activeChatUser.ip !== loadForIp) return;
         syncChatHistoryIdsFromDom(msgsEl);
         pendingUnreadScrollCount = 0;
 
@@ -15879,6 +15911,7 @@
         updateMineOutboundStatusLabels();
         await refreshAllVisibleReactions();
         await refreshImportantMessageKeys();
+        if (loadGen !== chatHistoryLoadGen || !activeChatUser || activeChatUser.ip !== loadForIp) return;
         if (!keyword) {
           await markChannelReadFromHistory(history);
           await refreshChannelMessageUnreadCounts();
@@ -15890,6 +15923,7 @@
           }
         }
       } catch (e) {
+        if (loadGen !== chatHistoryLoadGen) return;
         console.error('대화 기록을 불러오지 못했습니다:', e);
         msgsEl.innerHTML = `<div style="text-align:center; color:#ef4444; font-size:12px; padding:24px;">대화 기록을 불러오는 중 오류가 발생했습니다.</div>`;
       }
@@ -15901,6 +15935,7 @@
     let chatHistoryNewestId = 0;
     let chatHistoryLoadingOlder = false;
     let chatHistoryLoadingNewer = false;
+    let chatHistoryLoadGen = 0; // 대화방 전환 시 in-flight 로드 무효화
     const CHAT_DOM_MAX_MESSAGES = 220;
     const CHAT_HISTORY_PAGE_SIZE = 80;
 
@@ -15940,7 +15975,7 @@
         if (first.classList && (first.classList.contains('msg-row') || first.classList.contains('msg-row-bubble'))) removed += 1;
         container.removeChild(first);
       }
-      // 맨 위 날짜선만 남지 않게
+      // 맨 위 연속 날짜선 정리
       while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
         const next = container.children[1];
         if (next && next.classList && next.classList.contains('chat-date-sep')) {
@@ -15949,9 +15984,27 @@
         }
         break;
       }
+      // 날짜선이 잘려 같은 날 메시지만 남으면 맨 앞에 날짜선 복구
+      ensureLeadingChatDateSeparator(container);
       chatHistoryHasMore = true;
       syncChatHistoryIdsFromDom(container);
       return removed;
+    }
+
+    function ensureLeadingChatDateSeparator(container) {
+      if (!container) return;
+      let firstMsg = container.firstChild;
+      while (firstMsg && firstMsg.id === 'chat-history-load-older') firstMsg = firstMsg.nextSibling;
+      if (!firstMsg) return;
+      if (firstMsg.classList && firstMsg.classList.contains('chat-date-sep')) return;
+      if (!firstMsg.classList || !(firstMsg.classList.contains('msg-row') || firstMsg.classList.contains('msg-row-bubble'))) return;
+      const dateKey = firstMsg.getAttribute('data-chat-date-key') || '';
+      if (!dateKey || typeof formatChatDateSepLabel !== 'function') return;
+      const sep = document.createElement('div');
+      sep.className = 'chat-date-sep';
+      sep.setAttribute('data-chat-date-key', dateKey);
+      sep.textContent = formatChatDateSepLabel(dateKey);
+      container.insertBefore(sep, firstMsg);
     }
 
     function pruneChatDomFromBottom(container, removeCount) {
@@ -16005,12 +16058,13 @@
       const o = opts || {};
       const msgsEl = document.getElementById('chat-messages-area');
       if (!msgsEl || !history) return;
+      const peerIp = activeChatUser && activeChatUser.ip;
       history.forEach((row) => {
         const codeType = detectCodeAlertType(row.message);
         const urgent = codeType
           ? true
           : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
-        const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
+        const pendingStatus = row.isMe && row.status === 'PENDING' && peerIp && isDirectMessagePeerKey(peerIp) ? 'PENDING' : null;
         const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
         appendMessageRow(
           row.message, row.created_time, row.sender_name, !!row.isMe, urgent,
@@ -16028,11 +16082,14 @@
 
     async function loadOlderChatHistory() {
       if (!activeChatUser || chatHistoryLoadingOlder || chatHistoryLoadingNewer || !chatHistoryHasMore || !chatHistoryOldestId) return;
-      if (chatDateJumpActive) return;
+      // 날짜 점프 중에도 위·아래 이어 로드 허용 (배너는 유지)
       const searchInput = document.getElementById('chat-search-input');
       if (searchInput && searchInput.value && searchInput.value.trim()) return;
       const msgsEl = document.getElementById('chat-messages-area');
       if (!msgsEl) return;
+      const loadForIp = activeChatUser.ip;
+      const loadGen = chatHistoryLoadGen;
+      const beforeId = chatHistoryOldestId;
 
       chatHistoryLoadingOlder = true;
       setChatHistoryLoadOlderVisible(true);
@@ -16040,10 +16097,11 @@
       const prevTop = msgsEl.scrollTop;
       try {
         const result = await window.api.getChatHistory({
-          targetIP: activeChatUser.ip,
-          beforeId: chatHistoryOldestId,
+          targetIP: loadForIp,
+          beforeId,
           limit: CHAT_HISTORY_PAGE_SIZE
         });
+        if (loadGen !== chatHistoryLoadGen || !activeChatUser || activeChatUser.ip !== loadForIp) return;
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         if (!Array.isArray(result) && result) {
           chatHistoryHasMore = !!result.hasMore;
@@ -16085,17 +16143,20 @@
 
     async function loadNewerChatHistory() {
       if (!activeChatUser || chatHistoryLoadingNewer || chatHistoryLoadingOlder || !chatHistoryHasNewer || !chatHistoryNewestId) return;
-      if (chatDateJumpActive) return;
       const msgsEl = document.getElementById('chat-messages-area');
       if (!msgsEl) return;
+      const loadForIp = activeChatUser.ip;
+      const loadGen = chatHistoryLoadGen;
+      const afterId = chatHistoryNewestId;
 
       chatHistoryLoadingNewer = true;
       try {
         const result = await window.api.getChatHistory({
-          targetIP: activeChatUser.ip,
-          afterId: chatHistoryNewestId,
+          targetIP: loadForIp,
+          afterId,
           limit: CHAT_HISTORY_PAGE_SIZE
         });
+        if (loadGen !== chatHistoryLoadGen || !activeChatUser || activeChatUser.ip !== loadForIp) return;
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         if (!Array.isArray(result) && result) {
           chatHistoryHasNewer = !!result.hasMore;
@@ -16118,6 +16179,27 @@
       } finally {
         chatHistoryLoadingNewer = false;
       }
+    }
+
+    /** 화면이 최신이 아닐 때 라이브 메시지를 중간에 붙이면 영구 공백이 생김 → 따라잡기 후 표시 */
+    async function appendLiveMessageSafely(appendFn) {
+      if (typeof appendFn !== 'function') return;
+      if (!chatHistoryHasNewer) {
+        appendFn();
+        return;
+      }
+      if (!isNearChatBottom(200)) {
+        // 과거 구간 보는 중 — DOM에 붙이지 않음(DB에는 있음). 아래로 스크롤하면 loadNewer.
+        return;
+      }
+      let guard = 0;
+      while (chatHistoryHasNewer && activeChatUser && guard < 30) {
+        guard += 1;
+        const before = chatHistoryNewestId;
+        await loadNewerChatHistory();
+        if (chatHistoryNewestId === before && chatHistoryHasNewer) break;
+      }
+      appendFn();
     }
 
     let chatCalendarViewDate = new Date();
@@ -18695,7 +18777,12 @@
       const row = document.createElement('div');
       if (msgUid) {
         const existing = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(msgUid)}"]`);
-        if (existing) return existing;
+        if (existing) {
+          if (messageId && !existing.getAttribute('data-msg-id')) {
+            existing.setAttribute('data-msg-id', String(messageId));
+          }
+          return existing;
+        }
         row.setAttribute('data-msg-uid', msgUid);
       }
       if (messageId) row.setAttribute('data-msg-id', String(messageId));

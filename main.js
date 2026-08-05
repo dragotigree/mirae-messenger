@@ -2576,25 +2576,29 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
-  // 동일 msg_uid 중복 INSERT 방지 (재전송 레이스). 기존 중복이 있으면 한 건만 남기고 인덱스 생성.
-  db.run(
-    `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-      AND id NOT IN (
-        SELECT MIN(id) FROM messages
-        WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-        GROUP BY msg_uid
-      )`,
-    (delErr) => {
-      if (delErr) logDbErr(delErr);
-      db.run(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_unique
-         ON messages(msg_uid) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
-        (idxErr) => {
-          if (idxErr) console.error('msg_uid unique index:', idxErr.message || idxErr);
-        }
-      );
-    }
-  );
+  // msg_uid 단독 UNIQUE는 전체/부서/층 PENDING 팬아웃(동일 uid·다른 receiver)을 막음.
+  // (msg_uid, receiver_ip) 단위로만 중복 금지. 구버전 단독 unique 인덱스는 제거.
+  db.run(`DROP INDEX IF EXISTS idx_messages_msg_uid_unique`, (dropErr) => {
+    if (dropErr) logDbErr(dropErr);
+    db.run(
+      `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+        AND id NOT IN (
+          SELECT MIN(id) FROM messages
+          WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+          GROUP BY msg_uid, IFNULL(receiver_ip, '')
+        )`,
+      (delErr) => {
+        if (delErr) logDbErr(delErr);
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_receiver_unique
+           ON messages(msg_uid, receiver_ip) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
+          (idxErr) => {
+            if (idxErr) console.error('msg_uid+receiver unique index:', idxErr.message || idxErr);
+          }
+        );
+      }
+    );
+  });
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pending_out ON messages(sender_ip, status, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_scheduled_pending ON scheduled_messages(sent, send_at)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_hospital_schedules_time ON hospital_schedules(time_str)`, logDbErr);
@@ -4439,7 +4443,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
     case 'SCHEDULE_DELETE': handleScheduleDelete(payload.uid); break;
     case 'SCHEDULE_EDIT': handleScheduleEdit(payload.schedule); break;
-    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload); break;
+    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload, senderIP); break;
     case 'MESSAGE_REACTION': handleIncomingMessageReaction(payload, senderIP); break;
     case 'MSG_ACK': handleMsgAck(payload); break;
     case 'GROUP_SYNC': handleGroupSync(payload.group); break;
@@ -4613,10 +4617,10 @@ function handleIncomingChat(payload, senderIP) {
   };
 
   if (uid && isIncomingChatUidBusy(uid)) {
-    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? AND receiver_ip = ? LIMIT 1`, [uid, MY_IP], (err, row) => {
       if (err) {
         logDbErr(err);
-        ackIfUid();
+        // DB 확인 실패 시 ACK 금지 — 발신이 재시도해야 유실 방지
         return;
       }
       if (row) {
@@ -4624,9 +4628,8 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
-      // INSERT 진행 중 재전송 — UI 없이 즉시 ACK (발신 재시도 중지)
+      // INSERT 진행 중 재전송 — ACK하지 않음(실패 시 유실 방지). 발신은 타임아웃 후 재시도.
       if (incomingChatUidInflight.has(String(uid))) {
-        ackIfUid();
         return;
       }
       incomingChatUidInflight.add(String(uid));
@@ -4637,10 +4640,10 @@ function handleIncomingChat(payload, senderIP) {
 
   if (uid) {
     if (!claimIncomingChatUid(uid)) {
-      ackIfUid();
+      // 다른 처리가 점유 중 — ACK 보류 (완료 후 DB에 있으면 재시도 시 ACK)
       return;
     }
-    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? AND receiver_ip = ? LIMIT 1`, [uid, MY_IP], (err, row) => {
       if (err) {
         logDbErr(err);
         persist({ showUi: true });
@@ -4651,8 +4654,7 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
-      // 수락 확정 직후 ACK → INSERT 완료 전 재전송 폭주 방지
-      ackIfUid();
+      // ACK는 INSERT 성공 콜백에서만 (조기 ACK 후 INSERT 실패 = 조용한 유실)
       persist({ showUi: true });
     });
     return;
@@ -7751,12 +7753,17 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
 });
 
 // 🔑 마스터 아이디 + 비밀번호 검증 IPC 핸들러
-ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
+ipcMain.handle('verify-master-auth', async (event, payload) => {
+  const p = payload || {};
+  const id = p.id;
+  const password = p.password;
+  // elevateSession === false: 화면잠금 해제 등 — 인증만 하고 마스터 세션은 올리지 않음
+  const elevateSession = p.elevateSession !== false;
   return new Promise((resolve) => {
     db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
       const currentId = row && row.master_id ? row.master_id : 'admin';
       if (row && currentId === id && row.master_password === password) {
-        masterSessionActive = true;
+        if (elevateSession) masterSessionActive = true;
         resolve({ success: true });
       } else {
         resolve({ success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -8001,14 +8008,20 @@ ipcMain.handle('get-notices', async () => {
 });
 
 ipcMain.handle('add-notice', async (event, { title, content, authorName, images }) => {
+  if (!masterSessionActive && !noticeOperatorSessionActive) {
+    return { success: false, error: '작성 권한자로 로그인한 뒤 공지를 등록할 수 있습니다.' };
+  }
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
+    const sessionAuthor = noticeOperatorDisplayNameSession || noticeOperatorUsernameSession || '';
     const imagesJson = normalizeNoticeImagesField(images);
     const record = {
       uid: generateNoticeUid(),
       title,
       content,
-      author_name: (authorName && String(authorName).trim()) || fallbackAuthor,
+      author_name: (authorName && String(authorName).trim())
+        || sessionAuthor
+        || fallbackAuthor,
       author_ip: MY_IP,
       created_at: new Date().toISOString(),
       images: imagesJson
@@ -8115,6 +8128,7 @@ ipcMain.handle('update-notice-operator-display-name', async (event, { username, 
 });
 
 ipcMain.handle('add-notice-operator', async (event, { username, password, displayName, canManageDuty }) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
     const password_hash = hashPassword(password);
@@ -8149,6 +8163,7 @@ ipcMain.handle('set-notice-operator-duty-perm', async (event, { username, canMan
 });
 
 ipcMain.handle('delete-notice-operator', async (event, username) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], (err) => {
       if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DELETE', username });
@@ -8333,18 +8348,46 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
 });
 
 ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty, meta) => {
-  noticeOperatorSessionActive = !!active;
-  // 작성 권한자 세션이 활성면 당직·OFF도 허용 (별도 플래그 무시)
-  noticeOperatorCanManageDutySession = !!active;
-  if (active) {
-    const m = (meta && typeof meta === 'object') ? meta : {};
-    noticeOperatorDisplayNameSession = String(m.displayName || m.display_name || '').trim();
-    noticeOperatorUsernameSession = String(m.username || '').trim();
-  } else {
+  // 로그아웃은 항상 허용
+  if (!active) {
+    noticeOperatorSessionActive = false;
+    noticeOperatorCanManageDutySession = false;
     noticeOperatorDisplayNameSession = '';
     noticeOperatorUsernameSession = '';
+    return { success: true };
   }
-  return { success: true };
+  // 활성화: DB에 실제 등록된 계정만 허용 (임의 IPC로 위조 세션 방지).
+  // 표시 이름은 클라이언트 입력이 아니라 DB 값을 사용.
+  const m = (meta && typeof meta === 'object') ? meta : {};
+  const username = String(m.username || '').trim();
+  if (!username) {
+    return { success: false, msg: '작성 권한자 계정이 없습니다.' };
+  }
+  return new Promise((resolve) => {
+    db.get(
+      `SELECT username, display_name FROM notice_operators WHERE username = ?`,
+      [username],
+      (err, row) => {
+        if (err || !row) {
+          noticeOperatorSessionActive = false;
+          noticeOperatorCanManageDutySession = false;
+          noticeOperatorDisplayNameSession = '';
+          noticeOperatorUsernameSession = '';
+          resolve({ success: false, msg: '등록되지 않은 작성 권한자입니다.' });
+          return;
+        }
+        noticeOperatorSessionActive = true;
+        noticeOperatorCanManageDutySession = true;
+        noticeOperatorUsernameSession = String(row.username || '').trim();
+        noticeOperatorDisplayNameSession = String(row.display_name || '').trim() || noticeOperatorUsernameSession;
+        resolve({
+          success: true,
+          displayName: noticeOperatorDisplayNameSession,
+          username: noticeOperatorUsernameSession
+        });
+      }
+    );
+  });
 });
 
 function isAuthorOfRecord(row) {
@@ -8742,12 +8785,29 @@ ipcMain.handle('edit-message', async (event, { msgUid, targetIP, groupUid, newMe
   });
 });
 
-function handleIncomingMessageEdit(payload) {
+function handleIncomingMessageEdit(payload, senderIP) {
   if (!payload || !payload.msgUid) return;
-  db.run(`UPDATE messages SET message = ? WHERE msg_uid = ?`, [payload.newMessage, payload.msgUid], logDbErr);
-  if (mainWindow) {
-    safeWebContentsSend('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
-  }
+  const uid = String(payload.msgUid || '').trim();
+  const fromIp = String(senderIP || '').trim();
+  if (!uid || !fromIp) return;
+  // 발신 IP와 일치하는 행만 수정 — 임의 PC가 타인 메시지를 위조 편집하지 못함
+  db.run(
+    `UPDATE messages SET message = ? WHERE msg_uid = ? AND sender_ip = ?`,
+    [payload.newMessage, uid, fromIp],
+    function (err) {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      if (!this.changes) {
+        writeToLogFile('warn', `[MESSAGE_EDIT] 거부 uid=${uid} from=${fromIp} (발신자 불일치 또는 없음)`);
+        return;
+      }
+      if (mainWindow) {
+        safeWebContentsSend('message-edited', { msgUid: uid, newMessage: payload.newMessage });
+      }
+    }
+  );
 }
 
 function fetchReactionSummariesForKeys(keys, callback) {
@@ -10358,20 +10418,38 @@ async function getLastAutoBackupInfo() {
 
 async function performAutoBackupIfNeeded(opts) {
   const force = !!(opts && opts.force);
+  const retentionOnly = !!(opts && opts.retentionOnly);
   try {
-    if (!force && autoBackupIntervalHours <= 0) return { created: false, reason: 'disabled' };
+    if (!force && !retentionOnly && autoBackupIntervalHours <= 0) {
+      // 백업은 안 만들지만 보관기간 정리는 수행
+      const dirOff = await getAutoBackupDir();
+      const retentionDaysOff = Math.max(1, autoBackupRetentionDays || 14);
+      const cutoffOff = Date.now() - retentionDaysOff * 24 * 60 * 60 * 1000;
+      const afterOff = await listAutoBackupFiles(dirOff);
+      for (const f of afterOff) {
+        if (f.mtimeMs < cutoffOff) {
+          try { await fs.promises.unlink(f.filePath); } catch (_) { /* ignore */ }
+        }
+      }
+      return { created: false, reason: 'disabled' };
+    }
     const dir = await getAutoBackupDir();
     const files = await listAutoBackupFiles(dir);
-    const intervalMs = Math.max(1, autoBackupIntervalHours) * 60 * 60 * 1000;
-    const newest = files[0] || null;
-    const due = force || !newest || (Date.now() - newest.mtimeMs) >= intervalMs;
     let created = false;
     let createdPath = '';
-    if (due) {
-      await checkpointWal();
-      createdPath = path.join(dir, `auto_backup_${autoBackupStamp()}.db`);
-      await fs.promises.copyFile(dbPath, createdPath);
-      created = true;
+    if (!retentionOnly) {
+      const intervalMs = Math.max(1, autoBackupIntervalHours) * 60 * 60 * 1000;
+      const newest = files[0] || null;
+      const due = force || !newest || (Date.now() - newest.mtimeMs) >= intervalMs;
+      if (due) {
+        await checkpointWal();
+        createdPath = path.join(dir, `auto_backup_${autoBackupStamp()}.db`);
+        await fs.promises.copyFile(dbPath, createdPath);
+        created = true;
+      }
+      if (!due) {
+        // not due — still prune below
+      }
     }
     const retentionDays = Math.max(1, autoBackupRetentionDays || 14);
     const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
@@ -10381,7 +10459,8 @@ async function performAutoBackupIfNeeded(opts) {
         try { await fs.promises.unlink(f.filePath); } catch (_) { /* ignore */ }
       }
     }
-    return { created, path: createdPath, reason: due ? (created ? 'created' : 'error') : 'not-due' };
+    if (retentionOnly) return { created: false, reason: 'retention-only' };
+    return { created, path: createdPath, reason: created ? 'created' : 'not-due' };
   } catch (e) {
     console.error('자동 백업 오류:', e.message);
     return { created: false, reason: 'error', msg: e.message };
@@ -10399,8 +10478,15 @@ function startAutoBackup() {
   cleanupOldLogFiles();
   autoBackupLogCleanupTimer = setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
 
+  const pruneRetentionOnly = () => {
+    performAutoBackupIfNeeded({ force: false, retentionOnly: true }).catch(() => {});
+  };
+
   if (autoBackupIntervalHours <= 0) {
-    console.log('[자동백업] 꺼짐');
+    console.log('[자동백업] 꺼짐 (보관기간 정리만 유지)');
+    pruneRetentionOnly();
+    // 꺼져 있어도 오래된 자동백업 파일은 주기적으로 정리
+    autoBackupTimer = setInterval(pruneRetentionOnly, 6 * 60 * 60 * 1000);
     return;
   }
   performAutoBackupIfNeeded();
