@@ -1832,31 +1832,40 @@
       overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0;
       position: relative;
     }
-    .detail-heading { font-size: 11.5px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.08em; }
+    .detail-heading { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.06em; }
     .user-info-modal-card {
-      width: min(380px, 94vw); max-height: min(88vh, 720px); overflow-y: auto;
-      padding: 18px 16px 16px; gap: 12px;
+      width: min(420px, 94vw); max-height: min(88vh, 760px); overflow-y: auto;
+      padding: 20px 18px 18px; gap: 14px;
     }
     .user-info-modal-top {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
       flex-shrink: 0;
     }
     .user-info-modal-close {
-      border: none; background: #f1f5f9; color: #475569; width: 30px; height: 30px;
-      border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+      border: none; background: #f1f5f9; color: #475569; width: 32px; height: 32px;
+      border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
     }
     .user-info-modal-close:hover { background: #e2e8f0; }
     .user-info-modal-card .detail-profile-card {
-      border-bottom: none; padding-bottom: 0; align-items: center;
+      border-bottom: none; padding-bottom: 0; align-items: center; gap: 6px;
     }
     .user-info-modal-card .detail-avatar {
-      width: 56px; height: 56px; border-radius: 18px; font-size: 15px;
+      width: 68px; height: 68px; border-radius: 20px; font-size: 18px; margin-bottom: 6px;
     }
-    .user-info-modal-card .detail-name { font-size: 15px; }
-    .user-info-modal-card .detail-dept-line { font-size: 12px; }
-    .user-info-modal-card .detail-info-row { padding: 7px 12px; font-size: 12.5px; }
-    .user-info-modal-card .detail-info-label { font-size: 11.5px; }
-    .user-info-modal-card .detail-info-value { font-size: 12.5px; }
+    .user-info-modal-card .detail-avatar .avatar-emoji { font-size: 30px; }
+    .user-info-modal-card .detail-name { font-size: 18px; letter-spacing: -0.02em; }
+    .user-info-modal-card .detail-dept-line { font-size: 14px; line-height: 1.4; }
+    .user-info-modal-card .detail-info-group { gap: 7px; margin-top: 10px; }
+    .user-info-modal-card .detail-info-row { padding: 11px 14px; font-size: 14.5px; border-radius: 12px; gap: 10px; }
+    .user-info-modal-card .detail-info-label { font-size: 13.5px; }
+    .user-info-modal-card .detail-info-value { font-size: 14.5px; }
+    .user-info-modal-card .detail-self-edit-btn { font-size: 13.5px; padding: 10px 14px; margin-top: 12px; }
+    .user-info-modal-card .group-detail-members-heading { font-size: 13.5px; margin-bottom: 6px; }
+    .user-info-modal-card .group-member-row { padding: 10px 12px; gap: 12px; }
+    .user-info-modal-card .group-member-avatar { width: 40px; height: 40px; font-size: 15px; }
+    .user-info-modal-card .group-member-name { font-size: 14.5px; }
+    .user-info-modal-card .group-member-sub { font-size: 12.5px; }
+    .user-info-modal-card .group-member-status { font-size: 12px; }
     .detail-profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); gap: 3px; }
     .detail-avatar { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-size: 12px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2); letter-spacing: -0.03em; }
     .detail-name { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--text-primary); line-height: 1.3; word-break: keep-all; }
