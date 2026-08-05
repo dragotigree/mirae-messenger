@@ -15974,6 +15974,13 @@
             const marker = document.getElementById('unread-divider-marker');
             if (marker) marker.scrollIntoView({ block: 'center' });
           }, 0);
+        } else if (activeChatSearchKeyword) {
+          clearTimeout(pendingScrollTimer);
+          pendingScrollTimer = setTimeout(() => {
+            const hit = msgsEl.querySelector('mark.search-kw-hit');
+            if (hit) hit.scrollIntoView({ block: 'center', behavior: 'instant' });
+            else scrollChatToBottom(false);
+          }, 30);
         } else {
           scrollChatToBottom(false);
         }
