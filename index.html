@@ -7325,7 +7325,10 @@
 
     function refreshAvatarsForIp(ip) {
       renderUserListTree();
-      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+      // 미니모드: 아바타만 바뀌는 경우 전체 목록·DB 재조회를 하지 않음 (프리징 방지)
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { patchCompactDirectoryPresenceOnly(); } catch (_) {}
+      }
       if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
       if (activeChatUser && activeChatUser.ip === ip) {
         const av = document.getElementById('chat-header-avatar');
@@ -7836,13 +7839,22 @@
       return clamped;
     }
 
+    let compactOpacityRaf = 0;
+    let compactOpacityPending = null;
     async function onCompactOpacityInput(value) {
       const opacity = Math.max(0.55, Math.min(1, Number(value) / 100));
       const label = document.getElementById('compact-opacity-label');
       if (label) label.textContent = `${Math.round(opacity * 100)}%`;
-      // 세션 중 조절만 반영. 기본(재진입)은 항상 100%이므로 저장하지 않음.
       try { localStorage.removeItem('compactWindowOpacity'); } catch (_) {}
-      await applyMainWindowOpacity(opacity);
+      compactOpacityPending = opacity;
+      if (compactOpacityRaf) return;
+      compactOpacityRaf = requestAnimationFrame(async () => {
+        compactOpacityRaf = 0;
+        const next = compactOpacityPending;
+        compactOpacityPending = null;
+        if (next == null) return;
+        await applyMainWindowOpacity(next);
+      });
     }
 
     async function loadCompactOpacityUi() {
@@ -9235,8 +9247,9 @@
       const selecting = sidebarSelectedUserIps.size > 0;
       renderUserListTree();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
-        if (selecting) patchCompactDirectoryPresenceOnly();
-        else renderCompactList();
+        // 접속상태 갱신은 패치/디바운스만 — 매 틱 DB 강제 조회 금지
+        if (selecting || compactRailTab === 'friends') patchCompactDirectoryPresenceOnly();
+        else scheduleCompactListRender(false);
       }
       if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
       if (activeChatUser && activeChatUser.isGroup) {
@@ -10396,7 +10409,7 @@
       syncCompactFilterChipUi();
       syncCompactUnreadJumpUi();
       syncCompactConvenienceUi();
-      if (tab !== 'more' && tab !== 'calendar') renderCompactList();
+      if (tab !== 'more' && tab !== 'calendar') renderCompactListNow(false).catch(() => {});
     }
 
     function refreshCompactCalendarPane() {
@@ -10500,7 +10513,7 @@
         return;
       }
       try {
-        const recent = await loadCompactRecentConversations(true);
+        const recent = await loadCompactRecentConversations(false);
         _compactRecentCache = buildCompactConversationRows(recent).slice(0, 12);
       } catch (_) {
         _compactRecentCache = _compactRecentCache || [];
@@ -11280,7 +11293,31 @@
       userPanels.forEach((p) => container.appendChild(p));
     }
 
+    let compactListRenderTimer = null;
+    let compactListRenderGen = 0;
+    let compactListRenderForce = false;
+
+    function scheduleCompactListRender(forceDb) {
+      if (forceDb) {
+        compactListRenderForce = true;
+        invalidateCompactRecentConversations();
+      }
+      const gen = ++compactListRenderGen;
+      clearTimeout(compactListRenderTimer);
+      compactListRenderTimer = setTimeout(() => {
+        if (gen !== compactListRenderGen) return;
+        const force = compactListRenderForce;
+        compactListRenderForce = false;
+        renderCompactListNow(force).catch(() => {});
+      }, 220);
+    }
+
     async function renderCompactList() {
+      // 호환: 기존 호출은 디바운스 (강제 DB 재조회 없음)
+      scheduleCompactListRender(false);
+    }
+
+    async function renderCompactListNow(forceDb) {
       if (compactRailTab === 'more') {
         updateCompactMoreProfile();
         return;
@@ -11294,6 +11331,7 @@
       updateCompactOnlineCount();
 
       if (compactRailTab === 'chat') {
+        if (forceDb) invalidateCompactRecentConversations();
         await renderCompactChatConversations(container);
       } else {
         renderCompactStaffDirectory(container);

@@ -142,6 +142,18 @@ function sleepMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Promise에 타임아웃을 건다. 만료 시 reject (원본 작업은 백그라운드에 남을 수 있음). */
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label || 'operation'} timeout ${ms}ms`)), ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise).finally(() => { if (timer) clearTimeout(timer); }),
+    timeoutPromise
+  ]);
+}
+
 async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
   let lastErr;
@@ -417,6 +429,7 @@ const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
+let updateApplyInFlight = false;
 /** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
 let updateMode = 'auto';
 /** 자동 DB 백업 주기(시간). 0=끔. 기본 24(매일) */
@@ -445,6 +458,16 @@ function compareVersions(a, b) {
 /** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
 async function mirrorLocalInstallToZBridge(opts = {}) {
   const force = !!(opts && opts.force);
+  const timeoutMs = Number(opts && opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 15000;
+  try {
+    return await withTimeout(mirrorLocalInstallToZBridgeInner({ force }), timeoutMs, 'Z-bridge mirror');
+  } catch (e) {
+    return { mirrored: false, reason: e && e.message ? e.message : String(e) };
+  }
+}
+
+async function mirrorLocalInstallToZBridgeInner(opts = {}) {
+  const force = !!(opts && opts.force);
   const destRoot = Z_BRIDGE_UPDATE_SOURCE_PATH;
   let localVer = APP_VERSION;
   try {
@@ -453,7 +476,7 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
   } catch (e) {}
 
   try {
-    await fs.promises.access(path.dirname(destRoot));
+    await withTimeout(fs.promises.access(path.dirname(destRoot)), 4000, 'Z-drive access');
   } catch (e) {
     return { mirrored: false, reason: 'Z드라이브에 연결되지 않았습니다.' };
   }
@@ -684,7 +707,12 @@ async function readUpdateSourceBytes(relPath) {
     return fetchGithubUpdateFile(meta, relPath);
   }
   if (meta.kind === 'folder') {
-    return fs.promises.readFile(path.join(meta.dir, relPath));
+    // Z:/공유폴더 행 시 UI 프리징 방지
+    return withTimeout(
+      fs.promises.readFile(path.join(meta.dir, relPath)),
+      12000,
+      `update-read ${relPath}`
+    );
   }
   throw new Error('업데이트 소스가 설정되지 않았습니다.');
 }
@@ -4029,11 +4057,12 @@ app.whenReady().then(async () => {
   startAutoBackup();
   startUpdateChecker();
   startPendingWipeRetryLoop();
+  // Z 미러는 업데이트 검사와 겹치지 않게 늦게·짧게. Z: 행 시 프리징 방지.
   setTimeout(() => {
-    mirrorLocalInstallToZBridge().catch((e) => {
+    mirrorLocalInstallToZBridge({ timeoutMs: 12000 }).catch((e) => {
       console.warn('[Z브리지] 시작 시 미러 생략:', e.message || e);
     });
-  }, 8000);
+  }, 45000);
   // 부팅 직후: 다른 PC에 내 IP 대상 삭제 예약이 있으면 받아 즉시 적용
   setTimeout(() => {
     broadcastWipeClaim();
@@ -9809,7 +9838,23 @@ function markAppSettingsRowLoaded() {
 
 function whenAppSettingsRowLoaded() {
   if (appSettingsRowLoaded) return Promise.resolve();
-  return new Promise((resolve) => appSettingsRowWaiters.push(resolve));
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    appSettingsRowWaiters.push(done);
+    setTimeout(() => {
+      // DB 로드가 지연돼도 IPC가 영원히 기다리지 않음 (프리징 방지)
+      if (!appSettingsRowLoaded) {
+        console.warn('[app_settings] 로드 대기 타임아웃 — 기본값으로 진행');
+        markAppSettingsRowLoaded();
+      }
+      done();
+    }, 5000);
+  });
 }
 
 function persistQuickPhrasesList(list) {
@@ -10158,9 +10203,9 @@ async function applyUpdateFiles() {
     );
   }
 
-  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패해도 업데이트는 성공)
+  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패·타임아웃해도 업데이트는 성공)
   try {
-    const zRes = await mirrorLocalInstallToZBridge({ force: true });
+    const zRes = await mirrorLocalInstallToZBridge({ force: true, timeoutMs: 12000 });
     if (zRes && zRes.mirrored) {
       console.log('[업데이트] Z 브리지 미러 완료:', zRes.version);
     } else if (zRes && zRes.reason && zRes.reason !== 'already-latest') {
@@ -10174,12 +10219,16 @@ async function applyUpdateFiles() {
 ipcMain.handle('apply-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
+  if (updateApplyInFlight) return { success: false, msg: '업데이트가 이미 진행 중입니다.' };
+  updateApplyInFlight = true;
   try {
     await applyUpdateFiles();
     setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
+  } finally {
+    updateApplyInFlight = false;
   }
 });
 
@@ -10608,6 +10657,7 @@ async function autoCheckAndApplyUpdate() {
   if (!updateSourcePath || !mainWindow) return;
   if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
+  if (updateApplyInFlight) return;
   let remote;
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
@@ -10618,10 +10668,11 @@ async function autoCheckAndApplyUpdate() {
     return;
   }
 
+  updateApplyInFlight = true;
+  autoUpdateAlreadyApplied = true; // 중복 적용 방지 (실패 시 아래에서 해제)
   try {
     // 새 버전을 발견하면 바로 파일을 교체해 둔다. (실제 반영은 재시작해야 이루어짐)
     await applyUpdateFiles();
-    autoUpdateAlreadyApplied = true;
     pendingUpdateRemoteVersion = remote.version;
     safeWebContentsSend('auto-update-ready', {
       remoteVersion: remote.version,
@@ -10637,9 +10688,12 @@ async function autoCheckAndApplyUpdate() {
       app.exit();
     }, 30000);
   } catch (e) {
+    autoUpdateAlreadyApplied = false;
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
     // 혼란이 생기지 않도록 한다.
     safeWebContentsSend('auto-update-failed', { msg: e.message });
+  } finally {
+    updateApplyInFlight = false;
   }
 }
 
