@@ -3576,6 +3576,9 @@
     .settings-radio-row small { display: block; font-size: 11.5px; color: #94a3b8; margin-top: 2px; line-height: 1.4; font-weight: 400; }
 
     .settings-notify-section { gap: 10px !important; }
+    .settings-schedule-alarm-options.is-disabled {
+      opacity: 0.45; pointer-events: none; user-select: none;
+    }
     .settings-notify-list { display: flex; flex-direction: column; gap: 8px; }
     .settings-toggle-row {
       display: flex; align-items: flex-start; gap: 10px; padding: 0;
@@ -4575,32 +4578,34 @@
             <div class="settings-divider"></div>
             <div class="settings-section-title">병원 일정 알람</div>
             <label class="settings-toggle-row" for="setting-schedule-alarm-enabled">
-              <input type="checkbox" id="setting-schedule-alarm-enabled">
+              <input type="checkbox" id="setting-schedule-alarm-enabled" onchange="syncScheduleAlarmSettingsUi()">
               <span class="settings-toggle-text">
                 <span class="settings-toggle-title">일정 알람 사용</span>
-                <span class="settings-toggle-desc">기본은 꺼짐 · 켜면 아래 시점에 맞춰 알립니다</span>
+                <span class="settings-toggle-desc">기본은 꺼짐 · 켠 뒤 아래 저장을 눌러야 적용됩니다</span>
               </span>
             </label>
-            <label class="settings-field" style="margin-top:4px;">
-              알람이 나오는 시점
-              <select id="setting-schedule-alarm-lead" class="settings-select">
-                <option value="0">예정 시각에</option>
-                <option value="5">5분 전</option>
-                <option value="10">10분 전</option>
-                <option value="15">15분 전</option>
-                <option value="30">30분 전</option>
-                <option value="60">1시간 전</option>
-                <option value="1440">하루 전</option>
-              </select>
-            </label>
-            <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">같은 시점에 여러 일정이 있으면 내용을 모아 <b>한 번만</b> 알립니다.</p>
-            <label class="settings-toggle-row" for="setting-schedule-alarm-on-edit" style="margin-top:6px;">
-              <input type="checkbox" id="setting-schedule-alarm-on-edit">
-              <span class="settings-toggle-text">
-                <span class="settings-toggle-title">일정 수정 시 다시 알람</span>
-                <span class="settings-toggle-desc">끄면 이미 알린 일정은 시간이·내용이 바뀌어도 다시 울리지 않습니다</span>
-              </span>
-            </label>
+            <div id="setting-schedule-alarm-options" class="settings-schedule-alarm-options">
+              <label class="settings-field" style="margin-top:4px;">
+                알람이 나오는 시점
+                <select id="setting-schedule-alarm-lead" class="settings-select">
+                  <option value="0">예정 시각에</option>
+                  <option value="5">5분 전</option>
+                  <option value="10">10분 전</option>
+                  <option value="15">15분 전</option>
+                  <option value="30">30분 전</option>
+                  <option value="60">1시간 전</option>
+                  <option value="1440">하루 전</option>
+                </select>
+              </label>
+              <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">같은 시점에 여러 일정이 있으면 내용을 모아 <b>한 번만</b> 알립니다. 출발 시각이 「미정」인 일정은 알람하지 않습니다.</p>
+              <label class="settings-toggle-row" for="setting-schedule-alarm-on-edit" style="margin-top:6px;">
+                <input type="checkbox" id="setting-schedule-alarm-on-edit">
+                <span class="settings-toggle-text">
+                  <span class="settings-toggle-title">일정 수정 시 다시 알람</span>
+                  <span class="settings-toggle-desc">끄면 이미 알린 일정은 시간·내용이 바뀌어도 다시 울리지 않습니다</span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -5899,6 +5904,7 @@
       let changed = false;
       (hospitalSchedules || []).forEach((sch) => {
         if (!sch || !sch.uid) return;
+        if (typeof isScheduleStartUndecided === 'function' && isScheduleStartUndecided(sch)) return;
         const triggerAt = scheduleAlarmTriggerAt(sch, lead);
         if (!Number.isFinite(triggerAt) || now < triggerAt) return;
         const fp = scheduleAlarmFingerprint(sch);
@@ -5909,6 +5915,27 @@
         }
       });
       if (changed) persistScheduleAlarmNotifiedState();
+    }
+
+    function syncScheduleAlarmSettingsUi() {
+      const enabled = !!(document.getElementById('setting-schedule-alarm-enabled')?.checked);
+      const wrap = document.getElementById('setting-schedule-alarm-options');
+      const lead = document.getElementById('setting-schedule-alarm-lead');
+      const onEdit = document.getElementById('setting-schedule-alarm-on-edit');
+      if (wrap) wrap.classList.toggle('is-disabled', !enabled);
+      if (lead) lead.disabled = !enabled;
+      if (onEdit) onEdit.disabled = !enabled;
+    }
+
+    async function ensureScheduleAlarmNotificationPermission() {
+      if (!window.Notification) return 'unsupported';
+      if (Notification.permission === 'granted') return 'granted';
+      if (Notification.permission === 'denied') return 'denied';
+      try {
+        return await Notification.requestPermission();
+      } catch (_) {
+        return Notification.permission;
+      }
     }
     let allUsers = [];
     const CONTACT_SNAPSHOT_STORAGE_KEY = 'miraeContactSnapshots';
@@ -19684,7 +19711,7 @@
     }
 
     async function startScheduleAlarmChecker() {
-      const ALARM_GRACE_MS = 3 * 60 * 1000; // 폴링 간격·지연을 감안한 허용 창
+      const ALARM_GRACE_MS = 15 * 60 * 1000; // 절전·지연 후에도 놓치지 않도록 허용 창
       setInterval(async () => {
         if (!isScheduleAlarmEnabled()) return;
 
@@ -19698,6 +19725,16 @@
         (hospitalSchedules || []).forEach((sch) => {
           if (!sch || !sch.uid) return;
           liveUids.add(sch.uid);
+
+          // 출발 시각 미정(정오 placeholder)은 알람 대상에서 제외
+          if (typeof isScheduleStartUndecided === 'function' && isScheduleStartUndecided(sch)) {
+            if (notifiedScheduleUids[sch.uid]) {
+              delete notifiedScheduleUids[sch.uid];
+              updated = true;
+            }
+            return;
+          }
+
           const fp = scheduleAlarmFingerprint(sch);
           const prev = notifiedScheduleUids[sch.uid];
           const triggerAt = scheduleAlarmTriggerAt(sch, lead);
@@ -19706,19 +19743,16 @@
           if (prev) {
             if (prev.fp === fp) return;
             if (!onEdit) {
-              // 수정돼도 재알람 안 함 → 지문만 갱신
               notifiedScheduleUids[sch.uid] = { fp };
               updated = true;
               return;
             }
-            // 수정 시 재알람: 이전 알림 기록을 지우고 아래 로직으로 다시 판단
             delete notifiedScheduleUids[sch.uid];
             updated = true;
           }
 
           if (now < triggerAt) return;
 
-          // 이미 오래 지난 일정은 조용히 처리 (켠 직후 과거 일정 폭주 방지)
           if (now - triggerAt > ALARM_GRACE_MS) {
             notifiedScheduleUids[sch.uid] = { fp };
             updated = true;
@@ -19738,7 +19772,6 @@
         }
 
         if (updated) persistScheduleAlarmNotifiedState();
-
         if (!dueBatch.length) return;
 
         dueBatch.sort((a, b) => {
@@ -19761,12 +19794,10 @@
         const body = [`알림 시점: ${leadLabel}`, ...lines].join('\n');
 
         try {
-          if (window.Notification && Notification.permission === 'granted') {
+          // 여러 건은 OS 알림이 잘리므로 앱 대화상자로 전체 내용을 보여 줌
+          const preferDialog = dueBatch.length > 1 || body.length > 160;
+          if (!preferDialog && window.Notification && Notification.permission === 'granted') {
             new Notification(title, { body, silent: false });
-          } else if (window.Notification && Notification.permission !== 'denied') {
-            const perm = await Notification.requestPermission();
-            if (perm === 'granted') new Notification(title, { body, silent: false });
-            else await appAlert(`${title}\n\n${body}`);
           } else {
             await appAlert(`${title}\n\n${body}`);
           }
@@ -20256,6 +20287,7 @@
         if (schAlarmLead) schAlarmLead.value = String(getScheduleAlarmLeadMinutes());
         const schAlarmEdit = document.getElementById('setting-schedule-alarm-on-edit');
         if (schAlarmEdit) schAlarmEdit.checked = !!appSettings.scheduleAlarmOnEdit;
+        syncScheduleAlarmSettingsUi();
 
         if (appSettings.fileMode === 'ask') document.getElementById('recv-ask').checked = true;
         else document.getElementById('recv-auto').checked = true;
@@ -20354,6 +20386,12 @@
   // 방금 켰거나 알림 시점을 바꾼 경우: 이미 지난 트리거는 한꺼번에 울리지 않도록 맞춤
   if (scheduleAlarmEnabled && (!wasScheduleAlarmEnabled || scheduleAlarmLeadMinutes !== prevScheduleAlarmLeadMinutes)) {
     seedScheduleAlarmNotifiedForPastDue();
+  }
+  if (scheduleAlarmEnabled && !wasScheduleAlarmEnabled) {
+    const perm = await ensureScheduleAlarmNotificationPermission();
+    if (perm === 'denied') {
+      await appAlert('데스크톱 알림이 차단되어 있습니다.\n일정 알람은 앱 안 알림창으로 표시됩니다.\n(Windows 알림 설정에서 허용할 수 있습니다)');
+    }
   }
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
