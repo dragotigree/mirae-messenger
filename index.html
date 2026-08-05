@@ -7721,8 +7721,11 @@
         try { await window.api.setMutedChatKeys([...mutedChatKeys]); } catch (_) {}
       }
       syncCompactMuteButtonUi();
-      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
-        try { renderCompactList(); } catch (_) {}
+      if (document.body.classList.contains('compact-mode')) {
+        try {
+          invalidateCompactRecentConversations();
+          if (!activeChatUser) renderCompactList();
+        } catch (_) {}
       }
     }
 
@@ -7817,15 +7820,30 @@
       } catch (_) {}
     }
 
+    function readSavedCompactOpacity() {
+      try {
+        const n = Number(localStorage.getItem('compactWindowOpacity'));
+        if (Number.isFinite(n)) return Math.max(0.55, Math.min(1, n));
+      } catch (_) {}
+      return 1;
+    }
+
+    async function applyMainWindowOpacity(opacity) {
+      const clamped = Math.max(0.55, Math.min(1, Number(opacity) || 1));
+      try {
+        if (window.api && window.api.setMainWindowOpacity) {
+          await window.api.setMainWindowOpacity(clamped);
+        }
+      } catch (_) {}
+      return clamped;
+    }
+
     async function onCompactOpacityInput(value) {
       const opacity = Math.max(0.55, Math.min(1, Number(value) / 100));
       const label = document.getElementById('compact-opacity-label');
       if (label) label.textContent = `${Math.round(opacity * 100)}%`;
-      try {
-        if (window.api && window.api.setMainWindowOpacity) {
-          await window.api.setMainWindowOpacity(opacity);
-        }
-      } catch (_) {}
+      try { localStorage.setItem('compactWindowOpacity', String(opacity)); } catch (_) {}
+      await applyMainWindowOpacity(opacity);
     }
 
     async function loadCompactOpacityUi() {
@@ -7833,12 +7851,11 @@
       const label = document.getElementById('compact-opacity-label');
       if (!slider) return;
       try {
-        const opacity = (window.api && window.api.getMainWindowOpacity)
-          ? await window.api.getMainWindowOpacity()
-          : 1;
-        const pct = Math.round((Number(opacity) || 1) * 100);
+        const opacity = readSavedCompactOpacity();
+        const pct = Math.round(opacity * 100);
         slider.value = String(pct);
         if (label) label.textContent = `${pct}%`;
+        await applyMainWindowOpacity(opacity);
       } catch (_) {
         slider.value = '100';
         if (label) label.textContent = '100%';
@@ -10017,6 +10034,12 @@
       }
       updateCompactModeButtonUi();
       syncCompactConvenienceUi();
+      // 투명도는 미니모드 전용 — 일반화면 복귀 시 반드시 불투명으로
+      if (isCompactMode) {
+        applyMainWindowOpacity(readSavedCompactOpacity()).catch(() => {});
+      } else {
+        applyMainWindowOpacity(1).catch(() => {});
+      }
       const ta = document.getElementById('chat-textarea');
       if (ta) ta.placeholder = isCompactMode
         ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
@@ -10335,7 +10358,7 @@
     function setCompactRailTab(tab) {
       compactRailTab = tab;
       localStorage.setItem('compactRailTab', tab);
-      if (tab === 'friends' && compactListFilter === 'unread') {
+      if (tab === 'friends' && (compactListFilter === 'unread' || compactListFilter === 'muted' || compactListFilter === 'online')) {
         compactListFilter = 'all';
         localStorage.setItem('compactListFilter', 'all');
       }
@@ -19211,6 +19234,7 @@
       let timer = null;
       let startX = 0;
       let startY = 0;
+      let suppressNextClick = false;
       const THRESH_MS = 420;
       const MOVE_PX = 12;
       const clearTimer = () => {
@@ -19230,6 +19254,7 @@
         clearTimer();
         timer = setTimeout(() => {
           timer = null;
+          suppressNextClick = true;
           try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
           row.classList.add('msg-longpress-active');
           setTimeout(() => row.classList.remove('msg-longpress-active'), 180);
@@ -19243,6 +19268,12 @@
       chatMessagesAreaEl.addEventListener('pointerup', clearTimer);
       chatMessagesAreaEl.addEventListener('pointercancel', clearTimer);
       chatMessagesAreaEl.addEventListener('lostpointercapture', clearTimer);
+      chatMessagesAreaEl.addEventListener('click', (e) => {
+        if (!suppressNextClick) return;
+        suppressNextClick = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }, true);
     })();
 
     document.addEventListener('pointerdown', (e) => {
