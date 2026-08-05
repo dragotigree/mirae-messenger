@@ -494,6 +494,15 @@
       background: #e0f2fe !important;
       box-shadow: inset 3px 0 0 #0ea5e9;
     }
+    /* 검색 포커스는 다중선택과 헷갈리지 않게 다른 스타일 */
+    .user-card-item.is-search-nav {
+      background: rgba(251, 191, 36, 0.18) !important;
+      box-shadow: inset 0 0 0 1.5px rgba(251, 191, 36, 0.75);
+    }
+    .compact-list-item.is-search-nav {
+      background: #fef3c7 !important;
+      box-shadow: inset 3px 0 0 #f59e0b;
+    }
     #user-multi-select-bar {
       display: none; flex-shrink: 0; align-items: center; gap: 8px; flex-wrap: wrap;
       margin: 0 8px 8px; padding: 8px 10px; border-radius: 12px;
@@ -528,10 +537,6 @@
     }
     .compact-multi-select-bar .ums-btn-clear { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
     .compact-multi-select-bar .ums-btn-group { background: #0284c7; color: #fff; }
-    .user-card-item.is-search-nav {
-      background: rgba(56, 189, 248, 0.22) !important;
-      box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.55);
-    }
     .user-card-item.is-offline { opacity: 0.5; }
     .user-card-item.is-offline:hover { opacity: 0.82; }
     .user-card-body { flex: 1; min-width: 0; line-height: 1.25; }
@@ -1343,10 +1348,6 @@
     .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
     .compact-list-item:hover { background: #f7f7f7; }
     .compact-list-item.is-active { background: #f0f0f0; }
-    .compact-list-item.is-search-nav {
-      background: #dbeafe !important;
-      box-shadow: inset 3px 0 0 #3b82f6;
-    }
     .compact-list-item.is-offline { opacity: 0.72; }
     .compact-list-item.is-offline .compact-item-name { color: #888; }
     .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
@@ -6458,8 +6459,12 @@
       persistContactSnapshotsFromUserList(users);
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
       queueProfilePhotoLoads(users);
+      const selecting = sidebarSelectedUserIps.size > 0;
       renderUserListTree();
-      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        if (selecting) patchCompactDirectoryPresenceOnly();
+        else renderCompactList();
+      }
       if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
       if (activeChatUser && activeChatUser.isGroup) {
         try {
@@ -7589,7 +7594,7 @@
       const previewRow = preview
         ? `<div class="compact-item-bottom"><span class="compact-item-preview">${escapeHtml(preview)}</span>${unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : ''}</div>`
         : (unread > 0 ? `<div class="compact-item-bottom"><span class="compact-item-preview"></span><span class="unread-badge">${formatUnreadBadge(unread)}</span></div>` : '');
-      item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${sidebarSelectedUserIps.has(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
+      item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
       item.dataset.userIp = u.ip;
       item.innerHTML = `
         <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
@@ -7832,7 +7837,7 @@
     function appendCompactConversationItem(container, row) {
       const item = document.createElement('div');
       const active = row.user && isCompactChatActive(row.user.ip);
-      item.className = `compact-list-item compact-list-item-chat${row.kind === 'dm' ? ' compact-list-item-user' : ''}${active ? ' is-active' : ''}${row.kind === 'dm' && !row.isOnline ? ' is-offline' : ''}${row.kind === 'dm' && row.user && sidebarSelectedUserIps.has(row.user.ip) ? ' is-multi-selected' : ''}`;
+      item.className = `compact-list-item compact-list-item-chat${row.kind === 'dm' ? ' compact-list-item-user' : ''}${active ? ' is-active' : ''}${row.kind === 'dm' && !row.isOnline ? ' is-offline' : ''}${row.kind === 'dm' && row.user && isSidebarIpSelected(row.user.ip) ? ' is-multi-selected' : ''}`;
       if (row.kind === 'dm' && row.user && row.user.ip) item.dataset.userIp = row.user.ip;
       const timeLabel = row.createdAtLocal
         ? formatCompactConversationTime(row.createdAtLocal)
@@ -8050,6 +8055,11 @@
     function setSidebarSearchNavIndex(idx) {
       const items = getSidebarSearchNavTargets();
       clearSidebarSearchNavHighlight();
+      // 다중 선택 중에는 검색 포커스 하이라이트를 켜지 않음 (선택 표시와 혼동 방지)
+      if (sidebarSelectedUserIps.size > 0) {
+        sidebarSearchNavIndex = -1;
+        return;
+      }
       if (!items.length) {
         sidebarSearchNavIndex = -1;
         return;
@@ -8059,6 +8069,41 @@
       const el = items[sidebarSearchNavIndex];
       el.classList.add('is-search-nav');
       try { el.scrollIntoView({ block: 'nearest' }); } catch (err) { /* ignore */ }
+    }
+
+    /** 다중 선택 중 접속 상태만 갱신 — 목록 전체 재구성으로 인한 버벅임 방지 */
+    function patchCompactDirectoryPresenceOnly() {
+      const hosts = [
+        document.getElementById('compact-friends-list-items'),
+        document.getElementById('compact-list-items')
+      ].filter(Boolean);
+      if (!hosts.length) return;
+      hosts.forEach((host) => {
+        host.querySelectorAll('.compact-list-item-user[data-user-ip]').forEach((el) => {
+          const u = findUserByIp(el.dataset.userIp);
+          if (!u) return;
+          el.classList.toggle('is-offline', !u.online);
+          el.classList.toggle('is-multi-selected', isSidebarIpSelected(u.ip));
+          el.classList.toggle('is-active', isCompactChatActive(u.ip));
+          const timeEl = el.querySelector('.compact-item-time');
+          if (timeEl) {
+            timeEl.textContent = compactUserTimeLabel(u);
+            timeEl.classList.toggle('is-live', !!u.online);
+          }
+          const nameEl = el.querySelector('.compact-item-name');
+          if (nameEl) {
+            const nextName = formatDmListDisplayName(u);
+            if (nameEl.innerHTML !== nextName) nameEl.innerHTML = nextName;
+          }
+          const previewEl = el.querySelector('.compact-item-preview');
+          if (previewEl) {
+            const preview = compactUserPreview(u);
+            if (preview) previewEl.textContent = preview;
+          }
+        });
+      });
+      updateCompactOnlineCount();
+      syncSidebarUserSelectionUi();
     }
 
     function openSidebarSearchNavSelection() {
@@ -9470,25 +9515,55 @@
       return true;
     }
 
+    function canonicalSidebarUserIp(ip) {
+      const u = findUserByIp(ip);
+      return (u && u.ip) ? u.ip : (ip || '');
+    }
+
+    function isSidebarIpSelected(ip) {
+      if (!ip) return false;
+      if (sidebarSelectedUserIps.has(ip)) return true;
+      const u = findUserByIp(ip);
+      if (!u) return false;
+      if (sidebarSelectedUserIps.has(u.ip)) return true;
+      return Array.isArray(u.aliasIps) && u.aliasIps.some((a) => sidebarSelectedUserIps.has(a));
+    }
+
+    function getSidebarSelectionCount() {
+      const seen = new Set();
+      [...sidebarSelectedUserIps].forEach((ip) => {
+        const canon = canonicalSidebarUserIp(ip);
+        if (canon) seen.add(canon);
+      });
+      return seen.size;
+    }
+
     function getVisibleSidebarUserIps() {
       const ips = [];
       const seen = new Set();
       const push = (ip) => {
-        if (!ip || seen.has(ip)) return;
-        seen.add(ip);
-        ips.push(ip);
+        const canon = canonicalSidebarUserIp(ip);
+        if (!canon || seen.has(canon)) return;
+        seen.add(canon);
+        ips.push(canon);
       };
-      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip]').forEach((el) => push(el.dataset.userIp));
-      document.querySelectorAll('#compact-friends-list-items .compact-list-item-user[data-user-ip], #compact-list-items .compact-list-item-user[data-user-ip]').forEach((el) => push(el.dataset.userIp));
+      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip]').forEach((el) => {
+        if (el.offsetParent === null && document.body.classList.contains('compact-mode')) return;
+        push(el.dataset.userIp);
+      });
+      document.querySelectorAll('#compact-friends-list-items .compact-list-item-user[data-user-ip], #compact-list-items .compact-list-item-user[data-user-ip]').forEach((el) => {
+        if (el.offsetParent === null) return;
+        push(el.dataset.userIp);
+      });
       return ips;
     }
 
     function syncSidebarUserSelectionUi() {
-      const selected = sidebarSelectedUserIps;
+      const n = getSidebarSelectionCount();
+      if (n > 0) clearSidebarSearchNavHighlight();
       document.querySelectorAll('.user-card-item[data-user-ip], .compact-list-item-user[data-user-ip]').forEach((el) => {
-        el.classList.toggle('is-multi-selected', selected.has(el.dataset.userIp));
+        el.classList.toggle('is-multi-selected', isSidebarIpSelected(el.dataset.userIp));
       });
-      const n = selected.size;
       const bar = document.getElementById('user-multi-select-bar');
       const countEl = document.getElementById('user-multi-select-count');
       if (bar) bar.classList.toggle('is-visible', n > 0);
@@ -9508,9 +9583,13 @@
     function toggleSidebarUserSelection(ip, opts) {
       const user = findUserByIp(ip);
       if (!isSelectableSidebarUser(user)) return;
-      if (sidebarSelectedUserIps.has(ip)) sidebarSelectedUserIps.delete(ip);
-      else sidebarSelectedUserIps.add(ip);
-      if (!opts || opts.anchor !== false) sidebarSelectAnchorIp = ip;
+      const canon = user.ip;
+      const selected = isSidebarIpSelected(canon);
+      // 별칭 IP가 섞여 있어도 한 사람으로 통일
+      sidebarSelectedUserIps.delete(canon);
+      (user.aliasIps || []).forEach((a) => sidebarSelectedUserIps.delete(a));
+      if (!selected) sidebarSelectedUserIps.add(canon);
+      if (!opts || opts.anchor !== false) sidebarSelectAnchorIp = canon;
       syncSidebarUserSelectionUi();
     }
 
@@ -9519,16 +9598,25 @@
         const u = findUserByIp(ip);
         return isSelectableSidebarUser(u);
       });
-      const a = ips.indexOf(fromIp);
-      const b = ips.indexOf(toIp);
+      const fromCanon = canonicalSidebarUserIp(fromIp);
+      const toCanon = canonicalSidebarUserIp(toIp);
+      const a = ips.findIndex((ip) => canonicalSidebarUserIp(ip) === fromCanon);
+      const b = ips.findIndex((ip) => canonicalSidebarUserIp(ip) === toCanon);
       if (a < 0 || b < 0) {
         toggleSidebarUserSelection(toIp);
         return;
       }
       const start = Math.min(a, b);
       const end = Math.max(a, b);
-      for (let i = start; i <= end; i++) sidebarSelectedUserIps.add(ips[i]);
-      sidebarSelectAnchorIp = toIp;
+      const seen = new Set();
+      for (let i = start; i <= end; i++) {
+        const u = findUserByIp(ips[i]);
+        if (!isSelectableSidebarUser(u) || seen.has(u.ip)) continue;
+        seen.add(u.ip);
+        (u.aliasIps || []).forEach((alias) => sidebarSelectedUserIps.delete(alias));
+        sidebarSelectedUserIps.add(u.ip);
+      }
+      sidebarSelectAnchorIp = toCanon || toIp;
       syncSidebarUserSelectionUi();
     }
 
@@ -9559,11 +9647,13 @@
       const range = !!(ev && ev.shiftKey);
       if (multi) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        clearSidebarSearchNavHighlight();
         toggleSidebarUserSelection(user.ip);
         return;
       }
       if (range && sidebarSelectAnchorIp) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        clearSidebarSearchNavHighlight();
         selectSidebarUserRange(sidebarSelectAnchorIp, user.ip);
         return;
       }
@@ -9572,9 +9662,14 @@
     }
 
     function createGroupFromSidebarSelection() {
-      const users = [...sidebarSelectedUserIps]
-        .map((ip) => findUserByIp(ip))
-        .filter((u) => isSelectableSidebarUser(u));
+      const seen = new Set();
+      const users = [];
+      [...sidebarSelectedUserIps].forEach((ip) => {
+        const u = findUserByIp(ip);
+        if (!isSelectableSidebarUser(u) || seen.has(u.ip)) return;
+        seen.add(u.ip);
+        users.push(u);
+      });
       if (users.length === 0) {
         appAlert('그룹에 초대할 직원을 한 명 이상 선택해 주세요.\n\n사용자 목록에서 Ctrl(⌘)+클릭으로 여러 명을 고른 뒤 「그룹 만들기」를 눌러 주세요.');
         return;
@@ -10116,7 +10211,7 @@
       const unread = getUnreadForUser(u);
       const isActive = isSidebarDmCardActive(u.ip);
       const card = document.createElement('div');
-      card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}${sidebarSelectedUserIps.has(u.ip) ? ' is-multi-selected' : ''}`;
+      card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}`;
       card.dataset.userIp = u.ip;
       const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
 
@@ -10168,7 +10263,7 @@
         const unread = getUnreadForUser(u);
         card.classList.toggle('active', isSidebarDmCardActive(u.ip));
         card.classList.toggle('is-offline', !u.online);
-        card.classList.toggle('is-multi-selected', sidebarSelectedUserIps.has(u.ip));
+        card.classList.toggle('is-multi-selected', isSidebarIpSelected(u.ip));
         const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
         const badge = card.querySelector('.avatar-status-badge');
         if (badge) badge.className = `avatar-status-badge status-${userStatus}`;
@@ -10343,15 +10438,21 @@
         return;
       }
       let changed = false;
+      const next = new Set();
       [...sidebarSelectedUserIps].forEach((ip) => {
         const u = findUserByIp(ip);
         if (!isSelectableSidebarUser(u)) {
-          sidebarSelectedUserIps.delete(ip);
           changed = true;
+          return;
         }
+        if (u.ip !== ip) changed = true;
+        next.add(u.ip);
       });
-      if (changed && sidebarSelectAnchorIp && !sidebarSelectedUserIps.has(sidebarSelectAnchorIp)) {
-        sidebarSelectAnchorIp = [...sidebarSelectedUserIps][0] || null;
+      if (changed || next.size !== sidebarSelectedUserIps.size) {
+        sidebarSelectedUserIps = next;
+        if (sidebarSelectAnchorIp && !isSidebarIpSelected(sidebarSelectAnchorIp)) {
+          sidebarSelectAnchorIp = [...sidebarSelectedUserIps][0] || null;
+        }
       }
       syncSidebarUserSelectionUi();
     }
