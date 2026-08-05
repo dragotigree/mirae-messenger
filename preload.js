@@ -140,8 +140,6 @@ contextBridge.exposeInMainWorld('api', {
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   setWindowViewMode: (mode, savedBounds) => ipcRenderer.invoke('set-window-view-mode', mode, savedBounds),
   getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
-  setAlwaysOnTop: (enabled) => ipcRenderer.invoke('set-always-on-top', enabled),
-  getAlwaysOnTop: () => ipcRenderer.invoke('get-always-on-top'),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
   getAutoBackupSettings: () => ipcRenderer.invoke('get-auto-backup-settings'),

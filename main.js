@@ -10077,7 +10077,7 @@ ipcMain.handle('set-window-view-mode', async (event, mode, savedBounds) => {
   if (mode === 'compact') {
     savedNormalWindowBounds = mainWindow.getBounds();
     mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
-    // 미니모드 항상 위 고정은 렌더러 설정(compactAlwaysOnTop)으로 적용
+    mainWindow.setAlwaysOnTop(false);
 
     let bounds;
     if (savedBounds && Number.isFinite(savedBounds.x) && Number.isFinite(savedBounds.y)) {
@@ -10118,18 +10118,6 @@ ipcMain.handle('set-window-view-mode', async (event, mode, savedBounds) => {
 ipcMain.handle('get-window-bounds', async () => {
   if (!mainWindow) return null;
   return mainWindow.getBounds();
-});
-
-ipcMain.handle('set-always-on-top', async (event, enabled) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return { success: false, enabled: false };
-  const on = !!enabled;
-  mainWindow.setAlwaysOnTop(on, on ? 'floating' : 'normal');
-  return { success: true, enabled: mainWindow.isAlwaysOnTop() };
-});
-
-ipcMain.handle('get-always-on-top', async () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return false;
-  return mainWindow.isAlwaysOnTop();
 });
 
 ipcMain.handle('backup-database', async () => {

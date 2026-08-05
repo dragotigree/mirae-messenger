@@ -952,14 +952,168 @@
   }
 
   /* ── 미니모드 편의 UX ── */
-  body.compact-mode .compact-rail-btn.is-pinned {
-    color: #fee500;
-    background: rgba(254, 229, 0, 0.14);
+  body.compact-mode .compact-rail-divider {
+    width: 28px;
+    height: 1px;
+    margin: 4px 0;
+    background: var(--mm-border);
+    flex-shrink: 0;
+  }
+
+  body.compact-mode .compact-rail-emoji {
+    font-size: 16px;
+    line-height: 1;
   }
 
   body.compact-mode .compact-rail-badge {
     cursor: pointer;
     z-index: 2;
+  }
+
+  body.compact-mode .compact-list-prefs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px 0;
+    flex-shrink: 0;
+  }
+
+  body.compact-mode .compact-pref-seg {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.28);
+    gap: 2px;
+  }
+
+  body.compact-mode .compact-pref-chip {
+    border: none;
+    background: transparent;
+    color: var(--mm-muted);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: -0.02em;
+  }
+
+  body.compact-mode .compact-pref-chip:hover {
+    color: var(--mm-text);
+    background: var(--mm-hover);
+  }
+
+  body.compact-mode .compact-pref-chip.is-active {
+    background: #fff;
+    color: #1e1f22;
+  }
+
+  body.compact-mode .compact-pref-fav.is-active {
+    background: rgba(250, 204, 21, 0.25);
+    color: #facc15;
+  }
+
+  body.compact-mode .compact-group-create-btn {
+    margin-left: auto;
+    border: 1px solid var(--mm-border);
+    background: var(--mm-raised);
+    color: var(--mm-text);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  body.compact-mode .compact-group-create-btn:hover {
+    background: var(--mm-active);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  body.compact-mode .compact-chat-nav {
+    display: none;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  body.compact-mode .compact-chat-nav .icon-btn-compact {
+    width: 28px;
+    height: 28px;
+    color: var(--mm-muted);
+    border-radius: 8px;
+  }
+
+  body.compact-mode .compact-chat-nav .icon-btn-compact:hover {
+    background: var(--mm-hover);
+    color: var(--mm-text);
+  }
+
+  body.compact-mode .compact-recent-switcher {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    background: var(--mm-surface);
+    border-bottom: 1px solid var(--mm-border);
+    scrollbar-width: none;
+  }
+
+  body.compact-mode .compact-recent-switcher::-webkit-scrollbar { display: none; }
+
+  body.compact-mode .compact-recent-switcher[hidden] {
+    display: none !important;
+  }
+
+  body.compact-mode .compact-recent-chip {
+    flex-shrink: 0;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px solid var(--mm-border);
+    background: var(--mm-raised);
+    color: var(--mm-muted);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  body.compact-mode .compact-recent-chip:hover {
+    color: var(--mm-text);
+    background: var(--mm-active);
+  }
+
+  body.compact-mode .compact-recent-chip.is-active {
+    background: #fff;
+    color: #1e1f22;
+    border-color: transparent;
+  }
+
+  body.compact-mode .compact-recent-unread {
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: var(--mm-accent);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 14px;
+    text-align: center;
+  }
+
+  body.compact-mode .compact-recent-more {
+    min-width: 32px;
+    justify-content: center;
+    max-width: none;
   }
 
   body.compact-mode .compact-shortcut-hint {
@@ -1023,17 +1177,14 @@
     text-align: center;
   }
 
-  body.compact-mode #compact-chat-pin-btn {
-    display: inline-flex !important;
-  }
-
-  body.compact-mode #compact-chat-pin-btn.is-pinned {
-    color: #fee500;
-    background: rgba(254, 229, 0, 0.16);
-  }
-
   body.compact-mode .compact-list-item.is-search-nav {
     outline: 1px solid rgba(88, 101, 242, 0.65);
     background: rgba(88, 101, 242, 0.16);
+  }
+
+  /* 대화 중에도 헤더 액션이 다크 톤 */
+  body.compact-mode #chat-header .header-user-info {
+    gap: 4px;
+    min-width: 0;
   }
 }
