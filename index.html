@@ -1139,6 +1139,7 @@
     .msg-send-status { font-weight: 700; font-size: 11px; margin-left: 3px; letter-spacing: -0.02em; white-space: nowrap; }
     .msg-send-status.is-sent { color: var(--accent); opacity: 0.85; }
     .msg-send-status.is-read { color: #64748b; }
+    .msg-send-status.is-pending { color: #c2410c; }
     .msg-send-status.is-error { color: #dc2626; }
     .msg-row.is-other .msg-sender-name::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; position: relative; top: -1px; }
     .msg-time { font-size: 11px; color: #9ca0a5; }
@@ -8156,8 +8157,15 @@
 
     function paintSendStatusSpan(span, kind) {
       if (!span) return;
-      span.className = 'msg-send-status ' + (kind === 'read' ? 'is-read' : kind === 'error' ? 'is-error' : 'is-sent');
-      span.textContent = kind === 'read' ? ' · 읽음' : kind === 'error' ? ' · 오류' : ' · 보냄';
+      const cls = kind === 'read' ? 'is-read'
+        : kind === 'pending' ? 'is-pending'
+        : kind === 'error' ? 'is-error'
+        : 'is-sent';
+      span.className = 'msg-send-status ' + cls;
+      span.textContent = kind === 'read' ? ' · 읽음'
+        : kind === 'pending' ? ' · 대기'
+        : kind === 'error' ? ' · 오류'
+        : ' · 보냄';
     }
 
     function messageRowIsOutboundPending(row) {
@@ -8194,13 +8202,13 @@
         const isPending = st === 'PENDING' || messageRowIsOutboundPending(row);
         const isAcked = !!(uid && isDmMsgAckedRead(peerIp, uid));
 
-        // 전송 실패(오류): 해당 메시지에 표시
+        // 오프라인 대기(PENDING): 오류가 아니라 전달 대기
         if (isPending) {
-          paintSendStatusSpan(ensureOutboundStatusSpan(row), 'error');
+          paintSendStatusSpan(ensureOutboundStatusSpan(row), 'pending');
           return;
         }
 
-        // 마지막 내가 보낸 메시지: 읽음 / 보냄 / 오류
+        // 마지막 내가 보낸 메시지: 읽음 / 보냄
         if (isLast) {
           if (peerRead || isAcked) {
             paintSendStatusSpan(ensureOutboundStatusSpan(row), 'read');

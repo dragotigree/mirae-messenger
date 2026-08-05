@@ -2928,6 +2928,12 @@ db.serialize(() => {
     markAppSettingsRowLoaded();
   });
 
+  // 과거「나에게 보내기」실패분이 PENDING으로 남은 경우 SENT로 정리
+  db.run(
+    `UPDATE messages SET status = 'SENT' WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'`,
+    [MY_IP, MY_IP],
+    logDbErr
+  );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
@@ -6975,6 +6981,26 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       return;
     }
 
+    // 나에게 보내기: 수신측이 senderIP===MY_IP 를 무시하므로 TCP 불필요. 로컬 SENT로 보관.
+    if (targetIP === MY_IP) {
+      extractAndSaveAttachments(message, { msgUid });
+      appendChatLog(`DM_${targetIP}`, partnerName || senderLabelForMe(), myProfile.username, message);
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+        [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
+        function (insertErr) {
+          if (insertErr) {
+            logDbErr(insertErr);
+            finish({ status: 'ERROR', error: insertErr.message || 'DB 저장 실패', uid: msgUid });
+            return;
+          }
+          compactMessageRowById(this.lastID, msgUid, message);
+          finish({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
+        }
+      );
+      return;
+    }
+
     const startTcpSend = (localRowId) => {
       extractAndSaveAttachments(message, { msgUid });
       appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
@@ -9818,6 +9844,7 @@ ipcMain.handle('set-muted-chat-keys', async (event, keys) => {
 
 ipcMain.handle('snap-compact-window', async (event, edge) => {
   if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
   prepareWindowForBoundsChange();
   const b = mainWindow.getBounds();
   const display = screen.getDisplayMatching(b) || screen.getDisplayNearestPoint({ x: b.x, y: b.y });
@@ -9846,6 +9873,7 @@ ipcMain.handle('snap-compact-window', async (event, edge) => {
 
 ipcMain.handle('set-compact-size-preset', async (event, preset) => {
   if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
   prepareWindowForBoundsChange();
   const map = {
     narrow: { width: 360, height: 560 },
