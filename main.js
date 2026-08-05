@@ -48,8 +48,13 @@ try {
 } catch (e) {
   /* ignore */
 }
-app.on('second-instance', () => {
-  showAndFocusWindow();
+app.on('second-instance', (event, commandLine) => {
+  const action = parseMiraeLaunchAction(commandLine || []);
+  if (action) {
+    queueOrRunShellLaunchAction(action);
+  } else {
+    showAndFocusWindow();
+  }
 });
 
 // 🛡 마지막 안전장치: 여기서 잡지 못한 예외/Promise 거부가 있어도 병원 업무 중에
@@ -2800,7 +2805,7 @@ function setTrayLaunchViewMode(mode, persist) {
   if (persist !== false) {
     db.run(`UPDATE app_settings SET tray_launch_view_mode = ? WHERE id = 1`, [trayLaunchViewMode], logDbErr);
   }
-  if (tray) tray.setContextMenu(buildTrayContextMenu());
+  refreshShellMenus();
   safeWebContentsSend('tray-launch-view-mode-changed', trayLaunchViewMode);
 }
 
@@ -2810,34 +2815,278 @@ function openMainWindowWithViewMode(mode) {
   safeWebContentsSend('apply-tray-view-mode', resolved);
 }
 
+/** Jump List로 앱이 식기 전에 눌린 액션 (cold start) */
+let pendingShellAction = '';
+
+/** 작업표시줄 Jump List / 트레이 메뉴 공통 액션 */
+function parseMiraeLaunchAction(argv) {
+  const args = Array.isArray(argv) ? argv : [];
+  for (const raw of args) {
+    const s = String(raw || '');
+    const m = s.match(/^--mirae-action(?:=|\s+)([a-z0-9-]+)$/i);
+    if (m) return m[1].toLowerCase();
+    if (s.startsWith('--mirae-action=')) {
+      return s.slice('--mirae-action='.length).toLowerCase();
+    }
+  }
+  return '';
+}
+
+function isMainRendererReady() {
+  return !!(
+    mainWindow
+    && !mainWindow.isDestroyed()
+    && mainWindow.webContents
+    && !mainWindow.webContents.isDestroyed()
+    && !mainWindow.webContents.isLoading()
+  );
+}
+
+function queueOrRunShellLaunchAction(action) {
+  const act = String(action || '').toLowerCase();
+  if (!act) return;
+  if (!isMainRendererReady()) {
+    pendingShellAction = act;
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      try { createWindow(); } catch (_) { /* ignore */ }
+    }
+    return;
+  }
+  runShellLaunchAction(act);
+}
+
+function flushPendingShellAction() {
+  if (!pendingShellAction) return;
+  const act = pendingShellAction;
+  pendingShellAction = '';
+  setTimeout(() => runShellLaunchAction(act), 200);
+}
+
+function runShellLaunchAction(action) {
+  const act = String(action || '').toLowerCase();
+  if (!act) {
+    showAndFocusWindow();
+    return;
+  }
+
+  if (act === 'open-normal') {
+    openMainWindowWithViewMode('normal');
+    return;
+  }
+  if (act === 'open-compact') {
+    openMainWindowWithViewMode('compact');
+    return;
+  }
+  if (act === 'open' || act === 'show') {
+    openMainWindowWithViewMode(trayLaunchViewMode);
+    return;
+  }
+  if (act === 'quit') {
+    beginAppQuit();
+    return;
+  }
+  if (act === 'devtools') {
+    openMainWindowWithViewMode(trayLaunchViewMode);
+    if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.openDevTools({ mode: 'right' });
+    }
+    return;
+  }
+  if (act === 'schedule-board') {
+    openScheduleBoardWindow({});
+    return;
+  }
+
+  // 렌더러 모달/화면 트리거
+  openMainWindowWithViewMode(trayLaunchViewMode);
+  const triggerMap = {
+    logs: 'trigger-open-all-logs',
+    settings: 'trigger-open-settings',
+    notice: 'trigger-open-notice-board',
+    broadcast: 'trigger-open-broadcast',
+    transport: 'trigger-open-transport',
+    code: 'trigger-open-code-alert',
+    ipmsg: 'trigger-open-ipmsg',
+    group: 'trigger-open-group-modal',
+    'privacy-lock': 'trigger-privacy-lock'
+  };
+  const channel = triggerMap[act];
+  if (channel) {
+    // 창 로드 직후 트리거가 누락되지 않도록 약간 지연
+    setTimeout(() => safeWebContentsSend(channel), 120);
+  }
+}
+
+function getJumpListProgramAndPrefix() {
+  // 패키징된 앱: execPath가 메신저 exe. 개발: electron.exe + 프로젝트 경로
+  const isPackaged = app.isPackaged;
+  if (isPackaged) {
+    return { program: process.execPath, argsPrefix: '' };
+  }
+  return {
+    program: process.execPath,
+    argsPrefix: `"${app.getAppPath()}" `
+  };
+}
+
+function makeJumpTask(title, description, action) {
+  const { program, argsPrefix } = getJumpListProgramAndPrefix();
+  return {
+    type: 'task',
+    title,
+    description,
+    program,
+    args: `${argsPrefix}--mirae-action=${action}`.trim(),
+    iconPath: program,
+    iconIndex: 0
+  };
+}
+
+function updateWindowsJumpList() {
+  if (process.platform !== 'win32') return;
+  try {
+    app.setJumpList([
+      {
+        type: 'custom',
+        name: '화면 모드',
+        items: [
+          makeJumpTask('기본 화면으로 열기', '3단 기본 화면으로 메신저를 엽니다', 'open-normal'),
+          makeJumpTask('미니 화면으로 열기', '컴팩트 미니모드로 엽니다', 'open-compact')
+        ]
+      },
+      {
+        type: 'custom',
+        name: '빠른 실행',
+        items: [
+          makeJumpTask('쪽지 보내기', '채팅방 없이 쪽지를 보냅니다', 'ipmsg'),
+          makeJumpTask('원내 공지', '원내 공지사항 게시판을 엽니다', 'notice'),
+          makeJumpTask('전체 공지 채널', '전체 공지 대화방을 엽니다', 'broadcast'),
+          makeJumpTask('이동기사 요청', '환자 이동 요청을 작성합니다', 'transport'),
+          makeJumpTask('코드 발령', '코드블루·코드레드를 발령합니다', 'code'),
+          makeJumpTask('병동 일정 현황판', '일정 현황판을 엽니다', 'schedule-board'),
+          makeJumpTask('그룹 만들기', '새 그룹 대화방을 만듭니다', 'group'),
+          makeJumpTask('전체 대화 기록', '주고받은 메시지 기록을 엽니다', 'logs'),
+          makeJumpTask('환경 설정', '메신저 설정을 엽니다', 'settings')
+        ]
+      },
+      { type: 'recent' },
+      {
+        type: 'tasks',
+        items: [
+          makeJumpTask('화면 잠금', '사생활 보호 화면 잠금', 'privacy-lock'),
+          makeJumpTask('종료', '메신저를 종료합니다', 'quit')
+        ]
+      }
+    ]);
+  } catch (e) {
+    console.error('Jump List 설정 오류:', e.message);
+    // fallback: UserTasks만 (형식: program/arguments/title/…)
+    try {
+      const toUserTask = (title, description, action) => {
+        const t = makeJumpTask(title, description, action);
+        return {
+          program: t.program,
+          arguments: t.args,
+          title: t.title,
+          description: t.description,
+          iconPath: t.iconPath,
+          iconIndex: t.iconIndex
+        };
+      };
+      app.setUserTasks([
+        toUserTask('기본 화면으로 열기', '기본 화면', 'open-normal'),
+        toUserTask('미니 화면으로 열기', '미니 화면', 'open-compact'),
+        toUserTask('쪽지 보내기', '쪽지', 'ipmsg'),
+        toUserTask('원내 공지', '공지', 'notice'),
+        toUserTask('이동기사 요청', '이동', 'transport'),
+        toUserTask('코드 발령', '코드', 'code'),
+        toUserTask('환경 설정', '설정', 'settings')
+      ]);
+    } catch (e2) {
+      console.error('UserTasks 설정 오류:', e2.message);
+    }
+  }
+}
+
+function refreshShellMenus() {
+  if (tray && !tray.isDestroyed()) {
+    tray.setContextMenu(buildTrayContextMenu());
+  }
+  updateWindowsJumpList();
+}
+
 function buildTrayContextMenu() {
   return Menu.buildFromTemplate([
     {
-      label: '💬 메시지 보내기 (Ctrl+Alt+S)',
-      click: () => openMainWindowWithViewMode(trayLaunchViewMode)
-    },
-    {
-      label: '📜 전체 주고받은 메시지 열기 (Ctrl+Alt+E)',
-      click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
-        safeWebContentsSend('trigger-open-all-logs');
-      }
-    },
-    {
-      label: '⚙️ 환경 설정',
-      click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
-        safeWebContentsSend('trigger-open-settings');
-      }
+      label: '열기',
+      submenu: [
+        {
+          label: '기본 화면으로 열기',
+          click: () => runShellLaunchAction('open-normal')
+        },
+        {
+          label: '미니 화면으로 열기',
+          click: () => runShellLaunchAction('open-compact')
+        },
+        { type: 'separator' },
+        {
+          label: '마지막 모드로 열기',
+          accelerator: 'CommandOrControl+Alt+S',
+          click: () => runShellLaunchAction('open')
+        }
+      ]
     },
     { type: 'separator' },
     {
-      label: '🖥️ 기본 화면으로 열기',
-      click: () => openMainWindowWithViewMode('normal')
+      label: '빠른 실행',
+      submenu: [
+        {
+          label: '쪽지 보내기',
+          click: () => runShellLaunchAction('ipmsg')
+        },
+        {
+          label: '원내 공지',
+          click: () => runShellLaunchAction('notice')
+        },
+        {
+          label: '전체 공지 채널',
+          click: () => runShellLaunchAction('broadcast')
+        },
+        {
+          label: '이동기사 요청',
+          click: () => runShellLaunchAction('transport')
+        },
+        {
+          label: '코드 발령 (블루·레드)',
+          click: () => runShellLaunchAction('code')
+        },
+        {
+          label: '병동 일정 현황판',
+          click: () => runShellLaunchAction('schedule-board')
+        },
+        {
+          label: '그룹 만들기',
+          click: () => runShellLaunchAction('group')
+        }
+      ]
     },
     {
-      label: '📱 미니 화면으로 열기',
-      click: () => openMainWindowWithViewMode('compact')
+      label: '기록 · 설정',
+      submenu: [
+        {
+          label: '전체 주고받은 메시지',
+          accelerator: 'CommandOrControl+Alt+E',
+          click: () => runShellLaunchAction('logs')
+        },
+        {
+          label: '환경 설정',
+          click: () => runShellLaunchAction('settings')
+        },
+        {
+          label: '화면 잠금',
+          click: () => runShellLaunchAction('privacy-lock')
+        }
+      ]
     },
     { type: 'separator' },
     { label: '트레이·단축키로 열 때', enabled: false },
@@ -2855,16 +3104,11 @@ function buildTrayContextMenu() {
     },
     { type: 'separator' },
     {
-      label: '🛠️ 문제 진단 화면 열기',
-      click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
-        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-          mainWindow.webContents.openDevTools({ mode: 'right' });
-        }
-      }
+      label: '문제 진단 화면 열기',
+      click: () => runShellLaunchAction('devtools')
     },
     { type: 'separator' },
-    { label: '종료', click: () => { beginAppQuit(); } }
+    { label: '종료', click: () => runShellLaunchAction('quit') }
   ]);
 }
 
@@ -2875,6 +3119,10 @@ function createTray() {
   tray.setToolTip('미래병원 사내 메신저');
   tray.setContextMenu(buildTrayContextMenu());
   tray.on('double-click', () => openMainWindowWithViewMode(trayLaunchViewMode));
+  tray.on('click', () => {
+    // Windows에서 좌클릭만으로도 메뉴가 안 뜨는 환경이 있어 포커스만
+  });
+  updateWindowsJumpList();
 }
 
 function showAndFocusWindow() {
@@ -2947,6 +3195,7 @@ function createWindow() {
   mainWindow.loadFile('index.html');
   mainWindow.webContents.once('did-finish-load', () => {
     notifyUsageLockState();
+    flushPendingShellAction();
   });
 
   mainWindow.on('hide', () => {
@@ -3520,6 +3769,11 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   registerGlobalShortcuts();
+  // 작업표시줄 Jump List로 앱이 꺼진 상태에서 실행된 경우
+  const bootAction = parseMiraeLaunchAction(process.argv);
+  if (bootAction) {
+    pendingShellAction = bootAction;
+  }
   startUdpDiscovery();
   startTcpServer();
   startMobileServer(db, MY_IP);

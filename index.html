@@ -23366,6 +23366,29 @@
       openSettingsModal();
     });
 
+    // 작업표시줄 Jump List / 트레이 «빠른 실행» 트리거
+    if (window.api.onTriggerOpenNoticeBoard) {
+      window.api.onTriggerOpenNoticeBoard(() => { openBoardModal(); });
+    }
+    if (window.api.onTriggerOpenBroadcast) {
+      window.api.onTriggerOpenBroadcast(() => { selectUserChat(BROADCAST_CHANNEL); });
+    }
+    if (window.api.onTriggerOpenTransport) {
+      window.api.onTriggerOpenTransport(() => { openTransportRequestModal(); });
+    }
+    if (window.api.onTriggerOpenCodeAlert) {
+      window.api.onTriggerOpenCodeAlert(() => { openCodeAlertModal(); });
+    }
+    if (window.api.onTriggerOpenIpmsg) {
+      window.api.onTriggerOpenIpmsg(() => { openIpmsgSendModal(); });
+    }
+    if (window.api.onTriggerOpenGroupModal) {
+      window.api.onTriggerOpenGroupModal(() => { openGroupChatModal(null, { mode: 'new' }); });
+    }
+    if (window.api.onTriggerPrivacyLock) {
+      window.api.onTriggerPrivacyLock(() => { lockPrivacyScreen(); });
+    }
+
     // main 프로세스 쪽 로그(DB 오류, 프로필 저장/로딩 등)를 개발자 도구 콘솔에도 그대로 남긴다.
     // (main 프로세스의 console.log는 npm start로 켰을 때만 터미널에 보이고, 패키징된 프로그램에서는
     //  안 보이기 때문에 여기로도 전달받아야 문제 진단 화면에서 확인할 수 있다.)
