@@ -137,10 +137,60 @@ function sleepMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Promise에 타임아웃을 건다. 만료 시 reject (원본 작업은 백그라운드에 남을 수 있음). */
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label || 'operation'} timeout ${ms}ms`)), ms);
+  });
+  return Promise.race([
+    Promise.resolve(promise).finally(() => { if (timer) clearTimeout(timer); }),
+    timeoutPromise
+  ]);
+}
+
+/** OneDrive·Dropbox 등 클라우드 동기화 경로 — 파일 잠금으로 Electron '응답 없음' 유발 */
+function isCloudSyncedPath(p) {
+  const s = String(p || '').replace(/\//g, '\\').toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes('\\onedrive')
+    || s.includes('\\dropbox')
+    || s.includes('\\google drive')
+    || s.includes('\\googledrive')
+    || s.includes('\\icloud')
+    || s.includes('\\box\\')
+    || /\\box sync\\/i.test(s)
+  );
+}
+
+function isCloudSyncedInstallPath() {
+  try {
+    return isCloudSyncedPath(__dirname) || isCloudSyncedPath(process.execPath || '');
+  } catch (e) {
+    return false;
+  }
+}
+
+function getInstallPathInfo() {
+  const root = String(__dirname || '');
+  const cloud = isCloudSyncedInstallPath();
+  return {
+    root,
+    cloudSynced: cloud,
+    oneDrive: /onedrive/i.test(root.replace(/\//g, '\\')),
+    warning: cloud
+      ? '설치 폴더가 OneDrive/클라우드 동기화 경로입니다. 파일 잠금으로 응답 없음이 날 수 있으니 로컬 디스크(예: C:\\Apps)로 옮겨 주세요.'
+      : ''
+  };
+}
+
 async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
+  const cloud = isCloudSyncedPath(destPath) || isCloudSyncedPath(sourcePath);
+  const maxRetries = cloud ? Math.min(retries, 3) : retries;
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
   let lastErr;
-  for (let i = 0; i < retries; i++) {
+  for (let i = 0; i < maxRetries; i++) {
     try {
       const tmp = `${destPath}.tmp.${process.pid}.${Date.now()}`;
       await fs.promises.copyFile(sourcePath, tmp);
@@ -153,8 +203,8 @@ async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
       return;
     } catch (e) {
       lastErr = e;
-      if (['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(e.code) && i < retries - 1) {
-        await sleepMs(120 * (i + 1));
+      if (['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(e.code) && i < maxRetries - 1) {
+        await sleepMs((cloud ? 80 : 120) * (i + 1));
         continue;
       }
       throw e;
@@ -186,6 +236,7 @@ async function applyPendingUpdatesOnStartup() {
     return 0;
   }
   let applied = 0;
+  const cloud = isCloudSyncedInstallPath();
   for (const safe of names) {
     const from = path.join(pendingUpdateDir(), safe);
     let st;
@@ -199,7 +250,8 @@ async function applyPendingUpdatesOnStartup() {
     const to = path.join(__dirname, rel);
     try {
       await fs.promises.mkdir(path.dirname(to), { recursive: true });
-      await copyFileWithRetry(from, to);
+      // OneDrive 설치본: 파일당 상한 — hang 시 부팅 전체를 막지 않음
+      await withTimeout(copyFileWithRetry(from, to, cloud ? 2 : 10), cloud ? 8000 : 30000, `pending-apply ${rel}`);
       await fs.promises.unlink(from);
       applied++;
       console.log('[업데이트] 재시작 후 보류 파일 적용:', rel);
@@ -284,8 +336,8 @@ const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
-/** 사용자 목록 IPC 디바운스 */
-const USER_LIST_NOTIFY_DEBOUNCE_MS = 350;
+/** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
+const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -382,6 +434,8 @@ const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
+/** 업데이트 파일 적용 중 중복 진입 방지 */
+let updateApplyInFlight = false;
 /** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
 let updateMode = 'auto';
 
@@ -404,6 +458,16 @@ function compareVersions(a, b) {
 /** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
 async function mirrorLocalInstallToZBridge(opts = {}) {
   const force = !!(opts && opts.force);
+  const timeoutMs = Number(opts && opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 12000;
+  try {
+    return await withTimeout(mirrorLocalInstallToZBridgeInner({ force }), timeoutMs, 'Z-bridge mirror');
+  } catch (e) {
+    return { mirrored: false, reason: e && e.message ? e.message : String(e) };
+  }
+}
+
+async function mirrorLocalInstallToZBridgeInner(opts = {}) {
+  const force = !!(opts && opts.force);
   const destRoot = Z_BRIDGE_UPDATE_SOURCE_PATH;
   let localVer = APP_VERSION;
   try {
@@ -412,7 +476,7 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
   } catch (e) {}
 
   try {
-    await fs.promises.access(path.dirname(destRoot));
+    await withTimeout(fs.promises.access(path.dirname(destRoot)), 4000, 'Z-drive access');
   } catch (e) {
     return { mirrored: false, reason: 'Z드라이브에 연결되지 않았습니다.' };
   }
@@ -424,7 +488,11 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
 
   let remoteVer = '';
   try {
-    const raw = await fs.promises.readFile(path.join(destRoot, 'version.json'), 'utf8');
+    const raw = await withTimeout(
+      fs.promises.readFile(path.join(destRoot, 'version.json'), 'utf8'),
+      5000,
+      'Z version.json'
+    );
     remoteVer = String((parseUpdateJsonText(raw) || {}).version || '');
   } catch (e) {
     remoteVer = '';
@@ -441,7 +509,7 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
     try {
       await fs.promises.access(src);
       await fs.promises.mkdir(path.dirname(dst), { recursive: true });
-      await copyFileWithRetry(src, dst);
+      await copyFileWithRetry(src, dst, 3);
       try { await fs.promises.utimes(dst, new Date(), new Date()); } catch (e) {}
       copied.push(rel);
     } catch (e) {
@@ -463,7 +531,7 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
     try {
       await fs.promises.access(src);
       await fs.promises.mkdir(path.dirname(dst), { recursive: true });
-      await copyFileWithRetry(src, dst);
+      await copyFileWithRetry(src, dst, 2);
       copied.push(rel);
     } catch (e) {
       /* optional */
@@ -643,7 +711,12 @@ async function readUpdateSourceBytes(relPath) {
     return fetchGithubUpdateFile(meta, relPath);
   }
   if (meta.kind === 'folder') {
-    return fs.promises.readFile(path.join(meta.dir, relPath));
+    // Z:/공유폴더 행 시 UI 프리징 방지
+    return withTimeout(
+      fs.promises.readFile(path.join(meta.dir, relPath)),
+      12000,
+      `update-read ${relPath}`
+    );
   }
   throw new Error('업데이트 소스가 설정되지 않았습니다.');
 }
@@ -655,9 +728,11 @@ function parseUpdateJsonText(raw) {
 }
 
 async function writeBufferWithRetry(destPath, buffer, retries = 10) {
+  const cloud = isCloudSyncedPath(destPath);
+  const maxRetries = cloud ? Math.min(retries, 3) : retries;
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
   let lastErr;
-  for (let i = 0; i < retries; i++) {
+  for (let i = 0; i < maxRetries; i++) {
     try {
       const tmp = `${destPath}.tmp.${process.pid}.${Date.now()}`;
       await fs.promises.writeFile(tmp, buffer);
@@ -670,8 +745,8 @@ async function writeBufferWithRetry(destPath, buffer, retries = 10) {
       return;
     } catch (e) {
       lastErr = e;
-      if (['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(e.code) && i < retries - 1) {
-        await sleepMs(120 * (i + 1));
+      if (['EBUSY', 'EPERM', 'EACCES', 'ENOTEMPTY'].includes(e.code) && i < maxRetries - 1) {
+        await sleepMs((cloud ? 80 : 120) * (i + 1));
         continue;
       }
       throw e;
@@ -1500,7 +1575,21 @@ function extractAndSaveAttachments(messageHtml, options) {
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
-      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+      // 대용량 sync write는 메인 스레드를 막아 '응답 없음'을 유발 — 2MB 초과는 비동기 저장 + data URL 유지
+      const bin = Buffer.from(base64Data, 'base64');
+      if (bin.length > 2 * 1024 * 1024) {
+        fs.promises.writeFile(filePath, bin).catch((e) => {
+          console.error('첨부파일 비동기 저장 오류:', e.message);
+        });
+        continue;
+      }
+      try {
+        fs.writeFileSync(filePath, bin);
+      } catch (writeErr) {
+        // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
+        fs.promises.writeFile(filePath, bin).catch(() => {});
+        continue;
+      }
       if (compact) {
         replacements.push({
           from: full,
@@ -1541,11 +1630,16 @@ function compactStoredMessageHtml(messageHtml, msgUid) {
 function expandMiraeFileUrlsToDataUrls(messageHtml) {
   if (typeof messageHtml !== 'string' || messageHtml.indexOf('mirae-file://') === -1) return messageHtml;
   const dir = getReceivedFilesDir();
+  const MAX_SYNC_EXPAND_BYTES = 2 * 1024 * 1024;
   return messageHtml.replace(/((?:src|href)=")mirae-file:\/\/([^"]+)(")/gi, (full, prefix, encName, suffix) => {
     try {
       const name = path.basename(decodeURIComponent(encName.split(/[?#]/)[0]));
       const filePath = path.join(dir, name);
       if (!fs.existsSync(filePath)) return full;
+      let st;
+      try { st = fs.statSync(filePath); } catch (e) { return full; }
+      // 대용량 sync readFileSync는 메인 스레드 정지 → 응답 없음
+      if (st && st.size > MAX_SYNC_EXPAND_BYTES) return full;
       const buf = fs.readFileSync(filePath);
       const ext = (path.extname(name) || '').replace('.', '').toLowerCase() || 'bin';
       const mime =
@@ -2001,6 +2095,11 @@ function createMessengerIcon(size) {
 
 function getAppNativeIcon() {
   if (cachedAppIcon) return cachedAppIcon;
+  // OneDrive 등에서 existsSync/createFromPath가 멈출 수 있음 → 생성 아이콘 사용
+  if (isCloudSyncedInstallPath()) {
+    cachedAppIcon = createMessengerIcon(256);
+    return cachedAppIcon;
+  }
   const pngPath = path.join(__dirname, 'icon.png');
   if (fs.existsSync(pngPath)) {
     const img = nativeImage.createFromPath(pngPath);
@@ -2016,6 +2115,10 @@ function getAppNativeIcon() {
 /** Windows 트레이: 16px 전용 아이콘 (큰 PNG 축소 시 깨짐 방지) */
 function getTrayIcon() {
   if (cachedTrayIcon) return cachedTrayIcon;
+  if (isCloudSyncedInstallPath()) {
+    cachedTrayIcon = createMessengerIcon(16);
+    return cachedTrayIcon;
+  }
   const icoPath = path.join(__dirname, 'icon.ico');
   if (fs.existsSync(icoPath)) {
     const img = nativeImage.createFromPath(icoPath);
@@ -2036,14 +2139,38 @@ db.on('error', (err) => {
 });
 
 // 🛡 SQLite 안정성 강화: PC가 강제 종료(정전, 블루스크린)되어도 DB가 깨지지 않도록.
-// (아래 세 문장은 순서가 중요해서 serialize()로 묶는다 — WAL 모드 설정 → 동기화 설정 → 무결성 검사 순.
+// (아래 세 문장은 순서가 중요해서 serialize()로 묶는다 — WAL 모드 설정 → 동기화 설정 → (선택) 무결성 검사.
 //  단, serialize()는 SQLite 문장끼리의 순서만 보장할 뿐, 그 안의 콜백에서 하는 파일 복사 같은
 //  비-SQLite 비동기 작업까지 기다려주지는 않으므로 복구 로직은 아래에서 별도로 안전하게 처리한다.)
+function integrityCheckMarkerPath() {
+  return path.join(app.getPath('userData'), 'last-integrity-check.txt');
+}
+
+function shouldRunIntegrityCheck() {
+  // 매 시작 PRAGMA integrity_check는 대형 DB에서 수 초~수십 초 UI 정지 유발 → 주 1회만
+  try {
+    const raw = fs.readFileSync(integrityCheckMarkerPath(), 'utf8').trim();
+    const t = parseInt(raw, 10);
+    if (Number.isFinite(t) && Date.now() - t < 7 * 24 * 60 * 60 * 1000) return false;
+  } catch (e) { /* first run */ }
+  return true;
+}
+
+function markIntegrityCheckDone() {
+  try {
+    fs.writeFileSync(integrityCheckMarkerPath(), String(Date.now()), 'utf8');
+  } catch (e) { /* ignore */ }
+}
+
 db.serialize(() => {
   db.run(`PRAGMA journal_mode = WAL`);
   db.run(`PRAGMA synchronous = NORMAL`);
   db.run(`PRAGMA busy_timeout = 5000`);
+  if (!shouldRunIntegrityCheck()) {
+    console.log('[DB] integrity_check 생략 (최근 7일 이내 검사함)');
+  } else {
   db.get(`PRAGMA integrity_check`, (err, row) => {
+    markIntegrityCheckDone();
     const ok = !err && row && row.integrity_check === 'ok';
     if (ok) return;
     console.error('⚠️ 데이터베이스 손상 감지 — 최근 백업으로 복구를 시도합니다:', err ? err.message : row);
@@ -2075,6 +2202,7 @@ db.serialize(() => {
       }
     });
   });
+  }
 });
 
 // 💾 journal_mode=WAL이면 최근 쓰기 내용이 mirae_messenger.db-wal 파일에 잠깐 남아있을 수 있다.
@@ -2547,21 +2675,30 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
-  // 동일 msg_uid 중복 INSERT 방지 (재전송 레이스). 기존 중복이 있으면 한 건만 남기고 인덱스 생성.
-  db.run(
-    `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-      AND id NOT IN (
-        SELECT MIN(id) FROM messages
-        WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-        GROUP BY msg_uid
-      )`,
-    (delErr) => {
-      if (delErr) logDbErr(delErr);
+  // 동일 msg_uid 중복 INSERT 방지. unique index가 이미 있으면 매 부팅 DELETE GROUP BY 생략(대형 DB 프리즈 방지).
+  db.get(
+    `SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_messages_msg_uid_unique'`,
+    (idxLookupErr, idxRow) => {
+      if (idxLookupErr) logDbErr(idxLookupErr);
+      if (idxRow && idxRow.name) {
+        return;
+      }
       db.run(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_unique
-         ON messages(msg_uid) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
-        (idxErr) => {
-          if (idxErr) console.error('msg_uid unique index:', idxErr.message || idxErr);
+        `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+          AND id NOT IN (
+            SELECT MIN(id) FROM messages
+            WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+            GROUP BY msg_uid
+          )`,
+        (delErr) => {
+          if (delErr) logDbErr(delErr);
+          db.run(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_unique
+             ON messages(msg_uid) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
+            (idxErr) => {
+              if (idxErr) console.error('msg_uid unique index:', idxErr.message || idxErr);
+            }
+          );
         }
       );
     }
@@ -3350,11 +3487,16 @@ app.whenReady().then(async () => {
   startAutoBackup();
   startUpdateChecker();
   startPendingWipeRetryLoop();
-  setTimeout(() => {
-    mirrorLocalInstallToZBridge().catch((e) => {
-      console.warn('[Z브리지] 시작 시 미러 생략:', e.message || e);
-    });
-  }, 8000);
+  // 1.0.471: 부팅 시 Z: 미러 비활성 — Z드라이브 hang이 Electron '응답 없음'의 주원인.
+  // 수동 「Z드라이브에 공유」및 업데이트 직후 미러(타임아웃)만 유지.
+  const installInfo = getInstallPathInfo();
+  if (installInfo.cloudSynced) {
+    console.warn('[설치경로]', installInfo.warning);
+    writeToLogFile('warn', installInfo.warning + ' root=' + installInfo.root);
+    setTimeout(() => {
+      safeWebContentsSend('install-path-warning', installInfo);
+    }, 2500);
+  }
   // 부팅 직후: 다른 PC에 내 IP 대상 삭제 예약이 있으면 받아 즉시 적용
   setTimeout(() => {
     broadcastWipeClaim();
@@ -3592,10 +3734,18 @@ function broadcastPresence(socket) {
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
   socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
-  // 다른 층 대역은 라우터의 브로드캐스트 차단 여부와 상관없이 전달되도록 호스트별 유니캐스트로 전송
-  KNOWN_SUBNET_HOST_IPS.forEach(ip => {
-    try { socket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
-  });
+  // 다른 층 대역 유니캐스트(최대 508개) — 한 틱에 몰아보내면 메인 루프가 잠깐 멈출 수 있어 배치
+  const ips = KNOWN_SUBNET_HOST_IPS;
+  let i = 0;
+  const BATCH = 64;
+  const sendBatch = () => {
+    const end = Math.min(i + BATCH, ips.length);
+    for (; i < end; i++) {
+      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
+    }
+    if (i < ips.length) setImmediate(sendBatch);
+  };
+  sendBatch();
 }
 
 function broadcastGoodbye() {
@@ -8702,9 +8852,11 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);
 
+ipcMain.handle('get-install-path-info', async () => getInstallPathInfo());
+
 ipcMain.handle('mirror-update-to-z-bridge', async () => {
   try {
-    const res = await mirrorLocalInstallToZBridge({ force: true });
+    const res = await mirrorLocalInstallToZBridge({ force: true, timeoutMs: 15000 });
     if (res && res.mirrored) {
       return {
         success: true,
@@ -8846,6 +8998,13 @@ async function applyUpdateFiles() {
       await fs.promises.copyFile(localPath, path.join(backupDir, f.replace(/\//g, '_')));
     } catch (e) {}
     try {
+      // OneDrive 설치: 실행 중 in-place 덮어쓰기는 잠금·프리즈 → 보류 폴더에만 두고 재시작 적용
+      if (isCloudSyncedInstallPath()) {
+        await stagePendingUpdateBuffer(f, remoteBuf);
+        fileResults.push({ file: f, copied: true, pendingRestart: true });
+        console.warn(`[업데이트] OneDrive 경로 — ${f} 재시작 후 적용 예약`);
+        continue;
+      }
       await writeBufferWithRetry(localPath, remoteBuf);
       fileResults.push({ file: f, copied: true });
     } catch (e) {
@@ -8882,6 +9041,11 @@ async function applyUpdateFiles() {
         await fs.promises.access(localPath);
         await fs.promises.copyFile(localPath, path.join(backupDir, rel.replace(/\//g, '_')));
       } catch (e) {}
+      if (isCloudSyncedInstallPath()) {
+        await stagePendingUpdateBuffer(rel, remoteBuf);
+        fileResults.push({ file: rel, copied: true, pendingRestart: true });
+        continue;
+      }
       await writeBufferWithRetry(localPath, remoteBuf);
       fileResults.push({ file: rel, copied: true });
     } catch (e) {
@@ -8905,13 +9069,19 @@ async function applyUpdateFiles() {
   const requiredResults = fileResults.filter((r) => filesToUpdate.includes(r.file));
   // (예외 없이 끝났다고 해서 실제로 반영됐다는 보장은 없다 — 파일 잠금 등으로 조용히 실패할 수 있다.)
   let verifiedVersion = null;
+  const anyPending = requiredResults.some((r) => r.pendingRestart);
   try {
-    const localPkg = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'package.json'), 'utf8'));
-    verifiedVersion = localPkg.version;
+    if (anyPending && isCloudSyncedInstallPath()) {
+      // package.json이 보류만 된 경우 — 예정 버전은 expectedVersion으로 검증
+      verifiedVersion = expectedVersion || APP_VERSION;
+    } else {
+      const localPkg = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'package.json'), 'utf8'));
+      verifiedVersion = localPkg.version;
+    }
   } catch (e) {}
 
   const allCopied = requiredResults.every(r => r.copied);
-  const versionMatches = !expectedVersion || verifiedVersion === expectedVersion;
+  const versionMatches = !expectedVersion || verifiedVersion === expectedVersion || anyPending;
   if (!allCopied || !versionMatches) {
     const failedFiles = fileResults.filter(r => !r.copied).map(r => `${r.file}(${r.reason})`).join(', ');
     console.error('[업데이트] 검증 실패 — 예상 버전:', expectedVersion, '/ 실제 버전:', verifiedVersion, '/ 실패한 파일:', failedFiles || '없음');
@@ -8922,13 +9092,15 @@ async function applyUpdateFiles() {
     );
   }
 
-  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패해도 업데이트는 성공)
+  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패·타임아웃해도 업데이트는 성공)
   try {
-    const zRes = await mirrorLocalInstallToZBridge({ force: true });
-    if (zRes && zRes.mirrored) {
-      console.log('[업데이트] Z 브리지 미러 완료:', zRes.version);
-    } else if (zRes && zRes.reason && zRes.reason !== 'already-latest') {
-      console.warn('[업데이트] Z 브리지 미러 생략:', zRes.reason);
+    if (!isCloudSyncedInstallPath()) {
+      const zRes = await mirrorLocalInstallToZBridge({ force: true, timeoutMs: 10000 });
+      if (zRes && zRes.mirrored) {
+        console.log('[업데이트] Z 브리지 미러 완료:', zRes.version);
+      } else if (zRes && zRes.reason && zRes.reason !== 'already-latest') {
+        console.warn('[업데이트] Z 브리지 미러 생략:', zRes.reason);
+      }
     }
   } catch (e) {
     console.warn('[업데이트] Z 브리지 미러 오류:', e.message || e);
@@ -8936,14 +9108,21 @@ async function applyUpdateFiles() {
 }
 
 ipcMain.handle('apply-update', async () => {
+  if (updateApplyInFlight) return { success: false, msg: '업데이트가 이미 진행 중입니다.' };
+  updateApplyInFlight = true;
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
-  if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
+  if (!updateSourcePath) {
+    updateApplyInFlight = false;
+    return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
+  }
   try {
     await applyUpdateFiles();
     setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
+  } finally {
+    updateApplyInFlight = false;
   }
 });
 
@@ -9372,6 +9551,7 @@ async function autoCheckAndApplyUpdate() {
   if (!updateSourcePath || !mainWindow) return;
   if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
+  if (updateApplyInFlight) return;
   let remote;
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
@@ -9382,10 +9562,11 @@ async function autoCheckAndApplyUpdate() {
     return;
   }
 
+  updateApplyInFlight = true;
+  autoUpdateAlreadyApplied = true; // 중복 적용 방지 (실패 시 아래에서 해제)
   try {
     // 새 버전을 발견하면 바로 파일을 교체해 둔다. (실제 반영은 재시작해야 이루어짐)
     await applyUpdateFiles();
-    autoUpdateAlreadyApplied = true;
     pendingUpdateRemoteVersion = remote.version;
     safeWebContentsSend('auto-update-ready', {
       remoteVersion: remote.version,
@@ -9401,9 +9582,12 @@ async function autoCheckAndApplyUpdate() {
       app.exit();
     }, 30000);
   } catch (e) {
+    autoUpdateAlreadyApplied = false;
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
     // 혼란이 생기지 않도록 한다.
     safeWebContentsSend('auto-update-failed', { msg: e.message });
+  } finally {
+    updateApplyInFlight = false;
   }
 }
 
