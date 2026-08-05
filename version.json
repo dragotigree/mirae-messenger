@@ -1,4 +1,4 @@
 {
-  "version": "1.0.456",
-  "notes": "미니모드 개편 — Discord Overlay 반투명 크롬 + 카카오톡 컴팩트 채팅, Tailwind CSS, Phosphor Icons"
+  "version": "1.0.457",
+  "notes": "미니모드 편의성 — 항상 위 고정, 안읽음 바로가기(Ctrl+U), 1/2/3 탭·Alt+↑↓ 전환, 채팅 자동 포커스"
 }

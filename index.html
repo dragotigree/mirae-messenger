@@ -4378,17 +4378,20 @@
     <!-- 🗨 미니 모드 — Discord Overlay × 카카오톡 컴팩트 채팅 -->
     <div id="compact-list-view" class="mm-overlay-shell" style="display:none;">
       <aside class="compact-rail" aria-label="미니 모드 메뉴">
-        <button type="button" class="compact-rail-btn" data-rail="friends" onclick="setCompactRailTab('friends')" title="직원">
+        <button type="button" class="compact-rail-btn" data-rail="friends" onclick="setCompactRailTab('friends')" title="직원 (1)">
           <span class="compact-rail-icon" data-ui-icon="users"></span>
         </button>
-        <button type="button" class="compact-rail-btn is-active" data-rail="chat" onclick="setCompactRailTab('chat')" title="채팅">
+        <button type="button" class="compact-rail-btn is-active" data-rail="chat" onclick="setCompactRailTab('chat')" title="채팅 (2)">
           <span class="compact-rail-icon" data-ui-icon="chatBubble"></span>
-          <span class="unread-badge compact-rail-badge" id="compact-rail-chat-badge" style="display:none;">0</span>
+          <span class="unread-badge compact-rail-badge" id="compact-rail-chat-badge" style="display:none;" onclick="event.stopPropagation(); openFirstUnreadCompactChat()" title="안 읽은 대화 열기">0</span>
         </button>
-        <button type="button" class="compact-rail-btn" data-rail="more" onclick="setCompactRailTab('more')" title="더보기">
+        <button type="button" class="compact-rail-btn" data-rail="more" onclick="setCompactRailTab('more')" title="더보기 (3)">
           <span class="compact-rail-icon" data-ui-icon="moreDots"></span>
         </button>
         <div class="compact-rail-spacer"></div>
+        <button type="button" class="compact-rail-btn" id="compact-rail-pin-btn" onclick="toggleCompactAlwaysOnTop()" title="항상 위 고정">
+          <span class="compact-rail-icon" data-ui-icon="pin"></span>
+        </button>
         <button type="button" class="compact-rail-btn" onclick="openSettingsModal()" title="설정">
           <span class="compact-rail-icon" data-ui-icon="settings"></span>
         </button>
@@ -4401,10 +4404,17 @@
           </div>
           <div class="compact-header-actions">
             <button class="icon-btn-compact" id="toolbar-settings-btn-compact" onclick="openSettingsModal()" title="설정" style="display:none;"></button>
-            <button class="icon-btn-compact" id="compact-header-search-btn" onclick="focusCompactSearchInput()" title="검색"><span data-ui-icon="search"></span></button>
+            <button type="button" class="icon-btn-compact compact-unread-jump-btn" id="compact-unread-jump-btn" onclick="openFirstUnreadCompactChat()" title="안 읽은 대화 열기 (Ctrl+U)" style="display:none;">
+              <span data-ui-icon="chatBubble"></span>
+              <span class="compact-unread-jump-count" id="compact-unread-jump-count">0</span>
+            </button>
+            <button class="icon-btn-compact" id="compact-header-search-btn" onclick="focusCompactSearchInput()" title="검색 (Ctrl+Shift+F)"><span data-ui-icon="search"></span></button>
             <button type="button" class="compact-mode-exit-btn" id="compact-expand-btn" onclick="toggleCompactMode()" title="기본 화면으로">확장</button>
           </div>
         </header>
+        <div class="compact-shortcut-hint" id="compact-shortcut-hint" aria-hidden="true">
+          <kbd>1</kbd>직원 <kbd>2</kbd>채팅 <kbd>3</kbd>더보기 · <kbd>Ctrl</kbd>+<kbd>U</kbd>안읽음 · <kbd>Alt</kbd>+<kbd>↑↓</kbd>대화전환
+        </div>
         <div class="compact-pane" data-compact-pane="chat">
           <div class="compact-filter-row" id="compact-filter-row">
             <button type="button" class="compact-filter-chip is-active" data-compact-filter="all" onclick="setCompactListFilter('all')">전체</button>
@@ -4488,7 +4498,7 @@
     <div id="active-chat-container" style="display: none; flex: 1; flex-direction: column; min-height: 0;">
       <div id="chat-header">
         <div class="header-user-info">
-          <button class="icon-btn-compact" id="compact-back-btn" onclick="showCompactList()" title="목록으로"></button>
+          <button class="icon-btn-compact" id="compact-back-btn" onclick="showCompactList()" title="목록으로 (Esc)"></button>
           <div class="avatar-wrapper">
             <div class="avatar-circle" id="chat-header-avatar">상</div>
             <div class="avatar-status-badge status-ONLINE" id="chat-header-status-badge"></div>
@@ -4499,6 +4509,9 @@
           </div>
         </div>
         <div class="chat-header-actions">
+          <button type="button" class="chat-header-tool-btn" id="compact-chat-pin-btn" onclick="toggleCompactAlwaysOnTop()" title="항상 위 고정" style="display:none;">
+            <span class="chat-header-tool-icon" data-ui-icon="pin"></span>
+          </button>
           <button type="button" class="chat-header-tool-btn chat-header-tool-btn--calendar" id="chat-calendar-toggle-btn" onclick="toggleChatCalendarPopover()" title="날짜로 대화 이동">
             <span class="chat-header-tool-icon" aria-hidden="true"></span>
             <span class="chat-header-tool-label">날짜</span>
@@ -8554,12 +8567,13 @@
         ['chat-search-toggle-btn', 'search'],
         ['chat-calendar-toggle-btn', 'calendar'],
         ['chat-shared-archive-btn', 'mediaArchive'],
-        ['chat-shared-back-btn', 'back']
+        ['chat-shared-back-btn', 'back'],
+        ['compact-chat-pin-btn', 'pin']
       ];
       pairs.forEach(([id, name]) => {
         const el = document.getElementById(id);
         if (!el) return;
-        if (id === 'chat-clear-view-btn' || id === 'chat-search-toggle-btn' || id === 'chat-shared-archive-btn' || id === 'chat-calendar-toggle-btn') {
+        if (id === 'chat-clear-view-btn' || id === 'chat-search-toggle-btn' || id === 'chat-shared-archive-btn' || id === 'chat-calendar-toggle-btn' || id === 'compact-chat-pin-btn') {
           const iconHost = el.querySelector('.chat-header-tool-icon');
           if (iconHost) iconHost.innerHTML = uiIcon(name);
           else el.innerHTML = uiIcon(name) + el.innerHTML;
@@ -8588,6 +8602,8 @@
     if (isCompactMode) {
       document.body.classList.add('compact-mode');
       setCompactRailTab(compactRailTab);
+      applyCompactAlwaysOnTopPreference();
+      syncCompactConvenienceUi();
     }
     let pendingScheduleBoardOpenDate = '';
     let pendingScheduleBoardQuickOpts = null;
@@ -8866,6 +8882,7 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      syncCompactUnreadJumpUi();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
     }
 
@@ -9551,7 +9568,9 @@
       if (isCompactMode && viewResult && viewResult.bounds) {
         localStorage.setItem('compactWindowBounds', JSON.stringify(viewResult.bounds));
       }
+      await applyCompactAlwaysOnTopPreference();
       updateCompactModeButtonUi();
+      syncCompactConvenienceUi();
       const ta = document.getElementById('chat-textarea');
       if (ta) ta.placeholder = isCompactMode
         ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
@@ -9559,6 +9578,7 @@
       updateMainPanelVisibility();
       if (activeChatUser) loadChatHistory();
       resizeChatTextarea();
+      if (isCompactMode && activeChatUser) focusCompactChatInputSoon();
     }
 
     async function toggleCompactMode() {
@@ -9586,6 +9606,7 @@
       } else if (compact && hasChat) {
         setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       }
+      syncCompactConvenienceUi();
       pushToastUiState();
     }
 
@@ -9593,6 +9614,7 @@
       activeChatUser = null;
       renderUserListTree();
       updateMainPanelVisibility();
+      syncCompactConvenienceUi();
     }
 
     /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
@@ -9885,7 +9907,209 @@
       if (tab === 'more') updateCompactMoreProfile();
       else updateCompactOnlineCount();
       syncCompactFilterChipUi();
+      syncCompactUnreadJumpUi();
       if (tab !== 'more') renderCompactList();
+    }
+
+    function isCompactAlwaysOnTopEnabled() {
+      try {
+        const raw = localStorage.getItem('compactAlwaysOnTop');
+        if (raw == null) return true; // 미니모드는 기본 항상 위
+        return raw === 'true';
+      } catch (_) {
+        return true;
+      }
+    }
+
+    async function applyCompactAlwaysOnTopPreference() {
+      const want = isCompactMode && isCompactAlwaysOnTopEnabled();
+      try {
+        if (window.api && typeof window.api.setAlwaysOnTop === 'function') {
+          await window.api.setAlwaysOnTop(want);
+        }
+      } catch (_) {}
+      syncCompactAlwaysOnTopUi(want);
+    }
+
+    function syncCompactAlwaysOnTopUi(enabled) {
+      const on = !!enabled;
+      document.querySelectorAll('#compact-rail-pin-btn, #compact-chat-pin-btn').forEach((btn) => {
+        if (!btn) return;
+        btn.classList.toggle('is-pinned', on);
+        btn.title = on ? '항상 위 고정 해제' : '항상 위 고정';
+      });
+    }
+
+    async function toggleCompactAlwaysOnTop() {
+      if (!isCompactMode) {
+        await applyViewMode(true);
+      }
+      const next = !isCompactAlwaysOnTopEnabled();
+      try { localStorage.setItem('compactAlwaysOnTop', next ? 'true' : 'false'); } catch (_) {}
+      await applyCompactAlwaysOnTopPreference();
+    }
+
+    function syncCompactUnreadJumpUi() {
+      const btn = document.getElementById('compact-unread-jump-btn');
+      const countEl = document.getElementById('compact-unread-jump-count');
+      const total = getTotalUnread();
+      if (!btn) return;
+      const show = isCompactMode && !activeChatUser && total > 0 && compactRailTab !== 'more';
+      btn.style.display = show ? 'flex' : 'none';
+      if (countEl) countEl.textContent = formatUnreadBadge(total);
+    }
+
+    function syncCompactConvenienceUi() {
+      document.body.classList.toggle('compact-hints-on', isCompactMode && !activeChatUser);
+      const pinChat = document.getElementById('compact-chat-pin-btn');
+      if (pinChat) pinChat.style.display = isCompactMode ? '' : 'none';
+      syncCompactUnreadJumpUi();
+      syncCompactAlwaysOnTopUi(isCompactMode && isCompactAlwaysOnTopEnabled());
+    }
+
+    function focusCompactChatInputSoon() {
+      if (!isCompactMode || !activeChatUser) return;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const ta = document.getElementById('chat-textarea');
+          if (ta && document.body.classList.contains('compact-mode') && activeChatUser) {
+            try { ta.focus({ preventScroll: true }); } catch (_) { ta.focus(); }
+          }
+        }, 40);
+      });
+    }
+
+    function getCompactNavigableChatKeys() {
+      const keys = [];
+      const seen = new Set();
+      const pushKey = (key) => {
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        keys.push(key);
+      };
+      // 채널·그룹
+      pushKey('BROADCAST');
+      (myGroupChats || []).forEach((g) => pushKey(`GROUP:${g.uid}`));
+      // DM — 최근 활동/미읽 우선
+      const dms = (allUsers || [])
+        .filter((u) => u && u.ip && isDirectMessagePeerKey(u.ip) && !u.isMe && !(myProfile && u.ip === myProfile.ip))
+        .map((u) => ({
+          key: u.ip,
+          unread: getUnreadForUser(u) || 0,
+          lastAt: Number(u.lastMsgAt || u.lastSeen || 0)
+        }))
+        .sort((a, b) => (b.unread - a.unread) || (b.lastAt - a.lastAt));
+      dms.forEach((d) => pushKey(d.key));
+      return keys;
+    }
+
+    function openCompactChatByKey(key) {
+      if (!key) return false;
+      if (key === 'BROADCAST') {
+        selectUserChat(BROADCAST_CHANNEL);
+        return true;
+      }
+      if (key.startsWith('GROUP:')) {
+        const uid = key.slice(6);
+        const g = (myGroupChats || []).find((x) => x.uid === uid);
+        if (g) {
+          selectUserChat(makeGroupChannel(g));
+          return true;
+        }
+        return false;
+      }
+      if (key.startsWith('DEPT:')) {
+        selectUserChat(makeDeptChannel(key.slice(5)));
+        return true;
+      }
+      if (key.startsWith('FLOOR:')) {
+        selectUserChat(makeFloorChannel(key.slice(6)));
+        return true;
+      }
+      const user = findUserByIp(key);
+      if (user) {
+        selectUserChat(user);
+        return true;
+      }
+      selectUserChat({ ip: key, username: key, rank: '', dept: '', floor: '', extNo: '' });
+      return true;
+    }
+
+    function openFirstUnreadCompactChat() {
+      if (!isCompactMode) return false;
+      const entries = Object.entries(unreadCounts || {})
+        .filter(([, n]) => (n || 0) > 0)
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+      if (!entries.length) {
+        setCompactRailTab('chat');
+        setCompactListFilter('unread');
+        return false;
+      }
+      setCompactRailTab('chat');
+      return openCompactChatByKey(entries[0][0]);
+    }
+
+    function cycleCompactChat(delta) {
+      if (!isCompactMode) return false;
+      const keys = getCompactNavigableChatKeys();
+      if (!keys.length) return false;
+      const cur = activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : '';
+      let idx = cur ? keys.indexOf(cur) : -1;
+      if (idx < 0) idx = delta > 0 ? -1 : 0;
+      const next = keys[(idx + delta + keys.length) % keys.length];
+      return openCompactChatByKey(next);
+    }
+
+    function isEditableKeyboardTarget(el) {
+      if (!el) return false;
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (el.isContentEditable) return true;
+      return !!(el.closest && el.closest('[contenteditable="true"]'));
+    }
+
+    function handleCompactModeShortcuts(e) {
+      if (!document.body.classList.contains('compact-mode')) return false;
+      if (isPrivacyScreenLocked) return false;
+      if (e.defaultPrevented) return false;
+
+      // Ctrl+U: 안 읽은 대화
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'u' || e.key === 'U' || e.code === 'KeyU')) {
+        e.preventDefault();
+        openFirstUnreadCompactChat();
+        return true;
+      }
+
+      // Alt+↑/↓: 이전·다음 대화
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        cycleCompactChat(e.key === 'ArrowDown' ? 1 : -1);
+        return true;
+      }
+
+      // 입력 중이면 숫자 탭 전환 무시
+      if (isEditableKeyboardTarget(e.target)) return false;
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+
+      if (e.key === '1' || e.code === 'Digit1') {
+        e.preventDefault();
+        if (activeChatUser) showCompactList();
+        setCompactRailTab('friends');
+        return true;
+      }
+      if (e.key === '2' || e.code === 'Digit2') {
+        e.preventDefault();
+        if (activeChatUser) showCompactList();
+        setCompactRailTab('chat');
+        return true;
+      }
+      if (e.key === '3' || e.code === 'Digit3') {
+        e.preventDefault();
+        if (activeChatUser) showCompactList();
+        setCompactRailTab('more');
+        return true;
+      }
+      return false;
     }
 
     function focusCompactSearchInput() {
@@ -15627,6 +15851,8 @@
       loadChatHistory();
       refreshScheduledIndicator();
       refreshActiveChatPinBanner();
+      syncCompactConvenienceUi();
+      if (document.body.classList.contains('compact-mode')) focusCompactChatInputSoon();
     }
 
     function renderContactDetailPanel(user) {
@@ -23039,11 +23265,31 @@
         return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
+      if (handleCompactModeShortcuts(e)) return;
       if (document.body.classList.contains('compact-mode')) {
         if (e.key === 'Escape' && activeChatUser) {
           e.preventDefault();
           showCompactList();
         }
+      }
+    });
+
+    // 마우스 뒤로가기 버튼 → 미니모드 목록
+    window.addEventListener('mouseup', (e) => {
+      if (e.button !== 3) return;
+      if (!document.body.classList.contains('compact-mode') || !activeChatUser) return;
+      if (isPrivacyScreenLocked) return;
+      e.preventDefault();
+      showCompactList();
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button !== 4) return;
+      if (!document.body.classList.contains('compact-mode') || activeChatUser) return;
+      if (isPrivacyScreenLocked) return;
+      // forward: 안읽음 바로 열기
+      if (getTotalUnread() > 0) {
+        e.preventDefault();
+        openFirstUnreadCompactChat();
       }
     });
 

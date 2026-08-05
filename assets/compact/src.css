@@ -950,4 +950,90 @@
   body.compact-mode .header-user-text {
     color: var(--mm-text);
   }
+
+  /* ── 미니모드 편의 UX ── */
+  body.compact-mode .compact-rail-btn.is-pinned {
+    color: #fee500;
+    background: rgba(254, 229, 0, 0.14);
+  }
+
+  body.compact-mode .compact-rail-badge {
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  body.compact-mode .compact-shortcut-hint {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    padding: 0 16px 8px;
+    font-size: 10px;
+    color: var(--mm-dim);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.compact-mode.compact-hints-on .compact-shortcut-hint {
+    display: flex;
+  }
+
+  body.compact-mode .compact-shortcut-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 16px;
+    padding: 0 4px;
+    margin: 0 1px;
+    border-radius: 4px;
+    border: 1px solid var(--mm-border);
+    background: var(--mm-raised);
+    color: var(--mm-muted);
+    font-size: 9px;
+    font-weight: 700;
+    font-family: inherit;
+  }
+
+  body.compact-mode .compact-unread-jump-btn {
+    position: relative;
+    color: #fff !important;
+    background: var(--mm-accent) !important;
+  }
+
+  body.compact-mode .compact-unread-jump-btn:hover {
+    filter: brightness(1.08);
+  }
+
+  body.compact-mode .compact-unread-jump-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border-radius: 99px;
+    background: #fff;
+    color: var(--mm-accent);
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 14px;
+    text-align: center;
+  }
+
+  body.compact-mode #compact-chat-pin-btn {
+    display: inline-flex !important;
+  }
+
+  body.compact-mode #compact-chat-pin-btn.is-pinned {
+    color: #fee500;
+    background: rgba(254, 229, 0, 0.16);
+  }
+
+  body.compact-mode .compact-list-item.is-search-nav {
+    outline: 1px solid rgba(88, 101, 242, 0.65);
+    background: rgba(88, 101, 242, 0.16);
+  }
 }
