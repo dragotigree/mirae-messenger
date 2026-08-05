@@ -4242,6 +4242,7 @@
             <div class="net-status-row"><span>사용자 검색(UDP)</span><span id="net-udp-status">-</span></div>
             <div class="net-status-row"><span>메시지 연결(TCP)</span><span id="net-tcp-status">-</span></div>
             <div class="net-status-row"><span>현재 온라인 인원</span><span id="net-online-count">-</span></div>
+            <p class="settings-field-hint" style="margin:6px 0 0;font-size:11.5px;opacity:.7;line-height:1.4;">동일 직원은 1명으로 세고, 공용 컴퓨터(직급 없음)는 제외합니다.</p>
           </div>
           <p class="settings-hint">상태가 오류면 Windows 방화벽에서 이 프로그램 접근을 허용해 보세요.</p>
         </div>
@@ -5576,6 +5577,23 @@
       if (!u) return false;
       if (u.isMe) return true;
       return !!(myProfile && u.ip && myProfile.ip && u.ip === myProfile.ip);
+    }
+
+    /** 인원 집계용: 공용 PC(직급 없음) 제외, 본인은 포함 */
+    function isStaffForPeopleCount(u) {
+      if (!u) return false;
+      if (isDirectorySelfUser(u)) return true;
+      return !isSharedPcUser(u);
+    }
+
+    function countStaffUsers(users, pred) {
+      return (users || []).filter((u) => isStaffForPeopleCount(u) && (!pred || pred(u))).length;
+    }
+
+    function groupStaffCountBadge(groupUsers) {
+      const staff = (groupUsers || []).filter(isStaffForPeopleCount);
+      const online = staff.filter((u) => u.online).length;
+      return `${online}/${staff.length}`;
     }
 
     /** 직원 목록(사이드바·미니 직원 탭)에 표시할지 */
@@ -7764,9 +7782,10 @@
     function updateCompactOnlineCount() {
       const el = document.getElementById('compact-online-count');
       if (!el || compactRailTab === 'more') return;
-      const online = allUsers.filter(u => u.online).length;
+      const staff = (allUsers || []).filter((u) => !isSharedPcUser(u) || isDirectorySelfUser(u));
+      const online = staff.filter((u) => u.online).length;
       if (compactRailTab === 'friends') {
-        el.textContent = `접속 ${online}명 · 전체 ${allUsers.length}명`;
+        el.textContent = `접속 ${online}명 · 전체 ${staff.length}명`;
       } else {
         el.textContent = `미래병원 · 접속 ${online}명`;
       }
@@ -10581,10 +10600,9 @@
       treeEl.querySelectorAll('.user-group-block[data-group-name]').forEach((block) => {
         const groupName = block.dataset.groupName;
         const groupUsers = groups[groupName] || [];
-        const onlineCount = groupUsers.filter((u) => u.online).length;
         const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
         const countBadge = block.querySelector('.group-count-badge');
-        if (countBadge) countBadge.textContent = `${onlineCount}/${groupUsers.length}`;
+        if (countBadge) countBadge.textContent = groupStaffCountBadge(groupUsers);
         const trail = block.querySelector('.subsection-label > span:last-child');
         if (!trail) return;
         let unreadEl = trail.querySelector('.unread-badge');
@@ -10703,7 +10721,6 @@
         const label = document.createElement('div');
         label.className = `subsection-label ${isCollapsed ? 'is-collapsed' : ''}`;
         const icon = getUserGroupSidebarIcon(groupingKey, groupName);
-        const onlineCount = groupUsers.filter(u => u.online).length;
 
         label.innerHTML = `
           <span style="display:flex; align-items:center; min-width:0; flex:1; gap:2px;">
@@ -10711,7 +10728,7 @@
             <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span class="group-chevron">▾</span>${icon} ${escapeHtml(groupName)}</span>
           </span>
           <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-            <span class="group-count-badge">${onlineCount}/${groupUsers.length}</span>
+            <span class="group-count-badge">${groupStaffCountBadge(groupUsers)}</span>
             ${groupUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(groupUnread)}</span>` : ''}
           </span>
         `;
@@ -12506,7 +12523,7 @@
       document.getElementById('detail-contact-section').style.display = 'none';
       const sec = document.getElementById('detail-broadcast-section');
       sec.style.display = 'flex';
-      const onlineCount = allUsers.filter(u => u.online).length;
+      const onlineCount = countStaffUsers(allUsers, (u) => u.online);
       sec.innerHTML = `
         <div class="detail-avatar" style="background:linear-gradient(135deg,#0b2a4a,#1d5a99);">#</div>
         <div style="font-size:16px; font-weight:700;">전체 공지 채널</div>
@@ -12520,7 +12537,7 @@
       document.getElementById('detail-contact-section').style.display = 'none';
       const sec = document.getElementById('detail-broadcast-section');
       sec.style.display = 'flex';
-      const onlineCount = allUsers.filter(u => u.dept === deptName && u.online).length;
+      const onlineCount = countStaffUsers(allUsers, (u) => u.dept === deptName && u.online);
       sec.innerHTML = `
         <div class="detail-avatar" style="background:linear-gradient(135deg,#0284c7,#0369a1);">${deptName.charAt(0)}</div>
         <div style="font-size:16px; font-weight:700;"># ${deptName}</div>
@@ -12534,7 +12551,7 @@
       document.getElementById('detail-contact-section').style.display = 'none';
       const sec = document.getElementById('detail-broadcast-section');
       sec.style.display = 'flex';
-      const onlineCount = allUsers.filter(u => u.floor === floorName && u.online).length;
+      const onlineCount = countStaffUsers(allUsers, (u) => u.floor === floorName && u.online);
       sec.innerHTML = `
         <div class="detail-avatar" style="background:linear-gradient(135deg,#0284c7,#0369a1);">${floorName.charAt(0)}</div>
         <div style="font-size:16px; font-weight:700;"># ${floorName}</div>

@@ -3130,10 +3130,36 @@ let globalUdpSocket = null;
 let udpStatus = 'starting';
 let tcpStatus = 'starting';
 
+/** 직급이 없으면 공용 컴퓨터(인원 집계에서 제외) */
+function isSharedPcProfile(u) {
+  return !normalizeRankText(u && u.rank);
+}
+
+/** 사이드바와 동일한 직원 목록(동일인 합침) */
+function buildDirectoryUserList() {
+  return dedupeUsersByPersonIdentity(
+    Array.from(allKnownUsers.values())
+      .filter((u) => u && u.ip && !isSyntheticReceiverKey(u.ip))
+      .map(userListEntryForRenderer)
+  );
+}
+
+/**
+ * 실제 온라인 인원: 동일인 1명으로 합친 뒤, 공용 PC(직급 없음)는 제외.
+ * (본인 PC는 직급이 없어도 포함)
+ */
+function countOnlinePeopleForStatus() {
+  return buildDirectoryUserList().filter((u) => {
+    if (!u || !u.online) return false;
+    if (u.isMe || (MY_IP && u.ip === MY_IP)) return true;
+    return !isSharedPcProfile(u);
+  }).length;
+}
+
 function notifyNetworkStatus() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     safeWebContentsSend('network-status-update', {
-      myIp: MY_IP, udpStatus, tcpStatus, onlineCount: onlineUsers.size
+      myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()
     });
   }
 }
@@ -3975,12 +4001,8 @@ function notifyUserList(force) {
     const forced = notifyUserListForce;
     notifyUserListForce = false;
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    const combinedList = dedupeUsersByPersonIdentity(
-      Array.from(allKnownUsers.values())
-        .filter((u) => u && u.ip && !isSyntheticReceiverKey(u.ip))
-        .map(userListEntryForRenderer)
-    );
-    safeWebContentsSend('user-list-update', combinedList);
+    safeWebContentsSend('user-list-update', buildDirectoryUserList());
+    notifyNetworkStatus();
     if (forced) { /* keep API compatible */ }
   }, USER_LIST_NOTIFY_DEBOUNCE_MS);
 }
@@ -3992,12 +4014,8 @@ function notifyUserListNow() {
   }
   notifyUserListForce = false;
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const combinedList = dedupeUsersByPersonIdentity(
-    Array.from(allKnownUsers.values())
-      .filter((u) => u && u.ip && !isSyntheticReceiverKey(u.ip))
-      .map(userListEntryForRenderer)
-  );
-  safeWebContentsSend('user-list-update', combinedList);
+  safeWebContentsSend('user-list-update', buildDirectoryUserList());
+  notifyNetworkStatus();
 }
 
 function startPresenceSweeper() {
@@ -9433,7 +9451,7 @@ function startAutoBackup() {
 }
 
 ipcMain.handle('get-network-status', async () => ({
-  myIp: MY_IP, udpStatus, tcpStatus, onlineCount: onlineUsers.size
+  myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()
 }));
 
 ipcMain.handle('refresh-users', async () => {
