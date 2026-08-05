@@ -433,6 +433,34 @@
     .user-search-box input:focus { border-color: rgba(14, 165, 233, 0.45); background: rgba(255,255,255,0.1); box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12); }
     .user-search-box input::placeholder { color: rgba(255,255,255,0.42); }
 
+    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 작은 세그먼트 */
+    .sidebar-list-prefs {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+      padding: 0 10px 7px 10px; flex-shrink: 0;
+    }
+    .sidebar-pref-seg {
+      display: inline-flex; align-items: stretch;
+      border-radius: 7px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.18);
+      flex: 0 0 auto;
+    }
+    .sidebar-pref-chip {
+      border: none; margin: 0; padding: 3px 7px;
+      font-size: 10px; font-weight: 700; letter-spacing: -0.04em;
+      line-height: 1.2; color: rgba(255,255,255,0.55);
+      background: transparent; cursor: pointer;
+      white-space: nowrap; -webkit-app-region: no-drag;
+      transition: background 0.12s, color 0.12s;
+    }
+    .sidebar-pref-chip + .sidebar-pref-chip {
+      border-left: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-pref-chip:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.06); }
+    .sidebar-pref-chip.is-active {
+      color: #ecfeff; background: rgba(14, 165, 233, 0.38);
+    }
+
     /* 👥 그룹 대화방 체크리스트 */
     #group-member-checklist label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 12.5px; cursor: pointer; }
     .group-bulk-row {
@@ -3303,6 +3331,20 @@
         <div class="user-search-box" id="user-search-box">
           <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
         </div>
+        <div class="sidebar-list-prefs" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
+          <div class="sidebar-pref-seg" role="group" aria-label="분류">
+            <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
+            <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
+          </div>
+          <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
+            <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
+            <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
+          </div>
+          <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
+            <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터(직급 없음) 표시">공용</button>
+            <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
+          </div>
+        </div>
         <div id="user-list-tree"></div>
         <div id="user-multi-select-bar" aria-live="polite">
           <span id="user-multi-select-count">0명 선택</span>
@@ -5580,6 +5622,76 @@
       return !!(myProfile && u.ip && myProfile.ip && u.ip === myProfile.ip);
     }
 
+    function syncDirectoryListPrefsForm() {
+      const groupingEl = document.getElementById('setting-user-grouping');
+      if (groupingEl) groupingEl.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
+      const offlineEl = document.getElementById('setting-show-offline-users');
+      if (offlineEl) offlineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
+      const sharedEl = document.getElementById('setting-show-shared-pcs');
+      if (sharedEl) sharedEl.value = showSharedPcsInDirectory() ? 'show' : 'hide';
+    }
+
+    function syncSidebarListPrefsUi() {
+      const root = document.getElementById('sidebar-list-prefs');
+      if (!root) return;
+      const grouping = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
+      const presence = showOfflineUsersInDirectory() ? 'all' : 'online';
+      const shared = showSharedPcsInDirectory() ? 'show' : 'hide';
+      root.querySelectorAll('[data-list-pref]').forEach((btn) => {
+        const pref = btn.getAttribute('data-list-pref');
+        const val = btn.getAttribute('data-value');
+        let on = false;
+        if (pref === 'grouping') on = val === grouping;
+        else if (pref === 'presence') on = val === presence;
+        else if (pref === 'shared') on = val === shared;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    function persistDirectoryListPrefsAndRefresh() {
+      localStorage.setItem('appSettings', JSON.stringify(appSettings));
+      syncDirectoryListPrefsForm();
+      syncSidebarListPrefsUi();
+      lastUserListStructureKey = '';
+      renderUserListTree(true);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { renderCompactList(); } catch (e) { /* ignore */ }
+      }
+    }
+
+    function setDirectoryListPref(pref, value) {
+      if (pref === 'grouping') {
+        const next = value === 'dept' ? 'dept' : 'floor';
+        if ((appSettings.userGrouping || 'floor') === next) return;
+        appSettings.userGrouping = next;
+      } else if (pref === 'presence') {
+        const showOffline = value !== 'online';
+        if (showOfflineUsersInDirectory() === showOffline) return;
+        appSettings.showOfflineUsers = showOffline;
+      } else if (pref === 'shared') {
+        const showShared = value !== 'hide';
+        if (showSharedPcsInDirectory() === showShared) return;
+        appSettings.showSharedPcs = showShared;
+      } else {
+        return;
+      }
+      persistDirectoryListPrefsAndRefresh();
+    }
+
+    function initSidebarListPrefs() {
+      const root = document.getElementById('sidebar-list-prefs');
+      if (!root || root.dataset.bound === '1') return;
+      root.dataset.bound = '1';
+      root.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-list-pref]');
+        if (!btn || !root.contains(btn)) return;
+        e.preventDefault();
+        setDirectoryListPref(btn.getAttribute('data-list-pref'), btn.getAttribute('data-value'));
+      });
+      syncSidebarListPrefsUi();
+    }
+
     /** 인원 집계용: 공용 PC(직급 없음) 제외, 본인은 포함 */
     function isStaffForPeopleCount(u) {
       if (!u) return false;
@@ -6478,6 +6590,7 @@
     let pendingUnreadScrollCount = 0;
     if (!appSettings.userGrouping) appSettings.userGrouping = 'floor';
     applyAppSettingsToUI();
+    syncSidebarListPrefsUi();
     try { syncPrivacyLockButtonUi(); resetPrivacyIdleTimer(); } catch (_) {}
     syncSpellcheckEngine();
     updateMasterAuthUi();
@@ -6740,6 +6853,7 @@
       paintUiIcons();
       initUserDragAndDrop();
       initSidebarBlockReorder();
+      initSidebarListPrefs();
       initMessageForwardDropZones();
       bindModalEditableFocus(document.getElementById('settings-modal'));
       const groupingSelect = document.getElementById('setting-user-grouping');
@@ -18934,6 +19048,7 @@
   await syncSpellcheckEngine();
 
   applyAppSettingsToUI();
+  syncSidebarListPrefsUi();
   updateMyStatusBadge(statusState);
   if (isCompactMode !== (defaultViewMode === 'compact')) {
     await applyViewMode(defaultViewMode === 'compact');
