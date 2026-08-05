@@ -2422,6 +2422,22 @@
       font-size: 12px; background: #f8fafc; max-width: none;
     }
     .sb-board-content .schedule-board-login-hint { margin: 10px 14px 0; flex-shrink: 0; }
+    #schedule-board-recent-changes {
+      display: flex; flex-direction: column; gap: 6px;
+      margin: 8px 14px 0; flex-shrink: 0;
+    }
+    #schedule-board-recent-changes[hidden] { display: none !important; }
+    .sb-recent-change-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 11px; border-radius: 8px;
+      border: 1px solid #f9a8d4; background: #fdf2f8;
+      font-size: 12.5px; font-weight: 600; color: #9d174d; line-height: 1.35;
+    }
+    .sb-recent-change-dot {
+      flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%;
+      background: #e11d48; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.2);
+    }
+    .sb-recent-change-item b { font-weight: 800; color: #be123c; }
     .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; background: #eef2f7; }
     .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: #eef2f7; }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
@@ -5152,6 +5168,7 @@
         <div id="schedule-board-quick-feedback" class="schedule-board-quick-feedback"></div>
             </div>
           </div>
+          <div id="schedule-board-recent-changes" class="sb-recent-changes" hidden aria-live="polite"></div>
           <div class="schedule-board-body" id="schedule-board-body"></div>
         </div>
       </div>
@@ -19208,6 +19225,68 @@
       });
     }
 
+    const SCHEDULE_BOARD_RECENT_CHANGE_MS = 24 * 60 * 60 * 1000;
+
+    function getScheduleFlowChangeAtMs(sch) {
+      if (!sch) return 0;
+      if (sch.modified_at) {
+        const mod = new Date(sch.modified_at).getTime();
+        if (!Number.isNaN(mod)) return mod;
+      }
+      if (sch.created_at) {
+        const created = new Date(sch.created_at).getTime();
+        if (!Number.isNaN(created)) return created;
+      }
+      return 0;
+    }
+
+    function isScheduleFlowChangedRecently(sch, withinMs) {
+      const windowMs = withinMs == null ? SCHEDULE_BOARD_RECENT_CHANGE_MS : withinMs;
+      const type = sch?.type || '';
+      if (!SCHEDULE_BOARD_FLOW_TYPES.includes(type)) return false;
+      const at = getScheduleFlowChangeAtMs(sch);
+      if (!at) return false;
+      return Date.now() - at <= windowMs;
+    }
+
+    function collectScheduleBoardRecentChangeCounts(list) {
+      const counts = { OUTPATIENT: 0, OUTING: 0, OVERNIGHT: 0 };
+      const seen = new Set();
+      (list || []).forEach((sch) => {
+        if (!sch?.uid || seen.has(sch.uid)) return;
+        if (!isScheduleFlowChangedRecently(sch)) return;
+        seen.add(sch.uid);
+        if (counts[sch.type] != null) counts[sch.type]++;
+      });
+      return counts;
+    }
+
+    function renderScheduleBoardRecentChanges(list) {
+      const host = document.getElementById('schedule-board-recent-changes');
+      if (!host) return;
+      if (scheduleBoardView === 'admit') {
+        host.hidden = true;
+        host.innerHTML = '';
+        return;
+      }
+      const counts = collectScheduleBoardRecentChangeCounts(list);
+      const items = SCHEDULE_BOARD_FLOW_TYPES.map((key) => {
+        const n = counts[key] || 0;
+        if (!n) return '';
+        const label = (SCHEDULE_TYPE_ORDER.find((m) => m.key === key) || {}).label || key;
+        return `<div class="sb-recent-change-item" role="status">` +
+          `<span class="sb-recent-change-dot" aria-hidden="true"></span>` +
+          `<span>최근 24시간 ${escapeHtml(label)} 일정 변동 <b>${n}</b>건</span></div>`;
+      }).filter(Boolean);
+      if (!items.length) {
+        host.hidden = true;
+        host.innerHTML = '';
+        return;
+      }
+      host.hidden = false;
+      host.innerHTML = items.join('');
+    }
+
     function updateScheduleBoardDaySummary(filteredCount) {
       const el = document.getElementById('schedule-board-day-summary');
       if (!el || !scheduleBoardDateStr) return;
@@ -19976,6 +20055,7 @@
       );
       if (!o.skipCalendar) renderScheduleBoardCalendar();
       updateScheduleBoardDaySummary(list.length);
+      renderScheduleBoardRecentChanges(list);
 
       if (scheduleBoardView === 'main') {
         renderScheduleBoardMainGrid(body);
