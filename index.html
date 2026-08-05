@@ -12966,9 +12966,10 @@
       } else {
         if (title) { title.textContent = '🔓 사용 허용'; title.style.color = '#15803d'; }
         if (desc) {
+          const prevReason = String(o.reason || '').trim();
           desc.textContent = o.isMe
-            ? `이 PC(${o.targetIp})의 사용 중지를 해제합니다.`
-            : `${o.name || '대상'} (${o.targetIp}) PC의 사용 중지를 해제합니다.`;
+            ? `이 PC(${o.targetIp})의 사용 중지를 해제합니다.${prevReason ? `\n(기존 안내: ${prevReason})` : ''}`
+            : `${o.name || '대상'} (${o.targetIp}) PC의 사용 중지를 해제합니다.${prevReason ? `\n(기존 안내: ${prevReason})` : ''}`;
         }
         if (btn) { btn.textContent = '사용 허용'; btn.style.background = '#16a34a'; }
         if (reasonWrap) reasonWrap.style.display = 'none';
