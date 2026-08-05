@@ -18509,6 +18509,11 @@
           removed += 1;
         }
         chatHistoryHasMore = true;
+        const firstMsg = container.querySelector('.msg-row[data-msg-id], .msg-row-bubble[data-msg-id]');
+        if (firstMsg) {
+          const oid = parseInt(firstMsg.getAttribute('data-msg-id'), 10);
+          if (Number.isFinite(oid) && oid > 0) chatHistoryOldestId = oid;
+        }
       }
 
       // 그룹 이름 변경 등 "시스템 알림"은 말풍선이 아니라 가운데 정렬된 안내문으로 표시한다.
