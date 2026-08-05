@@ -1218,6 +1218,7 @@ function writeJsonLinesToIp(ip, payloads, timeoutMs) {
 /**
  * FILE_XFER: START 후 수신측 ACCEPT를 같은 소켓으로 기다린 뒤 청크 전송.
  * (수신 폭주 시 ABORT → 송신 실패로 정확히 반영)
+ * 구버전(ACCEPT 미전송)은 짧은 대기 후 청크 전송으로 호환.
  */
 function writeFileXferToIp(ip, buf, meta, timeoutMs) {
   return new Promise((resolve) => {
@@ -1237,13 +1238,16 @@ function writeFileXferToIp(ip, buf, meta, timeoutMs) {
     let success = false;
     let phase = 'wait-accept';
     let recvBuf = '';
+    let legacyTimer = null;
     const done = (ok) => {
       if (settled) return;
       settled = true;
+      if (legacyTimer) { clearTimeout(legacyTimer); legacyTimer = null; }
       try { client.destroy(); } catch (e) { /* ignore */ }
       resolve(!!ok);
     };
     const writeRest = () => {
+      if (legacyTimer) { clearTimeout(legacyTimer); legacyTimer = null; }
       let i = 0;
       const writeNext = () => {
         if (settled) return;
@@ -1268,6 +1272,12 @@ function writeFileXferToIp(ip, buf, meta, timeoutMs) {
     client.connect(TCP_PORT, ip, () => {
       const startLine = JSON.stringify(startPayload) + '\n';
       client.write(startLine);
+      // 구버전 수신측은 ACCEPT를 안 보냄 → 0.8초 후 청크 진행
+      legacyTimer = setTimeout(() => {
+        if (settled || phase !== 'wait-accept') return;
+        phase = 'sending-legacy';
+        writeRest();
+      }, 800);
     });
     client.on('data', (chunk) => {
       if (settled || phase !== 'wait-accept') return;
