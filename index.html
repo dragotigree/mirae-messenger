@@ -1301,7 +1301,7 @@
     .reaction-picker-item:hover { background: #f1f5f9; }
 
     #chat-input-wrapper { position: relative; padding: 12px 20px 18px; background: linear-gradient(180deg, transparent, rgba(248,250,252,0.55)); flex-shrink: 0; }
-    .input-box-inner { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+    .input-box-inner { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     .input-box-inner:focus-within { border-color: rgba(14, 165, 233, 0.4); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.08); }
     .input-box-inner textarea { width: 100%; height: 44px; min-height: 44px; max-height: 160px; border: none; background: transparent; outline: none; resize: none; font-size: var(--chat-font-size); color: var(--text-primary); line-height: 1.5; overflow-y: auto; }
     .input-bottom-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px; }
@@ -1686,6 +1686,22 @@
     .quick-phrase-item:hover { background: var(--surface-muted); }
     .quick-phrase-manage-row { border-top: 1px solid #f1f5f9; margin-top: 6px; padding-top: 6px; font-size: 11px; color: var(--accent); cursor: pointer; text-align: center; font-weight: 700; }
     .quick-phrase-manage-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12px; background: #f8fafc; }
+
+    /* ⌨️ 채팅 슬래시(/) 명령어 제안 */
+    #chat-slash-popover {
+      display: none; position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 6px;
+      max-height: 220px; overflow-y: auto; background: rgba(255,255,255,0.98); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; z-index: 55;
+      backdrop-filter: blur(12px);
+    }
+    .chat-slash-item {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%;
+      padding: 8px 10px; border: none; border-radius: var(--radius-md); background: transparent;
+      cursor: pointer; text-align: left; font-family: inherit;
+    }
+    .chat-slash-item:hover, .chat-slash-item.is-active { background: var(--surface-muted); }
+    .chat-slash-cmd { font-size: 12.5px; font-weight: 800; color: var(--accent-dark); flex-shrink: 0; }
+    .chat-slash-desc { font-size: 11.5px; color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ========== 🗨 미니 모드 (모바일 메신저 스타일) ========== */
     body.compact-mode #sidebar-left,
@@ -3256,6 +3272,32 @@
         transform: none !important;
       }
     }
+    html.ui-animations-off .empty-icon-ring,
+    html.ui-animations-off .empty-hint,
+    html.ui-animations-off .empty-ipmsg-cta,
+    html.ui-animations-off .settings-panel.active,
+    html.ui-animations-off #active-chat-container.is-chat-open,
+    html.ui-animations-off .msg-row.is-live-enter,
+    html.ui-animations-off .msg-row-bubble.is-live-enter,
+    html.ui-animations-off .modal-overlay,
+    html.ui-animations-off .modal-card,
+    html.ui-animations-off .app-dialog-card,
+    html.ui-animations-off #dm-context-menu,
+    html.ui-animations-off #quick-phrase-popover,
+    html.ui-animations-off #chat-slash-popover {
+      animation: none !important;
+    }
+    html.ui-animations-off .user-card-item:hover,
+    html.ui-animations-off .channel-item:hover,
+    html.ui-animations-off .notice-widget-area:hover,
+    html.ui-animations-off .btn-send:hover,
+    html.ui-animations-off .chat-header-tool-btn:hover,
+    html.ui-animations-off .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
+    html.ui-animations-off .sidebar-quick-actions .sidebar-code-alert-btn:hover,
+    html.ui-animations-off .settings-nav-btn.active,
+    html.ui-animations-off .sidebar-pref-chip.is-active {
+      transform: none !important;
+    }
     .master-admin-modal-card {
       width: min(1080px, 96vw) !important;
       height: min(760px, 92vh);
@@ -4080,6 +4122,7 @@
 
       <div id="chat-input-wrapper">
         <div class="input-box-inner" id="chat-input-inner" ondragover="event.preventDefault()" ondrop="handleFileDrop(event)">
+          <div id="chat-slash-popover" role="listbox" aria-label="채팅 명령어"></div>
           <div id="reply-compose-bar">
             <div class="reply-compose-head">
               <span id="reply-compose-label"></span>
@@ -4089,7 +4132,7 @@
           </div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력하세요 (Enter 전송 · Shift+Enter 줄바꿈)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
@@ -4793,6 +4836,11 @@
                 <span class="settings-toggle-desc">채팅·글 입력 시 밑줄 표시 (우클릭으로 제안)</span>
               </span>
             </label>
+            <div class="settings-section-title span-2" style="margin-top:4px;">UI 애니메이션</div>
+            <div class="settings-radio-stack span-2">
+              <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="on" id="setting-ui-animations-on" checked> <span><b>On</b><small>채팅·모달·빈 화면 등 가벼운 모션</small></span></label>
+              <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="off" id="setting-ui-animations-off"> <span><b>Off</b><small>모션 없이 즉시 표시</small></span></label>
+            </div>
             <label class="settings-inline-check span-2">
               <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
             </label>
@@ -6287,6 +6335,7 @@
     if (appSettings.scheduleAlarmEnabled === undefined) appSettings.scheduleAlarmEnabled = false;
     if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
+    if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = true;
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -6496,6 +6545,15 @@
       document.documentElement.style.setProperty('--chat-font-family', chatPreset.cssFamily);
       applySpellcheckToInputs(appSettings.spellcheck === true);
       applyUserListAvatarVisibility();
+      applyUiAnimationsSetting();
+    }
+
+    function isUiAnimationsEnabled() {
+      return appSettings.uiAnimationsEnabled !== false;
+    }
+
+    function applyUiAnimationsSetting() {
+      document.documentElement.classList.toggle('ui-animations-off', !isUiAnimationsEnabled());
     }
 
     const SPELLCHECK_INPUT_SELECTOR = '#chat-textarea, .board-form-textarea, #board-write-content, #sch-msg-content, #sb-quick-remark, .modal-card textarea, .reply-input-row textarea';
@@ -14553,10 +14611,147 @@
       setTimeout(() => { row.style.background = prev; }, 1200);
     }
 
+    function getChatSlashCommands() {
+      return [
+        { keys: ['help', '도움', '?'], label: '/도움', desc: '명령어 목록' },
+        { keys: ['search', '검색'], label: '/검색', desc: '대화 내용 검색' },
+        { keys: ['schedule', '예약'], label: '/예약', desc: '예약 메시지 등록' },
+        { keys: ['urgent', '긴급'], label: '/긴급', desc: '긴급 메시지 표시 켜기/끄기' },
+        { keys: ['phrase', '문구'], label: '/문구', desc: '빠른 문구' },
+        { keys: ['settings', '설정'], label: '/설정', desc: '환경 설정' },
+        { keys: ['board', '현황판'], label: '/현황판', desc: '병동 일정 현황판' },
+        { keys: ['code', '코드'], label: '/코드', desc: '코드블루·코드레드 발령' },
+        { keys: ['clear', '비우기'], label: '/비우기', desc: '이 PC 대화창만 비우기' },
+        { keys: ['draw', '그림'], label: '/그림', desc: '그림 그리기 (Excalidraw)' }
+      ];
+    }
+
+    function parseChatSlashInput(text) {
+      const trimmed = String(text || '').trim();
+      if (!trimmed.startsWith('/')) return null;
+      const body = trimmed.slice(1).trim();
+      if (!body) return { incomplete: true };
+      const spaceIdx = body.search(/\s/);
+      const cmd = (spaceIdx === -1 ? body : body.slice(0, spaceIdx)).toLowerCase();
+      const args = spaceIdx === -1 ? '' : body.slice(spaceIdx + 1).trim();
+      return { cmd, args };
+    }
+
+    async function showChatSlashHelp() {
+      const lines = getChatSlashCommands().map((c) => `${c.label} — ${c.desc}`);
+      await appAlert(['채팅 명령어 (전송 시 실행)', '', ...lines].join('\n'));
+    }
+
+    async function tryExecuteChatSlashCommand(text) {
+      const parsed = parseChatSlashInput(text);
+      if (!parsed) return false;
+      if (parsed.incomplete) {
+        await showChatSlashHelp();
+        return true;
+      }
+      const { cmd } = parsed;
+      const run = async () => {
+        if (['help', '도움', '?'].includes(cmd)) { await showChatSlashHelp(); return; }
+        if (['search', '검색'].includes(cmd)) { openChatSearchBarForShortcut(); return; }
+        if (['schedule', '예약'].includes(cmd)) { openScheduleMessageModal(); return; }
+        if (['urgent', '긴급'].includes(cmd)) { toggleUrgentMode(); return; }
+        if (['phrase', '문구'].includes(cmd)) { toggleQuickPhrasePopover(); return; }
+        if (['settings', '설정'].includes(cmd)) { await openSettingsModal(); return; }
+        if (['board', '현황판'].includes(cmd)) { openScheduleBoardModal(); return; }
+        if (['code', '코드'].includes(cmd)) { openCodeAlertModal(); return; }
+        if (['clear', '비우기'].includes(cmd)) { await clearActiveChatView(); return; }
+        if (['draw', '그림'].includes(cmd)) { openExcalidrawForChat(); return; }
+        await appAlert(`알 수 없는 명령어: /${cmd}\n/도움 으로 목록을 볼 수 있습니다.`);
+      };
+      try {
+        await run();
+        return true;
+      } catch (e) {
+        console.error('슬래시 명령 실행 실패:', e);
+        await appAlert('명령을 실행하지 못했습니다.');
+        return true;
+      }
+    }
+
+    let chatSlashActiveIndex = 0;
+
+    function hideChatSlashPopover() {
+      const pop = document.getElementById('chat-slash-popover');
+      if (pop) pop.style.display = 'none';
+      chatSlashActiveIndex = 0;
+    }
+
+    function applyChatSlashSelection(cmdKey) {
+      const ta = document.getElementById('chat-textarea');
+      if (!ta || !cmdKey) return;
+      ta.value = `/${cmdKey} `;
+      hideChatSlashPopover();
+      ta.focus();
+      onChatTextareaInput();
+    }
+
+    function getChatSlashMatches(queryRaw) {
+      const query = String(queryRaw || '').toLowerCase();
+      return getChatSlashCommands().filter((c) => {
+        if (!query) return true;
+        if (c.keys.some((k) => k.toLowerCase().startsWith(query))) return true;
+        const labelKey = c.label.replace(/^\//, '').toLowerCase();
+        return labelKey.startsWith(query);
+      });
+    }
+
+    function updateChatSlashPopover() {
+      const ta = document.getElementById('chat-textarea');
+      const pop = document.getElementById('chat-slash-popover');
+      if (!ta || !pop || editingMessageUid) {
+        hideChatSlashPopover();
+        return;
+      }
+      const val = ta.value;
+      if (!val.startsWith('/') || val.includes('\n')) {
+        hideChatSlashPopover();
+        return;
+      }
+      const query = val.slice(1);
+      if (query.includes(' ')) {
+        hideChatSlashPopover();
+        return;
+      }
+      const matches = getChatSlashMatches(query);
+      if (!matches.length) {
+        hideChatSlashPopover();
+        return;
+      }
+      if (chatSlashActiveIndex >= matches.length) chatSlashActiveIndex = 0;
+      pop.innerHTML = matches.slice(0, 10).map((c, i) => {
+        const key = c.keys[0];
+        const active = i === chatSlashActiveIndex ? ' is-active' : '';
+        return `<button type="button" class="chat-slash-item${active}" data-slash-key="${escapeHtml(key)}"><span class="chat-slash-cmd">${escapeHtml(c.label)}</span><span class="chat-slash-desc">${escapeHtml(c.desc)}</span></button>`;
+      }).join('');
+      pop.style.display = 'block';
+      pop.querySelectorAll('.chat-slash-item').forEach((btn) => {
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          applyChatSlashSelection(btn.getAttribute('data-slash-key'));
+        });
+      });
+    }
+
     async function sendChatMessage() {
       const textarea = document.getElementById('chat-textarea');
       const text = textarea.value.trim();
       if (!text || !activeChatUser) return;
+
+      if (!editingMessageUid && text.startsWith('/')) {
+        const handled = await tryExecuteChatSlashCommand(text);
+        if (handled) {
+          textarea.value = '';
+          resizeChatTextarea();
+          hideChatSlashPopover();
+          cancelReplyMessage();
+          return;
+        }
+      }
 
       if (editingMessageUid) {
         const { targetIP, groupUid } = getEditMessageContext();
@@ -16284,7 +16479,7 @@
     function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
       const options = opts || {};
       const skipStatusUpdate = !!options.skipStatusUpdate;
-      const skipEnterAnim = !!options.skipEnterAnim;
+      const skipEnterAnim = !!options.skipEnterAnim || !isUiAnimationsEnabled();
       const container = document.getElementById('chat-messages-area');
       if (!container) return;
       const wasNearBottom = isMe || isNearChatBottom();
@@ -16429,8 +16624,8 @@
       }
       container.appendChild(row);
       if (!skipEnterAnim) {
-        const prefersReduced = typeof matchMedia === 'function'
-          && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const prefersReduced = !isUiAnimationsEnabled()
+          || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
         if (prefersReduced) {
           row.classList.remove('is-live-enter');
         } else {
@@ -20145,6 +20340,7 @@
     function onChatTextareaInput() {
       resetIdleTimer();
       resizeChatTextarea();
+      updateChatSlashPopover();
     }
 
     function resizeChatTextarea() {
@@ -20160,6 +20356,33 @@
 
     function onChatKeyDown(e) {
       if (e.isComposing || e.keyCode === 229) return;
+      const pop = document.getElementById('chat-slash-popover');
+      const popOpen = pop && pop.style.display === 'block';
+      if (popOpen) {
+        const matches = getChatSlashMatches((document.getElementById('chat-textarea')?.value || '').slice(1));
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          hideChatSlashPopover();
+          return;
+        }
+        if (e.key === 'ArrowDown' && matches.length) {
+          e.preventDefault();
+          chatSlashActiveIndex = (chatSlashActiveIndex + 1) % matches.length;
+          updateChatSlashPopover();
+          return;
+        }
+        if (e.key === 'ArrowUp' && matches.length) {
+          e.preventDefault();
+          chatSlashActiveIndex = (chatSlashActiveIndex - 1 + matches.length) % matches.length;
+          updateChatSlashPopover();
+          return;
+        }
+        if (e.key === 'Tab' && matches.length) {
+          e.preventDefault();
+          applyChatSlashSelection(matches[chatSlashActiveIndex].keys[0]);
+          return;
+        }
+      }
       // Enter: 전송 / Shift+Enter: 줄바꿈
       if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -20430,6 +20653,11 @@
         document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
         const chatFontEl = document.getElementById('setting-chat-font-family');
         if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
+        const uiAnimOn = document.getElementById('setting-ui-animations-on');
+        const uiAnimOff = document.getElementById('setting-ui-animations-off');
+        if (isUiAnimationsEnabled()) {
+          if (uiAnimOn) uiAnimOn.checked = true;
+        } else if (uiAnimOff) uiAnimOff.checked = true;
         document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
         const compactClickEl = document.getElementById('setting-compact-person-click');
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
@@ -20525,6 +20753,8 @@
     try { await window.api.setUpdateMode(updateMode); } catch (e) { /* ignore */ }
   }
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
+  const uiAnimEl = document.querySelector('input[name="setting-ui-animations"]:checked');
+  const uiAnimationsEnabled = !uiAnimEl || uiAnimEl.value !== 'off';
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
     : true;
@@ -20569,7 +20799,7 @@
 
   appSettings = {
     fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
-    spellcheck, showUserListAvatars, showOfflineUsers, showSharedPcs, compactPersonClickMode,
+    spellcheck, uiAnimationsEnabled, showUserListAvatars, showOfflineUsers, showSharedPcs, compactPersonClickMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
     scheduleAlarmEnabled, scheduleAlarmLeadMinutes, scheduleAlarmOnEdit
   };
