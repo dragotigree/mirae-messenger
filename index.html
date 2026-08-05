@@ -3382,7 +3382,7 @@
           </div>
         </div>
         <div id="master-online-clients-box" class="master-online-clients-box"></div>
-        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. 「사용 중지」하면 해당 PC는 메신저에 접속할 수 없으며, 마스터 아이디·비밀번호 또는 이 화면의 「사용 허용」으로만 해제됩니다. 「로그 삭제」는 퇴사자 PC 등에서 대화·채팅 로그·앱 로그·자동 DB 백업을 원격으로 비웁니다. (대상 PC에도 마스터 비밀번호가 동일해야 하며, 메신저가 실행 중이어야 합니다.)</p>
+        <p style="font-size:11px; color:#64748b; margin:0;">「정보 수정」으로 프로필을 바꿀 수 있습니다. 「강제 업데이트」는 대상 PC가 온라인일 때 최신 파일을 받아 재시작합니다. 「사용 중지」하면 해당 PC는 메신저에 접속할 수 없으며, 마스터 아이디·비밀번호 또는 이 화면의 「사용 허용」으로만 해제됩니다. 「로그 삭제」는 퇴사자 PC 등에서 대화·채팅 로그·앱 로그·자동 DB 백업을 원격으로 비웁니다. <b>오프라인이어도 예약</b>되며, 해당 PC가 켜져 메신저에 접속하는 순간 바로 삭제됩니다. (대상 PC에도 마스터 비밀번호가 동일해야 합니다.)</p>
       </div>
     </div>
   </div>
@@ -10704,8 +10704,9 @@
       window.api.focusMainWindow();
     }
 
-    function openMasterAdminModal() {
+    async function openMasterAdminModal() {
       loadMasterOperatorList();
+      try { await refreshPendingRemoteWipesUi(); } catch (_) {}
       renderMasterOnlineClients();
       setModalOpenState(true);
       document.getElementById('master-admin-modal').style.display = 'flex';
@@ -10722,6 +10723,7 @@
       const box = document.getElementById('master-online-clients-box');
       const refEl = document.getElementById('master-ref-version');
       if (!box) return;
+      try { await refreshPendingRemoteWipesUi(); } catch (_) {}
       const refVersion = await window.api.getAppVersion();
       if (refEl) refEl.textContent = refVersion;
 
@@ -10766,11 +10768,15 @@
         const lastTitle = formatLastSeenTitle(u);
         const nameText = `${u.rank || ''} ${u.username || '-'}`.trim();
         const usageDisabled = !!u.usageDisabled;
+        const wipePending = pendingRemoteWipeIps.has(u.ip);
         const statusCell = usageDisabled
           ? '<span style="color:#b91c1c; font-weight:700;">🔒 사용중지</span>'
           : (masterStatusLabel[statusKey] || statusKey);
+        const wipePendingBadge = wipePending
+          ? ' <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:999px; background:#ffedd5; color:#c2410c; font-size:10px; font-weight:800;">삭제예약</span>'
+          : '';
         return `<tr style="border-top:1px solid #f1f5f9; ${u.online && !usageDisabled ? '' : 'opacity:.65;'}">
-          <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}</td>
+          <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}${wipePendingBadge}</td>
           <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
           <td style="font-weight:700; color:${verOutdated ? '#dc2626' : '#15803d'};">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</td>
@@ -10782,7 +10788,8 @@
               ${usageDisabled
                 ? `<button type="button" class="master-usage-enable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #86efac; background:#f0fdf4; color:#15803d;">사용 허용</button>`
                 : `<button type="button" class="master-usage-disable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">사용 중지</button>`}
-              <button type="button" class="master-wipe-logs-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fdba74; background:#fff7ed; color:#c2410c;">로그 삭제</button>
+              <button type="button" class="master-wipe-logs-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fdba74; background:#fff7ed; color:#c2410c;">${wipePending ? '삭제 재예약' : '로그 삭제'}</button>
+              ${wipePending ? `<button type="button" class="master-wipe-cancel-btn" data-ip="${escAttr(u.ip)}" style="border:1px solid #cbd5e1; background:#f8fafc; color:#475569;">예약 취소</button>` : ''}
               ${u.online && !usageDisabled ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
             </div>
           </td>
@@ -10815,6 +10822,9 @@
           isMe: btn.getAttribute('data-isme') === '1',
           disabled: false
         }));
+      });
+      box.querySelectorAll('.master-wipe-cancel-btn').forEach(btn => {
+        btn.addEventListener('click', () => cancelPendingRemoteWipeForIp(btn.getAttribute('data-ip')));
       });
       box.querySelectorAll('.master-wipe-logs-btn').forEach(btn => {
         btn.addEventListener('click', () => openMasterWipeLogsModal({
@@ -11064,7 +11074,7 @@
       if (desc) {
         desc.textContent = o.isMe
           ? `이 PC(${o.targetIp})에 저장된 대화·로그·자동 백업을 지금 삭제합니다.`
-          : `${o.name || '대상'} (${o.targetIp}) PC의 대화·로그·자동 백업을 원격으로 삭제합니다. 퇴사자 PC 정리 등에 사용하세요.`;
+          : `${o.name || '대상'} (${o.targetIp}) PC의 대화·로그·자동 백업을 원격으로 삭제합니다. 지금 꺼져 있어도 예약되며, 해당 PC가 켜져 메신저에 접속하면 바로 삭제됩니다.`;
       }
       document.getElementById('master-wipe-logs-pwd').value = '';
       document.getElementById('master-wipe-logs-modal').style.display = 'flex';
@@ -11087,7 +11097,7 @@
         return;
       }
       if (!await appConfirm(
-        `대상 PC(${targetIp})의 대화·로그·자동 백업을 영구 삭제할까요?\n\n되돌릴 수 없습니다.`,
+        `대상 PC(${targetIp})의 대화·로그·자동 백업을 영구 삭제할까요?\n\n오프라인이면 예약된 뒤, 해당 PC가 켜져 메신저에 접속하는 순간 바로 삭제됩니다.\n되돌릴 수 없습니다.`,
         { title: '원격 로그 삭제', confirmText: '영구 삭제', cancelText: '취소', variant: 'danger', icon: '🗑️' }
       )) return;
 
@@ -11107,7 +11117,46 @@
         await appAlert(`이 PC의 대화·로그 삭제가 완료되었습니다.\n\n${summary}`);
         return;
       }
-      await appAlert(`로그 삭제 명령을 보냈습니다. (${res.targetIp || targetIp})\n\n대상 PC가 응답하면 아래에 결과가 표시됩니다. 메신저가 꺼져 있거나 버전이 낮으면 적용되지 않을 수 있습니다.`);
+      try { await refreshPendingRemoteWipesUi(); } catch (_) {}
+      try { renderMasterOnlineClients(); } catch (_) {}
+      if (res.online) {
+        await appAlert(`로그 삭제 명령을 보냈습니다. (${res.targetIp || targetIp})\n\n대상 PC가 응답하면 결과가 표시됩니다. 응답이 없으면 예약 상태로 두고 재시도합니다.`);
+      } else {
+        await appAlert(`대상 PC가 오프라인이라 삭제를 예약했습니다. (${res.targetIp || targetIp})\n\n해당 PC가 켜져 메신저에 접속하면 바로 삭제됩니다.`);
+      }
+    }
+
+    let pendingRemoteWipeIps = new Set();
+
+    async function refreshPendingRemoteWipesUi() {
+      if (!window.api.getPendingRemoteWipes || !isMasterAuthenticated) {
+        pendingRemoteWipeIps = new Set();
+        return;
+      }
+      try {
+        const rows = await window.api.getPendingRemoteWipes();
+        pendingRemoteWipeIps = new Set((rows || []).map((r) => r && r.target_ip).filter(Boolean));
+      } catch (_) {
+        pendingRemoteWipeIps = new Set();
+      }
+    }
+
+    async function cancelPendingRemoteWipeForIp(targetIp) {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      if (!await appConfirm(
+        `${targetIp} 에 예약된 로그 삭제를 취소할까요?`,
+        { title: '삭제 예약 취소', confirmText: '예약 취소', cancelText: '닫기' }
+      )) return;
+      const res = await window.api.cancelPendingRemoteWipe(targetIp);
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '예약 취소에 실패했습니다.');
+        return;
+      }
+      await refreshPendingRemoteWipesUi();
+      renderMasterOnlineClients();
     }
 
     function refreshUiAfterChatHistoryWipe() {
@@ -11161,7 +11210,16 @@
         } else {
           await appAlert(`원격 로그 삭제 실패\nIP: ${ip}\n${(data && data.msg) || '실패'}`);
         }
+        try { await refreshPendingRemoteWipesUi(); } catch (_) {}
         try { renderMasterOnlineClients(); } catch (_) {}
+      });
+    }
+    if (window.api.onPendingRemoteWipesUpdated) {
+      window.api.onPendingRemoteWipesUpdated((rows) => {
+        pendingRemoteWipeIps = new Set((rows || []).map((r) => r && r.target_ip).filter(Boolean));
+        if (document.getElementById('master-admin-modal')?.style.display === 'flex') {
+          try { renderMasterOnlineClients(); } catch (_) {}
+        }
       });
     }
 

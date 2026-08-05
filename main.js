@@ -2176,6 +2176,15 @@ db.serialize(() => {
   });
   db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_notices_at ON deleted_notices(deleted_at)`, () => {});
 
+  /** 오프라인 PC 원격 로그 삭제 예약 — 대상이 켜져 접속하면 즉시 전달 */
+  db.run(`CREATE TABLE IF NOT EXISTS pending_remote_wipes (
+    target_ip TEXT PRIMARY KEY,
+    master_password TEXT NOT NULL,
+    reason TEXT DEFAULT '',
+    requested_by_ip TEXT DEFAULT '',
+    requested_at TEXT NOT NULL
+  )`, logDbErr);
+
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     target_ip TEXT,
@@ -2735,11 +2744,17 @@ app.whenReady().then(async () => {
   startPresenceSweeper();
   startAutoBackup();
   startUpdateChecker();
+  startPendingWipeRetryLoop();
   setTimeout(() => {
     mirrorLocalInstallToZBridge().catch((e) => {
       console.warn('[Z브리지] 시작 시 미러 생략:', e.message || e);
     });
   }, 8000);
+  // 부팅 직후: 다른 PC에 내 IP 대상 삭제 예약이 있으면 받아 즉시 적용
+  setTimeout(() => {
+    broadcastWipeClaim();
+    flushAllPendingWipesForOnlinePeers();
+  }, 3500);
 });
 
 app.on('before-quit', () => {
@@ -2856,6 +2871,7 @@ function startUdpDiscovery() {
           resendPendingMessages(rinfo.address);
           requestNoticeSync(rinfo.address);
           syncGroupsWithPeer(rinfo.address);
+          tryDeliverPendingWipe(rinfo.address);
           if (myProfile.photo) {
             sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
           } else {
@@ -3808,15 +3824,17 @@ function routeIncomingPayload(payload, senderIP) {
       });
       break;
     case 'WIPE_CHAT_HISTORY_RESULT':
-      safeWebContentsSend('wipe-chat-history-result', {
-        success: !!payload.success,
-        msg: payload.msg || '',
-        fromIp: payload.fromIp || senderIP,
-        messageCount: payload.messageCount || 0,
-        chatLogFileCount: payload.chatLogFileCount || 0,
-        appLogFileCount: payload.appLogFileCount || 0,
-        backupFileCount: payload.backupFileCount || 0
-      });
+      handleWipeChatHistoryResult(payload, senderIP);
+      break;
+    case 'WIPE_QUEUE_SYNC':
+      handleWipeQueueSync(payload, senderIP);
+      break;
+    case 'WIPE_QUEUE_CLEAR':
+      handleWipeQueueClear(payload);
+      break;
+    case 'WIPE_CLAIM':
+      // 대상 PC가 방금 켜짐 → 예약된 삭제가 있으면 즉시 전달
+      tryDeliverPendingWipe(senderIP);
       break;
     case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
     case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
@@ -8626,6 +8644,178 @@ ipcMain.handle('clear-all-chat-history', async () => {
   }
 });
 
+const pendingWipeDeliverAt = new Map(); // targetIp → last attempt ms
+let pendingWipeRetryTimer = null;
+
+function notifyPendingWipesChanged() {
+  if (!masterSessionActive) return;
+  listPendingRemoteWipes().then((rows) => {
+    safeWebContentsSend('pending-remote-wipes-updated', rows);
+  }).catch(() => {});
+}
+
+function upsertPendingRemoteWipe(row) {
+  return new Promise((resolve) => {
+    if (!row || !row.target_ip || !row.master_password) {
+      resolve(false);
+      return;
+    }
+    db.run(
+      `INSERT OR REPLACE INTO pending_remote_wipes (target_ip, master_password, reason, requested_by_ip, requested_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        String(row.target_ip),
+        String(row.master_password),
+        String(row.reason || ''),
+        String(row.requested_by_ip || MY_IP),
+        String(row.requested_at || new Date().toISOString())
+      ],
+      (err) => {
+        if (err) logDbErr(err);
+        else notifyPendingWipesChanged();
+        resolve(!err);
+      }
+    );
+  });
+}
+
+function removePendingRemoteWipe(targetIp) {
+  return new Promise((resolve) => {
+    const ip = String(targetIp || '').trim();
+    if (!ip) {
+      resolve(false);
+      return;
+    }
+    db.run(`DELETE FROM pending_remote_wipes WHERE target_ip = ?`, [ip], (err) => {
+      if (err) logDbErr(err);
+      else {
+        pendingWipeDeliverAt.delete(ip);
+        notifyPendingWipesChanged();
+      }
+      resolve(!err);
+    });
+  });
+}
+
+function getPendingRemoteWipe(targetIp) {
+  return new Promise((resolve) => {
+    const ip = String(targetIp || '').trim();
+    if (!ip) {
+      resolve(null);
+      return;
+    }
+    db.get(`SELECT * FROM pending_remote_wipes WHERE target_ip = ?`, [ip], (err, row) => {
+      if (err) {
+        logDbErr(err);
+        resolve(null);
+        return;
+      }
+      resolve(row || null);
+    });
+  });
+}
+
+function listPendingRemoteWipes() {
+  return new Promise((resolve) => {
+    db.all(
+      `SELECT target_ip, reason, requested_by_ip, requested_at FROM pending_remote_wipes ORDER BY requested_at DESC`,
+      [],
+      (err, rows) => {
+        if (err) {
+          logDbErr(err);
+          resolve([]);
+          return;
+        }
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
+function tryDeliverPendingWipe(targetIp) {
+  const ip = String(targetIp || '').trim();
+  if (!ip || ip === MY_IP) return;
+  getPendingRemoteWipe(ip).then((row) => {
+    if (!row) return;
+    const now = Date.now();
+    if ((pendingWipeDeliverAt.get(ip) || 0) + 8000 > now) return;
+    pendingWipeDeliverAt.set(ip, now);
+    writeToLogFile('info', `[원격삭제예약] ${ip} 에 로그 삭제 명령 전달 시도`);
+    sendToIpDirect(ip, {
+      type: 'WIPE_CHAT_HISTORY',
+      masterPassword: row.master_password,
+      fromIp: row.requested_by_ip || MY_IP,
+      reason: row.reason || '마스터 관리자 원격 로그 삭제(예약)',
+      queued: true
+    });
+  }).catch(() => {});
+}
+
+function flushAllPendingWipesForOnlinePeers() {
+  listPendingRemoteWipes().then((rows) => {
+    (rows || []).forEach((r) => {
+      if (r && r.target_ip && onlineUsers.has(r.target_ip)) {
+        tryDeliverPendingWipe(r.target_ip);
+      }
+    });
+  }).catch(() => {});
+}
+
+function startPendingWipeRetryLoop() {
+  if (pendingWipeRetryTimer) return;
+  pendingWipeRetryTimer = setInterval(() => {
+    flushAllPendingWipesForOnlinePeers();
+  }, 20000);
+}
+
+function broadcastWipeClaim() {
+  broadcastToOnlinePeers({ type: 'WIPE_CLAIM', fromIp: MY_IP });
+}
+
+function handleWipeQueueSync(payload, senderIP) {
+  const p = payload || {};
+  const targetIp = String(p.targetIp || '').trim();
+  const password = String(p.masterPassword || '');
+  if (!targetIp || !password || targetIp === MY_IP) return;
+  upsertPendingRemoteWipe({
+    target_ip: targetIp,
+    master_password: password,
+    reason: p.reason || '',
+    requested_by_ip: p.fromIp || senderIP || '',
+    requested_at: p.requestedAt || new Date().toISOString()
+  }).then(() => {
+    if (onlineUsers.has(targetIp)) tryDeliverPendingWipe(targetIp);
+  });
+}
+
+function handleWipeQueueClear(payload) {
+  const targetIp = String((payload && payload.targetIp) || '').trim();
+  if (!targetIp) return;
+  removePendingRemoteWipe(targetIp);
+}
+
+function handleWipeChatHistoryResult(payload, senderIP) {
+  const fromIp = (payload && payload.fromIp) || senderIP || '';
+  const msg = String((payload && payload.msg) || '');
+  safeWebContentsSend('wipe-chat-history-result', {
+    success: !!payload.success,
+    msg,
+    fromIp,
+    queued: !!(payload && payload.queued),
+    messageCount: payload.messageCount || 0,
+    chatLogFileCount: payload.chatLogFileCount || 0,
+    appLogFileCount: payload.appLogFileCount || 0,
+    backupFileCount: payload.backupFileCount || 0
+  });
+  // 성공 또는 비밀번호 불일치 시 예약 제거 (틀린 비밀번호로 무한 재시도 방지)
+  const authFailed = /마스터 비밀번호/.test(msg);
+  if (fromIp && (payload && payload.success || authFailed)) {
+    removePendingRemoteWipe(fromIp).then(() => {
+      broadcastToOnlinePeers({ type: 'WIPE_QUEUE_CLEAR', targetIp: fromIp, fromIp: MY_IP });
+    });
+  }
+}
+
 async function handleWipeChatHistoryCommand(payload, senderIP) {
   const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
   if (!ok) {
@@ -8634,7 +8824,8 @@ async function handleWipeChatHistoryCommand(payload, senderIP) {
         type: 'WIPE_CHAT_HISTORY_RESULT',
         success: false,
         msg: '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)',
-        fromIp: MY_IP
+        fromIp: MY_IP,
+        queued: !!(payload && payload.queued)
       });
     }
     return;
@@ -8646,18 +8837,27 @@ async function handleWipeChatHistoryCommand(payload, senderIP) {
     });
     const result = await performClearAllChatHistory({ logPrefix: '마스터 원격 로그 삭제' });
     safeWebContentsSend('chat-history-wiped', result);
-    if (senderIP) {
-      sendToIpDirect(senderIP, {
-        type: 'WIPE_CHAT_HISTORY_RESULT',
-        success: true,
-        msg: '대화·로그 삭제 완료',
-        fromIp: MY_IP,
-        messageCount: result.messageCount,
-        chatLogFileCount: result.chatLogFileCount,
-        appLogFileCount: result.appLogFileCount,
-        backupFileCount: result.backupFileCount
-      });
-    }
+    // 내 PC에 남아 있던 자기 자신 대상 예약도 정리
+    removePendingRemoteWipe(MY_IP);
+    const resultPayload = {
+      type: 'WIPE_CHAT_HISTORY_RESULT',
+      success: true,
+      msg: '대화·로그 삭제 완료',
+      fromIp: MY_IP,
+      queued: !!(payload && payload.queued),
+      messageCount: result.messageCount,
+      chatLogFileCount: result.chatLogFileCount,
+      appLogFileCount: result.appLogFileCount,
+      backupFileCount: result.backupFileCount
+    };
+    const notifyIps = new Set();
+    if (senderIP) notifyIps.add(senderIP);
+    if (payload && payload.fromIp) notifyIps.add(String(payload.fromIp));
+    notifyIps.forEach((ip) => {
+      if (ip && ip !== MY_IP) sendToIpDirect(ip, resultPayload);
+    });
+    // 예약을 들고 있던 다른 PC에서는 대기열만 비움 (알림 스팸 방지)
+    broadcastToOnlinePeers({ type: 'WIPE_QUEUE_CLEAR', targetIp: MY_IP, fromIp: MY_IP });
   } catch (e) {
     console.error('원격 로그 삭제 오류:', e.message);
     if (senderIP) {
@@ -8665,7 +8865,8 @@ async function handleWipeChatHistoryCommand(payload, senderIP) {
         type: 'WIPE_CHAT_HISTORY_RESULT',
         success: false,
         msg: e.message || '삭제 실패',
-        fromIp: MY_IP
+        fromIp: MY_IP,
+        queued: !!(payload && payload.queued)
       });
     }
   }
@@ -8681,11 +8882,12 @@ ipcMain.handle('master-wipe-client-logs', async (event, payload) => {
   const targetIp = String(p.targetIp || '').trim();
   if (!targetIp) return { success: false, msg: '대상 IP가 없습니다.' };
 
+  const reason = p.reason || '마스터 관리자 원격 로그 삭제(퇴사자 등)';
   const wipePayload = {
     type: 'WIPE_CHAT_HISTORY',
     masterPassword: password,
     fromIp: MY_IP,
-    reason: p.reason || '마스터 관리자 원격 로그 삭제(퇴사자 등)'
+    reason
   };
 
   if (targetIp === MY_IP || targetIp === 'SELF') {
@@ -8693,15 +8895,58 @@ ipcMain.handle('master-wipe-client-logs', async (event, payload) => {
       safeWebContentsSend('chat-history-wipe-started', { fromIp: MY_IP, local: true, reason: wipePayload.reason });
       const result = await performClearAllChatHistory({ logPrefix: '마스터 로컬 로그 삭제' });
       safeWebContentsSend('chat-history-wiped', result);
+      await removePendingRemoteWipe(MY_IP);
       return { success: true, local: true, ...result };
     } catch (e) {
       return { success: false, msg: e.message || String(e) };
     }
   }
 
-  // 사용 중지된 PC도 TCP로 도달할 수 있도록 직접 전송
-  sendToIpDirect(targetIp, wipePayload);
-  return { success: true, targetIp, sent: true };
+  const isOnline = onlineUsers.has(targetIp);
+  const requestedAt = new Date().toISOString();
+  await upsertPendingRemoteWipe({
+    target_ip: targetIp,
+    master_password: password,
+    reason,
+    requested_by_ip: MY_IP,
+    requested_at: requestedAt
+  });
+
+  // 다른 온라인 PC에도 예약을 공유 → 마스터 PC가 꺼져 있어도 대상이 켜지면 전달 가능
+  broadcastToOnlinePeers({
+    type: 'WIPE_QUEUE_SYNC',
+    targetIp,
+    masterPassword: password,
+    reason,
+    fromIp: MY_IP,
+    requestedAt
+  });
+
+  // 사용 중지·오프라인 PC도 TCP로 시도. 실패해도 예약으로 재시도됨.
+  sendToIpDirect(targetIp, { ...wipePayload, queued: !isOnline });
+  if (isOnline) tryDeliverPendingWipe(targetIp);
+
+  return {
+    success: true,
+    targetIp,
+    sent: true,
+    queued: true,
+    online: isOnline
+  };
+});
+
+ipcMain.handle('get-pending-remote-wipes', async () => {
+  if (!masterSessionActive) return [];
+  return listPendingRemoteWipes();
+});
+
+ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  const ip = String(targetIp || '').trim();
+  if (!ip) return { success: false, msg: '대상 IP가 없습니다.' };
+  await removePendingRemoteWipe(ip);
+  broadcastToOnlinePeers({ type: 'WIPE_QUEUE_CLEAR', targetIp: ip, fromIp: MY_IP });
+  return { success: true };
 });
 
 const AUTO_BACKUP_RETENTION_DAYS = 14;
