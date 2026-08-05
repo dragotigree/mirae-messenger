@@ -2,8 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https:; frame-src 'none';" />
   <title>그림 그리기 — Mirae Messenger</title>
+  <script>window.name = 'mirae_excalidraw_editor';</script>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f5f9; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
     #boot {
@@ -177,6 +178,30 @@
         if (window.excalidrawBridge) await window.excalidrawBridge.cancel();
         else window.close();
       });
+
+      // libraries.excalidraw.com 에서 고른 라이브러리 → hash 로 전달 (useHandleLibrary 가 처리)
+      if (window.excalidrawBridge && typeof window.excalidrawBridge.onAddLibrary === 'function') {
+        window.excalidrawBridge.onAddLibrary((data) => {
+          try {
+            const libraryUrl = data && data.libraryUrl;
+            if (!libraryUrl) return;
+            const params = new URLSearchParams();
+            params.set('addLibrary', libraryUrl);
+            if (data.idToken) params.set('token', String(data.idToken));
+            const nextHash = params.toString();
+            if (window.location.hash.slice(1) === nextHash) {
+              window.dispatchEvent(new HashChangeEvent('hashchange', {
+                oldURL: window.location.href,
+                newURL: window.location.href
+              }));
+            } else {
+              window.location.hash = nextHash;
+            }
+          } catch (err) {
+            console.error('[excalidraw] addLibrary hash failed', err);
+          }
+        });
+      }
 
       sendBtn.addEventListener('click', async () => {
         if (busy || !editor) return;

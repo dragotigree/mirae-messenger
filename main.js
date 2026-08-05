@@ -2732,6 +2732,109 @@ function closeExcalidrawWindow() {
   excalidrawWindow = null;
 }
 
+const EXCALIDRAW_LIBRARY_RETURN_HOST = 'mirae-excalidraw.local';
+
+function parseExcalidrawLibraryReturnUrl(navUrl) {
+  try {
+    const parsed = new URL(String(navUrl || ''));
+    const hashParams = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
+    const queryParams = new URLSearchParams(parsed.search || '');
+    const libraryUrl = hashParams.get('addLibrary') || queryParams.get('addLibrary');
+    if (!libraryUrl) return null;
+    return {
+      libraryUrl,
+      idToken: hashParams.get('token') || queryParams.get('token') || ''
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function deliverExcalidrawLibraryReturn(payload, childWin) {
+  if (!payload || !payload.libraryUrl) return false;
+  if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
+    try {
+      excalidrawWindow.webContents.send('excalidraw-add-library', payload);
+      excalidrawWindow.focus();
+    } catch (e) {
+      console.error('[excalidraw] deliver library failed', e);
+    }
+  }
+  if (childWin && !childWin.isDestroyed()) {
+    try { childWin.close(); } catch (_) {}
+  }
+  return true;
+}
+
+function attachExcalidrawLibraryWindowHandlers(parentWin) {
+  if (!parentWin || parentWin.isDestroyed()) return;
+
+  parentWin.webContents.setWindowOpenHandler(({ url }) => {
+    const u = String(url || '');
+    if (/^https:\/\/libraries\.excalidraw\.com/i.test(u)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1120,
+          height: 820,
+          minWidth: 720,
+          minHeight: 520,
+          title: 'Excalidraw 라이브러리',
+          autoHideMenuBar: true,
+          backgroundColor: '#ffffff',
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+          }
+        }
+      };
+    }
+    if (/^https?:\/\//i.test(u)) {
+      shell.openExternal(u).catch(() => {});
+      return { action: 'deny' };
+    }
+    return { action: 'deny' };
+  });
+
+  parentWin.webContents.on('did-create-window', (child) => {
+    try { child.setMenu(null); } catch (_) {}
+
+    const tryCapture = (navUrl, event) => {
+      const payload = parseExcalidrawLibraryReturnUrl(navUrl);
+      if (payload) {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        deliverExcalidrawLibraryReturn(payload, child);
+        return true;
+      }
+      try {
+        const host = new URL(String(navUrl || '')).hostname;
+        if (host === EXCALIDRAW_LIBRARY_RETURN_HOST) {
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          try { child.close(); } catch (_) {}
+          return true;
+        }
+        if (/^file:/i.test(String(navUrl || ''))) {
+          // file:// 복귀도 해시가 있으면 전달, 없으면 차단(에디터 중복 오픈 방지)
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    };
+
+    child.webContents.on('will-navigate', (e, navUrl) => { tryCapture(navUrl, e); });
+    child.webContents.on('will-redirect', (e, navUrl) => { tryCapture(navUrl, e); });
+    try {
+      child.webContents.on('will-frame-navigate', (e) => {
+        if (e && e.url) tryCapture(e.url, e);
+      });
+    } catch (_) {}
+    child.webContents.on('did-navigate', (_e, navUrl) => { tryCapture(navUrl, null); });
+    child.webContents.on('did-navigate-in-page', (_e, navUrl) => { tryCapture(navUrl, null); });
+  });
+}
+
 function openExcalidrawWindow(purpose) {
   const meta = getExcalidrawPurposeMeta(purpose);
   excalidrawSession = { purpose: meta.purpose, title: meta.title, subtitle: meta.subtitle };
@@ -2782,6 +2885,7 @@ function openExcalidrawWindow(purpose) {
   });
   excalidrawWindow.setMenu(null);
   attachEditableContextMenu(excalidrawWindow.webContents);
+  attachExcalidrawLibraryWindowHandlers(excalidrawWindow);
 
   const showWin = () => {
     if (!excalidrawWindow || excalidrawWindow.isDestroyed()) return;

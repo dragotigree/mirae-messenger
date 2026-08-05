@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Excalidraw, exportToBlob } from '@excalidraw/excalidraw';
+import { Excalidraw, exportToBlob, useHandleLibrary } from '@excalidraw/excalidraw';
+
+/** libraries.excalidraw.com 이 돌아올 가짜 URL — main 프로세스에서 가로채서 에디터로 전달 */
+const LIBRARY_RETURN_URL = 'https://mirae-excalidraw.local/library-return';
 
 function EditorApp({ onReady }) {
   const apiRef = useRef(null);
+  const [excalidrawAPI, setExcalidrawAPI] = useState(null);
   const [theme] = useState('light');
   const onChange = useCallback(() => {}, []);
+
+  useHandleLibrary({ excalidrawAPI });
 
   useEffect(() => {
     if (typeof onReady !== 'function') return;
@@ -44,8 +50,12 @@ function EditorApp({ onReady }) {
       <Excalidraw
         theme={theme}
         langCode="ko-KR"
+        libraryReturnUrl={LIBRARY_RETURN_URL}
         onChange={onChange}
-        excalidrawAPI={(api) => { apiRef.current = api; }}
+        excalidrawAPI={(api) => {
+          apiRef.current = api;
+          setExcalidrawAPI(api);
+        }}
         UIOptions={{
           canvasActions: {
             loadScene: true,
