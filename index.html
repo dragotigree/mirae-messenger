@@ -3118,9 +3118,135 @@
       box-sizing: border-box;
     }
 
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.2s var(--ease-out); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
-    .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.28s var(--ease-spring); }
+    .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
+
+    /* ✨ 가벼운 UI 모션 */
+    @keyframes ui-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes ui-fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ui-msg-in {
+      from { opacity: 0; transform: translateY(6px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes ui-panel-in {
+      from { opacity: 0; transform: translateX(6px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes ui-chat-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .empty-icon-ring {
+      animation: ui-float 4.5s ease-in-out infinite;
+    }
+    .empty-hint {
+      animation: ui-fade-up 0.45s var(--ease-out) both;
+    }
+    .empty-hint:nth-child(1) { animation-delay: 0.08s; }
+    .empty-hint:nth-child(2) { animation-delay: 0.14s; }
+    .empty-hint:nth-child(3) { animation-delay: 0.2s; }
+    .empty-ipmsg-cta { animation: ui-fade-up 0.5s var(--ease-out) 0.22s both; }
+    .settings-panel.active {
+      animation: ui-panel-in 0.22s var(--ease-out);
+    }
+    .settings-nav-btn {
+      transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+    .settings-nav-btn.active {
+      transform: translateX(1px);
+    }
+    #active-chat-container.is-chat-open {
+      animation: ui-chat-in 0.28s var(--ease-out);
+    }
+    .msg-row.is-live-enter,
+    .msg-row-bubble.is-live-enter {
+      animation: ui-msg-in 0.26s var(--ease-out);
+    }
+    .msg-row.is-me.is-live-enter,
+    .msg-row-bubble.is-me.is-live-enter {
+      animation-name: ui-msg-in-me;
+    }
+    @keyframes ui-msg-in-me {
+      from { opacity: 0; transform: translateY(6px) translateX(4px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn,
+    .sidebar-quick-actions .sidebar-code-alert-btn {
+      transition: background 0.14s, border-color 0.14s, transform 0.14s, box-shadow 0.14s;
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
+    .sidebar-quick-actions .sidebar-code-alert-btn:hover {
+      transform: translateY(-1px);
+    }
+    .sidebar-pref-chip {
+      transition: background 0.14s, color 0.14s, transform 0.14s;
+    }
+    .sidebar-pref-chip.is-active {
+      transform: translateY(-0.5px);
+    }
+    .user-card-item {
+      transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+    }
+    .user-card-item:hover {
+      transform: translateX(1px);
+    }
+    .channel-item {
+      transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+    .channel-item:hover {
+      transform: translateX(1px);
+    }
+    .notice-widget-area {
+      transition: background var(--transition-normal), border-color var(--transition-normal), transform var(--transition-fast);
+    }
+    .notice-widget-area:hover {
+      transform: translateY(-1px);
+    }
+    .btn-send {
+      transition: background 0.14s, filter 0.14s, transform 0.14s, box-shadow 0.14s;
+    }
+    .btn-send:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.28);
+    }
+    .chat-header-tool-btn {
+      transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s, transform 0.14s;
+    }
+    .chat-header-tool-btn:hover {
+      transform: translateY(-1px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .empty-icon-ring,
+      .empty-hint,
+      .empty-ipmsg-cta,
+      .settings-panel.active,
+      #active-chat-container.is-chat-open,
+      .msg-row.is-live-enter,
+      .msg-row-bubble.is-live-enter,
+      .modal-overlay,
+      .modal-card,
+      .app-dialog-card {
+        animation: none !important;
+      }
+      .user-card-item:hover,
+      .channel-item:hover,
+      .notice-widget-area:hover,
+      .btn-send:hover,
+      .chat-header-tool-btn:hover,
+      .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
+      .sidebar-quick-actions .sidebar-code-alert-btn:hover,
+      .settings-nav-btn.active,
+      .sidebar-pref-chip.is-active {
+        transform: none !important;
+      }
+    }
     .master-admin-modal-card {
       width: min(1080px, 96vw) !important;
       height: min(760px, 92vh);
@@ -8492,6 +8618,7 @@
       document.getElementById('compact-list-view').style.display = (compact && !hasChat) ? 'flex' : 'none';
       document.getElementById('empty-state').style.display = (!compact && !hasChat) ? 'flex' : 'none';
       document.getElementById('active-chat-container').style.display = hasChat ? 'flex' : 'none';
+      document.getElementById('active-chat-container')?.classList.toggle('is-chat-open', hasChat);
       document.getElementById('compact-back-btn').style.display = (compact && hasChat) ? 'flex' : 'none';
 
       if (compact && !hasChat) {
@@ -14122,7 +14249,7 @@
             ? true
             : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
           const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
-          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true });
+          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true });
         });
         pendingUnreadScrollCount = 0;
         if (unreadStartIndex >= 0 && unreadStartIndex < history.length) {
@@ -16138,6 +16265,7 @@
     function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
       const options = opts || {};
       const skipStatusUpdate = !!options.skipStatusUpdate;
+      const skipEnterAnim = !!options.skipEnterAnim;
       const container = document.getElementById('chat-messages-area');
       const wasNearBottom = isMe || isNearChatBottom();
 
@@ -16226,6 +16354,7 @@
       if (useBubbleLayout) {
         row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
+        if (!skipEnterAnim) row.classList.add('is-live-enter');
         const showName = !isMe && isGroupChannel;
         row.innerHTML = `
           ${showName ? `<div class="bubble-sender">${displayName}</div>` : ''}
@@ -16246,6 +16375,7 @@
       } else {
         row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
+        if (!skipEnterAnim) row.classList.add('is-live-enter');
         const avatarClass = isMe ? 'avatar-me' : (isGroupChannel ? 'avatar-broadcast' : 'avatar-other');
         const avCtx = avatarContextForSender(isMe, displayName);
         const avPhotoOk = isUsableProfilePhoto(avCtx.photo);
@@ -16278,6 +16408,9 @@
         `;
       }
       container.appendChild(row);
+      if (!skipEnterAnim) {
+        row.addEventListener('animationend', () => row.classList.remove('is-live-enter'), { once: true });
+      }
       bindMessageForwardDrag(row);
       if (isMe && !isGroupChannel && !skipStatusUpdate) updateMineOutboundStatusLabels();
       if (wasNearBottom) scrollChatToBottom(false);
