@@ -409,7 +409,9 @@ const Z_BRIDGE_MIRROR_FILES = [
   'excalidraw-editor.html',
   'preload-excalidraw.js',
   'lib/excalidraw-app.js',
-  'lib/excalidraw-app.css'
+  'lib/excalidraw-app.css',
+  'assets/compact/compact-overlay.css',
+  'assets/compact/phosphor-paths.json'
 ];
 const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
 let pendingRestartTimer = null;
@@ -10040,7 +10042,9 @@ async function applyUpdateFiles() {
     'excalidraw-editor.html',
     'preload-excalidraw.js',
     'lib/excalidraw-app.js',
-    'lib/excalidraw-app.css'
+    'lib/excalidraw-app.css',
+    'assets/compact/compact-overlay.css',
+    'assets/compact/phosphor-paths.json'
   ];
   const optionalAssets = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
   try {
