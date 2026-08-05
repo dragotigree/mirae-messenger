@@ -2761,18 +2761,20 @@
       border-bottom: 1px solid #eef2f6;
     }
     .app-dialog-icon {
-      width: 44px; height: 44px; border-radius: 14px; margin-bottom: 12px;
+      width: 48px; height: 48px; border-radius: 15px; margin-bottom: 12px;
       display: flex; align-items: center; justify-content: center; font-size: 22px;
       background: linear-gradient(145deg, #0ea5e9, #0284c7);
       box-shadow: 0 6px 16px rgba(14, 165, 233, 0.3);
       color: #fff;
     }
-    .app-dialog-icon svg { width: 22px; height: 22px; display: block; flex-shrink: 0; }
+    .app-dialog-icon svg,
+    .app-dialog-icon .icon-glyph { width: 26px; height: 26px; display: block; flex-shrink: 0; }
     .app-dialog-icon.is-danger { background: linear-gradient(145deg, #f87171, #dc2626); box-shadow: 0 6px 16px rgba(220, 38, 38, 0.28); }
     .app-dialog-icon.is-success { background: linear-gradient(145deg, #4ade80, #16a34a); box-shadow: 0 6px 16px rgba(22, 163, 74, 0.28); }
     .app-dialog-icon.is-question {
-      background: linear-gradient(145deg, #38bdf8, #0284c7);
-      box-shadow: 0 8px 18px rgba(14, 165, 233, 0.34);
+      background: linear-gradient(160deg, #818cf8 0%, #6366f1 55%, #4f46e5 100%);
+      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.32);
+      color: #eef2ff;
     }
     .app-dialog-title { font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; margin: 0; }
     .app-dialog-body-wrap { padding: 8px 22px 20px; background: #fff; }
@@ -5046,7 +5048,9 @@
       users: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
       chatBubble: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H9l-4.5 3.5V5.5z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
       moreDots: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.75" fill="currentColor"/><circle cx="12" cy="12" r="1.75" fill="currentColor"/><circle cx="18" cy="12" r="1.75" fill="currentColor"/></svg>',
-      calendar: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="3.25" width="11.5" height="10.5" rx="2" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.3"/><path d="M2.25 6.25h11.5M5.25 2.25v2.5M10.75 2.25v2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="8" cy="9.1" r="0.85" fill="currentColor"/><circle cx="10.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="5.5" cy="11.5" r="0.85" fill="currentColor"/><circle cx="8" cy="11.5" r="0.85" fill="currentColor"/></svg>'
+      calendar: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="3.25" width="11.5" height="10.5" rx="2" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.3"/><path d="M2.25 6.25h11.5M5.25 2.25v2.5M10.75 2.25v2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="8" cy="9.1" r="0.85" fill="currentColor"/><circle cx="10.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="5.5" cy="11.5" r="0.85" fill="currentColor"/><circle cx="8" cy="11.5" r="0.85" fill="currentColor"/></svg>',
+      /* Flaticon/Heroicons 계열 라인 스타일 — 툴바 아이콘과 선 굵기·라운드 통일 */
+      question: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.75"/><path d="M9.9 9.2a2.55 2.55 0 0 1 4.2 1.95c0 1.15-.7 1.7-1.45 2.15-.55.35-.9.7-.9 1.35" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17.15" r="1.15" fill="currentColor"/></svg>'
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -7114,9 +7118,9 @@
     }
 
     const APP_DIALOG_ICON_SVGS = {
-      question: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.7" opacity="0.35"/><path d="M9.2 9.15a2.95 2.95 0 1 1 4.55 2.48c-.72.55-1.15 1.05-1.35 1.72-.12.4-.15.72-.15 1.15" stroke="currentColor" stroke-width="2.05" stroke-linecap="round"/><circle cx="12" cy="17.15" r="1.2" fill="currentColor"/></svg>`,
-      info: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.7" opacity="0.35"/><path d="M12 10.6v6.1" stroke="currentColor" stroke-width="2.15" stroke-linecap="round"/><circle cx="12" cy="7.55" r="1.2" fill="currentColor"/></svg>`,
-      chat: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6.2 17.4 4.7 19.2V7.6A2.6 2.6 0 0 1 7.3 5h9.4A2.6 2.6 0 0 1 19.3 7.6v6.2a2.6 2.6 0 0 1-2.6 2.6H8.2l-2 2z" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/><circle cx="9.2" cy="10.7" r="1.05" fill="currentColor"/><circle cx="12" cy="10.7" r="1.05" fill="currentColor"/><circle cx="14.8" cy="10.7" r="1.05" fill="currentColor"/></svg>`
+      question: null, // UI_SVG.question 사용
+      info: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.75"/><path d="M12 10.75v5.5" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.15" fill="currentColor"/></svg>',
+      chat: null // UI_SVG.chatBubble 사용
     };
 
     function setAppDialogIconContent(iconEl, icon, variant) {
@@ -7131,11 +7135,19 @@
         + (variant === 'danger' ? ' is-danger' : variant === 'success' ? ' is-success' : '')
         + (isQuestion ? ' is-question' : '');
       if (isQuestion) {
-        iconEl.innerHTML = APP_DIALOG_ICON_SVGS.question;
+        iconEl.innerHTML = UI_SVG.question;
         return;
       }
-      if (APP_DIALOG_ICON_SVGS[resolved]) {
-        iconEl.innerHTML = APP_DIALOG_ICON_SVGS[resolved];
+      if (resolved === 'chat' || resolved === '💬') {
+        iconEl.innerHTML = UI_SVG.chatBubble;
+        return;
+      }
+      if (resolved === 'info' && APP_DIALOG_ICON_SVGS.info) {
+        iconEl.innerHTML = APP_DIALOG_ICON_SVGS.info;
+        return;
+      }
+      if (UI_SVG[resolved]) {
+        iconEl.innerHTML = UI_SVG[resolved];
         return;
       }
       iconEl.textContent = resolved;
