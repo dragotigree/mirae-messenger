@@ -576,6 +576,59 @@
     .left-footer-btn #privacy-lock-btn { --footer-icon: #a5b4fc; --footer-icon-hover: #c7d2fe; }
     .left-footer-btn #privacy-lock-btn.is-privacy-ready { --footer-icon: #818cf8; --footer-icon-hover: #a5b4fc; }
 
+    /* 업데이트 진행 오버레이 */
+    .app-update-progress {
+      display: none; position: fixed; inset: 0; z-index: 100010;
+      align-items: center; justify-content: center;
+      background: rgba(15, 23, 42, 0.42);
+      backdrop-filter: blur(6px);
+      -webkit-app-region: no-drag;
+    }
+    .app-update-progress.is-visible { display: flex; }
+    .app-update-progress-card {
+      width: min(320px, 86vw);
+      padding: 28px 24px 22px;
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+      text-align: center;
+    }
+    .app-update-gear {
+      width: 52px; height: 52px; margin: 0 auto 14px;
+      color: #0284c7;
+      animation: app-update-spin 1.1s linear infinite;
+    }
+    .app-update-gear svg { width: 100%; height: 100%; display: block; }
+    @keyframes app-update-spin { to { transform: rotate(360deg); } }
+    .app-update-progress-title {
+      font-size: 16px; font-weight: 800; color: #0f172a;
+      letter-spacing: -0.03em; margin: 0 0 6px;
+    }
+    .app-update-progress-desc {
+      font-size: 12.5px; color: #64748b; line-height: 1.55; margin: 0 0 16px;
+    }
+    .app-update-progress-bar {
+      height: 4px; border-radius: 999px; background: #e2e8f0; overflow: hidden;
+    }
+    .app-update-progress-bar span {
+      display: block; height: 100%; width: 40%; border-radius: inherit;
+      background: linear-gradient(90deg, #38bdf8, #0284c7);
+      animation: app-update-bar 1.15s ease-in-out infinite;
+    }
+    @keyframes app-update-bar {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(320%); }
+    }
+    .settings-update-checking {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: #0369a1; font-weight: 600;
+    }
+    .settings-update-checking::before {
+      content: ''; width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid #bae6fd; border-top-color: #0284c7;
+      animation: app-update-spin 0.7s linear infinite;
+    }
+
     /* 🔒 사생활 화면 잠금 (카카오톡식) */
     #privacy-lock-overlay {
       display: none; position: fixed; inset: 0; z-index: 100001;
@@ -3750,6 +3803,21 @@
       <div style="font-size:28px; margin-bottom:12px;">⚡</div>
       <div style="font-size:18px; font-weight:800; margin-bottom:8px;">강제 업데이트 진행 중</div>
       <div id="force-update-overlay-text" style="font-size:13px; color:#cbd5e1; line-height:1.6;">최신 파일을 적용한 뒤 자동으로 재시작합니다. 창을 닫지 마세요.</div>
+    </div>
+  </div>
+
+  <!-- 업데이트 진행 (수동·강제 공통) -->
+  <div id="app-update-progress" class="app-update-progress" aria-live="polite" aria-busy="true" hidden>
+    <div class="app-update-progress-card">
+      <div class="app-update-gear" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path d="M24 16.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15z" stroke="currentColor" stroke-width="2.4"/>
+          <path d="M24 6.5v4.2M24 37.3v4.2M6.5 24h4.2M37.3 24h4.2M11.4 11.4l3 3M33.6 33.6l3 3M11.4 36.6l3-3M33.6 14.4l3-3" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="app-update-progress-title" id="app-update-progress-title">업데이트 중</div>
+      <div class="app-update-progress-desc" id="app-update-progress-desc">최신 파일을 받는 중입니다. 잠시만 기다려 주세요.</div>
+      <div class="app-update-progress-bar" aria-hidden="true"><span></span></div>
     </div>
   </div>
 
@@ -11356,14 +11424,38 @@
 
     async function checkUpdateNow() {
       const resultEl = document.getElementById('update-check-result');
-      resultEl.textContent = '확인 중...';
-      const res = await window.api.checkForUpdate();
-      if (res.available) {
-        resultEl.innerHTML = `🆕 새 버전 ${res.remoteVersion}이 있습니다 (현재 ${res.currentVersion})${res.notes ? '<br>' + res.notes : ''}<br><button onclick="applyUpdateNow()" style="margin-top:6px; padding:6px 12px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer;">지금 업데이트하고 재시작</button>`;
-      } else if (res.msg) {
-        resultEl.textContent = res.msg;
-      } else {
-        resultEl.textContent = '✅ 이미 최신 버전입니다.';
+      resultEl.innerHTML = '<span class="settings-update-checking">업데이트 확인 중…</span>';
+      try {
+        const res = await window.api.checkForUpdate();
+        if (res.available) {
+          resultEl.innerHTML = `🆕 새 버전 ${res.remoteVersion}이 있습니다 (현재 ${res.currentVersion})${res.notes ? '<br>' + res.notes : ''}<br><button type="button" id="apply-update-now-btn" onclick="applyUpdateNow()" style="margin-top:6px; padding:6px 12px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer;">지금 업데이트하고 재시작</button>`;
+        } else if (res.msg) {
+          resultEl.textContent = res.msg;
+        } else {
+          resultEl.textContent = '✅ 이미 최신 버전입니다.';
+        }
+      } catch (e) {
+        resultEl.textContent = '확인 중 오류가 발생했습니다.';
+      }
+    }
+
+    function showAppUpdateProgress(title, desc) {
+      const el = document.getElementById('app-update-progress');
+      const titleEl = document.getElementById('app-update-progress-title');
+      const descEl = document.getElementById('app-update-progress-desc');
+      if (titleEl) titleEl.textContent = title || '업데이트 중';
+      if (descEl) descEl.textContent = desc || '최신 파일을 받는 중입니다. 잠시만 기다려 주세요.';
+      if (el) {
+        el.hidden = false;
+        el.classList.add('is-visible');
+      }
+    }
+
+    function hideAppUpdateProgress() {
+      const el = document.getElementById('app-update-progress');
+      if (el) {
+        el.classList.remove('is-visible');
+        el.hidden = true;
       }
     }
 
@@ -11375,8 +11467,38 @@
         confirmText: '재시작',
         cancelText: '나중에'
       })) return;
-      const res = await window.api.applyUpdate();
-      if (!res.success) { await appAlert(res.msg || '업데이트 적용에 실패했습니다.'); return; }
+      const btn = document.getElementById('apply-update-now-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '업데이트 중…';
+      }
+      const resultEl = document.getElementById('update-check-result');
+      if (resultEl) {
+        resultEl.innerHTML = '<span class="settings-update-checking">업데이트 파일을 적용하는 중…</span>';
+      }
+      showAppUpdateProgress('업데이트 중', '최신 파일을 받아 적용하고 있습니다. 곧 자동으로 재시작됩니다.');
+      try {
+        const res = await window.api.applyUpdate();
+        if (!res || !res.success) {
+          hideAppUpdateProgress();
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '지금 업데이트하고 재시작';
+          }
+          if (resultEl) resultEl.textContent = (res && res.msg) || '업데이트 적용에 실패했습니다.';
+          await appAlert((res && res.msg) || '업데이트 적용에 실패했습니다.');
+          return;
+        }
+        // 성공 시 재시작까지 오버레이 유지
+        showAppUpdateProgress('재시작 준비', '업데이트가 적용되었습니다. 프로그램을 다시 여는 중입니다.');
+      } catch (e) {
+        hideAppUpdateProgress();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '지금 업데이트하고 재시작';
+        }
+        await appAlert('업데이트 적용 중 오류가 발생했습니다.');
+      }
     }
 
     let autoUpdateCountdownTimer = null;
@@ -11615,15 +11737,15 @@
     }
 
     function showForceUpdateOverlay(text) {
-      const el = document.getElementById('force-update-overlay');
-      const t = document.getElementById('force-update-overlay-text');
-      if (t && text) t.textContent = text;
-      if (el) el.style.display = 'flex';
+      showAppUpdateProgress('강제 업데이트 중', text || '최신 파일을 적용한 뒤 자동으로 재시작합니다. 창을 닫지 마세요.');
+      const legacy = document.getElementById('force-update-overlay');
+      if (legacy) legacy.style.display = 'none';
     }
 
     function hideForceUpdateOverlay() {
-      const el = document.getElementById('force-update-overlay');
-      if (el) el.style.display = 'none';
+      hideAppUpdateProgress();
+      const legacy = document.getElementById('force-update-overlay');
+      if (legacy) legacy.style.display = 'none';
     }
 
     if (window.api.onForceUpdateStarted) {
