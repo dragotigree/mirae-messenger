@@ -7268,11 +7268,101 @@ ipcMain.handle('get-recent-conversations', async () => {
 ipcMain.handle('get-chat-history', async (event, args) => {
   const targetIP = (args && typeof args === 'object') ? args.targetIP : args;
   const keyword = args && typeof args === 'object' ? args.keyword : null;
+  const dateStrRaw = args && typeof args === 'object' ? (args.dateStr || args.aroundDate || null) : null;
+  const dateStr = (typeof dateStrRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStrRaw.trim()))
+    ? dateStrRaw.trim()
+    : null;
   const hideUpToId = await getChatViewHideUpToId(targetIP);
   const scope = chatHistoryScopeSql(targetIP);
 
+  const mapRows = (rows) => {
+    const mineLabel = senderLabelForMe();
+    return (rows || []).map((r) => ({
+      ...r,
+      isMe: r.sender_ip === MY_IP || (mineLabel && r.sender_name === mineLabel),
+      sender_name: formatSenderDisplay(r.sender_name, r.sender_ip)
+    }));
+  };
+
+  const selectCols = `DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
+
+  // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터 최대 200건
+  if (dateStr && !keyword) {
+    return new Promise((resolve) => {
+      let findSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
+      const findParams = [...scope.params, dateStr];
+      if (hideUpToId > 0) {
+        findSql += ` AND id > ?`;
+        findParams.push(hideUpToId);
+      }
+      db.get(findSql, findParams, (err, row) => {
+        const finishFromAnchor = (anchorId, resolvedDate) => {
+          if (!anchorId) {
+            resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+            return;
+          }
+          let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id >= ?`;
+          const params = [...scope.params, anchorId];
+          if (hideUpToId > 0) {
+            sql += ` AND id > ?`;
+            params.push(hideUpToId);
+          }
+          sql += ` ORDER BY id ASC LIMIT 200`;
+          db.all(sql, params, (err2, rows) => {
+            if (err2) {
+              logDbErr(err2);
+              resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+              return;
+            }
+            resolve({
+              rows: mapRows(rows),
+              jumpedDate: resolvedDate || dateStr,
+              requestedDate: dateStr,
+              empty: !(rows && rows.length)
+            });
+          });
+        };
+
+        if (err) {
+          logDbErr(err);
+          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+          return;
+        }
+        if (row && row.minId) {
+          finishFromAnchor(row.minId, dateStr);
+          return;
+        }
+        // 해당일에 없으면 그 이전 가장 가까운 대화일로 이동
+        let nearSql = `SELECT id, strftime('%Y-%m-%d', created_at, 'localtime') AS date_key FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') <= ?`;
+        const nearParams = [...scope.params, dateStr];
+        if (hideUpToId > 0) {
+          nearSql += ` AND id > ?`;
+          nearParams.push(hideUpToId);
+        }
+        nearSql += ` ORDER BY id DESC LIMIT 1`;
+        db.get(nearSql, nearParams, (errNear, nearRow) => {
+          if (errNear) logDbErr(errNear);
+          if (nearRow && nearRow.id) {
+            // 그 날의 첫 메시지로 맞춤
+            let dayStartSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
+            const dayStartParams = [...scope.params, nearRow.date_key];
+            if (hideUpToId > 0) {
+              dayStartSql += ` AND id > ?`;
+              dayStartParams.push(hideUpToId);
+            }
+            db.get(dayStartSql, dayStartParams, (err3, dayRow) => {
+              finishFromAnchor((dayRow && dayRow.minId) || nearRow.id, nearRow.date_key);
+            });
+            return;
+          }
+          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+        });
+      });
+    });
+  }
+
   return new Promise((resolve) => {
-    let sql = `SELECT DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key FROM messages WHERE ${scope.where}`;
+    let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where}`;
     const params = [...scope.params];
 
     if (hideUpToId > 0) {
@@ -7287,13 +7377,36 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     sql += ` ORDER BY id DESC LIMIT 200`;
 
     db.all(sql, params, (err, rows) => {
-      const mineLabel = senderLabelForMe();
       const ordered = (rows || []).slice().reverse();
-      resolve(ordered.map(r => ({
-        ...r,
-        isMe: r.sender_ip === MY_IP || (mineLabel && r.sender_name === mineLabel),
-        sender_name: formatSenderDisplay(r.sender_name, r.sender_ip)
-      })));
+      // 기존 호출부 호환: 배열 그대로 반환
+      resolve(mapRows(ordered));
+    });
+  });
+});
+
+/** 채팅 달력: 해당 월에 대화가 있는 날짜 목록 */
+ipcMain.handle('get-chat-message-dates', async (event, args) => {
+  const targetIP = args && args.targetIP;
+  const month = args && args.month; // YYYY-MM
+  if (!targetIP || !month || !/^\d{4}-\d{2}$/.test(String(month))) return [];
+  const hideUpToId = await getChatViewHideUpToId(targetIP);
+  const scope = chatHistoryScopeSql(targetIP);
+  return new Promise((resolve) => {
+    let sql = `SELECT DISTINCT strftime('%Y-%m-%d', created_at, 'localtime') AS date_key
+      FROM messages WHERE ${scope.where}
+      AND strftime('%Y-%m', created_at, 'localtime') = ?`;
+    const params = [...scope.params, String(month)];
+    if (hideUpToId > 0) {
+      sql += ` AND id > ?`;
+      params.push(hideUpToId);
+    }
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        resolve([]);
+        return;
+      }
+      resolve((rows || []).map((r) => r.date_key).filter(Boolean));
     });
   });
 });

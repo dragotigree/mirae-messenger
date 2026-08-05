@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   getMessageUnreadCounts: (channelKey, messages) => ipcRenderer.invoke('get-message-unread-counts', { channelKey, messages }),
   onChannelReadUpdate: (callback) => ipcRenderer.on('channel-read-update', (e, data) => callback(data)),
   getChatHistory: (targetIP, dateStr, keyword) => ipcRenderer.invoke('get-chat-history', { targetIP, dateStr, keyword }),
+  getChatMessageDates: (targetIP, month) => ipcRenderer.invoke('get-chat-message-dates', { targetIP, month }),
   getRecentConversations: () => ipcRenderer.invoke('get-recent-conversations'),
   getChatSharedArchive: (targetIP) => ipcRenderer.invoke('get-chat-shared-archive', targetIP),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
