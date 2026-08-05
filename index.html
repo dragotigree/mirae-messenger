@@ -2658,6 +2658,28 @@
     .schedule-board-add-btn:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0284c7; }
     .schedule-board-add-btn.is-active { background: #0369a1; border-color: #0369a1; color: #fff; }
     .schedule-board-add-btn.is-active:hover { background: #0284c7; border-color: #0284c7; color: #fff; }
+    .schedule-board-refresh-btn {
+      background: #fff;
+      border-color: #cbd5e1;
+      color: #475569;
+    }
+    .schedule-board-refresh-btn:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+    .schedule-board-refresh-btn.is-busy {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .schedule-board-refresh-btn.is-busy .sb-refresh-spin {
+      display: inline-block;
+      animation: sb-refresh-spin 0.7s linear infinite;
+    }
+    @keyframes sb-refresh-spin {
+      to { transform: rotate(360deg); }
+    }
+    body.compact-mode .schedule-board-refresh-btn .sb-refresh-label { display: none; }
     .schedule-board-toolbar {
       padding: 12px 20px 14px; flex-shrink: 0;
       background: #f8fafc; border-bottom: 1px solid #e2e8f0;
@@ -5590,6 +5612,7 @@
           <button type="button" id="schedule-board-login-btn" class="schedule-board-add-btn" style="display:none;" onclick="openOperatorLoginModal()">✍️ 작성자 로그인</button>
           <button type="button" id="schedule-board-logout-btn" class="schedule-board-add-btn" style="display:none; background:#fee2e2; color:#b91c1c;" onclick="logoutScheduleBoardAuth()">🔓 로그아웃</button>
           <button type="button" id="schedule-board-add-btn" class="schedule-board-add-btn" style="display:none;" onclick="toggleScheduleBoardQuickAddPanel()" aria-expanded="false" aria-controls="schedule-board-quick-add" title="빠른 등록 (Ctrl+R)">+ 빠른 등록</button>
+          <button type="button" id="schedule-board-refresh-btn" class="schedule-board-add-btn schedule-board-refresh-btn" onclick="refreshScheduleBoardNow()" title="일정 새로고침 (F5)"><span aria-hidden="true">🔄</span><span class="sb-refresh-label"> 새로고침</span></button>
           <button type="button" class="calendar-day-close-btn sb-top-close" onclick="closeScheduleBoardModal()" title="닫기">✕</button>
         </div>
       </div>
@@ -6646,6 +6669,16 @@
         return true;
       }
       return false;
+    }
+
+    /** 현황판이 열려 있을 때 F5 → 새로고침 */
+    function handleScheduleBoardRefreshKey(e) {
+      if (!isScheduleBoardContext()) return false;
+      if (e.key !== 'F5' && e.code !== 'F5') return false;
+      e.preventDefault();
+      e.stopPropagation();
+      refreshScheduleBoardNow();
+      return true;
     }
 
     function canWriteScheduleBoard() {
@@ -19144,6 +19177,46 @@
           btn.textContent = '🔄';
         }
       }
+    }
+
+    let scheduleBoardRefreshInFlight = null;
+
+    async function refreshScheduleBoardNow() {
+      if (!isScheduleBoardContext()) return;
+      if (scheduleBoardRefreshInFlight) return scheduleBoardRefreshInFlight;
+      const btn = document.getElementById('schedule-board-refresh-btn');
+      const prevHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('is-busy');
+        btn.innerHTML = `<span class="sb-refresh-spin" aria-hidden="true">🔄</span><span class="sb-refresh-label"> 새로고침</span>`;
+      }
+      scheduleBoardRefreshInFlight = (async () => {
+        try {
+          await Promise.all([
+            refreshSchedulesFromServer(),
+            (typeof refreshDutyRosterFromServer === 'function')
+              ? refreshDutyRosterFromServer()
+              : Promise.resolve()
+          ]);
+          // refreshSchedulesFromServer가 현황판을 다시 그리지만, 당직 반영 보장을 위해 한 번 더
+          const sbModal = document.getElementById('schedule-board-modal');
+          const sbOpen = document.body.classList.contains('schedule-board-standalone') ||
+            (sbModal && sbModal.style.display === 'flex');
+          if (sbOpen) renderScheduleBoard();
+        } catch (e) {
+          console.error('현황판 새로고침 실패:', e);
+          await appAlert('현황판을 새로고침하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('is-busy');
+            btn.innerHTML = prevHtml || '🔄 새로고침';
+          }
+          scheduleBoardRefreshInFlight = null;
+        }
+      })();
+      return scheduleBoardRefreshInFlight;
     }
 
     function formatCalendarDayHeader(dateStr) {
