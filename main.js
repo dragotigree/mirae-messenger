@@ -254,11 +254,11 @@ function getToastPreloadPath() {
   return resolvedToastPreloadPath;
 }
 
-// 미니 모드 상단 툴바(공지·관리·파일·기록·새로고침 등)가 잘리지 않도록 최소 너비 확보
-const COMPACT_DEFAULT_WIDTH = 480;
-const COMPACT_DEFAULT_HEIGHT = 680;
-const COMPACT_MIN_WIDTH = 480;
-const COMPACT_MIN_HEIGHT = 520;
+// 미니 모드(Discord Overlay 스타일) — 컴팩트 창 크기
+const COMPACT_DEFAULT_WIDTH = 420;
+const COMPACT_DEFAULT_HEIGHT = 640;
+const COMPACT_MIN_WIDTH = 360;
+const COMPACT_MIN_HEIGHT = 480;
 const NORMAL_MIN_WIDTH = 1040;
 const NORMAL_MIN_HEIGHT = 600;
 

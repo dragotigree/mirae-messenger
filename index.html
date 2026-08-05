@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Mirae Messenger</title>
   <link rel="stylesheet" href="assets/fonts/mirae-fonts.css">
+  <link rel="stylesheet" href="assets/compact/compact-overlay.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-family); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 
@@ -171,16 +172,6 @@
     .titlebar-btn svg { opacity: 0.95; display: block; }
     .titlebar-close-btn:hover { background: #dc2626; color: #fff; border-color: transparent; }
     .titlebar-close-btn:hover svg { opacity: 1; }
-    body.compact-mode #titlebar-sidebar-accent { width: 0; overflow: hidden; border: none; box-shadow: none; padding: 0; }
-    body.compact-mode #titlebar-app-label { display: none; }
-    body.compact-mode #titlebar-drag-region .titlebar-app-label-compact {
-      display: block;
-      font-size: 10.5px;
-      font-weight: var(--font-weight-bold);
-      color: rgba(255, 255, 255, 0.55);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
     #titlebar-drag-region .titlebar-app-label-compact { display: none; }
 
     body { font-size: var(--chat-font-size); }
@@ -999,9 +990,6 @@
       white-space: nowrap;
     }
     #chat-date-jump-banner button:hover { background: #4338ca; }
-    body.compact-mode #chat-calendar-popover {
-      right: 10px; top: 54px; width: min(300px, calc(100% - 20px));
-    }
     #active-chat-container { position: relative; }
     .chat-shared-drawer {
       position: absolute; inset: 0; z-index: 40;
@@ -1120,16 +1108,6 @@
     @keyframes chat-date-flash {
       0%, 100% { background: rgba(255, 255, 255, 0.92); border-color: #e8edf2; }
       30% { background: #e0e7ff; border-color: #a5b4fc; color: #4338ca; }
-    }
-    body.compact-mode .chat-date-sep { margin: 10px 2px 6px; }
-    body.compact-mode .chat-date-sep::before,
-    body.compact-mode .chat-date-sep::after {
-      background: rgba(255, 255, 255, 0.4);
-    }
-    body.compact-mode .chat-date-sep span {
-      background: rgba(255, 255, 255, 0.55);
-      border-color: rgba(255, 255, 255, 0.35);
-      color: #334155;
     }
 
     .msg-row { display: flex; gap: 12px; padding: 8px 12px 10px; border-radius: var(--radius-md); position: relative; align-items: flex-start; transition: background var(--transition-fast); max-width: 82%; }
@@ -1325,12 +1303,6 @@
     .is-other .reply-quote-snippet { color: #64748b; }
     .chat-bubble .reply-quote-snippet,
     .msg-text .reply-quote-snippet { max-width: min(210px, 100%); }
-    body.compact-mode .is-me .reply-quote-block {
-      background: rgba(0, 0, 0, 0.06);
-      border-left-color: rgba(25, 25, 25, 0.35);
-    }
-    body.compact-mode .is-me .reply-quote-label { color: #3f3f46; }
-    body.compact-mode .is-me .reply-quote-snippet { color: #71717a; }
 
     /* 😊 메시지 리액션 (카카오톡 스타일) */
     .msg-reactions { display: none; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; max-width: 100%; }
@@ -1361,10 +1333,6 @@
       width: 12px; height: 12px; border-radius: 50%; background: #3c3c3c; color: #fff;
       font-size: 9px; font-weight: 800; line-height: 12px; text-align: center;
     }
-    body.compact-mode .reaction-chip { background: rgba(255, 255, 255, 0.92); }
-    body.compact-mode .reaction-icon-btn { background: rgba(55, 65, 75, 0.5); color: #fff; }
-    body.compact-mode .reaction-icon-btn:hover { background: rgba(45, 55, 65, 0.65); }
-    body.compact-mode .reaction-add-btn::after { background: #fff; color: #333; }
     #reaction-people-popover {
       display: none; position: fixed; z-index: 2501; min-width: 160px; max-width: 260px;
       background: #fff; border-radius: 12px; box-shadow: 0 10px 32px rgba(15,23,42,0.18);
@@ -2086,133 +2054,9 @@
     .chat-slash-cmd { font-size: 12.5px; font-weight: 800; color: var(--accent-dark); flex-shrink: 0; }
     .chat-slash-desc { font-size: 11.5px; color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ========== 🗨 미니 모드 (모바일 메신저 스타일) ========== */
-    body.compact-mode #sidebar-left,
-    body.compact-mode #sidebar-right { display: none; }
-    body.compact-mode #main-chat-panel { border-right: none; width: 100%; background: #fff; min-width: 480px; }
-    body.compact-mode #chat-header {
-      height: 52px; min-height: 52px; padding: 0 12px; gap: 8px;
-      flex-direction: row; align-items: center;
-      background: #fff; border-bottom: 1px solid #e4e9f0; box-shadow: none;
-    }
-    body.compact-mode .chat-header-actions { justify-content: flex-end; gap: 6px; }
-    body.compact-mode .chat-header-tool-label { display: none; }
-    body.compact-mode .chat-header-tool-btn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 11px; }
-    body.compact-mode .header-user-name { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
-    body.compact-mode #chat-header-status-text { font-size: 11.5px; color: #64748b; }
-    body.compact-mode #chat-messages-area { padding: 14px 12px; gap: 8px; background: #b2c7d9; }
-    body.compact-mode #chat-input-wrapper { padding: 10px 12px 12px; background: #fff; border-top: 1px solid #e4e9f0; }
-    body.compact-mode .input-box-inner { border-radius: 18px; padding: 8px 12px 10px; border: 1px solid #e2e8f0; background: #fff; box-shadow: none; }
-    body.compact-mode .input-box-inner textarea { height: 22px; min-height: 22px; max-height: 120px; font-size: 14px; }
-    body.compact-mode .input-bottom-actions { gap: 8px; }
-    body.compact-mode .input-bottom-actions .btn-send { flex-shrink: 0; margin-left: auto; }
-    body.compact-mode .chat-tool-btn,
-    body.compact-mode .btn-schedule,
-    body.compact-mode .btn-quickphrase,
-    body.compact-mode .btn-urgent,
-    body.compact-mode .btn-capture {
-      width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: 9px;
-    }
-    body.compact-mode .btn-send { padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-radius: 11px; background: #1d75d3; border: none; color: #fff; box-shadow: none; }
-    body.compact-mode #scheduled-indicator,
-    body.compact-mode #scheduled-list-box { padding-left: 12px; padding-right: 12px; }
-    body.compact-mode .is-other .chat-bubble { background: #ffffff; border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
-    body.compact-mode .is-me .chat-bubble { background: #fee500; color: #191919; border: none; border-radius: 18px 18px 4px 18px; box-shadow: none; }
-    body.compact-mode .bubble-sender { color: #475569; font-size: 11px; font-weight: 600; margin: 0 6px 4px 2px; }
-    body.compact-mode .bubble-sender::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; }
-    body.compact-mode .msg-row-bubble.is-me { padding-right: 2px; }
-    body.compact-mode .msg-row-bubble.is-other { padding-left: 2px; }
-    body.compact-mode .msg-row { max-width: 92%; padding: 4px 6px; gap: 8px; }
-    body.compact-mode .msg-avatar { width: 32px; height: 32px; font-size: 12px; border-radius: 50%; }
-    body.compact-mode .msg-sender-name { font-size: 11px; }
-    body.compact-mode .msg-text { font-size: 14px; padding: 10px 14px; }
-    body.compact-mode .msg-row.is-me .msg-text { border-radius: 18px 18px 4px 18px; background: #fee500; color: #191919; border: none; }
-    body.compact-mode .msg-row.is-other .msg-text { border-radius: 18px 18px 18px 4px; }
-
-    #compact-back-btn { display: none; width: 36px; height: 36px; font-size: 0; color: #191919; background: transparent; border: none; border-radius: 8px; cursor: pointer; }
-    #compact-back-btn:hover { background: #f0f0f0; }
-
-    #compact-list-view { display: none; flex-direction: row; height: 100%; background: #fff; min-width: 480px; --compact-accent: #ff6229; --compact-rail: #ebebeb; }
-    .compact-rail { width: 52px; flex-shrink: 0; background: var(--compact-rail); display: flex; flex-direction: column; align-items: center; padding: 8px 0 10px; gap: 2px; border-right: 1px solid #e0e0e0; }
-    .compact-rail-spacer { flex: 1; min-height: 8px; }
-    .compact-rail-btn { position: relative; width: 44px; height: 44px; border: none; background: transparent; border-radius: 12px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-    .compact-rail-btn .icon-glyph { width: 22px; height: 22px; }
-    .compact-rail-btn:hover { background: rgba(0, 0, 0, 0.06); color: #191919; }
-    .compact-rail-btn.is-active { color: #191919; background: rgba(0, 0, 0, 0.08); }
-    .compact-rail-badge { position: absolute; top: 4px; right: 2px; min-width: 16px; height: 16px; font-size: 9px; padding: 0 4px; background: var(--compact-accent); box-shadow: none; }
-
-    .compact-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; }
-    .compact-header { flex-shrink: 0; height: 52px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #ececec; background: #fff; }
-    .compact-header-title-wrap { min-width: 0; }
-    .compact-header-title { font-size: 20px; font-weight: 700; color: #191919; letter-spacing: -0.03em; line-height: 1.2; }
-    .compact-header-sub { font-size: 11px; color: #888; margin-top: 2px; font-weight: 500; }
-    .compact-header-actions { display: flex; gap: 2px; flex-shrink: 0; }
-    .compact-header-actions .icon-btn-compact { width: 36px; height: 36px; color: #333; background: transparent; border-radius: 8px; opacity: 1; }
-    .compact-header-actions .icon-btn-compact:hover { background: #f0f0f0; }
-    .compact-header-actions .icon-btn-compact.is-master-authed { color: #059669; }
-    .compact-mode-exit-btn {
-      height: 32px; padding: 0 11px; font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
-      border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; cursor: pointer;
-      flex-shrink: 0; transition: background 0.12s ease, border-color 0.12s ease;
-    }
-    .compact-mode-exit-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
-
-    .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-    .compact-pane[hidden] { display: none !important; }
-
-    .compact-filter-row { display: flex; gap: 6px; padding: 10px 14px 0; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
-    .compact-filter-row::-webkit-scrollbar { display: none; }
-    .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: #f0f0f0; font-size: 12px; font-weight: 600; color: #666; cursor: pointer; transition: background 0.12s, color 0.12s; }
-    .compact-filter-chip:hover { color: #333; background: #e8e8e8; }
-    .compact-filter-chip.is-active { background: #191919; color: #fff; }
-
-    .compact-search { padding: 8px 14px 6px; flex-shrink: 0; position: relative; background: #fff; }
-    .compact-search input { width: 100%; padding: 9px 36px 9px 36px; border-radius: 8px; border: none; background: #f5f5f5; font-size: 13px; outline: none; color: #191919; }
-    .compact-search input::placeholder { color: #999; }
-    .compact-search input:focus { background: #efefef; }
-    .compact-search-icon { position: absolute; left: 26px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.45; pointer-events: none; display: flex; }
-    .compact-search-clear { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border: none; background: #bbb; color: #fff; border-radius: 50%; font-size: 14px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
-
-    #compact-list-items,
-    #compact-friends-list-items { flex: 1; min-height: 0; overflow-y: auto; padding: 0; scrollbar-width: thin; background: #fff; }
-    .compact-list-panel { background: transparent; margin-bottom: 0; }
-    .compact-section-label { font-size: 12px; font-weight: 600; color: #888; padding: 14px 16px 6px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-top: 1px solid #f0f0f0; }
-    .compact-list-panel:first-child .compact-section-label { border-top: none; }
-    .compact-section-label span:first-child { color: #888; font-weight: 600; font-size: 12px; }
-    .compact-section-label .unread-badge { min-width: 16px; height: 16px; font-size: 9px; background: var(--compact-accent); box-shadow: none; }
-    .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
-    .compact-list-item:hover { background: #f7f7f7; }
-    .compact-list-item.is-active { background: #f0f0f0; }
-    .compact-list-item.is-offline { opacity: 0.72; }
-    .compact-list-item.is-offline .compact-item-name { color: #888; }
-    .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
-    .compact-avatar { position: relative; width: 46px; height: 46px; border-radius: 50%; background: #ddd; color: #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; box-shadow: none; overflow: hidden; }
-    .compact-avatar-broadcast { background: #4a4a4a; color: #fff; font-size: 14px; }
-    .compact-avatar-transport { background: #e85d5d; color: #fff; font-size: 15px; }
-    .compact-avatar-group { background: #7eb8e8; color: #fff; font-size: 15px; }
-    .compact-avatar-dept { background: #64748b; color: #fff; font-size: 14px; }
-    .compact-avatar-floor { background: #0ea5e9; color: #fff; font-size: 14px; }
-    .compact-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
-    .compact-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-    .compact-item-name { font-weight: 700; font-size: 14px; color: #191919; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; letter-spacing: -0.02em; }
-    .compact-item-inline-sub { font-weight: 500; font-size: 12px; color: #888; }
-    .compact-item-time { flex-shrink: 0; font-size: 11px; font-weight: 400; color: #999; white-space: nowrap; }
-    .compact-item-time.is-live { color: #888; }
-    .compact-item-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-    .compact-item-sub, .compact-item-preview { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; line-height: 1.25; }
-    .compact-empty-hint { text-align: center; padding: 48px 24px; color: #888; font-size: 13px; line-height: 1.65; white-space: pre-line; background: #fff; margin: 0; }
-
-    .compact-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; }
-    .compact-more-profile { margin-top: 12px; border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; background: #fff; }
-    .compact-more-profile-top { padding: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-    .compact-more-profile-name { font-size: 16px; font-weight: 700; color: #191919; letter-spacing: -0.02em; }
-    .compact-more-profile-sub { font-size: 12px; color: #888; margin-top: 4px; }
-    .compact-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 0; margin-top: 20px; }
-    .compact-more-cell { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 4px; border: none; background: transparent; cursor: pointer; border-radius: 8px; color: #333; font-size: 11px; font-weight: 500; }
-    .compact-more-cell:hover { background: #f5f5f5; }
-    .compact-more-cell-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #191919; }
-    .compact-more-cell-icon .icon-glyph { width: 24px; height: 24px; }
-    .compact-more-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #999; }
+    /* 미니 모드 스타일 → assets/compact/compact-overlay.css (Discord Overlay × 카카오톡) */
+    #compact-list-view { display: none; }
+    #compact-back-btn { display: none; }
 
     .msg-row-bubble { display: flex; flex-direction: column; max-width: 78%; margin: 4px 0; }
     .msg-row-bubble.is-me { align-items: flex-end; align-self: flex-end; margin-left: auto; }
@@ -2742,7 +2586,6 @@
     @keyframes sb-refresh-spin {
       to { transform: rotate(360deg); }
     }
-    body.compact-mode .schedule-board-refresh-btn .sb-refresh-label { display: none; }
     .schedule-board-toolbar {
       padding: 12px 20px 14px; flex-shrink: 0;
       background: #f8fafc; border-bottom: 1px solid #e2e8f0;
@@ -4532,8 +4375,8 @@
 
   <!-- 2단 대화 영역 -->
   <div id="main-chat-panel">
-    <!-- 🗨 미니 모드 전용: 대화상대 없을 때 보이는 간단한 목록 화면 -->
-    <div id="compact-list-view">
+    <!-- 🗨 미니 모드 — Discord Overlay × 카카오톡 컴팩트 채팅 -->
+    <div id="compact-list-view" class="mm-overlay-shell" style="display:none;">
       <aside class="compact-rail" aria-label="미니 모드 메뉴">
         <button type="button" class="compact-rail-btn" data-rail="friends" onclick="setCompactRailTab('friends')" title="직원">
           <span class="compact-rail-icon" data-ui-icon="users"></span>
@@ -4559,7 +4402,7 @@
           <div class="compact-header-actions">
             <button class="icon-btn-compact" id="toolbar-settings-btn-compact" onclick="openSettingsModal()" title="설정" style="display:none;"></button>
             <button class="icon-btn-compact" id="compact-header-search-btn" onclick="focusCompactSearchInput()" title="검색"><span data-ui-icon="search"></span></button>
-            <button type="button" class="compact-mode-exit-btn" id="compact-expand-btn" onclick="toggleCompactMode()" title="기본 화면으로">일반</button>
+            <button type="button" class="compact-mode-exit-btn" id="compact-expand-btn" onclick="toggleCompactMode()" title="기본 화면으로">확장</button>
           </div>
         </header>
         <div class="compact-pane" data-compact-pane="chat">
@@ -4605,7 +4448,7 @@
               <button type="button" class="compact-more-cell" onclick="window.api.openFilesFolder()"><span class="compact-more-cell-icon" data-ui-icon="folder"></span>파일</button>
               <button type="button" class="compact-more-cell" onclick="openAllLogsModal()"><span class="compact-more-cell-icon" data-ui-icon="logs"></span>기록</button>
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
-              <button type="button" class="compact-more-cell" onclick="openCodeAlertModal()"><span class="compact-more-cell-icon" style="font-size:20px;line-height:1;">🚨</span>코드</button>
+              <button type="button" class="compact-more-cell" onclick="openCodeAlertModal()"><span class="compact-more-cell-icon" data-ui-icon="notice" style="color:#f87171;"></span>코드</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
               <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
             </div>
@@ -6566,33 +6409,39 @@
     const DELETED_MSG_HTML = '<span class="deleted-msg-flag" style="display:none"></span>삭제된 메시지입니다.';
 
     const _uiSvg = (inner) =>
-      `<svg class="icon-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+      `<svg class="icon-glyph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">${inner}</svg>`;
     const UI_SVG = {
-      lock: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
-      lockOpen: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
-      /* 마스터 인증 — 방패+인물 (경비원/보안 담당) */
-      shieldUser: _uiSvg('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>'),
-      shieldCheck: _uiSvg('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'),
-      logs: _uiSvg('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
-      pin: _uiSvg('<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>'),
-      folder: _uiSvg('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'),
-      refresh: _uiSvg('<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'),
-      panelNarrow: _uiSvg('<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>'),
-      monitor: _uiSvg('<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'),
-      chevronLeft: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
-      chevronRight: _uiSvg('<path d="m9 18 6-6-6-6"/>'),
-      settings: _uiSvg('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'),
-      clearChat: _uiSvg('<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>'),
-      search: _uiSvg('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>'),
-      mediaArchive: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'),
-      back: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
-      ipmsg: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>'),
-      notice: _uiSvg('<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19 7a9 9 0 0 1 0 10"/>'),
-      users: _uiSvg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
-      chatBubble: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
-      moreDots: _uiSvg('<circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/>'),
-      calendar: _uiSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
-      question: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>')
+      lock: _uiSvg('<path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/>'),
+      lockOpen: _uiSvg('<path d="M208,80H96V56a32,32,0,0,1,32-32c15.37,0,29.2,11,32.16,25.59a8,8,0,0,0,15.68-3.18C171.32,24.15,151.2,8,128,8A48.05,48.05,0,0,0,80,56V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80Zm0,128H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/>'),
+      shieldUser: _uiSvg('<path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/>'),
+      shieldCheck: _uiSvg('<path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/>'),
+      logs: _uiSvg('<path d="M96,104a8,8,0,0,1,8-8h64a8,8,0,0,1,0,16H104A8,8,0,0,1,96,104Zm8,40h64a8,8,0,0,0,0-16H104a8,8,0,0,0,0,16Zm128,48a32,32,0,0,1-32,32H88a32,32,0,0,1-32-32V64a16,16,0,0,0-32,0c0,5.74,4.83,9.62,4.88,9.66h0A8,8,0,0,1,24,88a7.89,7.89,0,0,1-4.79-1.61h0C18.05,85.54,8,77.61,8,64A32,32,0,0,1,40,32H176a32,32,0,0,1,32,32V168h8a8,8,0,0,1,4.8,1.6C222,170.46,232,178.39,232,192ZM96.26,173.48A8.07,8.07,0,0,1,104,168h88V64a16,16,0,0,0-16-16H67.69A31.71,31.71,0,0,1,72,64V192a16,16,0,0,0,32,0c0-5.74-4.83-9.62-4.88-9.66A7.82,7.82,0,0,1,96.26,173.48ZM216,192a12.58,12.58,0,0,0-3.23-8h-94a26.92,26.92,0,0,1,1.21,8,31.82,31.82,0,0,1-4.29,16H200A16,16,0,0,0,216,192Z"/>'),
+      pin: _uiSvg('<path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/>'),
+      folder: _uiSvg('<path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM40,56H92.69l16,16H40ZM216,200H40V88H216Z"/>'),
+      refresh: _uiSvg('<path d="M224,48V96a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h28.69L182.06,73.37a79.56,79.56,0,0,0-56.13-23.43h-.45A79.52,79.52,0,0,0,69.59,72.71,8,8,0,0,1,58.41,61.27a96,96,0,0,1,135,.79L208,76.69V48a8,8,0,0,1,16,0ZM186.41,183.29a80,80,0,0,1-112.47-.66L59.31,168H88a8,8,0,0,0,0-16H40a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V179.31l14.63,14.63A95.43,95.43,0,0,0,130,222.06h.53a95.36,95.36,0,0,0,67.07-27.33,8,8,0,0,0-11.18-11.44Z"/>'),
+      panelNarrow: _uiSvg('<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z"/>'),
+      monitor: _uiSvg('<path d="M208,40H48A24,24,0,0,0,24,64V176a24,24,0,0,0,24,24H208a24,24,0,0,0,24-24V64A24,24,0,0,0,208,40Zm8,136a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8H208a8,8,0,0,1,8,8Zm-48,48a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,224Z"/>'),
+      chevronLeft: _uiSvg('<path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/>'),
+      chevronRight: _uiSvg('<path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/>'),
+      settings: _uiSvg('<path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"/>'),
+      clearChat: _uiSvg('<path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/>'),
+      search: _uiSvg('<path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/>'),
+      mediaArchive: _uiSvg('<path d="M224,48H32A16,16,0,0,0,16,64V88a16,16,0,0,0,16,16v88a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V104a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM208,192H48V104H208ZM224,88H32V64H224V88ZM96,136a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,136Z"/>'),
+      back: _uiSvg('<path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/>'),
+      ipmsg: _uiSvg('<path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128ZM84,116a12,12,0,1,0,12,12A12,12,0,0,0,84,116Zm88,0a12,12,0,1,0,12,12A12,12,0,0,0,172,116Zm60,12A104,104,0,0,1,79.12,219.82L45.07,231.17a16,16,0,0,1-20.24-20.24l11.35-34.05A104,104,0,1,1,232,128Zm-16,0A88,88,0,1,0,51.81,172.06a8,8,0,0,1,.66,6.54L40,216,77.4,203.53a7.85,7.85,0,0,1,2.53-.42,8,8,0,0,1,4,1.08A88,88,0,0,0,216,128Z"/>'),
+      notice: _uiSvg('<path d="M248,120a48.05,48.05,0,0,0-48-48H160.2c-2.91-.17-53.62-3.74-101.91-44.24A16,16,0,0,0,32,40V200a16,16,0,0,0,26.29,12.25c37.77-31.68,77-40.76,93.71-43.3v31.72A16,16,0,0,0,159.12,214l11,7.33A16,16,0,0,0,194.5,212l11.77-44.36A48.07,48.07,0,0,0,248,120ZM48,199.93V40h0c42.81,35.91,86.63,45,104,47.24v65.48C134.65,155,90.84,164.07,48,199.93Zm131,8,0,.11-11-7.33V168h21.6ZM200,152H168V88h32a32,32,0,1,1,0,64Z"/>'),
+      users: _uiSvg('<path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/>'),
+      chatBubble: _uiSvg('<path d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"/>'),
+      moreDots: _uiSvg('<path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/>'),
+      calendar: _uiSvg('<path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/>'),
+      question: _uiSvg('<path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/>'),
+      send: _uiSvg('<path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/>'),
+      expand: _uiSvg('<path d="M216,48V96a8,8,0,0,1-16,0V67.31l-42.34,42.35a8,8,0,0,1-11.32-11.32L188.69,56H160a8,8,0,0,1,0-16h48A8,8,0,0,1,216,48ZM98.34,146.34,56,188.69V160a8,8,0,0,0-16,0v48a8,8,0,0,0,8,8H96a8,8,0,0,0,0-16H67.31l42.35-42.34a8,8,0,0,0-11.32-11.32ZM208,152a8,8,0,0,0-8,8v28.69l-42.34-42.35a8,8,0,0,0-11.32,11.32L188.69,200H160a8,8,0,0,0,0,16h48a8,8,0,0,0,8-8V160A8,8,0,0,0,208,152ZM67.31,56H96a8,8,0,0,0,0-16H48a8,8,0,0,0-8,8V96a8,8,0,0,0,16,0V67.31l42.34,42.35a8,8,0,0,0,11.32-11.32Z"/>'),
+      compress: _uiSvg('<path d="M144,104V64a8,8,0,0,1,16,0V84.69l42.34-42.35a8,8,0,0,1,11.32,11.32L171.31,96H192a8,8,0,0,1,0,16H152A8,8,0,0,1,144,104Zm-40,40H64a8,8,0,0,0,0,16H84.69L42.34,202.34a8,8,0,0,0,11.32,11.32L96,171.31V192a8,8,0,0,0,16,0V152A8,8,0,0,0,104,144Zm67.31,16H192a8,8,0,0,0,0-16H152a8,8,0,0,0-8,8v40a8,8,0,0,0,16,0V171.31l42.34,42.35a8,8,0,0,0,11.32-11.32ZM104,56a8,8,0,0,0-8,8V84.69L53.66,42.34A8,8,0,0,0,42.34,53.66L84.69,96H64a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V64A8,8,0,0,0,104,56Z"/>'),
+      star: _uiSvg('<path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"/>'),
+      funnel: _uiSvg('<path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.32l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/>'),
+      userCircle: _uiSvg('<path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24ZM74.08,197.5a64,64,0,0,1,107.84,0,87.83,87.83,0,0,1-107.84,0ZM96,120a32,32,0,1,1,32,32A32,32,0,0,1,96,120Zm97.76,66.41a79.66,79.66,0,0,0-36.06-28.75,48,48,0,1,0-59.4,0,79.66,79.66,0,0,0-36.06,28.75,88,88,0,1,1,131.52,0Z"/>'),
+      x: _uiSvg('<path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/>'),
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 

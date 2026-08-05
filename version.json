@@ -1,4 +1,4 @@
 {
-  "version": "1.0.455",
-  "notes": "메모리·CPU 폭주 검사 스크립트 추가 (stress:cpu-mem) — 500대 동시 부하에서 RSS·이벤트루프·CPU 측정"
+  "version": "1.0.456",
+  "notes": "미니모드 개편 — Discord Overlay 반투명 크롬 + 카카오톡 컴팩트 채팅, Tailwind CSS, Phosphor Icons"
 }
