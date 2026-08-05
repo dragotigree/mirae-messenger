@@ -2786,7 +2786,8 @@
     .modal-card.all-logs-modal-card,
     .modal-card.calendar-day-modal-card,
     .modal-card.transport-modal-card,
-    .modal-card.schedule-board-modal-card {
+    .modal-card.schedule-board-modal-card,
+    .modal-card.settings-modal-card {
       padding: 0;
       gap: 0;
       overflow: hidden;
@@ -2828,6 +2829,73 @@
     }
     body.schedule-board-standalone #app-dialog-overlay {
       z-index: 6000;
+    }
+
+    /* 설정 모달 — 현황판급 크기 + 2열 배치 */
+    .modal-card.settings-modal-card {
+      width: min(1480px, 98vw) !important;
+      height: min(940px, 94vh);
+      max-height: 94vh;
+      max-width: none;
+      padding: 0;
+      gap: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border-radius: 16px;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+    }
+    #settings-modal.modal-overlay {
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .settings-modal-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 20px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .settings-modal-header h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #1d1c1d;
+    }
+    .settings-modal-header-hint {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .settings-modal-body {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 16px 18px 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-content: start;
+      background: #eef2f7;
+    }
+    .settings-modal-body > .settings-span-2 {
+      grid-column: 1 / -1;
+    }
+    .settings-modal-footer {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 18px;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+    }
+    @media (max-width: 960px) {
+      .settings-modal-body { grid-template-columns: 1fr; }
     }
 
     /* 설정 모달 — 프로필 사진 */
@@ -3589,10 +3657,14 @@
 
   <!-- ⚙️ 환경 설정 모달 -->
   <div id="settings-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div style="font-size:17px; font-weight:700; color:#1d1c1d;">⚙️ 메신저 환경 설정</div>
+    <div class="modal-card settings-modal-card">
+      <div class="settings-modal-header">
+        <h2>⚙️ 메신저 환경 설정</h2>
+        <span class="settings-modal-header-hint">프로필 · 알림 · 화면 · 업데이트</span>
+      </div>
+      <div class="settings-modal-body">
 
-      <div class="settings-section">
+      <div class="settings-section settings-span-2">
         <div class="settings-section-title">👤 내 프로필 및 연락처 정보</div>
         <div class="settings-profile-photo-row">
           <div class="settings-profile-avatar-wrap">
@@ -3620,8 +3692,8 @@
         <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-top:-2px;">성명만 있으면 사용할 수 있습니다. 직급·내선·휴대폰은 비워 두어도 됩니다. (예: 성명에 물리치료실1)</div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">🟢 나의 근무 상태 표시 설정</div>
+      <div class="settings-section">
+        <div class="settings-section-title">🟢 나의 근무 상태 표시 설정</div>
         <select id="setting-my-status" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
           <option value="ONLINE">🟢 온라인 (상담 가능)</option>
           <option value="BUSY">🔴 진료 중 / 치료 중</option>
@@ -3629,8 +3701,8 @@
         </select>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">🏢 사용자 목록 분류 설정</div>
+      <div class="settings-section">
+        <div class="settings-section-title">🏢 사용자 목록 분류 설정</div>
         <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
           목록 분류 기준:
           <select id="setting-user-grouping" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
@@ -3655,15 +3727,15 @@
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">사이드바·미니 모드 직원 목록에 적용됩니다. 「대화」 탭의 기존 대화는 그대로 보입니다.</div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">✏️ 맞춤법 검사</div>
+      <div class="settings-section">
+        <div class="settings-section-title">✏️ 맞춤법 검사</div>
         <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
           <input type="checkbox" id="setting-spellcheck" style="width:16px; height:16px;"> 채팅·글 입력 시 맞춤법 밑줄 표시
         </label>
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">한국어·영어 사전을 사용합니다. 오타에 우클릭하면 수정 제안을 볼 수 있습니다. (전문 용어·약어는 오탐될 수 있습니다.)</div>
       </div>
 
-      <div class="settings-section settings-notify-section">
+      <div class="settings-section settings-notify-section settings-span-2">
         <div class="settings-section-title">🔔 메시지 알림</div>
         <div class="settings-notify-list">
           <label class="settings-toggle-row" for="setting-notify-incoming">
@@ -3713,8 +3785,8 @@
         <p class="settings-notify-note">토스트의 <b>열기</b>는 해당 대화로 이동하고, <b>닫기</b>는 바로 숨깁니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다. 같은 상대가 연속으로 보내도 알림은 1개만 표시됩니다.</p>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">📁 파일 수신 방식 설정</div>
+      <div class="settings-section">
+        <div class="settings-section-title">📁 파일 수신 방식 설정</div>
         <div style="font-size:11px; color:#94a3b8; line-height:1.4;">사이드바 📁 버튼으로 여는 폴더와 동일합니다.</div>
         <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
           <input type="radio" name="file-recv-mode" value="auto" id="recv-auto"> 지정된 폴더에 <b>자동 저장</b>
@@ -3728,8 +3800,8 @@
         </div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:10px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">🎨 인터페이스 설정</div>
+      <div class="settings-section">
+        <div class="settings-section-title">🎨 인터페이스 설정</div>
         <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
           화면 모드:
           <select id="setting-default-view" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
@@ -3781,8 +3853,8 @@
         <button onclick="window.api.openUserDataFolder()" style="align-self:flex-start; padding:6px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">📂 데이터 폴더 열기</button>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">🔒 화면 잠금 (사생활 보호)</div>
+      <div class="settings-section">
+        <div class="settings-section-title">🔒 화면 잠금 (사생활 보호)</div>
         <div style="font-size:11px; color:#94a3b8; line-height:1.45;">카카오톡처럼 PIN으로 화면을 잠가 대화 내용을 가립니다. 직급자·공용 PC에 권장합니다. 하단 자물쇠 버튼으로 즉시 잠글 수 있습니다.</div>
         <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer;">
           <input type="checkbox" id="setting-privacy-lock-enabled" style="width:16px; height:16px;" onchange="onPrivacyLockEnabledToggle()"> 화면 잠금 사용
@@ -3813,22 +3885,22 @@
         </div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">💾 대화 내용 백업</div>
+      <div class="settings-section">
+        <div class="settings-section-title">💾 대화 내용 백업</div>
         <div style="font-size:11px; color:#94a3b8; line-height:1.45;">저장된 모든 대화를 JSON·텍스트·CSV 파일과 일별 채팅 로그로 내보냅니다. 폴더를 선택하면 그 안에 백업용 하위 폴더가 만들어집니다.</div>
         <button type="button" onclick="backupChatHistory()" style="align-self:flex-start; padding:8px 14px; background:var(--accent); border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">대화 백업 실행</button>
         <div id="chat-backup-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
       </div>
 
-      <div style="background:#fff7f7; border:1px solid #fecaca; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:#b91c1c;">🗑️ 대화·로그 전체 삭제</div>
+      <div class="settings-section" style="background:#fff7f7; border-color:#fecaca;">
+        <div class="settings-section-title" style="color:#b91c1c;">🗑️ 대화·로그 전체 삭제</div>
         <div style="font-size:11px; color:#94a3b8; line-height:1.45;">이 PC에 저장된 <b>모든 대화 메시지</b>, 일별 채팅 로그(<code>chat_logs</code>), 앱 로그, 자동 DB 백업을 삭제합니다. 공지·일정·프로필·직원 목록은 유지됩니다. 삭제 전 위에서 백업하는 것을 권장합니다.</div>
         <button type="button" onclick="clearAllChatHistoryFromSettings()" style="align-self:flex-start; padding:8px 14px; background:#dc2626; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">모든 대화·로그 삭제</button>
         <div id="chat-clear-all-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:4px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent); margin-bottom:4px;">📶 네트워크 연결 상태</div>
+      <div class="settings-section">
+        <div class="settings-section-title">📶 네트워크 연결 상태</div>
         <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
         <div class="net-status-row"><span>사용자 검색(UDP)</span><span id="net-udp-status">-</span></div>
         <div class="net-status-row"><span>메시지 연결(TCP)</span><span id="net-tcp-status">-</span></div>
@@ -3836,8 +3908,8 @@
         <div style="font-size:10px; color:#94a3b8; margin-top:4px;">메시지가 전혀 안 오고 간다면, 위 상태가 "오류"인지 먼저 확인해 주세요. 대부분 Windows 방화벽에서 이 프로그램의 접근을 허용하면 해결됩니다.</div>
       </div>
 
-      <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius: 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:13px; font-weight:700; color:var(--accent);">🔄 프로그램 업데이트</div>
+      <div class="settings-section settings-span-2">
+        <div class="settings-section-title">🔄 프로그램 업데이트</div>
         <div style="font-size:12px; color:#475569;">현재 버전: <b id="update-current-version">-</b></div>
         <label style="font-size:12px; color:#475569;">업데이트 소스 (GitHub 또는 Z 브리지):
           <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
@@ -3854,7 +3926,9 @@
         <div id="update-check-result" style="font-size:12px; color:#64748b;"></div>
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
+      </div><!-- /.settings-modal-body -->
+
+      <div class="settings-modal-footer">
         <button onclick="closeSettingsModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
         <button onclick="saveAppSettings()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">💾 설정 저장</button>
       </div>
