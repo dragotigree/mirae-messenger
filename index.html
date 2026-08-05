@@ -4143,7 +4143,7 @@
       </div>
       <div class="sidebar-cal-actions">
         <button type="button" id="sidebar-cal-refresh-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
-        <button type="button" id="sidebar-cal-board-btn" onclick="openScheduleBoardModal()">📋 현황판</button>
+        <button type="button" id="sidebar-cal-board-btn" onclick="openScheduleBoardModal()" title="병동 일정 현황판 (Ctrl+3)">📋 현황판</button>
         <button type="button" id="add-sch-btn" onclick="openDutyRosterModal()" title="주치의 OFF · 당직의 등록">일정등록</button>
       </div>
     </div>
@@ -20793,6 +20793,11 @@
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '2' || e.code === 'Digit2')) {
         e.preventDefault();
         if (!isPrivacyScreenLocked) openAllLogsModal();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '3' || e.code === 'Digit3')) {
+        e.preventDefault();
+        if (!isPrivacyScreenLocked) openScheduleBoardModal();
         return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
