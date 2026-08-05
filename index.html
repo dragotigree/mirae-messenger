@@ -5133,7 +5133,7 @@
 
       <div class="settings-panel" data-settings-panel="privacy">
         <h3 class="settings-panel-title">화면 잠금</h3>
-        <p class="settings-panel-desc">PIN으로 화면을 잠가 대화 내용을 가립니다.</p>
+        <p class="settings-panel-desc">PIN으로 화면을 잠가 대화 내용을 가립니다. 사용 중이면 <b>Esc</b>로도 바로 잠글 수 있습니다.</p>
         <div class="settings-card" id="settings-privacy-card">
           <label class="settings-inline-check">
             <input type="checkbox" id="setting-privacy-lock-enabled" onchange="onPrivacyLockEnabledToggle()"> 화면 잠금 사용
@@ -5148,6 +5148,7 @@
               </label>
             </div>
             <div id="privacy-lock-pin-hint" class="settings-hint">처음 켤 때는 PIN을 반드시 설정하세요. 이미 설정돼 있으면 비워 두고 저장해도 됩니다.</div>
+            <div class="settings-hint">단축키: <b>Esc</b> — 열린 창이 없을 때 화면 잠금 · 툴바 잠금 버튼 · 트레이로 숨기기</div>
             <label class="settings-inline-check">
               <input type="checkbox" id="setting-privacy-lock-on-hide" checked> 트레이로 숨길 때 자동 잠금
             </label>
@@ -9100,7 +9101,13 @@
       if (btn) {
         btn.classList.toggle('is-privacy-ready', isPrivacyLockEnabled());
         btn.title = isPrivacyLockEnabled()
-          ? '화면 잠금 (사생활 보호)'
+          ? '화면 잠금 (Esc · 사생활 보호)'
+          : '화면 잠금 — 설정에서 PIN을 먼저 켜 주세요';
+      }
+      const compactBtn = document.getElementById('compact-privacy-lock-btn');
+      if (compactBtn) {
+        compactBtn.title = isPrivacyLockEnabled()
+          ? '화면 잠금 (Esc)'
           : '화면 잠금 — 설정에서 PIN을 먼저 켜 주세요';
       }
       const fields = document.getElementById('privacy-lock-settings-fields');
@@ -9108,6 +9115,19 @@
       if (fields && enabledEl) {
         fields.style.display = enabledEl.checked ? 'flex' : 'none';
       }
+    }
+
+    /** Esc로 화면 잠금 — 설정에서 잠금 사용 중인 경우만. 잠그면 true. */
+    function tryPrivacyLockOnEscape(e) {
+      if (!e || e.key !== 'Escape') return false;
+      if (isPrivacyScreenLocked) return false;
+      if (!isPrivacyLockEnabled()) return false;
+      if (document.body.classList.contains('schedule-board-standalone')) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      leaveActiveChatForPrivacy();
+      lockPrivacyScreen({ silent: true });
+      return true;
     }
 
     function onPrivacyLockEnabledToggle() {
@@ -21195,6 +21215,7 @@
           return;
         }
         if (await handleEscapeKeyForOverlays(e)) return;
+        if (tryPrivacyLockOnEscape(e)) return;
       }
       if (e.ctrlKey && e.altKey && (e.key === 'e' || e.key === 'E' || e.keyCode === 69)) {
         e.preventDefault();
