@@ -7721,7 +7721,8 @@ ipcMain.handle('get-schedules', async () => {
     db.all(`SELECT * FROM hospital_schedules ORDER BY time_str ASC`, [], (err, rows) => {
       if (err) {
         logDbErr(err);
-        resolve([]);
+        // [] 대신 null → 렌더러가 기존 hospitalSchedules를 유지하도록
+        resolve(null);
         return;
       }
       const list = rows || [];

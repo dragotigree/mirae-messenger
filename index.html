@@ -7839,8 +7839,12 @@
           console.error('그룹 상세 패널 갱신 실패:', e);
         }
       } else if (activeChatUser && isDmPeerIp(activeChatUser.ip)) {
-        const live = findUserByIp(activeChatUser.ip);
-        if (live) renderContactDetailPanel(userWithSavedContactSnapshot(live));
+        try {
+          const live = findUserByIp(activeChatUser.ip);
+          if (live) renderContactDetailPanel(userWithSavedContactSnapshot(live));
+        } catch (e) {
+          console.error('연락처 상세 패널 갱신 실패:', e);
+        }
       }
     });
 
@@ -8624,11 +8628,17 @@
       const compact = document.body.classList.contains('compact-mode');
       const hasChat = !!activeChatUser;
 
-      document.getElementById('compact-list-view').style.display = (compact && !hasChat) ? 'flex' : 'none';
-      document.getElementById('empty-state').style.display = (!compact && !hasChat) ? 'flex' : 'none';
-      document.getElementById('active-chat-container').style.display = hasChat ? 'flex' : 'none';
-      document.getElementById('active-chat-container')?.classList.toggle('is-chat-open', hasChat);
-      document.getElementById('compact-back-btn').style.display = (compact && hasChat) ? 'flex' : 'none';
+      const compactList = document.getElementById('compact-list-view');
+      const emptyState = document.getElementById('empty-state');
+      const activeChat = document.getElementById('active-chat-container');
+      const compactBack = document.getElementById('compact-back-btn');
+      if (compactList) compactList.style.display = (compact && !hasChat) ? 'flex' : 'none';
+      if (emptyState) emptyState.style.display = (!compact && !hasChat) ? 'flex' : 'none';
+      if (activeChat) {
+        activeChat.style.display = hasChat ? 'flex' : 'none';
+        activeChat.classList.toggle('is-chat-open', hasChat);
+      }
+      if (compactBack) compactBack.style.display = (compact && hasChat) ? 'flex' : 'none';
 
       if (compact && !hasChat) {
         setCompactRailTab(compactRailTab);
@@ -16276,6 +16286,7 @@
       const skipStatusUpdate = !!options.skipStatusUpdate;
       const skipEnterAnim = !!options.skipEnterAnim;
       const container = document.getElementById('chat-messages-area');
+      if (!container) return;
       const wasNearBottom = isMe || isNearChatBottom();
 
       // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 제한 (예: 300개)
@@ -16418,7 +16429,21 @@
       }
       container.appendChild(row);
       if (!skipEnterAnim) {
-        row.addEventListener('animationend', () => row.classList.remove('is-live-enter'), { once: true });
+        const prefersReduced = typeof matchMedia === 'function'
+          && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReduced) {
+          row.classList.remove('is-live-enter');
+        } else {
+          let enterFallback = 0;
+          const clearEnter = (e) => {
+            if (e && e.target && e.target !== row) return;
+            row.classList.remove('is-live-enter');
+            row.removeEventListener('animationend', clearEnter);
+            if (enterFallback) clearTimeout(enterFallback);
+          };
+          enterFallback = setTimeout(() => clearEnter(null), 500);
+          row.addEventListener('animationend', clearEnter);
+        }
       }
       bindMessageForwardDrag(row);
       if (isMe && !isGroupChannel && !skipStatusUpdate) updateMineOutboundStatusLabels();
@@ -17293,7 +17318,12 @@
           schedulesRefreshPending = false;
           try {
             const rows = await window.api.getSchedules();
-            hospitalSchedules = Array.isArray(rows) ? rows : [];
+            // DB 오류 등으로 null/비배열이 오면 기존 목록을 유지 (빈 배열로 덮어 알람 상태 폭주를 막음)
+            if (!Array.isArray(rows)) {
+              console.error('일정 불러오기 실패: 잘못된 응답');
+              return;
+            }
+            hospitalSchedules = rows;
             rebuildScheduleIndexes();
           } catch (err) {
             console.error('일정 불러오기 실패:', err);
@@ -19853,99 +19883,118 @@
     }
 
     async function startScheduleAlarmChecker() {
+      // 현황판 전용 창에서도 index.html이 로드되므로 메인 창에서만 알람을 돌린다.
+      if (typeof isScheduleBoardStandalone === 'function' && isScheduleBoardStandalone()) return;
+
       const ALARM_GRACE_MS = 15 * 60 * 1000; // 절전·지연 후에도 놓치지 않도록 허용 창
+      let scheduleAlarmTickBusy = false;
       setInterval(async () => {
         if (!isScheduleAlarmEnabled()) return;
+        if (scheduleAlarmTickBusy) return;
+        scheduleAlarmTickBusy = true;
+        try {
+          const lead = getScheduleAlarmLeadMinutes();
+          const onEdit = isScheduleAlarmOnEdit();
+          const now = Date.now();
+          const scheduleList = Array.isArray(hospitalSchedules) ? hospitalSchedules : [];
+          const liveUids = new Set();
+          const dueBatch = [];
+          let updated = false;
 
-        const lead = getScheduleAlarmLeadMinutes();
-        const onEdit = isScheduleAlarmOnEdit();
-        const now = Date.now();
-        const liveUids = new Set();
-        const dueBatch = [];
-        let updated = false;
+          scheduleList.forEach((sch) => {
+            if (!sch || !sch.uid) return;
+            liveUids.add(sch.uid);
 
-        (hospitalSchedules || []).forEach((sch) => {
-          if (!sch || !sch.uid) return;
-          liveUids.add(sch.uid);
+            // 출발 시각 미정(정오 placeholder)은 알람 대상에서 제외
+            if (typeof isScheduleStartUndecided === 'function' && isScheduleStartUndecided(sch)) {
+              if (notifiedScheduleUids[sch.uid]) {
+                delete notifiedScheduleUids[sch.uid];
+                updated = true;
+              }
+              return;
+            }
 
-          // 출발 시각 미정(정오 placeholder)은 알람 대상에서 제외
-          if (typeof isScheduleStartUndecided === 'function' && isScheduleStartUndecided(sch)) {
-            if (notifiedScheduleUids[sch.uid]) {
+            const fp = scheduleAlarmFingerprint(sch);
+            const prev = notifiedScheduleUids[sch.uid];
+            const triggerAt = scheduleAlarmTriggerAt(sch, lead);
+            if (!Number.isFinite(triggerAt)) return;
+
+            if (prev) {
+              if (prev.fp === fp) return;
+              if (!onEdit) {
+                notifiedScheduleUids[sch.uid] = { fp };
+                updated = true;
+                return;
+              }
               delete notifiedScheduleUids[sch.uid];
               updated = true;
             }
-            return;
-          }
 
-          const fp = scheduleAlarmFingerprint(sch);
-          const prev = notifiedScheduleUids[sch.uid];
-          const triggerAt = scheduleAlarmTriggerAt(sch, lead);
-          if (!Number.isFinite(triggerAt)) return;
+            if (now < triggerAt) return;
 
-          if (prev) {
-            if (prev.fp === fp) return;
-            if (!onEdit) {
+            if (now - triggerAt > ALARM_GRACE_MS) {
               notifiedScheduleUids[sch.uid] = { fp };
               updated = true;
               return;
             }
-            delete notifiedScheduleUids[sch.uid];
-            updated = true;
-          }
 
-          if (now < triggerAt) return;
-
-          if (now - triggerAt > ALARM_GRACE_MS) {
+            dueBatch.push(sch);
             notifiedScheduleUids[sch.uid] = { fp };
             updated = true;
-            return;
+          });
+
+          // 목록이 비어 있으면(초기·DB 오류로 [] 반환) notified 상태를 통째로 지우지 않음
+          if (scheduleList.length > 0) {
+            for (const uid of Object.keys(notifiedScheduleUids)) {
+              if (!liveUids.has(uid)) {
+                delete notifiedScheduleUids[uid];
+                updated = true;
+              }
+            }
           }
 
-          dueBatch.push(sch);
-          notifiedScheduleUids[sch.uid] = { fp };
-          updated = true;
-        });
-
-        for (const uid of Object.keys(notifiedScheduleUids)) {
-          if (!liveUids.has(uid)) {
-            delete notifiedScheduleUids[uid];
-            updated = true;
+          if (updated) {
+            try { persistScheduleAlarmNotifiedState(); } catch (e) {
+              console.error('일정 알람 상태 저장 실패:', e);
+            }
           }
-        }
+          if (!dueBatch.length) return;
 
-        if (updated) persistScheduleAlarmNotifiedState();
-        if (!dueBatch.length) return;
+          dueBatch.sort((a, b) => {
+            const ta = new Date(a.time_str).getTime() || 0;
+            const tb = new Date(b.time_str).getTime() || 0;
+            return ta - tb;
+          });
 
-        dueBatch.sort((a, b) => {
-          const ta = new Date(a.time_str).getTime() || 0;
-          const tb = new Date(b.time_str).getTime() || 0;
-          return ta - tb;
-        });
+          const leadLabel = lead === 0
+            ? '예정 시각'
+            : lead === 1440
+              ? '하루 전'
+              : lead >= 60
+                ? `${Math.round(lead / 60)}시간 전`
+                : `${lead}분 전`;
+          const lines = dueBatch.map((sch, i) => `${i + 1}. ${formatScheduleAlarmLine(sch)}`);
+          const title = dueBatch.length === 1
+            ? `일정 알람 · ${scheduleAlarmTypeLabel(dueBatch[0])}`
+            : `일정 알람 ${dueBatch.length}건`;
+          const body = [`알림 시점: ${leadLabel}`, ...lines].join('\n');
 
-        const leadLabel = lead === 0
-          ? '예정 시각'
-          : lead === 1440
-            ? '하루 전'
-            : lead >= 60
-              ? `${Math.round(lead / 60)}시간 전`
-              : `${lead}분 전`;
-        const lines = dueBatch.map((sch, i) => `${i + 1}. ${formatScheduleAlarmLine(sch)}`);
-        const title = dueBatch.length === 1
-          ? `일정 알람 · ${scheduleAlarmTypeLabel(dueBatch[0])}`
-          : `일정 알람 ${dueBatch.length}건`;
-        const body = [`알림 시점: ${leadLabel}`, ...lines].join('\n');
-
-        try {
-          // 여러 건은 OS 알림이 잘리므로 앱 대화상자로 전체 내용을 보여 줌
-          const preferDialog = dueBatch.length > 1 || body.length > 160;
-          if (!preferDialog && window.Notification && Notification.permission === 'granted') {
-            new Notification(title, { body, silent: false });
-          } else {
-            await appAlert(`${title}\n\n${body}`);
+          try {
+            // 여러 건은 OS 알림이 잘리므로 앱 대화상자로 전체 내용을 보여 줌
+            const preferDialog = dueBatch.length > 1 || body.length > 160;
+            if (!preferDialog && window.Notification && Notification.permission === 'granted') {
+              new Notification(title, { body, silent: false });
+            } else {
+              await appAlert(`${title}\n\n${body}`);
+            }
+          } catch (e) {
+            console.error('일정 알람 표시 실패:', e);
+            try { await appAlert(`${title}\n\n${body}`); } catch (_) {}
           }
         } catch (e) {
-          console.error('일정 알람 표시 실패:', e);
-          try { await appAlert(`${title}\n\n${body}`); } catch (_) {}
+          console.error('일정 알람 체크 실패:', e);
+        } finally {
+          scheduleAlarmTickBusy = false;
         }
       }, 10000);
     }
