@@ -139,6 +139,8 @@ contextBridge.exposeInMainWorld('api', {
   mirrorUpdateToZBridge: () => ipcRenderer.invoke('mirror-update-to-z-bridge'),
   getUpdateSourcePath: () => ipcRenderer.invoke('get-update-source-path'),
   setUpdateSourcePath: (folderPath) => ipcRenderer.invoke('set-update-source-path', folderPath),
+  getUpdateMode: () => ipcRenderer.invoke('get-update-mode'),
+  setUpdateMode: (mode) => ipcRenderer.invoke('set-update-mode', mode),
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
   applyUpdate: () => ipcRenderer.invoke('apply-update'),
   onAutoUpdateReady: (callback) => ipcRenderer.on('auto-update-ready', (e, data) => callback(data)),

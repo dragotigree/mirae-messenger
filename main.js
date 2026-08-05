@@ -364,6 +364,8 @@ const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
+/** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
+let updateMode = 'auto';
 
 // 🚑 이동요청시스템(mirae-transport) 연동: 이동기사에게 이동 요청을 전달하는 앱스크립트 웹앱 주소.
 let transportWebappUrl = '';
@@ -2279,12 +2281,14 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_read_receipts INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'auto'`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
       transportWebappUrl = DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = app.getPath('downloads');
-      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path) VALUES (1, 1, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
+      updateMode = 'auto';
+      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode) VALUES (1, 1, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode], logDbErr);
     } else {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
@@ -2298,6 +2302,7 @@ db.serialize(() => {
       } else {
         incomingNotifyMode = 'toast';
       }
+      updateMode = row.update_mode === 'manual' ? 'manual' : 'auto';
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
@@ -8057,6 +8062,23 @@ ipcMain.handle('set-update-source-path', async (event, folderPath) => {
   return { success: true, path: updateSourcePath };
 });
 
+function normalizeUpdateMode(mode) {
+  return String(mode || '').toLowerCase() === 'manual' ? 'manual' : 'auto';
+}
+
+function persistUpdateMode(mode) {
+  updateMode = normalizeUpdateMode(mode);
+  db.run(`UPDATE app_settings SET update_mode = ? WHERE id = 1`, [updateMode], logDbErr);
+  return updateMode;
+}
+
+ipcMain.handle('get-update-mode', async () => updateMode === 'manual' ? 'manual' : 'auto');
+
+ipcMain.handle('set-update-mode', async (event, mode) => {
+  const next = persistUpdateMode(mode);
+  return { success: true, mode: next };
+});
+
 ipcMain.handle('check-for-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
@@ -8608,6 +8630,7 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
 async function autoCheckAndApplyUpdate() {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath || !mainWindow) return;
+  if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
   let remote;
   try {
