@@ -1311,7 +1311,8 @@
     }
     .schedule-time-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      margin-top: 0; padding-top: 8px; border-top: 1px solid #e2e8f0; flex-shrink: 0;
+      margin-top: auto; padding: 8px; border: 1px solid #e2e8f0; border-radius: 12px;
+      background: #f8fafc; flex-shrink: 0;
     }
     .schedule-time-row label { font-size: 10.5px; font-weight: 700; color: #64748b; }
     .schedule-time-select {
@@ -5938,7 +5939,7 @@
                 <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('tomorrow9')">내일 09:00</button>
               </div>
             </div>
-            <div class="schedule-time-row" style="border-top:none; padding-top:0; margin-top:auto; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px;">
+            <div class="schedule-time-row">
               <label for="sch-msg-hour">시</label>
               <select id="sch-msg-hour" class="schedule-time-select" onchange="syncScheduleSendAtFromTimeSelects()"></select>
               <span class="schedule-time-colon">:</span>
