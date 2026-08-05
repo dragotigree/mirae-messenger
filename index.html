@@ -1473,11 +1473,33 @@
       gap: 8px; flex-shrink: 0; min-width: 0;
     }
     .sidebar-cal-header .sidebar-section-title {
-      margin: 0; gap: 6px; min-width: 0; flex: none;
-      font-size: 16px;
+      margin: 0; gap: 8px; min-width: 0; flex: none;
+      color: #0f172a;
     }
-    .sidebar-cal-header .sidebar-section-title > span {
-      flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .sidebar-cal-title {
+      display: inline-flex; align-items: center; gap: 9px;
+      min-width: 0; flex: 1;
+    }
+    .sidebar-cal-title-icon {
+      width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #e0f2fe 0%, #f0f9ff 100%);
+      color: #0284c7;
+      border: 1px solid #bae6fd;
+      box-shadow: 0 1px 2px rgba(14, 165, 233, 0.08);
+    }
+    .sidebar-cal-title-icon .icon-glyph { width: 15px; height: 15px; }
+    .sidebar-cal-title-text {
+      min-width: 0;
+      font-size: 15px; font-weight: 700; letter-spacing: -0.03em;
+      color: #0f172a; line-height: 1.25;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-cal-title-sub {
+      margin-top: 1px;
+      font-size: 10.5px; font-weight: 500; letter-spacing: -0.01em;
+      color: #94a3b8; line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .sidebar-cal-actions {
       display: flex; flex-wrap: nowrap; gap: 6px; align-items: center;
@@ -3477,7 +3499,13 @@
     <div id="sidebar-right-resize-handle" title="너비 조절 · 더블클릭으로 접기"></div>
     <div class="sidebar-cal-header">
       <div class="sidebar-section-title">
-        <span>📅 병원 달력</span>
+        <div class="sidebar-cal-title">
+          <span class="sidebar-cal-title-icon" data-ui-icon="calendar" aria-hidden="true"></span>
+          <span>
+            <span class="sidebar-cal-title-text">병원 달력</span>
+            <span class="sidebar-cal-title-sub">일정 · 당직 · 입퇴원</span>
+          </span>
+        </div>
         <button type="button" id="sidebar-right-collapse-btn" class="sidebar-panel-collapse-btn" onclick="toggleSidebarRight()" title="우측 패널 접기" data-ui-icon="panelCollapseRight"></button>
       </div>
       <div class="sidebar-cal-actions">
@@ -4815,7 +4843,8 @@
       notice: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5v3a1 1 0 0 0 1 1h1.2l2.8 2.5V3l-2.8 2.5H4a1 1 0 0 0-1 1z" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linejoin="round"/><path d="M11.5 5.5a3 3 0 0 1 0 5M12.75 3.25a5.25 5.25 0 0 1 0 9.5" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
       users: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
       chatBubble: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H9l-4.5 3.5V5.5z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>',
-      moreDots: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.75" fill="currentColor"/><circle cx="12" cy="12" r="1.75" fill="currentColor"/><circle cx="18" cy="12" r="1.75" fill="currentColor"/></svg>'
+      moreDots: '<svg class="icon-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.75" fill="currentColor"/><circle cx="12" cy="12" r="1.75" fill="currentColor"/><circle cx="18" cy="12" r="1.75" fill="currentColor"/></svg>',
+      calendar: '<svg class="icon-glyph" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.25" y="3.25" width="11.5" height="10.5" rx="2" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.3"/><path d="M2.25 6.25h11.5M5.25 2.25v2.5M10.75 2.25v2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="5.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="8" cy="9.1" r="0.85" fill="currentColor"/><circle cx="10.5" cy="9.1" r="0.85" fill="currentColor"/><circle cx="5.5" cy="11.5" r="0.85" fill="currentColor"/><circle cx="8" cy="11.5" r="0.85" fill="currentColor"/></svg>'
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
