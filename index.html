@@ -5257,7 +5257,7 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="privacy" onclick="setSettingsTab('privacy')">화면 잠금</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
-          <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">시스템</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="inquiry" onclick="setSettingsTab('inquiry')">문의</button>
         </nav>
         <div class="settings-panels">
@@ -5471,9 +5471,6 @@
               <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="on" id="setting-ui-animations-on" checked> <span><b>On</b><small>채팅·모달·빈 화면 등 가벼운 모션</small></span></label>
               <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="off" id="setting-ui-animations-off"> <span><b>Off</b><small>모션 없이 즉시 표시</small></span></label>
             </div>
-            <label class="settings-inline-check span-2">
-              <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
-            </label>
           </div>
         </div>
       </div>
@@ -5571,8 +5568,18 @@
       </div>
 
       <div class="settings-panel" data-settings-panel="system">
-        <h3 class="settings-panel-title">네트워크·업데이트</h3>
-        <p class="settings-panel-desc">연결 상태를 확인하고 프로그램 업데이트를 관리합니다.</p>
+        <h3 class="settings-panel-title">시스템</h3>
+        <p class="settings-panel-desc">Windows 시작, 연결 상태, 프로그램 업데이트를 관리합니다.</p>
+        <div class="settings-card">
+          <div class="settings-section-title">Windows 시작</div>
+          <label class="settings-toggle-row" for="setting-auto-launch">
+            <input type="checkbox" id="setting-auto-launch">
+            <span class="settings-toggle-text">
+              <span class="settings-toggle-title">Windows 시작 시 자동 실행</span>
+              <span class="settings-toggle-desc">PC를 켜거나 로그온하면 메신저가 자동으로 실행됩니다</span>
+            </span>
+          </label>
+        </div>
         <div class="settings-card">
           <div class="settings-section-title">병원 안정성 모드</div>
           <label class="settings-toggle-row" for="setting-stability-mode">
@@ -22494,7 +22501,13 @@
         if (showOfflineEl) showOfflineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
         const showSharedPcsEl = document.getElementById('setting-show-shared-pcs');
         if (showSharedPcsEl) showSharedPcsEl.value = showSharedPcsInDirectory() ? 'show' : 'hide';
-        document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
+        try {
+          if (window.api && typeof window.api.getAutoLaunch === 'function') {
+            appSettings.autoLaunch = !!(await window.api.getAutoLaunch());
+          }
+        } catch (_) { /* OS 조회 실패 시 저장된 값 유지 */ }
+        const autoLaunchEl = document.getElementById('setting-auto-launch');
+        if (autoLaunchEl) autoLaunchEl.checked = !!appSettings.autoLaunch;
         const privacyEnabledEl = document.getElementById('setting-privacy-lock-enabled');
         if (privacyEnabledEl) privacyEnabledEl.checked = !!appSettings.privacyLockEnabled && !!appSettings.privacyLockPinHash;
         const privacyOnHideEl = document.getElementById('setting-privacy-lock-on-hide');
@@ -22568,7 +22581,8 @@
     ? 'chat'
     : 'ipmsg';
   const userGrouping = document.getElementById('setting-user-grouping').value;
-  const autoLaunch = document.getElementById('setting-auto-launch').checked;
+  const autoLaunch = !!(document.getElementById('setting-auto-launch')
+    && document.getElementById('setting-auto-launch').checked);
   const notificationPreview = document.getElementById('setting-notification-preview').checked;
   const notifyIncomingMessages = document.getElementById('setting-notify-incoming') ? document.getElementById('setting-notify-incoming').checked : true;
   const notifyReadReceipts = document.getElementById('setting-notify-read-receipt') ? document.getElementById('setting-notify-read-receipt').checked : true;
@@ -22673,7 +22687,16 @@
   // 저장 함수 파라미터에 floor, dept, rank, photo 추가
   myProfile = await window.api.saveMyProfile({ username, floor, dept, rank, extNo, phone, statusState, photo: currentProfilePhotoValue });
   
-  await window.api.setAutoLaunch(autoLaunch);
+  let autoLaunchApplied = true;
+  try {
+    autoLaunchApplied = !!(await window.api.setAutoLaunch(autoLaunch));
+  } catch (_) {
+    autoLaunchApplied = false;
+  }
+  if (autoLaunch && !autoLaunchApplied) {
+    appSettings.autoLaunch = false;
+    localStorage.setItem('appSettings', JSON.stringify(appSettings));
+  }
   await window.api.setNotificationPreviewSetting(notificationPreview);
   await window.api.setMessageNotificationSettings({
     notifyIncomingMessages,
@@ -22699,7 +22722,11 @@
   renderUserListTree(true);
   if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
   window.api.focusMainWindow();
-  await appAlert('설정이 저장되었습니다.');
+  if (autoLaunch && !autoLaunchApplied) {
+    await appAlert('설정이 저장되었습니다.\n다만 Windows 시작 시 자동 실행 등록에 실패했습니다.\n관리자 권한이나 Windows 시작 앱 설정을 확인해 주세요.');
+  } else {
+    await appAlert('설정이 저장되었습니다.');
+  }
   return;
   setTimeout(() => window.api.focusMainWindow(), 100);
 }

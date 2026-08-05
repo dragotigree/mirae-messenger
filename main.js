@@ -9436,11 +9436,28 @@ function startUpdateChecker() {
 }
 
 ipcMain.handle('set-auto-launch', async (event, enable) => {
-  app.setLoginItemSettings({ openAtLogin: enable, path: app.getPath('exe') });
-  return true;
+  const openAtLogin = !!enable;
+  const settings = {
+    openAtLogin,
+    openAsHidden: false,
+    path: process.execPath,
+    args: []
+  };
+  // Windows 시작 프로그램 목록에 표시될 이름
+  if (process.platform === 'win32') {
+    settings.name = '미래병원 사내 메신저';
+  }
+  app.setLoginItemSettings(settings);
+  return app.getLoginItemSettings().openAtLogin === openAtLogin;
 });
 
-ipcMain.handle('get-auto-launch', async () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle('get-auto-launch', async () => {
+  try {
+    return !!app.getLoginItemSettings().openAtLogin;
+  } catch (_) {
+    return false;
+  }
+});
 
 function getDefaultCompactBounds(width = COMPACT_DEFAULT_WIDTH, height = COMPACT_DEFAULT_HEIGHT) {
   const current = mainWindow ? mainWindow.getBounds() : { x: 0, y: 0, width, height };
