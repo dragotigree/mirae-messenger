@@ -29,6 +29,12 @@ $files = @(
   'toast.html',
   'toast-preload.js',
   'lib\minimal-xlsx.js',
+  'excalidraw-editor.html',
+  'preload-excalidraw.js',
+  'lib\excalidraw-app.js',
+  'lib\excalidraw-app.css',
+  'assets\compact\compact-overlay.css',
+  'assets\compact\phosphor-paths.json',
   'assets\splash.png'
 )
 
@@ -44,11 +50,14 @@ function Find-AppDirFromExe([string]$exePath) {
 
 function Find-DefaultTarget {
   $candidates = @(
+    # 요청하신 OneDrive 수동 배포 경로 (패키지 app)
+    (Join-Path $env:USERPROFILE 'OneDrive\6. Desktop_1\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'),
+    # 소스 폴더 자체를 실행하는 경우
+    (Join-Path $env:USERPROFILE 'OneDrive\6. Desktop_1\Mirae Messenger'),
     # 설치 프로그램 기본 경로
     (Join-Path $env:LOCALAPPDATA 'MiraeMessenger\resources\app'),
     (Join-Path $env:LOCALAPPDATA 'Programs\MiraeMessenger\resources\app'),
     # 개발/수동 배포 경로
-    (Join-Path $env:USERPROFILE 'OneDrive\6. Desktop_1\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'),
     (Join-Path $env:USERPROFILE 'Desktop\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'),
     (Join-Path $env:USERPROFILE 'Desktop\MiraeMessenger-win32-x64\resources\app'),
     (Join-Path $env:USERPROFILE 'MiraeMessenger-dist\MiraeMessenger-win32-x64\resources\app'),
@@ -106,9 +115,13 @@ Write-Host ''
 
 if (-not (Test-Path -LiteralPath (Join-Path $SourceDir 'index.html'))) {
   Write-Host "원본(소스) 폴더가 올바르지 않습니다: $SourceDir" -ForegroundColor Red
-  Write-Host 'Z 드라이브 messenger 폴더에서 스크립트를 실행했는지 확인해 주세요.' -ForegroundColor Yellow
+  Write-Host 'Z 드라이브 messenger 폴더 또는 GitHub 최신 폴더에서 스크립트를 실행했는지 확인해 주세요.' -ForegroundColor Yellow
   exit 1
 }
+
+# 원본과 대상이 같으면 덮어쓰기가 의미 없음 → GitHub raw에서 받을 수 없으므로 안내
+$resolvedSource = (Resolve-Path -LiteralPath $SourceDir).Path
+$resolvedTargetProbe = if ($TargetAppDir) { $TargetAppDir } else { '' }
 
 if (-not $TargetAppDir) {
   Write-Host '설치 폴더 검색 중...' -ForegroundColor DarkGray
@@ -140,6 +153,19 @@ if (-not (Test-Path -LiteralPath (Join-Path $TargetAppDir 'index.html'))) {
   exit 1
 }
 
+$resolvedTarget = (Resolve-Path -LiteralPath $TargetAppDir).Path
+if ($resolvedSource -ieq $resolvedTarget) {
+  Write-Host '원본과 대상 폴더가 같습니다. 이 폴더를 GitHub 최신으로 맞추려면:' -ForegroundColor Yellow
+  Write-Host ''
+  Write-Host "  cd `"$resolvedTarget`"" -ForegroundColor Cyan
+  Write-Host '  git fetch origin main' -ForegroundColor Cyan
+  Write-Host '  git checkout main' -ForegroundColor Cyan
+  Write-Host '  git pull origin main' -ForegroundColor Cyan
+  Write-Host ''
+  Write-Host '또는 GitHub에서 받은 다른 폴더를 -SourceDir 로 지정하세요.' -ForegroundColor Yellow
+  exit 1
+}
+
 $srcVer = '?'
 $dstVer = '?'
 try { $srcVer = (Get-Content -LiteralPath (Join-Path $SourceDir 'version.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version } catch {}
@@ -149,6 +175,24 @@ Write-Host "원본: $SourceDir  (버전 $srcVer)"
 Write-Host "대상: $TargetAppDir  (현재 $dstVer)"
 Write-Host ''
 
+# 대상이 이미 같거나 더 새 버전이면 경고만
+try {
+  function Compare-Ver([string]$a, [string]$b) {
+    $pa = @(($a -split '\.') | ForEach-Object { [int]($_ -as [int]) })
+    $pb = @(($b -split '\.') | ForEach-Object { [int]($_ -as [int]) })
+    $n = [Math]::Max($pa.Count, $pb.Count)
+    for ($i = 0; $i -lt $n; $i++) {
+      $na = if ($i -lt $pa.Count) { $pa[$i] } else { 0 }
+      $nb = if ($i -lt $pb.Count) { $pb[$i] } else { 0 }
+      if ($na -gt $nb) { return 1 }
+      if ($na -lt $nb) { return -1 }
+    }
+    return 0
+  }
+  if ($srcVer -ne '?' -and $dstVer -ne '?' -and (Compare-Ver $srcVer $dstVer) -le 0) {
+    Write-Host "대상이 이미 최신(또는 동일)일 수 있습니다: $dstVer → $srcVer (그래도 파일 동기화합니다)" -ForegroundColor DarkYellow
+  }
+} catch {}
 $procs = @(Get-Process -Name 'MiraeMessenger','electron' -ErrorAction SilentlyContinue)
 if ($procs.Count -gt 0) {
   if ($ForceKill) {

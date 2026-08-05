@@ -1,4 +1,4 @@
 {
-  "version": "1.0.468",
-  "notes": "업데이트 후 프리징 완화 — Z드라이브 미러 타임아웃, 미니모드 목록 재조회 폭주·투명도 IPC 억제"
+  "version": "1.0.469",
+  "notes": "수동 업데이트 스크립트 보강 — OneDrive 경로·compact CSS·GitHub 직접 덮어쓰기"
 }
