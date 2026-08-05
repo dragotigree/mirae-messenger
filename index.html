@@ -3210,6 +3210,7 @@
                 <input type="file" id="chat-file-input" style="display:none;" onchange="handleFileSelect(event)">
               </label>
               <button class="btn-capture chat-tool-btn" type="button" onclick="toggleScreenCapturePopover(event)" title="화면 캡처">📷</button>
+              <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)">✏️</button>
               <button class="btn-schedule chat-tool-btn" onclick="openScheduleMessageModal()" title="예약 전송">⏰</button>
               <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구">💬</button>
               <button class="btn-urgent chat-tool-btn" id="urgent-toggle-btn" onclick="toggleUrgentMode()" title="긴급 메시지로 표시">🚨</button>
@@ -3561,6 +3562,7 @@
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
         <div class="board-photo-toolbar">
           <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
+          <button type="button" class="board-photo-attach-btn" onclick="openExcalidrawForNotice()">✏️ 그림 그리기</button>
           <span class="board-photo-hint" id="board-photo-hint">최대 2장 · JPG/PNG</span>
           <input type="file" id="board-write-photo-input" accept="image/*" multiple style="display:none;" onchange="handleBoardPhotoSelect(event)">
         </div>
@@ -4223,6 +4225,7 @@
           <div class="ipmsg-compose-label">메시지</div>
           <textarea id="ipmsg-message-input" placeholder="보낼 내용을 입력하세요..." spellcheck="false"></textarea>
           <div class="ipmsg-compose-footer">
+            <button type="button" class="ipmsg-mini-btn" onclick="openExcalidrawForIpmsg()" title="그림 그려서 쪽지에 첨부">✏️ 그림</button>
             <label class="ipmsg-urgent-label"><input type="checkbox" id="ipmsg-urgent-check"> 🚨 긴급 메시지</label>
             <button type="button" class="ipmsg-send-btn" id="ipmsg-send-btn" onclick="submitIpmsgSend()">보내기</button>
           </div>
@@ -6118,6 +6121,9 @@
     window.addEventListener('DOMContentLoaded', () => {
       loadNoticeOperatorSession();
       refreshNoticePermission();
+      if (window.api && typeof window.api.onExcalidrawPngReady === 'function') {
+        window.api.onExcalidrawPngReady((data) => { handleExcalidrawPngReady(data); });
+      }
       window.addEventListener('storage', (e) => {
         if (e.key === NOTICE_OPERATOR_STORAGE_KEY) {
           loadNoticeOperatorSession();
@@ -6813,6 +6819,7 @@
       if (msgEl) msgEl.value = '';
       const urgentEl = document.getElementById('ipmsg-urgent-check');
       if (urgentEl) urgentEl.checked = false;
+      clearIpmsgPendingImage();
       renderIpmsgRecipientTable('');
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
@@ -6824,6 +6831,7 @@
 
     function closeIpmsgSendModal() {
       document.getElementById('ipmsg-send-modal').style.display = 'none';
+      clearIpmsgPendingImage();
       setModalOpenState(false);
     }
 
@@ -6835,11 +6843,15 @@
 
     async function submitIpmsgSend() {
       const text = (document.getElementById('ipmsg-message-input')?.value || '').trim();
-      if (!text) { await appAlert('보낼 메시지를 입력해 주세요.'); return; }
+      const imageHtml = ipmsgPendingImageHtml || '';
+      if (!text && !imageHtml) { await appAlert('보낼 메시지를 입력해 주세요.'); return; }
       const ips = [...ipmsgSelectedIps];
       if (!ips.length) { await appAlert('받는 사람을 한 명 이상 선택해 주세요.'); return; }
       const urgent = !!document.getElementById('ipmsg-urgent-check')?.checked;
-      const html = textToMessageHtml(text);
+      const parts = [];
+      if (text) parts.push(textToMessageHtml(text));
+      if (imageHtml) parts.push(imageHtml);
+      const html = parts.join('<br>');
       const btn = document.getElementById('ipmsg-send-btn');
       if (btn) { btn.disabled = true; btn.textContent = '전송 중…'; }
       let ok = 0;
@@ -10403,6 +10415,113 @@
       if (files.length > remain) {
         await appAlert(`사진은 최대 ${MAX_NOTICE_IMAGES}장까지입니다. 앞의 ${remain}장만 추가했습니다.`);
       }
+    }
+
+    async function addBoardWriteImageFromDataUrl(dataUrl, fileName) {
+      if (!dataUrl || String(dataUrl).indexOf('data:image') !== 0) return false;
+      if (boardWriteImages.length >= MAX_NOTICE_IMAGES) {
+        await appAlert(`사진은 최대 ${MAX_NOTICE_IMAGES}장까지 첨부할 수 있습니다.`);
+        return false;
+      }
+      try {
+        const compressed = await compressImageDataUrlForNotice(dataUrl, fileName || `draw-${Date.now()}.png`, 'image/png');
+        if (compressed && compressed.dataUrl) {
+          boardWriteImages.push(compressed.dataUrl);
+          renderBoardPhotoPreview();
+          return true;
+        }
+      } catch (err) {
+        console.error('공지 그림 첨부 실패', err);
+        await appAlert('그림을 공지에 첨부하지 못했습니다.');
+      }
+      return false;
+    }
+
+    function openExcalidrawForChat() {
+      if (!activeChatUser) {
+        appAlert('대화 상대를 먼저 선택하세요.');
+        return;
+      }
+      if (!window.api || typeof window.api.openExcalidrawEditor !== 'function') {
+        appAlert('그림 그리기 기능을 사용할 수 없습니다.');
+        return;
+      }
+      window.api.openExcalidrawEditor('chat');
+    }
+
+    function openExcalidrawForNotice() {
+      const writeView = document.getElementById('board-write-view');
+      if (!writeView || writeView.style.display === 'none') {
+        appAlert('공지 글쓰기/수정 화면에서 사용해 주세요.');
+        return;
+      }
+      if (boardWriteImages.length >= MAX_NOTICE_IMAGES) {
+        appAlert(`사진은 최대 ${MAX_NOTICE_IMAGES}장까지 첨부할 수 있습니다.`);
+        return;
+      }
+      if (!window.api || typeof window.api.openExcalidrawEditor !== 'function') {
+        appAlert('그림 그리기 기능을 사용할 수 없습니다.');
+        return;
+      }
+      window.api.openExcalidrawEditor('notice');
+    }
+
+    function openExcalidrawForIpmsg() {
+      const modal = document.getElementById('ipmsg-send-modal');
+      if (!modal || modal.style.display !== 'flex') {
+        appAlert('쪽지 보내기 창에서 사용해 주세요.');
+        return;
+      }
+      if (!window.api || typeof window.api.openExcalidrawEditor !== 'function') {
+        appAlert('그림 그리기 기능을 사용할 수 없습니다.');
+        return;
+      }
+      window.api.openExcalidrawEditor('ipmsg');
+    }
+
+    async function handleExcalidrawPngReady(data) {
+      const purpose = (data && data.purpose) || 'chat';
+      const dataUrl = data && data.dataUrl;
+      if (!dataUrl) return;
+      const fileName = `excalidraw-${Date.now()}.png`;
+      if (purpose === 'notice') {
+        await addBoardWriteImageFromDataUrl(dataUrl, fileName);
+        return;
+      }
+      if (purpose === 'ipmsg') {
+        try {
+          const compressed = await compressImageDataUrlForChat(dataUrl, fileName, 'image/png');
+          const safeName = escapeHtmlText(compressed.fileName || fileName);
+          const imgHtml = `<img src="${compressed.dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
+          const msgEl = document.getElementById('ipmsg-message-input');
+          if (msgEl) {
+            const cur = (msgEl.value || '').trim();
+            // 쪽지 본문은 텍스트 입력이지만 전송 시 HTML로 변환되므로,
+            // 이미지 첨부는 바로 보내기 플로우를 쓰는 대신 입력란 아래 미리보기 큐에 넣는다.
+            ipmsgPendingImageHtml = imgHtml;
+            let preview = document.getElementById('ipmsg-draw-preview');
+            if (!preview) {
+              preview = document.createElement('div');
+              preview.id = 'ipmsg-draw-preview';
+              preview.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:8px;';
+              msgEl.parentElement.appendChild(preview);
+            }
+            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius:10px;border:1px solid #e2e8f0;" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
+          }
+        } catch (err) {
+          console.error('쪽지 그림 처리 실패', err);
+          await appAlert('그림을 쪽지에 첨부하지 못했습니다.');
+        }
+        return;
+      }
+      await processAndSendImageDataUrl(dataUrl, fileName);
+    }
+
+    let ipmsgPendingImageHtml = '';
+    function clearIpmsgPendingImage() {
+      ipmsgPendingImageHtml = '';
+      const preview = document.getElementById('ipmsg-draw-preview');
+      if (preview) preview.remove();
     }
 
     async function loadNoticesList() {

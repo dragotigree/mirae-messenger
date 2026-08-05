@@ -29,10 +29,15 @@ $files = @(
   "version.json",
   "toast.html",
   "toast-preload.js",
-  "lib\minimal-xlsx.js"
+  "lib\minimal-xlsx.js",
+  "excalidraw-editor.html",
+  "preload-excalidraw.js",
+  "lib\excalidraw-app.js",
+  "lib\excalidraw-app.css"
 )
 $optional = @(
-  "assets\splash.png"
+  "assets\splash.png",
+  "vendor\excalidraw\asset-list.json"
 )
 
 Write-Host "Source: $SourceDir" -ForegroundColor Cyan
@@ -79,6 +84,16 @@ foreach ($rel in $optional) {
     Copy-Item -LiteralPath $src -Destination $dst -Force
   }
   Write-Host "  ok(optional): $rel"
+}
+
+$vendorSrc = Join-Path $SourceDir "vendor\excalidraw"
+if (Test-Path -LiteralPath $vendorSrc) {
+  $vendorDst = Join-Path $DestDir "vendor\excalidraw"
+  if (-not $sameRoot) {
+    New-Item -ItemType Directory -Force -Path $vendorDst | Out-Null
+    Copy-Item -LiteralPath (Join-Path $vendorSrc "*") -Destination $vendorDst -Recurse -Force
+  }
+  Write-Host "  ok(optional): vendor\excalidraw\*"
 }
 
 $ver = ""

@@ -67,6 +67,8 @@ function hashPassword(pw) {
 
 let mainWindow;
 let scheduleBoardWindow = null;
+let excalidrawWindow = null;
+let excalidrawSession = null;
 /** 렌더러 작성자/공지 작성 권한 로그인 — 타인 일정 수정·삭제 허용 */
 let noticeOperatorSessionActive = false;
 /** 마스터 관리자 UI 로그인 (렌더러 verify-master-auth 성공 시) */
@@ -352,9 +354,13 @@ const Z_BRIDGE_MIRROR_FILES = [
   'version.json',
   'toast.html',
   'toast-preload.js',
-  'lib/minimal-xlsx.js'
+  'lib/minimal-xlsx.js',
+  'excalidraw-editor.html',
+  'preload-excalidraw.js',
+  'lib/excalidraw-app.js',
+  'lib/excalidraw-app.css'
 ];
-const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png'];
+const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
@@ -422,7 +428,16 @@ async function mirrorLocalInstallToZBridge(opts = {}) {
       failed.push(`${rel}(${e.message || e})`);
     }
   }
-  for (const rel of Z_BRIDGE_MIRROR_OPTIONAL) {
+  const optionalMirror = Z_BRIDGE_MIRROR_OPTIONAL.slice();
+  try {
+    const listRaw = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'vendor', 'excalidraw', 'asset-list.json'), 'utf8'));
+    const files = Array.isArray(listRaw && listRaw.files) ? listRaw.files : [];
+    for (const f of files) {
+      const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
+      if (rel && !optionalMirror.includes(rel)) optionalMirror.push(rel);
+    }
+  } catch (e) { /* optional */ }
+  for (const rel of optionalMirror) {
     const src = path.join(__dirname, rel);
     const dst = path.join(destRoot, rel);
     try {
@@ -2618,6 +2633,105 @@ ipcMain.handle('open-schedule-board-window', async (event, payload = {}) => {
   const data = typeof payload === 'string' ? { dateStr: payload } : payload;
   openScheduleBoardWindow(data);
   return { success: true };
+});
+
+function getExcalidrawPurposeMeta(purpose) {
+  const p = String(purpose || 'chat');
+  if (p === 'notice') {
+    return {
+      purpose: 'notice',
+      title: '✏️ 공지용 그림 그리기',
+      subtitle: '그린 뒤 「이미지로 보내기」를 누르면 공지 작성 화면에 사진으로 첨부됩니다.'
+    };
+  }
+  if (p === 'ipmsg') {
+    return {
+      purpose: 'ipmsg',
+      title: '✏️ 쪽지용 그림 그리기',
+      subtitle: '그린 뒤 「이미지로 보내기」를 누르면 쪽지 내용에 이미지로 첨부됩니다.'
+    };
+  }
+  return {
+    purpose: 'chat',
+    title: '✏️ 채팅용 그림 그리기',
+    subtitle: '그린 뒤 「이미지로 보내기」를 누르면 현재 대화방에 PNG로 전송됩니다.'
+  };
+}
+
+function closeExcalidrawWindow() {
+  if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
+    try { excalidrawWindow.close(); } catch (e) {}
+  }
+  excalidrawWindow = null;
+}
+
+function openExcalidrawWindow(purpose) {
+  const meta = getExcalidrawPurposeMeta(purpose);
+  excalidrawSession = { purpose: meta.purpose, title: meta.title, subtitle: meta.subtitle };
+  if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
+    try {
+      excalidrawWindow.focus();
+      excalidrawWindow.webContents.send('excalidraw-context', excalidrawSession);
+    } catch (e) {}
+    return { success: true };
+  }
+  excalidrawWindow = new BrowserWindow({
+    width: 1180,
+    height: 820,
+    minWidth: 900,
+    minHeight: 640,
+    title: meta.title,
+    icon: getAppNativeIcon(),
+    frame: true,
+    autoHideMenuBar: true,
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    modal: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-excalidraw.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      backgroundThrottling: false
+    }
+  });
+  excalidrawWindow.setMenu(null);
+  attachEditableContextMenu(excalidrawWindow.webContents);
+  excalidrawWindow.loadFile(path.join(__dirname, 'excalidraw-editor.html'));
+  excalidrawWindow.on('closed', () => {
+    excalidrawWindow = null;
+    excalidrawSession = null;
+  });
+  return { success: true };
+}
+
+ipcMain.handle('open-excalidraw-editor', async (event, purpose) => openExcalidrawWindow(purpose));
+
+ipcMain.handle('excalidraw-get-context', async () => {
+  return excalidrawSession || getExcalidrawPurposeMeta('chat');
+});
+
+ipcMain.handle('excalidraw-submit-png', async (event, payload) => {
+  const dataUrl = payload && payload.dataUrl;
+  const purpose = (payload && payload.purpose) || (excalidrawSession && excalidrawSession.purpose) || 'chat';
+  if (typeof dataUrl !== 'string' || dataUrl.indexOf('data:image') !== 0) {
+    return { ok: false, msg: '이미지 데이터가 없습니다.' };
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return { ok: false, msg: '메인 창을 찾을 수 없습니다.' };
+  }
+  try {
+    mainWindow.webContents.send('excalidraw-png-ready', { purpose, dataUrl });
+    closeExcalidrawWindow();
+    try { showAndFocusWindow(); } catch (e) {}
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: e.message || String(e) };
+  }
+});
+
+ipcMain.handle('excalidraw-cancel', async () => {
+  closeExcalidrawWindow();
+  return { ok: true };
 });
 
 ipcMain.handle('close-schedule-board-window', async (event) => {
@@ -7849,8 +7963,30 @@ ipcMain.handle('check-for-update', async () => {
 
 async function applyUpdateFiles() {
   // package.json을 포함해야 버전 번호(APP_VERSION)도 함께 갱신된다.
-  const filesToUpdate = ['main.js', 'preload.js', 'index.html', 'package.json', 'version.json', 'toast.html', 'toast-preload.js', 'lib/minimal-xlsx.js'];
-  const optionalAssets = ['assets/splash.png'];
+  const filesToUpdate = [
+    'main.js',
+    'preload.js',
+    'index.html',
+    'package.json',
+    'version.json',
+    'toast.html',
+    'toast-preload.js',
+    'lib/minimal-xlsx.js',
+    'excalidraw-editor.html',
+    'preload-excalidraw.js',
+    'lib/excalidraw-app.js',
+    'lib/excalidraw-app.css'
+  ];
+  const optionalAssets = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
+  try {
+    const remoteListBuf = await readUpdateSourceBytes('vendor/excalidraw/asset-list.json');
+    const remoteList = parseUpdateJsonText(remoteListBuf.toString('utf8'));
+    const remoteFiles = Array.isArray(remoteList && remoteList.files) ? remoteList.files : [];
+    for (const f of remoteFiles) {
+      const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
+      if (rel && rel !== 'vendor/excalidraw/asset-list.json') optionalAssets.push(rel);
+    }
+  } catch (e) { /* optional fonts/locales */ }
   const backupDir = path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
   await fs.promises.mkdir(backupDir, { recursive: true });
   const fileResults = [];

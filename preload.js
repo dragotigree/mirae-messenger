@@ -66,6 +66,8 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('open-schedule-board-window', p);
   },
   closeScheduleBoardWindow: () => ipcRenderer.invoke('close-schedule-board-window'),
+  openExcalidrawEditor: (purpose) => ipcRenderer.invoke('open-excalidraw-editor', purpose || 'chat'),
+  onExcalidrawPngReady: (callback) => ipcRenderer.on('excalidraw-png-ready', (e, data) => callback(data)),
   onScheduleBoardOpen: (callback) => ipcRenderer.on('schedule-board-open', (e, data) => callback(data)),
   addSchedule: (data) => ipcRenderer.invoke('add-schedule', data),
   deleteSchedule: (uid) => ipcRenderer.invoke('delete-schedule', uid),
