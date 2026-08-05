@@ -435,6 +435,24 @@
 
     /* 👥 그룹 대화방 체크리스트 */
     #group-member-checklist label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 12.5px; cursor: pointer; }
+    .group-bulk-row {
+      display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px;
+      margin-top: 6px; padding: 8px 10px;
+      background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px;
+    }
+    .group-bulk-field {
+      display: flex; flex-direction: column; gap: 3px;
+      font-size: 10.5px; font-weight: 700; color: #64748b; min-width: 0;
+    }
+    .group-bulk-field select {
+      min-width: 100px; max-width: 150px; padding: 6px 8px;
+      border: 1px solid #dbe3ec; border-radius: 9px; font-size: 12px; font-family: inherit; background: #fff;
+    }
+    .group-bulk-btn {
+      padding: 6px 10px; border-radius: 9px; border: 1px solid #bae6fd;
+      background: #fff; color: #0369a1; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    }
+    .group-bulk-btn:hover { background: #e0f2fe; }
 
     #user-list-tree { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 6px 6px 6px; scrollbar-width: thin; }
     .sidebar-main-sections {
@@ -1135,6 +1153,29 @@
     }
     .ipmsg-recipient-toolbar input:focus { border-color: #7dd3fc; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
     .ipmsg-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ipmsg-bulk-row {
+      display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px;
+      margin: 0 0 10px; padding: 10px 12px;
+      background: #f8fafc; border: 1px solid #e8edf2; border-radius: 12px;
+    }
+    .ipmsg-bulk-field {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 10.5px; font-weight: 700; color: #64748b; letter-spacing: -0.02em;
+      min-width: 0;
+    }
+    .ipmsg-bulk-field select {
+      min-width: 120px; max-width: 180px; padding: 7px 10px;
+      border: 1px solid #dbe3ec; border-radius: 9px; font-size: 12.5px;
+      font-family: inherit; background: #fff; color: #0f172a;
+    }
+    .ipmsg-bulk-field select:focus {
+      outline: none; border-color: #7dd3fc; box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
+    }
+    .ipmsg-bulk-apply {
+      padding: 7px 12px !important; font-weight: 700;
+      background: #fff !important; border-color: #bae6fd !important; color: #0369a1 !important;
+    }
+    .ipmsg-bulk-apply:hover { background: #e0f2fe !important; }
     .ipmsg-mini-btn {
       padding: 8px 13px; border-radius: 99px; border: 1px solid #e2e8f0; background: #fff;
       font-size: 11px; font-weight: 600; color: #475569; cursor: pointer;
@@ -4368,6 +4409,16 @@
           <input type="text" id="group-name-input" placeholder="예: 재활치료 3팀" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius: 12px;">
         </label>
         <div style="font-size:12px; font-weight:600; color:#475569; margin-top:8px;">참여자 선택:</div>
+        <div class="group-bulk-row" aria-label="층·부서 일괄 선택">
+          <label class="group-bulk-field">층
+            <select id="group-floor-select" aria-label="층 선택"></select>
+          </label>
+          <button type="button" class="group-bulk-btn" onclick="groupToggleSelectByFloor()" title="해당 층 전체 선택/해제">이 층</button>
+          <label class="group-bulk-field">부서
+            <select id="group-dept-select" aria-label="부서 선택"></select>
+          </label>
+          <button type="button" class="group-bulk-btn" onclick="groupToggleSelectByDept()" title="해당 부서 전체 선택/해제">이 부서</button>
+        </div>
         <div id="group-member-checklist" style="max-height:200px; overflow-y:auto; border:1px solid #f1f5f9; border-radius: 15px; padding:6px 10px; margin-top:4px;"></div>
       </div>
 
@@ -4488,7 +4539,7 @@
           <div class="ipmsg-header-icon" aria-hidden="true">✉️</div>
           <div>
             <h2>쪽지 보내기</h2>
-            <p>받는 사람을 고른 뒤 메시지를 보냅니다. 1:1 채팅과 같이 전달되며, 이 창에서는 대화 기록을 보지 않습니다.</p>
+            <p>받는 사람을 고른 뒤 메시지를 보냅니다. 층·부서로 일괄 선택할 수 있습니다.</p>
           </div>
         </div>
         <button type="button" class="ipmsg-close-btn" onclick="closeIpmsgSendModal()" title="닫기">×</button>
@@ -4497,7 +4548,7 @@
         <div class="ipmsg-stats-bar">
           <span class="ipmsg-stat-pill">접속 <strong id="ipmsg-online-count">0</strong>명</span>
           <span class="ipmsg-stat-pill ipmsg-stat-pill--select">선택 <strong id="ipmsg-selected-count">0</strong>명</span>
-          <button type="button" class="ipmsg-mini-btn ipmsg-refresh-btn" onclick="manualRefreshUsers(); setTimeout(() => renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || ''), 400);">↻ 새로고침</button>
+          <button type="button" class="ipmsg-mini-btn ipmsg-refresh-btn" onclick="manualRefreshUsers(); setTimeout(() => { fillIpmsgBulkSelects(); renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || ''); }, 400);">↻ 새로고침</button>
         </div>
         <div class="ipmsg-recipient-pane">
           <div class="ipmsg-recipient-toolbar">
@@ -4509,6 +4560,16 @@
               <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectOnlineVisible()">온라인만</button>
               <button type="button" class="ipmsg-mini-btn" onclick="ipmsgClearSelection()">선택 해제</button>
             </div>
+          </div>
+          <div class="ipmsg-bulk-row" aria-label="층·부서 일괄 선택">
+            <label class="ipmsg-bulk-field">층
+              <select id="ipmsg-floor-select" aria-label="층 선택"></select>
+            </label>
+            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByFloor()" title="해당 층 전체를 선택합니다. 이미 모두 선택된 경우 해제됩니다.">이 층 선택</button>
+            <label class="ipmsg-bulk-field">부서
+              <select id="ipmsg-dept-select" aria-label="부서 선택"></select>
+            </label>
+            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByDept()" title="해당 부서 전체를 선택합니다. 이미 모두 선택된 경우 해제됩니다.">이 부서 선택</button>
           </div>
           <div class="ipmsg-table-wrap">
             <table class="ipmsg-user-table">
@@ -7119,6 +7180,52 @@
       renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || '');
     }
 
+    function getIpmsgPeerUsers() {
+      const myIp = myProfile && myProfile.ip;
+      return (allUsers || []).filter((u) => u && u.ip && u.ip !== myIp && !u.isMe);
+    }
+
+    function fillIpmsgBulkSelects() {
+      const peers = getIpmsgPeerUsers();
+      const fill = (selId, kind) => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        const prev = sel.value;
+        const keys = getOrderedUserGroupKeys(kind, collectUserGroupKeys(kind, peers));
+        sel.innerHTML = keys.length
+          ? keys.map((k) => `<option value="${escapeHtmlText(k)}">${escapeHtmlText(k)}</option>`).join('')
+          : '<option value="">없음</option>';
+        if (prev && keys.includes(prev)) sel.value = prev;
+      };
+      fill('ipmsg-floor-select', 'floor');
+      fill('ipmsg-dept-select', 'dept');
+    }
+
+    function ipmsgUsersInGroup(kind, groupName) {
+      if (!groupName) return [];
+      return getIpmsgPeerUsers().filter((u) => {
+        const name = (kind === 'floor') ? (u.floor || '기타 층') : (u.dept || '기타 부서');
+        return name === groupName;
+      });
+    }
+
+    function ipmsgToggleSelectGroup(kind) {
+      const sel = document.getElementById(kind === 'floor' ? 'ipmsg-floor-select' : 'ipmsg-dept-select');
+      const groupName = sel && sel.value;
+      if (!groupName) return;
+      const users = ipmsgUsersInGroup(kind, groupName);
+      if (!users.length) return;
+      const allOn = users.every((u) => ipmsgSelectedIps.has(u.ip));
+      users.forEach((u) => {
+        if (allOn) ipmsgSelectedIps.delete(u.ip);
+        else ipmsgSelectedIps.add(u.ip);
+      });
+      renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || '');
+    }
+
+    function ipmsgToggleSelectByFloor() { ipmsgToggleSelectGroup('floor'); }
+    function ipmsgToggleSelectByDept() { ipmsgToggleSelectGroup('dept'); }
+
     function openIpmsgSendModal(prefillIps) {
       ipmsgSelectedIps = new Set();
       (prefillIps || []).forEach((ip) => { if (ip) ipmsgSelectedIps.add(ip); });
@@ -7129,6 +7236,7 @@
       const urgentEl = document.getElementById('ipmsg-urgent-check');
       if (urgentEl) urgentEl.checked = false;
       clearIpmsgPendingImage();
+      fillIpmsgBulkSelects();
       renderIpmsgRecipientTable('');
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
@@ -9776,9 +9884,45 @@
       document.getElementById('group-existing-section').style.display = isNew ? 'none' : 'block';
     }
 
+    function fillGroupBulkSelects() {
+      const peers = (allUsers || []).filter((u) => isSelectableSidebarUser(u));
+      const fill = (selId, kind) => {
+        const sel = document.getElementById(selId);
+        if (!sel) return;
+        const prev = sel.value;
+        const keys = getOrderedUserGroupKeys(kind, collectUserGroupKeys(kind, peers));
+        sel.innerHTML = keys.length
+          ? keys.map((k) => `<option value="${escapeHtmlText(k)}">${escapeHtmlText(k)}</option>`).join('')
+          : '<option value="">없음</option>';
+        if (prev && keys.includes(prev)) sel.value = prev;
+      };
+      fill('group-floor-select', 'floor');
+      fill('group-dept-select', 'dept');
+    }
+
+    function groupToggleSelectGroup(kind) {
+      const sel = document.getElementById(kind === 'floor' ? 'group-floor-select' : 'group-dept-select');
+      const groupName = sel && sel.value;
+      if (!groupName) return;
+      const boxes = [...document.querySelectorAll('#group-member-checklist input[type="checkbox"]')];
+      const matched = boxes.filter((cb) => {
+        const u = findUserByIp(cb.value);
+        if (!isSelectableSidebarUser(u)) return false;
+        const name = (kind === 'floor') ? (u.floor || '기타 층') : (u.dept || '기타 부서');
+        return name === groupName;
+      });
+      if (!matched.length) return;
+      const allOn = matched.every((cb) => cb.checked);
+      matched.forEach((cb) => { cb.checked = !allOn; });
+    }
+
+    function groupToggleSelectByFloor() { groupToggleSelectGroup('floor'); }
+    function groupToggleSelectByDept() { groupToggleSelectGroup('dept'); }
+
     function renderGroupMemberChecklist() {
       const box = document.getElementById('group-member-checklist');
       box.innerHTML = '';
+      fillGroupBulkSelects();
       if (allUsers.length === 0) {
         box.innerHTML = `<div style="font-size:11px; color:#94a3b8; padding:6px;">현재 목록에 표시할 동료가 없습니다.</div>`;
         return;
