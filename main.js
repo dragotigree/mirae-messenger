@@ -3830,7 +3830,7 @@ function routeIncomingPayload(payload, senderIP) {
       handleWipeQueueSync(payload, senderIP);
       break;
     case 'WIPE_QUEUE_CLEAR':
-      handleWipeQueueClear(payload);
+      handleWipeQueueClear(payload, senderIP);
       break;
     case 'WIPE_CLAIM':
       // 대상 PC가 방금 켜짐 → 예약된 삭제가 있으면 즉시 전달
@@ -4459,7 +4459,7 @@ function normalizeNoticeImagesField(raw) {
         return '';
       })
       .filter((s) => typeof s === 'string' && s.indexOf('data:image') === 0)
-      .slice(0, 3)
+      .slice(0, 2) // TCP 한도 고려하여 최대 2장
   );
 }
 
@@ -4491,11 +4491,39 @@ function handleNoticeUpdate(n) {
       });
       return;
     }
-    const images = normalizeNoticeImagesField(n.images);
-    db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
-      if (mainWindow) safeWebContentsSend('notices-update');
-    });
+    // images 필드가 없는 구버전 업데이트는 기존 사진을 지우지 않음
+    const hasImagesField = n && Object.prototype.hasOwnProperty.call(n, 'images');
+    if (hasImagesField) {
+      const images = normalizeNoticeImagesField(n.images);
+      db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
+    } else {
+      db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
+    }
   });
+}
+
+/** 공지 실시간 전파 — TCP 한도 초과 시 사진 제외하고 본문만 보내고, 사진은 NOTICE_SYNC로 보충 */
+function broadcastNoticeWire(type, notice) {
+  if (!notice || !notice.uid) return;
+  const full = { type, notice };
+  const fullBytes = Buffer.byteLength(JSON.stringify(full) + '\n', 'utf8');
+  if (fullBytes <= MAX_TCP_LINE_BUFFER - 2048) {
+    broadcastToOnlinePeers(full);
+    return;
+  }
+  const slimNotice = Object.assign({}, notice, { images: '[]' });
+  const slim = { type, notice: slimNotice };
+  const slimBytes = Buffer.byteLength(JSON.stringify(slim) + '\n', 'utf8');
+  if (slimBytes <= MAX_TCP_LINE_BUFFER - 2048) {
+    console.warn(`[공지] ${notice.uid} 사진 포함 시 TCP 한도 초과 — 본문만 실시간 전송, 사진은 동기화로 전달`);
+    broadcastToOnlinePeers(slim);
+    return;
+  }
+  console.error(`[공지] ${notice.uid} 실시간 전송 실패(크기 초과)`);
 }
 
 function handleNoticeDelete(uid) {
@@ -6833,7 +6861,7 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images 
           resolve({ success: false, error: err.message });
           return;
         }
-        broadcastToOnlinePeers({ type: 'NOTICE_ADD', notice: record });
+        broadcastNoticeWire('NOTICE_ADD', record);
         resolve({ success: true, notice: record });
       }
     );
@@ -6848,7 +6876,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images }) =
   return new Promise((resolve) => {
     const imagesJson = normalizeNoticeImagesField(images);
     db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [title, content, imagesJson, uid], (err) => {
-      if (!err) broadcastToOnlinePeers({ type: 'NOTICE_UPDATE', notice: { uid, title, content, images: imagesJson } });
+      if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson });
       resolve({ success: !err });
     });
   });
@@ -8777,21 +8805,41 @@ function handleWipeQueueSync(payload, senderIP) {
   const targetIp = String(p.targetIp || '').trim();
   const password = String(p.masterPassword || '');
   if (!targetIp || !password || targetIp === MY_IP) return;
-  upsertPendingRemoteWipe({
-    target_ip: targetIp,
-    master_password: password,
-    reason: p.reason || '',
-    requested_by_ip: p.fromIp || senderIP || '',
-    requested_at: p.requestedAt || new Date().toISOString()
-  }).then(() => {
-    if (onlineUsers.has(targetIp)) tryDeliverPendingWipe(targetIp);
-  });
+  // 잘못된 비밀번호로 예약을 덮어쓰면 정당한 삭제가 무력화되므로, 로컬 마스터 비밀번호와 일치할 때만 저장
+  verifyLocalMasterPassword(password).then((ok) => {
+    if (!ok) {
+      writeToLogFile('warn', `[원격삭제예약] ${senderIP || '?'} 의 WIPE_QUEUE_SYNC 거부(비밀번호 불일치) target=${targetIp}`);
+      return;
+    }
+    upsertPendingRemoteWipe({
+      target_ip: targetIp,
+      master_password: password,
+      reason: p.reason || '',
+      requested_by_ip: p.fromIp || senderIP || '',
+      requested_at: p.requestedAt || new Date().toISOString()
+    }).then(() => {
+      if (onlineUsers.has(targetIp)) tryDeliverPendingWipe(targetIp);
+    });
+  }).catch(() => {});
 }
 
-function handleWipeQueueClear(payload) {
+function handleWipeQueueClear(payload, senderIP) {
   const targetIp = String((payload && payload.targetIp) || '').trim();
   if (!targetIp) return;
-  removePendingRemoteWipe(targetIp);
+  const fromIp = String((payload && payload.fromIp) || senderIP || '').trim();
+  getPendingRemoteWipe(targetIp).then((row) => {
+    if (!row) return;
+    const requester = String(row.requested_by_ip || '');
+    // 요청자·대상 PC·발신 IP가 일치할 때만 취소 (임의 PC의 예약 취소 방지)
+    const allowed = fromIp === targetIp
+      || senderIP === targetIp
+      || (requester && (fromIp === requester || senderIP === requester));
+    if (!allowed) {
+      writeToLogFile('warn', `[원격삭제예약] WIPE_QUEUE_CLEAR 거부 target=${targetIp} from=${fromIp || senderIP || '?'}`);
+      return;
+    }
+    removePendingRemoteWipe(targetIp);
+  }).catch(() => {});
 }
 
 function handleWipeChatHistoryResult(payload, senderIP) {

@@ -3554,7 +3554,7 @@
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
         <div class="board-photo-toolbar">
           <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
-          <span class="board-photo-hint" id="board-photo-hint">최대 3장 · JPG/PNG</span>
+          <span class="board-photo-hint" id="board-photo-hint">최대 2장 · JPG/PNG</span>
           <input type="file" id="board-write-photo-input" accept="image/*" multiple style="display:none;" onchange="handleBoardPhotoSelect(event)">
         </div>
         <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
@@ -10319,7 +10319,7 @@
     }
 
 
-    const MAX_NOTICE_IMAGES = 3;
+    const MAX_NOTICE_IMAGES = 2;
     let boardWriteImages = [];
 
     function parseNoticeImages(raw) {
@@ -12666,9 +12666,10 @@
       });
     }
 
-    /** 공지 첨부용: TCP 동기화 한도 고려해 채팅보다 더 작게 압축 (장당 ~120KB, 최대 3장) */
+    /** 공지 첨부용: TCP 동기화 한도 고려해 채팅보다 더 작게 압축 (장당 ~90KB, 최대 2장) */
     async function compressImageDataUrlForNotice(dataUrl, fileName, mimeHint) {
-      const MAX_NOTICE_IMAGE_BYTES = 120 * 1024;
+      // TCP 한 줄 한도(~512KB) 안에서 본문+사진 2장이 들어가도록 장당 상한을 낮춤
+      const MAX_NOTICE_IMAGE_BYTES = 90 * 1024;
       const mime = mimeHint || (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || 'image/jpeg';
       const originalBytes = estimateDataUrlBytes(dataUrl);
       const outName = fileName || 'notice.jpg';
