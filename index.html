@@ -2831,11 +2831,11 @@
       z-index: 6000;
     }
 
-    /* 설정 모달 — 현황판급 크기 + 3열 배치 */
+    /* 설정 모달 — 좌측 메뉴 + 패널 */
     .modal-card.settings-modal-card {
-      width: min(1480px, 98vw) !important;
-      height: min(940px, 94vh);
-      max-height: 94vh;
+      width: min(1080px, 96vw) !important;
+      height: min(760px, 92vh);
+      max-height: 92vh;
       max-width: none;
       padding: 0;
       gap: 0;
@@ -2844,6 +2844,7 @@
       flex-direction: column;
       border-radius: 16px;
       box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+      background: #fff;
     }
     #settings-modal.modal-overlay {
       padding: 16px;
@@ -2857,36 +2858,75 @@
       gap: 12px;
       padding: 14px 20px;
       background: #fff;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e8edf2;
     }
     .settings-modal-header h2 {
       margin: 0;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
-      color: #1d1c1d;
+      color: #0f172a;
     }
-    .settings-modal-header-hint {
-      font-size: 12px;
-      color: #94a3b8;
-      font-weight: 500;
-    }
-    .settings-modal-body {
+    .settings-modal-header-hint { display: none; }
+    .settings-modal-shell {
       flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      background: #fff;
+    }
+    .settings-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 10px;
+      background: #f8fafc;
+      border-right: 1px solid #e8edf2;
+      overflow-y: auto;
+    }
+    .settings-nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, color 0.12s;
+    }
+    .settings-nav-btn:hover { background: #eef2f7; color: #0f172a; }
+    .settings-nav-btn.active {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .settings-panels {
+      min-width: 0;
       min-height: 0;
       overflow-x: hidden;
       overflow-y: auto;
-      padding: 16px 18px 18px;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      align-content: start;
-      background: #eef2f7;
+      padding: 20px 24px 28px;
+      background: #fff;
     }
-    .settings-modal-body > .settings-span-2 {
-      grid-column: span 2;
+    .settings-panel { display: none; flex-direction: column; gap: 18px; max-width: 760px; }
+    .settings-panel.active { display: flex; }
+    .settings-panel-title {
+      margin: 0 0 2px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
     }
-    .settings-modal-body > .settings-span-3 {
-      grid-column: 1 / -1;
+    .settings-panel-desc {
+      margin: 0;
+      font-size: 12.5px;
+      color: #64748b;
+      line-height: 1.45;
     }
     .settings-modal-footer {
       flex-shrink: 0;
@@ -2895,32 +2935,61 @@
       gap: 8px;
       padding: 12px 18px;
       background: #fff;
-      border-top: 1px solid #e2e8f0;
+      border-top: 1px solid #e8edf2;
     }
-    @media (max-width: 1180px) {
-      .settings-modal-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .settings-modal-body > .settings-span-2 { grid-column: 1 / -1; }
-    }
-    @media (max-width: 860px) {
-      .settings-modal-body { grid-template-columns: 1fr; }
-      .settings-modal-body > .settings-span-2,
-      .settings-modal-body > .settings-span-3 { grid-column: 1 / -1; }
-      .settings-profile-layout { grid-template-columns: 1fr; }
-      .settings-profile-fields-grid { grid-template-columns: 1fr; }
+    @media (max-width: 820px) {
+      .settings-modal-shell { grid-template-columns: 1fr; }
+      .settings-nav {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 1px solid #e8edf2;
+        padding: 8px;
+      }
+      .settings-nav-btn { width: auto; white-space: nowrap; flex-shrink: 0; }
     }
 
-    /* 설정 모달 — 프로필 사진 */
-    .settings-section { background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 18px; display: flex; flex-direction: column; gap: 12px; }
-    .settings-section-title { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+    /* 설정 폼 공통 */
+    .settings-section {
+      background: transparent;
+      border: none;
+      padding: 0;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .settings-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.02em;
+      text-transform: none;
+      margin: 4px 0 0;
+    }
+    .settings-card {
+      background: #f8fafc;
+      border: 1px solid #e8edf2;
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .settings-card.danger {
+      background: #fff7f7;
+      border-color: #fecaca;
+    }
     .settings-profile-layout {
       display: grid;
-      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-      gap: 14px;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 16px 20px;
       align-items: start;
     }
     .settings-profile-photo-row {
-      display: flex; align-items: center; gap: 12px; padding: 12px;
-      background: #fff; border: 1px solid #e8edf2; border-radius: 14px; height: 100%; box-sizing: border-box;
+      display: flex; align-items: center; gap: 12px;
+      background: transparent; border: none; padding: 0; height: auto;
     }
     .settings-profile-avatar-wrap { position: relative; flex-shrink: 0; }
     .settings-profile-avatar { width: 72px; height: 72px; font-size: 26px; border-radius: 22px; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.18); cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
@@ -2937,32 +3006,84 @@
       gap: 10px 12px;
     }
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
-    .settings-btn-secondary { padding: 7px 12px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s, border-color 0.12s; white-space: nowrap; }
-    .settings-btn-secondary:hover { background: #e2e8f0; border-color: #cbd5e1; }
+    .settings-btn-secondary { padding: 8px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s, border-color 0.12s; white-space: nowrap; }
+    .settings-btn-secondary:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .settings-btn-primary { padding: 8px 16px; background: var(--accent); border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
+    .settings-btn-primary:hover { filter: brightness(0.96); }
+    .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
+    .settings-btn-danger:hover { background: #b91c1c; }
     .settings-btn-text { padding: 7px 4px; background: none; border: none; font-size: 11.5px; font-weight: 500; color: #94a3b8; cursor: pointer; transition: color 0.12s; }
     .settings-btn-text:hover { color: #ef4444; }
+    .settings-toast-dur { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; color: #64748b; font-weight: 600; }
+    .settings-toast-dur input {
+      width: 64px; padding: 7px 8px; border: 1px solid #dbe3ec; border-radius: 9px;
+      font-size: 13px; text-align: center; font-family: inherit; background: #fff; color: #0f172a;
+    }
+    .settings-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .settings-version-line { font-size: 13px; color: #475569; }
+    .net-status-list { display: flex; flex-direction: column; gap: 2px; }
+    .settings-path-input {
+      flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid #dbe3ec; border-radius: 10px;
+      font-size: 12px; background: #fff; color: #64748b; font-family: inherit;
+    }
     .settings-field { font-size: 12px; color: #475569; display: flex; flex-direction: column; gap: 4px; }
-    .settings-field input { width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 12px; font-family: inherit; background: #fff; }
+    .settings-field input,
+    .settings-field select,
+    .settings-select {
+      width: 100%; padding: 8px 10px; border: 1px solid #dbe3ec; border-radius: 10px;
+      font-size: 13px; font-family: inherit; background: #fff; color: #0f172a; box-sizing: border-box;
+    }
+    .settings-field input:focus,
+    .settings-field select:focus,
+    .settings-select:focus {
+      outline: none; border-color: #7dd3fc; box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
+    }
     .settings-field-row { display: flex; gap: 8px; }
     .settings-field-row .settings-field { flex: 1; min-width: 0; }
+    .settings-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+    }
+    .settings-form-grid .span-2 { grid-column: 1 / -1; }
+    .settings-hint { font-size: 11.5px; color: #94a3b8; line-height: 1.45; margin: 0; }
+    .settings-inline-check {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; cursor: pointer;
+    }
+    .settings-inline-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .settings-radio-stack { display: flex; flex-direction: column; gap: 8px; }
+    .settings-radio-row {
+      display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #334155; cursor: pointer;
+    }
+    .settings-radio-row input { margin-top: 2px; accent-color: var(--accent); }
+    .settings-radio-row b { font-weight: 700; color: #0f172a; }
+    .settings-radio-row small { display: block; font-size: 11.5px; color: #94a3b8; margin-top: 2px; line-height: 1.4; font-weight: 400; }
 
     .settings-notify-section { gap: 10px !important; }
     .settings-notify-list { display: flex; flex-direction: column; gap: 8px; }
     .settings-toggle-row {
-      display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
-      background: #fff; border: 1px solid #e8edf2; border-radius: 12px; cursor: pointer;
-      transition: border-color 0.12s, box-shadow 0.12s;
+      display: flex; align-items: flex-start; gap: 10px; padding: 0;
+      background: transparent; border: none; border-radius: 0; cursor: pointer;
+      transition: none;
     }
-    .settings-toggle-row:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); }
+    .settings-toggle-row:hover { border-color: transparent; box-shadow: none; }
     .settings-toggle-row input[type="checkbox"] {
       width: 17px; height: 17px; margin-top: 2px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent);
     }
-    .settings-toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-    .settings-toggle-title { font-size: 12.5px; font-weight: 600; color: #1e293b; line-height: 1.4; letter-spacing: -0.02em; }
-    .settings-toggle-desc { font-size: 11px; color: #94a3b8; line-height: 1.45; }
+    .settings-toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .settings-toggle-title { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.4; letter-spacing: -0.02em; }
+    .settings-toggle-desc { font-size: 11.5px; color: #94a3b8; line-height: 1.4; }
     .settings-notify-note {
-      font-size: 11px; color: #64748b; line-height: 1.5; padding: 10px 12px;
-      background: #f1f5f9; border-radius: 10px; border-left: 3px solid #bae6fd;
+      font-size: 11.5px; color: #64748b; line-height: 1.5; padding: 0;
+      background: transparent; border-radius: 0; border-left: none;
+    }
+    .settings-divider {
+      height: 1px; background: #eef2f7; margin: 4px 0;
+    }
+    @media (max-width: 720px) {
+      .settings-profile-layout { grid-template-columns: 1fr; }
+      .settings-profile-fields-grid,
+      .settings-form-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -3686,299 +3807,307 @@
   <div id="settings-modal" class="modal-overlay">
     <div class="modal-card settings-modal-card">
       <div class="settings-modal-header">
-        <h2>⚙️ 메신저 환경 설정</h2>
-        <span class="settings-modal-header-hint">프로필 · 알림 · 화면 · 업데이트</span>
+        <h2>환경 설정</h2>
       </div>
-      <div class="settings-modal-body">
+      <div class="settings-modal-shell">
+        <nav class="settings-nav" aria-label="설정 메뉴">
+          <button type="button" class="settings-nav-btn active" data-settings-tab="profile" onclick="setSettingsTab('profile')">프로필</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="list" onclick="setSettingsTab('list')">목록·상태</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="notify" onclick="setSettingsTab('notify')">알림</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="appearance" onclick="setSettingsTab('appearance')">화면·글꼴</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="files" onclick="setSettingsTab('files')">파일</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="privacy" onclick="setSettingsTab('privacy')">화면 잠금</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
+        </nav>
+        <div class="settings-panels">
 
-      <div class="settings-section settings-span-3">
-        <div class="settings-section-title">👤 내 프로필 및 연락처 정보</div>
-        <div class="settings-profile-layout">
-          <div class="settings-profile-photo-row">
-            <div class="settings-profile-avatar-wrap">
-              <div class="avatar-circle settings-profile-avatar" id="setting-photo-preview" onclick="document.getElementById('setting-photo-input').click()" title="클릭하여 사진 변경">정</div>
-              <span class="settings-profile-avatar-edit">📷</span>
-            </div>
-            <div class="settings-profile-actions">
-              <div class="settings-profile-label">프로필 사진</div>
-              <div class="settings-profile-hint">JPG, PNG · 160×160으로 자동 조정됩니다</div>
-              <div class="settings-profile-btn-row">
-                <input type="file" id="setting-photo-input" accept="image/*" style="display:none;" onchange="handleProfilePhotoSelect(event)">
-                <button type="button" class="settings-btn-secondary" onclick="document.getElementById('setting-photo-input').click()">🖼️ 사진 등록/변경</button>
-                <button type="button" class="settings-btn-text" onclick="removeProfilePhoto()">사진 제거</button>
+      <div class="settings-panel active" data-settings-panel="profile">
+        <h3 class="settings-panel-title">프로필</h3>
+        <p class="settings-panel-desc">이름·부서·연락처와 프로필 사진을 설정합니다.</p>
+        <div class="settings-card settings-section">
+          <div class="settings-profile-layout">
+            <div class="settings-profile-photo-row">
+              <div class="settings-profile-avatar-wrap">
+                <div class="avatar-circle settings-profile-avatar" id="setting-photo-preview" onclick="document.getElementById('setting-photo-input').click()" title="클릭하여 사진 변경">정</div>
+                <span class="settings-profile-avatar-edit">📷</span>
+              </div>
+              <div class="settings-profile-actions">
+                <div class="settings-profile-label">프로필 사진</div>
+                <div class="settings-profile-hint">JPG/PNG · 자동 160×160</div>
+                <div class="settings-profile-btn-row">
+                  <input type="file" id="setting-photo-input" accept="image/*" style="display:none;" onchange="handleProfilePhotoSelect(event)">
+                  <button type="button" class="settings-btn-secondary" onclick="document.getElementById('setting-photo-input').click()">사진 변경</button>
+                  <button type="button" class="settings-btn-text" onclick="removeProfilePhoto()">제거</button>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="settings-profile-fields">
-            <div class="settings-profile-fields-grid">
-              <label class="settings-field">성명<input type="text" id="setting-name" placeholder="예: 물리치료실1"></label>
-              <label class="settings-field">층<input type="text" id="setting-floor" placeholder="선택"></label>
-              <label class="settings-field">부서<input type="text" id="setting-dept" placeholder="선택"></label>
-              <label class="settings-field">직급 (선택)<input type="text" id="setting-rank" placeholder="없으면 비움"></label>
-              <label class="settings-field">내선번호 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
-              <label class="settings-field">휴대폰 번호 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
+            <div class="settings-profile-fields">
+              <div class="settings-profile-fields-grid">
+                <label class="settings-field">성명<input type="text" id="setting-name" placeholder="예: 물리치료실1"></label>
+                <label class="settings-field">층<input type="text" id="setting-floor" placeholder="선택"></label>
+                <label class="settings-field">부서<input type="text" id="setting-dept" placeholder="선택"></label>
+                <label class="settings-field">직급 (선택)<input type="text" id="setting-rank" placeholder="없으면 비움"></label>
+                <label class="settings-field">내선 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
+                <label class="settings-field">휴대폰 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
+              </div>
+              <p class="settings-profile-hint-note">성명만 필수입니다. 나머지는 비워 두어도 됩니다.</p>
             </div>
-            <div class="settings-profile-hint-note">성명만 있으면 사용할 수 있습니다. 직급·내선·휴대폰은 비워 두어도 됩니다. (예: 성명에 물리치료실1)</div>
           </div>
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">🟢 나의 근무 상태 표시 설정</div>
-        <select id="setting-my-status" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-          <option value="ONLINE">🟢 온라인 (상담 가능)</option>
-          <option value="BUSY">🔴 진료 중 / 치료 중</option>
-          <option value="TREATMENT">🟡 자리 비움</option>
-        </select>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">🏢 사용자 목록 분류 설정</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          목록 분류 기준:
-          <select id="setting-user-grouping" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="floor" selected>🏢 층별 분류 (기본)</option>
-            <option value="dept">🏥 부서별 분류</option>
-          </select>
-        </label>
-        <label class="settings-toggle-row" for="setting-show-user-list-avatars" style="margin-top:4px;">
-          <input type="checkbox" id="setting-show-user-list-avatars" checked>
-          <span class="settings-toggle-text">
-            <span class="settings-toggle-title">사용자 목록에 프로필 사진 표시</span>
-            <span class="settings-toggle-desc">끄면 사이드바·미니 모드 목록에서 사진·이모지 아바타를 숨깁니다 (채팅 헤더·상세 정보는 유지)</span>
-          </span>
-        </label>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-          목록에 표시할 직원:
-          <select id="setting-show-offline-users" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="all">온라인 + 오프라인 모두</option>
-            <option value="online">온라인만</option>
-          </select>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">사이드바·미니 모드 직원 목록에 적용됩니다. 「대화」 탭의 기존 대화는 그대로 보입니다.</div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">✏️ 맞춤법 검사</div>
-        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="checkbox" id="setting-spellcheck" style="width:16px; height:16px;"> 채팅·글 입력 시 맞춤법 밑줄 표시
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">한국어·영어 사전을 사용합니다. 오타에 우클릭하면 수정 제안을 볼 수 있습니다. (전문 용어·약어는 오탐될 수 있습니다.)</div>
-      </div>
-
-      <div class="settings-section settings-notify-section settings-span-3">
-        <div class="settings-section-title">🔔 메시지 알림</div>
-        <div class="settings-notify-list">
-          <label class="settings-toggle-row" for="setting-notify-incoming">
-            <input type="checkbox" id="setting-notify-incoming" checked>
-            <span class="settings-toggle-text">
-              <span class="settings-toggle-title">새 메시지 알림</span>
-              <span class="settings-toggle-desc">상대가 메시지를 보냈을 때 알림 (보고 있는 대화방은 제외). 같은 상대의 연속 메시지는 알림 1개만 표시</span>
-            </span>
-          </label>
-          <div style="padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px; display:flex; flex-direction:column; gap:8px;">
-            <div style="font-size:13px; font-weight:700; color:#0f172a;">알림 방식</div>
-            <div style="font-size:11px; color:#94a3b8; line-height:1.4; margin-top:-2px;">토스트와 데스크탑 중 하나만 사용합니다. 기본값은 토스트입니다.</div>
-            <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
-              <input type="radio" name="incoming-notify-mode" value="toast" id="notify-mode-toast" checked>
-              토스트 알림 (화면 중앙)
-            </label>
-            <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
-              <input type="radio" name="incoming-notify-mode" value="desktop" id="notify-mode-desktop">
-              데스크탑 알림 (OS 알림)
-            </label>
-          </div>
-          <label class="settings-toggle-row" for="setting-notify-read-receipt">
-            <input type="checkbox" id="setting-notify-read-receipt" checked>
-            <span class="settings-toggle-text">
-              <span class="settings-toggle-title">읽음 확인 알림</span>
-              <span class="settings-toggle-desc">상대가 처음 읽었을 때 데스크탑 알림 1회 (채팅방에는 보냄·읽음·오류만 표시)</span>
-            </span>
-          </label>
-          <label class="settings-toggle-row" for="setting-notification-preview">
-            <input type="checkbox" id="setting-notification-preview">
-            <span class="settings-toggle-text">
-              <span class="settings-toggle-title">알림 본문 미리보기</span>
-              <span class="settings-toggle-desc">끄면 「메시지가 도착했습니다」만 표시</span>
-            </span>
-          </label>
-          <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px;">
-            <span class="settings-toggle-text" style="flex:1;">
-              <span class="settings-toggle-title" style="display:block; font-size:13px; font-weight:700; color:#0f172a;">토스트 표시 시간</span>
-              <span class="settings-toggle-desc" style="display:block; font-size:11px; color:#94a3b8; margin-top:2px;">토스트 알림이 자동으로 사라지기까지 (2~60초, 긴급은 +2초). 같은 상대 알림 묶음에도 사용</span>
-            </span>
-            <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-              <input type="number" id="setting-toast-duration" min="2" max="60" step="1" value="7" style="width:64px; padding:7px 8px; border:1px solid #cbd5e1; border-radius:9px; font-size:13px; text-align:center;">
-              <span style="font-size:12px; color:#64748b; font-weight:600;">초</span>
-            </span>
-          </label>
-        </div>
-        <p class="settings-notify-note">토스트의 <b>열기</b>는 해당 대화로 이동하고, <b>닫기</b>는 바로 숨깁니다. 이미 그 대화를 보고 있을 때는 새 메시지 알림을 띄우지 않습니다. 같은 상대가 연속으로 보내도 알림은 1개만 표시됩니다.</p>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">📁 파일 수신 방식 설정</div>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">사이드바 📁 버튼으로 여는 폴더와 동일합니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="radio" name="file-recv-mode" value="auto" id="recv-auto"> 지정된 폴더에 <b>자동 저장</b>
-        </label>
-        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="radio" name="file-recv-mode" value="ask" id="recv-ask"> <b>저장할 위치 매번 물어보기</b>
-        </label>
-        <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
-          <input type="text" id="setting-download-folder" readonly style="flex:1; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 12px; font-size:11px; background:#fff; color:#64748b;">
-          <button type="button" onclick="chooseDownloadFolder()" style="padding:6px 10px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">폴더 선택</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">🎨 인터페이스 설정</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          화면 모드:
-          <select id="setting-default-view" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="normal">🖥️ 기본 화면 (3단 레이아웃)</option>
-            <option value="compact">🗨 미니 모드 (좁은 창)</option>
-          </select>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">앱을 켤 때와 설정 저장 시 선택한 화면으로 전환됩니다. 사이드바 하단 좁은 창 아이콘으로도 바꿀 수 있습니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          미니 모드에서 직원 클릭 시:
-          <select id="setting-compact-person-click" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="ipmsg">✉️ 쪽지 보내기 (채팅창 없이)</option>
-            <option value="chat">💬 채팅창 열기</option>
-          </select>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">직원 목록·직원 탭에서 사람을 눌렀을 때 동작입니다. 「대화」 탭의 기존 대화는 항상 채팅창으로 열립니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          시스템 폰트:
-          <select id="setting-font-family" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="suit">수트 (SUIT)</option>
-            <option value="pretendard">프리텐다드 (Pretendard)</option>
-            <option value="gmarketSans">G마켓 산스 (Gmarket Sans)</option>
-            <option value="spoqa">스포카 (Spoqa Han Sans)</option>
-          </select>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">메뉴·사이드바·설정·일정판·버튼 등 UI 전체에 적용됩니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          채팅방용 폰트:
-          <select id="setting-chat-font-family" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="ridiBatang">리디바탕 (RIDIBatang)</option>
-            <option value="maruBuri">마루부리 (MaruBuri)</option>
-            <option value="eulyoo1945">을유1945 (Eulyoo1945)</option>
-            <option value="pretendard">프리텐다드 (Pretendard)</option>
-          </select>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.4;">1:1·그룹·방송·부서·층 채팅 말풍선 글씨에만 적용됩니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-          대화창 글씨 크기:
-          <select id="setting-font-size" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; background:#fff;">
-            <option value="12px">작게 (12px)</option>
-            <option value="14px" selected>보통 (기본 14px)</option>
-            <option value="16px">크게 (16px)</option>
-            <option value="18px">아주 크게 (18px)</option>
-          </select>
-        </label>
-        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:4px;">
-          <input type="checkbox" id="setting-auto-launch" style="width:16px; height:16px;"> 💻 컴퓨터 부팅 시 메신저 자동 실행
-        </label>
-        <button onclick="window.api.openUserDataFolder()" style="align-self:flex-start; padding:6px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">📂 데이터 폴더 열기</button>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-section-title">🔒 화면 잠금 (사생활 보호)</div>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">카카오톡처럼 PIN으로 화면을 잠가 대화 내용을 가립니다. 직급자·공용 PC에 권장합니다. 하단 자물쇠 버튼으로 즉시 잠글 수 있습니다.</div>
-        <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" id="setting-privacy-lock-enabled" style="width:16px; height:16px;" onchange="onPrivacyLockEnabledToggle()"> 화면 잠금 사용
-        </label>
-        <div id="privacy-lock-settings-fields" style="display:none; flex-direction:column; gap:8px;">
-          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-            PIN (숫자 4~8자리):
-            <input type="password" id="setting-privacy-lock-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="새 PIN 또는 변경할 PIN" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
-          </label>
-          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-            PIN 확인:
-            <input type="password" id="setting-privacy-lock-pin2" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="같은 PIN 다시 입력" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
-          </label>
-          <div id="privacy-lock-pin-hint" style="font-size:11px; color:#94a3b8; line-height:1.4;">처음 켤 때는 PIN을 반드시 설정하세요. 이미 설정돼 있으면 비워 두고 저장해도 됩니다.</div>
-          <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="setting-privacy-lock-on-hide" style="width:16px; height:16px;" checked> 창을 닫아 트레이로 숨길 때 자동 잠금
-          </label>
-          <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-            자리 비움 후 자동 잠금:
-            <select id="setting-privacy-lock-idle" style="padding:8px; border:1px solid #cbd5e1; border-radius:12px; font-size:12px; background:#fff;">
-              <option value="0">사용 안 함</option>
-              <option value="1">1분</option>
-              <option value="3">3분</option>
-              <option value="5">5분</option>
-              <option value="10">10분</option>
+      <div class="settings-panel" data-settings-panel="list">
+        <h3 class="settings-panel-title">목록·상태</h3>
+        <p class="settings-panel-desc">근무 상태와 직원 목록 표시 방식을 정합니다.</p>
+        <div class="settings-card">
+          <label class="settings-field">근무 상태
+            <select id="setting-my-status" class="settings-select">
+              <option value="ONLINE">온라인 (상담 가능)</option>
+              <option value="BUSY">진료 중 / 치료 중</option>
+              <option value="TREATMENT">자리 비움</option>
             </select>
           </label>
         </div>
+        <div class="settings-card">
+          <div class="settings-form-grid">
+            <label class="settings-field">목록 분류
+              <select id="setting-user-grouping" class="settings-select">
+                <option value="floor" selected>층별</option>
+                <option value="dept">부서별</option>
+              </select>
+            </label>
+            <label class="settings-field">표시할 직원
+              <select id="setting-show-offline-users" class="settings-select">
+                <option value="all">온라인 + 오프라인</option>
+                <option value="online">온라인만</option>
+              </select>
+            </label>
+            <label class="settings-toggle-row span-2" for="setting-show-user-list-avatars">
+              <input type="checkbox" id="setting-show-user-list-avatars" checked>
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">목록에 프로필 사진 표시</span>
+                <span class="settings-toggle-desc">끄면 사이드바·미니 모드에서 아바타를 숨깁니다</span>
+              </span>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">💾 대화 내용 백업</div>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">저장된 모든 대화를 JSON·텍스트·CSV 파일과 일별 채팅 로그로 내보냅니다. 폴더를 선택하면 그 안에 백업용 하위 폴더가 만들어집니다.</div>
-        <button type="button" onclick="backupChatHistory()" style="align-self:flex-start; padding:8px 14px; background:var(--accent); border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">대화 백업 실행</button>
-        <div id="chat-backup-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
+      <div class="settings-panel" data-settings-panel="notify">
+        <h3 class="settings-panel-title">알림</h3>
+        <p class="settings-panel-desc">새 메시지·읽음 확인 알림을 설정합니다.</p>
+        <div class="settings-card settings-notify-section">
+          <div class="settings-notify-list">
+            <label class="settings-toggle-row" for="setting-notify-incoming">
+              <input type="checkbox" id="setting-notify-incoming" checked>
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">새 메시지 알림</span>
+                <span class="settings-toggle-desc">보고 있는 대화방은 제외 · 같은 상대 연속 메시지는 1회</span>
+              </span>
+            </label>
+            <div class="settings-divider"></div>
+            <div class="settings-section-title">알림 방식</div>
+            <div class="settings-radio-stack">
+              <label class="settings-radio-row"><input type="radio" name="incoming-notify-mode" value="toast" id="notify-mode-toast" checked> <span><b>토스트</b><small>화면 중앙 알림 (기본)</small></span></label>
+              <label class="settings-radio-row"><input type="radio" name="incoming-notify-mode" value="desktop" id="notify-mode-desktop"> <span><b>데스크탑</b><small>OS 알림</small></span></label>
+            </div>
+            <div class="settings-divider"></div>
+            <label class="settings-toggle-row" for="setting-notify-read-receipt">
+              <input type="checkbox" id="setting-notify-read-receipt" checked>
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">읽음 확인 알림</span>
+                <span class="settings-toggle-desc">상대가 처음 읽었을 때 1회</span>
+              </span>
+            </label>
+            <label class="settings-toggle-row" for="setting-notification-preview">
+              <input type="checkbox" id="setting-notification-preview">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">알림 본문 미리보기</span>
+                <span class="settings-toggle-desc">끄면 「메시지가 도착했습니다」만 표시</span>
+              </span>
+            </label>
+            <label class="settings-toggle-row" for="setting-toast-duration-wrap">
+              <span class="settings-toggle-text" style="flex:1;">
+                <span class="settings-toggle-title">토스트 표시 시간</span>
+                <span class="settings-toggle-desc">2~60초 (긴급은 +2초)</span>
+              </span>
+              <span class="settings-toast-dur">
+                <input type="number" id="setting-toast-duration" min="2" max="60" step="1" value="7" aria-label="토스트 표시 시간(초)">
+                <span>초</span>
+              </span>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <div class="settings-section" style="background:#fff7f7; border-color:#fecaca;">
-        <div class="settings-section-title" style="color:#b91c1c;">🗑️ 대화·로그 전체 삭제</div>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">이 PC에 저장된 <b>모든 대화 메시지</b>, 일별 채팅 로그(<code>chat_logs</code>), 앱 로그, 자동 DB 백업을 삭제합니다. 공지·일정·프로필·직원 목록은 유지됩니다. 삭제 전 위에서 백업하는 것을 권장합니다.</div>
-        <button type="button" onclick="clearAllChatHistoryFromSettings()" style="align-self:flex-start; padding:8px 14px; background:#dc2626; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; color:#fff;">모든 대화·로그 삭제</button>
-        <div id="chat-clear-all-result" style="font-size:11px; color:#64748b; line-height:1.4;"></div>
+      <div class="settings-panel" data-settings-panel="appearance">
+        <h3 class="settings-panel-title">화면·글꼴</h3>
+        <p class="settings-panel-desc">화면 모드와 글꼴을 조정합니다.</p>
+        <div class="settings-card">
+          <div class="settings-form-grid">
+            <label class="settings-field">화면 모드
+              <select id="setting-default-view" class="settings-select">
+                <option value="normal">기본 화면 (3단)</option>
+                <option value="compact">미니 모드</option>
+              </select>
+            </label>
+            <label class="settings-field">미니 모드에서 직원 클릭
+              <select id="setting-compact-person-click" class="settings-select">
+                <option value="ipmsg">쪽지 보내기</option>
+                <option value="chat">채팅창 열기</option>
+              </select>
+            </label>
+            <label class="settings-field">시스템 폰트
+              <select id="setting-font-family" class="settings-select">
+                <option value="suit">수트 (SUIT)</option>
+                <option value="pretendard">프리텐다드</option>
+                <option value="gmarketSans">G마켓 산스</option>
+                <option value="spoqa">스포카</option>
+              </select>
+            </label>
+            <label class="settings-field">채팅방 폰트
+              <select id="setting-chat-font-family" class="settings-select">
+                <option value="ridiBatang">리디바탕</option>
+                <option value="maruBuri">마루부리</option>
+                <option value="eulyoo1945">을유1945</option>
+                <option value="pretendard">프리텐다드</option>
+              </select>
+            </label>
+            <label class="settings-field">대화창 글씨 크기
+              <select id="setting-font-size" class="settings-select">
+                <option value="12px">작게 (12)</option>
+                <option value="14px" selected>보통 (14)</option>
+                <option value="16px">크게 (16)</option>
+                <option value="18px">아주 크게 (18)</option>
+              </select>
+            </label>
+            <label class="settings-toggle-row span-2" for="setting-spellcheck">
+              <input type="checkbox" id="setting-spellcheck">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">맞춤법 검사</span>
+                <span class="settings-toggle-desc">채팅·글 입력 시 밑줄 표시 (우클릭으로 제안)</span>
+              </span>
+            </label>
+            <label class="settings-inline-check span-2">
+              <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
+            </label>
+          </div>
+        </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">📶 네트워크 연결 상태</div>
-        <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
-        <div class="net-status-row"><span>사용자 검색(UDP)</span><span id="net-udp-status">-</span></div>
-        <div class="net-status-row"><span>메시지 연결(TCP)</span><span id="net-tcp-status">-</span></div>
-        <div class="net-status-row"><span>현재 온라인 인원</span><span id="net-online-count">-</span></div>
-        <div style="font-size:10px; color:#94a3b8; margin-top:4px;">메시지가 전혀 안 오고 간다면, 위 상태가 "오류"인지 먼저 확인해 주세요. 대부분 Windows 방화벽에서 이 프로그램의 접근을 허용하면 해결됩니다.</div>
+      <div class="settings-panel" data-settings-panel="files">
+        <h3 class="settings-panel-title">파일</h3>
+        <p class="settings-panel-desc">받은 파일 저장 방식을 정합니다.</p>
+        <div class="settings-card">
+          <div class="settings-radio-stack">
+            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="auto" id="recv-auto"> <span><b>자동 저장</b><small>지정 폴더에 저장</small></span></label>
+            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="ask" id="recv-ask"> <span><b>매번 묻기</b><small>저장 위치를 매번 선택</small></span></label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="text" id="setting-download-folder" class="settings-path-input" readonly>
+            <button type="button" class="settings-btn-secondary" onclick="chooseDownloadFolder()">폴더 선택</button>
+          </div>
+        </div>
       </div>
 
-      <div class="settings-section settings-span-3">
-        <div class="settings-section-title">🔄 프로그램 업데이트</div>
-        <div style="font-size:12px; color:#475569;">현재 버전: <b id="update-current-version">-</b></div>
-        <div style="padding:10px 12px; background:#fff; border:1px solid #e8edf2; border-radius:12px; display:flex; flex-direction:column; gap:8px;">
-          <div style="font-size:13px; font-weight:700; color:#0f172a;">업데이트 방식</div>
-          <label style="font-size:12px; color:#475569; display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
-            <input type="radio" name="update-mode" value="auto" id="update-mode-auto" checked style="margin-top:2px;" onchange="onUpdateModeChange('auto')">
-            <span>
-              <span style="font-weight:700; color:#0f172a;">자동</span>
-              <span style="display:block; font-size:11px; color:#94a3b8; line-height:1.4; margin-top:2px;">새 버전이 있으면 자동으로 받은 뒤 재시작합니다. (기본)</span>
-            </span>
+      <div class="settings-panel" data-settings-panel="privacy">
+        <h3 class="settings-panel-title">화면 잠금</h3>
+        <p class="settings-panel-desc">PIN으로 화면을 잠가 대화 내용을 가립니다.</p>
+        <div class="settings-card" id="settings-privacy-card">
+          <label class="settings-inline-check">
+            <input type="checkbox" id="setting-privacy-lock-enabled" onchange="onPrivacyLockEnabledToggle()"> 화면 잠금 사용
           </label>
-          <label style="font-size:12px; color:#475569; display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
-            <input type="radio" name="update-mode" value="manual" id="update-mode-manual" style="margin-top:2px;" onchange="onUpdateModeChange('manual')">
-            <span>
-              <span style="font-weight:700; color:#0f172a;">수동</span>
-              <span style="display:block; font-size:11px; color:#94a3b8; line-height:1.4; margin-top:2px;">「지금 확인」을 눌렀을 때만 확인하고, 원하면 직접 업데이트합니다.</span>
-            </span>
-          </label>
+          <div id="privacy-lock-settings-fields" style="display:none; flex-direction:column; gap:12px;">
+            <div class="settings-form-grid">
+              <label class="settings-field">PIN (숫자 4~8자리)
+                <input type="password" id="setting-privacy-lock-pin" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="새 PIN 또는 변경할 PIN">
+              </label>
+              <label class="settings-field">PIN 확인
+                <input type="password" id="setting-privacy-lock-pin2" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="같은 PIN 다시 입력">
+              </label>
+            </div>
+            <div id="privacy-lock-pin-hint" class="settings-hint">처음 켤 때는 PIN을 반드시 설정하세요. 이미 설정돼 있으면 비워 두고 저장해도 됩니다.</div>
+            <label class="settings-inline-check">
+              <input type="checkbox" id="setting-privacy-lock-on-hide" checked> 트레이로 숨길 때 자동 잠금
+            </label>
+            <label class="settings-field">자리 비움 후 자동 잠금
+              <select id="setting-privacy-lock-idle" class="settings-select">
+                <option value="0">사용 안 함</option>
+                <option value="1">1분</option>
+                <option value="3">3분</option>
+                <option value="5">5분</option>
+                <option value="10">10분</option>
+              </select>
+            </label>
+          </div>
         </div>
-        <label style="font-size:12px; color:#475569;">업데이트 소스 (GitHub 또는 Z 브리지):
-          <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius: 9px; margin-top:2px;" disabled>
-        </label>
-        <div style="font-size:11px; color:#94a3b8; line-height:1.45;">
-          기본은 GitHub입니다. GitHub로 업데이트하면 Z 연결된 PC가 자동으로 <b>Z:\...\물리치료실\messenger</b>에도 공유합니다.
-        </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button onclick="checkUpdateNow()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">지금 확인</button>
-          <button id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">GitHub 주소 저장</button>
-          <button id="update-z-mirror-btn" onclick="mirrorUpdateToZBridgeNow()" style="display:none; padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">Z드라이브에 공유</button>
-          <button type="button" onclick="window.api.openUserDataFolder()" style="padding:7px 12px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer; color:#475569;">토큰 폴더 열기</button>
-        </div>
-        <div id="update-check-result" style="font-size:12px; color:#64748b;"></div>
       </div>
 
-      </div><!-- /.settings-modal-body -->
+      <div class="settings-panel" data-settings-panel="data">
+        <h3 class="settings-panel-title">데이터</h3>
+        <p class="settings-panel-desc">대화 백업과 삭제를 관리합니다.</p>
+        <div class="settings-card">
+          <p class="settings-hint">모든 대화를 JSON·텍스트·CSV와 일별 로그로 내보냅니다.</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button type="button" class="settings-btn-primary" onclick="backupChatHistory()">대화 백업 실행</button>
+            <button type="button" class="settings-btn-secondary" onclick="window.api.openUserDataFolder()">데이터 폴더 열기</button>
+          </div>
+          <div id="chat-backup-result" class="settings-hint"></div>
+        </div>
+        <div class="settings-card danger">
+          <div class="settings-section-title" style="color:#b91c1c;">대화·로그 전체 삭제</div>
+          <p class="settings-hint">이 PC의 모든 대화·채팅 로그·앱 로그·자동 DB 백업을 삭제합니다. 공지·일정·프로필은 유지됩니다.</p>
+          <button type="button" class="settings-btn-danger" onclick="clearAllChatHistoryFromSettings()">모든 대화·로그 삭제</button>
+          <div id="chat-clear-all-result" class="settings-hint"></div>
+        </div>
+      </div>
+
+      <div class="settings-panel" data-settings-panel="system">
+        <h3 class="settings-panel-title">네트워크·업데이트</h3>
+        <p class="settings-panel-desc">연결 상태를 확인하고 프로그램 업데이트를 관리합니다.</p>
+        <div class="settings-card">
+          <div class="settings-section-title">네트워크</div>
+          <div class="net-status-list">
+            <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
+            <div class="net-status-row"><span>사용자 검색(UDP)</span><span id="net-udp-status">-</span></div>
+            <div class="net-status-row"><span>메시지 연결(TCP)</span><span id="net-tcp-status">-</span></div>
+            <div class="net-status-row"><span>현재 온라인 인원</span><span id="net-online-count">-</span></div>
+          </div>
+          <p class="settings-hint">상태가 오류면 Windows 방화벽에서 이 프로그램 접근을 허용해 보세요.</p>
+        </div>
+        <div class="settings-card">
+          <div class="settings-section-title">업데이트</div>
+          <div class="settings-version-line">현재 버전 <b id="update-current-version">-</b></div>
+          <div class="settings-radio-stack">
+            <label class="settings-radio-row">
+              <input type="radio" name="update-mode" value="auto" id="update-mode-auto" checked onchange="onUpdateModeChange('auto')">
+              <span><b>자동</b><small>새 버전이 있으면 받아 재시작</small></span>
+            </label>
+            <label class="settings-radio-row">
+              <input type="radio" name="update-mode" value="manual" id="update-mode-manual" onchange="onUpdateModeChange('manual')">
+              <span><b>수동</b><small>「지금 확인」할 때만 업데이트</small></span>
+            </label>
+          </div>
+          <label class="settings-field">업데이트 소스
+            <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" disabled>
+          </label>
+          <div class="settings-btn-row">
+            <button type="button" class="settings-btn-secondary" onclick="checkUpdateNow()">지금 확인</button>
+            <button type="button" class="settings-btn-secondary" id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none;">GitHub 주소 저장</button>
+            <button type="button" class="settings-btn-secondary" id="update-z-mirror-btn" onclick="mirrorUpdateToZBridgeNow()" style="display:none;">Z드라이브에 공유</button>
+            <button type="button" class="settings-btn-secondary" onclick="window.api.openUserDataFolder()">토큰 폴더 열기</button>
+          </div>
+          <div id="update-check-result" class="settings-hint"></div>
+        </div>
+      </div>
+
+        </div><!-- /.settings-panels -->
+      </div><!-- /.settings-modal-shell -->
 
       <div class="settings-modal-footer">
-        <button onclick="closeSettingsModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="saveAppSettings()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">💾 설정 저장</button>
+        <button type="button" class="settings-btn-secondary" onclick="closeSettingsModal()">취소</button>
+        <button type="button" class="settings-btn-primary" onclick="saveAppSettings()">설정 저장</button>
       </div>
     </div>
   </div>
@@ -8987,30 +9116,34 @@
       openSettingsModal({ focus: 'details' });
     }
 
-    function focusSettingsSection(focusKey) {
+    function setSettingsTab(tab) {
+      const key = String(tab || 'profile');
       const modal = document.getElementById('settings-modal');
       if (!modal) return;
-      const profileSection = modal.querySelector('.settings-section');
-      if (focusKey === 'profile') {
-        profileSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      modal.querySelectorAll('.settings-nav-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-settings-tab') === key);
+      });
+      modal.querySelectorAll('.settings-panel').forEach((panel) => {
+        panel.classList.toggle('active', panel.getAttribute('data-settings-panel') === key);
+      });
+      const panels = modal.querySelector('.settings-panels');
+      if (panels) panels.scrollTop = 0;
+    }
+
+    function focusSettingsSection(focusKey) {
+      if (focusKey === 'profile' || focusKey === 'details') {
+        setSettingsTab('profile');
+        const focusId = focusKey === 'details' ? 'setting-floor' : 'setting-name';
         setTimeout(() => {
-          document.getElementById('setting-name')?.focus();
-          document.getElementById('setting-name')?.select?.();
-        }, 80);
-        return;
-      }
-      if (focusKey === 'details') {
-        profileSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => {
-          document.getElementById('setting-floor')?.focus();
-          document.getElementById('setting-floor')?.select?.();
-        }, 80);
+          const el = document.getElementById(focusId);
+          el?.focus();
+          el?.select?.();
+        }, 60);
         return;
       }
       if (focusKey === 'privacy-lock') {
-        const el = document.getElementById('setting-privacy-lock-enabled');
-        el?.closest('div[style*="border-radius: 18px"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => el?.focus(), 80);
+        setSettingsTab('privacy');
+        setTimeout(() => document.getElementById('setting-privacy-lock-enabled')?.focus(), 60);
       }
     }
     document.addEventListener('click', () => {
@@ -18025,6 +18158,7 @@
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('settings-modal'));
       document.getElementById('settings-modal').style.display = 'flex';
+      if (!o.focus) setSettingsTab('profile');
       const backupResultEl = document.getElementById('chat-backup-result');
       if (backupResultEl) backupResultEl.textContent = '';
       const clearAllResultEl = document.getElementById('chat-clear-all-result');
