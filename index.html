@@ -1084,6 +1084,13 @@
     }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
+    .chat-history-load-older {
+      display: none; align-self: center; margin: 4px 0 10px; padding: 6px 12px;
+      font-size: 11.5px; font-weight: 600; color: #64748b; background: #f1f5f9;
+      border-radius: 999px; border: 1px solid #e2e8f0;
+    }
+    .chat-history-load-older.is-visible { display: inline-flex; }
+    .chat-history-load-older[hidden] { display: none !important; }
     .chat-date-sep {
       display: flex; align-items: center; gap: 12px;
       margin: 12px 4px 8px; flex-shrink: 0; user-select: none;
@@ -4684,7 +4691,9 @@
         <span style="font-size:11px; color:#94a3b8; cursor:pointer;" onclick="closeChatSearchBar()">닫기</span>
       </div>
 
-      <div id="chat-messages-area"></div>
+      <div id="chat-messages-area">
+        <div id="chat-history-load-older" class="chat-history-load-older" hidden>이전 대화 불러오는 중…</div>
+      </div>
       <div id="read-receipt-note" class="read-receipt-note" style="display:none;"></div>
 
       <div id="scheduled-indicator">
@@ -15766,15 +15775,23 @@
       if (!msgsEl) return;
       const aroundDate = opts && opts.aroundDate ? String(opts.aroundDate).trim() : null;
       const scrollToDate = opts && opts.scrollToDate ? String(opts.scrollToDate).trim() : aroundDate;
+      chatHistoryLoadingOlder = false;
       try {
-        msgsEl.innerHTML = '';
-        const result = await window.api.getChatHistory(
-          activeChatUser.ip,
-          aroundDate || null,
-          keyword || null
-        );
+        msgsEl.innerHTML = '<div id="chat-history-load-older" class="chat-history-load-older" hidden>이전 대화 불러오는 중…</div>';
+        const result = await window.api.getChatHistory({
+          targetIP: activeChatUser.ip,
+          dateStr: aroundDate || null,
+          keyword: keyword || null
+        });
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         const jumpedDate = (!Array.isArray(result) && result && result.jumpedDate) ? result.jumpedDate : null;
+        if (!Array.isArray(result) && result) {
+          chatHistoryHasMore = !!result.hasMore;
+          chatHistoryOldestId = result.oldestId || (history[0] && history[0].id) || 0;
+        } else {
+          chatHistoryHasMore = false;
+          chatHistoryOldestId = (history[0] && history[0].id) || 0;
+        }
 
         if (!history.length) {
           if (keyword) {
@@ -15786,6 +15803,7 @@
             msgsEl.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:12px; padding:24px; line-height:1.5;">표시할 메시지가 없습니다.<br><span style="font-size:11px;">새 메시지를 보내면 여기에 표시됩니다.</span></div>`;
             setChatDateJumpBanner(null);
           }
+          chatHistoryHasMore = false;
           return;
         }
 
@@ -15818,7 +15836,7 @@
             : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
           const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
           const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
-          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey });
+          appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey, skipDomPrune: true });
         });
         pendingUnreadScrollCount = 0;
 
@@ -15853,6 +15871,98 @@
       } catch (e) {
         console.error('대화 기록을 불러오지 못했습니다:', e);
         msgsEl.innerHTML = `<div style="text-align:center; color:#ef4444; font-size:12px; padding:24px;">대화 기록을 불러오는 중 오류가 발생했습니다.</div>`;
+      }
+    }
+
+    let chatHistoryHasMore = false;
+    let chatHistoryOldestId = 0;
+    let chatHistoryLoadingOlder = false;
+
+    function setChatHistoryLoadOlderVisible(visible) {
+      let el = document.getElementById('chat-history-load-older');
+      const area = document.getElementById('chat-messages-area');
+      if (!el && area) {
+        el = document.createElement('div');
+        el.id = 'chat-history-load-older';
+        el.className = 'chat-history-load-older';
+        el.textContent = '이전 대화 불러오는 중…';
+        area.insertBefore(el, area.firstChild);
+      }
+      if (!el) return;
+      if (visible) {
+        el.hidden = false;
+        el.classList.add('is-visible');
+      } else {
+        el.hidden = true;
+        el.classList.remove('is-visible');
+      }
+    }
+
+    async function loadOlderChatHistory() {
+      if (!activeChatUser || chatHistoryLoadingOlder || !chatHistoryHasMore || !chatHistoryOldestId) return;
+      if (chatDateJumpActive) return;
+      const searchInput = document.getElementById('chat-search-input');
+      if (searchInput && searchInput.value && searchInput.value.trim()) return;
+      const msgsEl = document.getElementById('chat-messages-area');
+      if (!msgsEl) return;
+
+      chatHistoryLoadingOlder = true;
+      setChatHistoryLoadOlderVisible(true);
+      const prevHeight = msgsEl.scrollHeight;
+      const prevTop = msgsEl.scrollTop;
+      try {
+        const result = await window.api.getChatHistory({
+          targetIP: activeChatUser.ip,
+          beforeId: chatHistoryOldestId,
+          limit: 400
+        });
+        const history = Array.isArray(result) ? result : ((result && result.rows) || []);
+        if (!Array.isArray(result) && result) {
+          chatHistoryHasMore = !!result.hasMore;
+          if (result.oldestId) chatHistoryOldestId = result.oldestId;
+        } else {
+          chatHistoryHasMore = false;
+        }
+        if (!history.length) {
+          chatHistoryHasMore = false;
+          return;
+        }
+        // 현재 맨 위 노드 앞에 끼워 넣음 (로딩 표시 다음)
+        let anchor = msgsEl.firstChild;
+        const loadEl = document.getElementById('chat-history-load-older');
+        if (loadEl) anchor = loadEl.nextSibling;
+
+        history.forEach((row, idx) => {
+          const codeType = detectCodeAlertType(row.message);
+          const urgent = codeType
+            ? true
+            : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
+          const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
+          const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+          // 같은 날짜 구분선이 이미 있으면 제거하고 배치 앞에서 다시 그리도록
+          if (idx === 0 && anchor && anchor.classList && anchor.classList.contains('chat-date-sep')
+            && dateKey && anchor.getAttribute('data-chat-date-key') === dateKey) {
+            const next = anchor.nextSibling;
+            anchor.remove();
+            anchor = next;
+          }
+          appendMessageRow(
+            row.message, row.created_time, row.sender_name, !!row.isMe, urgent,
+            row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full,
+            { skipStatusUpdate: true, skipEnterAnim: true, dateKey, skipDomPrune: true, insertBefore: anchor }
+          );
+        });
+
+        // 이어붙인 뒤 스크롤 위치 유지
+        const newHeight = msgsEl.scrollHeight;
+        msgsEl.scrollTop = prevTop + (newHeight - prevHeight);
+        await refreshAllVisibleReactions();
+        await refreshImportantMessageKeys();
+      } catch (e) {
+        console.error('이전 대화 불러오기 실패:', e);
+      } finally {
+        chatHistoryLoadingOlder = false;
+        setChatHistoryLoadOlderVisible(false);
       }
     }
 
@@ -17943,6 +18053,14 @@
     // 대화 내용은 계속 새로 그려지므로, 이미지 하나하나에 리스너를 달지 않고
     // 채팅 영역 전체에 위임(delegate)해서 클릭된 것이 이미지일 때만 확대창을 연다.
     const chatMessagesAreaEl = document.getElementById('chat-messages-area');
+    if (chatMessagesAreaEl) {
+      chatMessagesAreaEl.addEventListener('scroll', () => {
+        closeOpenMsgActions();
+        if (chatMessagesAreaEl.scrollTop <= 80) {
+          loadOlderChatHistory();
+        }
+      }, { passive: true });
+    }
 
     function resetMsgActionBtnPosition(btns) {
       if (!btns) return;
@@ -17993,8 +18111,6 @@
       e.stopPropagation();
       openMsgActionsForRow(row, e.clientX, e.clientY);
     });
-
-    chatMessagesAreaEl.addEventListener('scroll', () => { closeOpenMsgActions(); }, { passive: true });
 
     document.addEventListener('pointerdown', (e) => {
       if (!document.querySelector('.msg-actions-open')) return;
@@ -18349,56 +18465,63 @@
       for (; i >= 0; i--) {
         const el = kids[i];
         if (!el || !el.getAttribute) continue;
+        if (el.id === 'chat-history-load-older') continue;
         const key = el.getAttribute('data-chat-date-key');
         if (key) return key;
       }
       return '';
     }
 
-    function insertChatDateSeparatorIfNeeded(container, dateKey) {
+    function insertChatDateSeparatorIfNeeded(container, dateKey, insertBefore) {
       if (!container || !dateKey) return;
-      if (getPreviousChatDateKey(container) === dateKey) return;
+      if (getPreviousChatDateKey(container, insertBefore || null) === dateKey) return;
+      // 앞에 끼워 넣을 때, 바로 다음이 같은 날짜선이면 중복 방지
+      if (insertBefore && insertBefore.getAttribute && insertBefore.getAttribute('data-chat-date-key') === dateKey
+        && insertBefore.classList && insertBefore.classList.contains('chat-date-sep')) {
+        return;
+      }
       const sep = document.createElement('div');
       sep.className = 'chat-date-sep';
       sep.setAttribute('data-chat-date-key', dateKey);
       sep.innerHTML = `<span>${escapeHtml(formatChatDateSepLabel(dateKey))}</span>`;
-      container.appendChild(sep);
+      if (insertBefore && insertBefore.parentNode === container) container.insertBefore(sep, insertBefore);
+      else container.appendChild(sep);
     }
 
     function appendMessageRow(msg, time, senderName, isMe, urgent, msgUid, messageId, senderIP, outboundStatus, sentAtLabelForPending, opts) {
       const options = opts || {};
       const skipStatusUpdate = !!options.skipStatusUpdate;
       const skipEnterAnim = !!options.skipEnterAnim || !isUiAnimationsEnabled();
+      const insertBefore = options.insertBefore || null;
+      const skipDomPrune = !!options.skipDomPrune || !!insertBefore;
       const container = document.getElementById('chat-messages-area');
       if (!container) return;
       const wasNearBottom = isMe || isNearChatBottom();
       const dateKey = resolveChatDateKey(sentAtLabelForPending, options);
 
-      // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 제한 (예: 300개)
-      if (container.children.length > 300) {
-        container.removeChild(container.firstChild);
-        // 맨 위가 날짜선만 남지 않도록 정리
-        while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
-          const next = container.children[1];
-          if (next && next.getAttribute && next.getAttribute('data-chat-date-key') === container.firstChild.getAttribute('data-chat-date-key')) break;
-          if (next && next.classList && next.classList.contains('chat-date-sep')) {
-            container.removeChild(container.firstChild);
-            continue;
-          }
-          break;
+      // 메모리 보호: 매우 많을 때만 맨 위(오래된 쪽)부터 정리. 이전 대화는 스크롤로 다시 불러옴.
+      if (!skipDomPrune && container.children.length > 4000) {
+        let removed = 0;
+        while (container.firstChild && removed < 50) {
+          const first = container.firstChild;
+          if (first && first.id === 'chat-history-load-older') break;
+          container.removeChild(first);
+          removed += 1;
         }
+        chatHistoryHasMore = true;
       }
 
       // 그룹 이름 변경 등 "시스템 알림"은 말풍선이 아니라 가운데 정렬된 안내문으로 표시한다.
       if (typeof msg === 'string' && msg.indexOf('class="system-notice-flag"') !== -1) {
-        insertChatDateSeparatorIfNeeded(container, dateKey);
+        insertChatDateSeparatorIfNeeded(container, dateKey, insertBefore);
         const noticeText = msg.replace(/<span class="system-notice-flag"[^>]*><\/span>/, '');
         const noticeRow = document.createElement('div');
         noticeRow.setAttribute('data-chat-date-key', dateKey);
         noticeRow.style.cssText = 'text-align:center; margin:10px 0;';
         noticeRow.innerHTML = `<span style="display:inline-block; background:#eef2f7; color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: 18px;">${noticeText}</span>`;
-        container.appendChild(noticeRow);
-        if (wasNearBottom) scrollChatToBottom(false);
+        if (insertBefore && insertBefore.parentNode === container) container.insertBefore(noticeRow, insertBefore);
+        else container.appendChild(noticeRow);
+        if (wasNearBottom && !insertBefore) scrollChatToBottom(false);
         return;
       }
 
@@ -18410,7 +18533,7 @@
       }
       if (messageId) row.setAttribute('data-msg-id', String(messageId));
       if (dateKey) row.setAttribute('data-chat-date-key', dateKey);
-      insertChatDateSeparatorIfNeeded(container, dateKey);
+      insertChatDateSeparatorIfNeeded(container, dateKey, insertBefore);
       const isGroupChannel = activeChatUser && (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup);
       if (isMe && !isGroupChannel) {
         row.setAttribute('data-outbound-status', outboundStatus === 'PENDING' ? 'PENDING' : 'SENT');
@@ -18539,7 +18662,8 @@
           </div>
         `;
       }
-      container.appendChild(row);
+      if (insertBefore && insertBefore.parentNode === container) container.insertBefore(row, insertBefore);
+      else container.appendChild(row);
       if (!skipEnterAnim) {
         const prefersReduced = !isUiAnimationsEnabled()
           || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -18559,7 +18683,7 @@
       }
       bindMessageForwardDrag(row);
       if (isMe && !isGroupChannel && !skipStatusUpdate) updateMineOutboundStatusLabels();
-      if (wasNearBottom) scrollChatToBottom(false);
+      if (wasNearBottom && !insertBefore) scrollChatToBottom(false);
     }
 
     const MESSAGE_DRAG_MIME = 'application/x-mirae-message-forward';

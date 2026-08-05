@@ -7301,6 +7301,13 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   const dateStr = (typeof dateStrRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStrRaw.trim()))
     ? dateStrRaw.trim()
     : null;
+  const beforeIdRaw = args && typeof args === 'object' ? parseInt(args.beforeId, 10) : 0;
+  const beforeId = Number.isFinite(beforeIdRaw) && beforeIdRaw > 0 ? beforeIdRaw : 0;
+  const limitRaw = args && typeof args === 'object' ? parseInt(args.limit, 10) : 0;
+  // 기본: 최근 2000건. 이전 페이지: 400건. 날짜 점프: 1000건.
+  const CHAT_HISTORY_INITIAL = 2000;
+  const CHAT_HISTORY_PAGE = 400;
+  const CHAT_HISTORY_DATE = 1000;
   const hideUpToId = await getChatViewHideUpToId(targetIP);
   const scope = chatHistoryScopeSql(targetIP);
 
@@ -7313,10 +7320,45 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     }));
   };
 
+  const pack = (rowsAsc, pageLimit) => {
+    const list = mapRows(rowsAsc);
+    const oldestId = list.length ? (list[0].id || 0) : 0;
+    const newestId = list.length ? (list[list.length - 1].id || 0) : 0;
+    const hasMore = list.length >= pageLimit;
+    return { rows: list, hasMore, oldestId, newestId };
+  };
+
   const selectCols = `DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
 
-  // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터 최대 200건
+  // 위로 스크롤: beforeId 이전(더 오래된) 메시지
+  if (beforeId && !keyword && !dateStr) {
+    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
+      ? Math.min(1000, limitRaw)
+      : CHAT_HISTORY_PAGE;
+    return new Promise((resolve) => {
+      let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id < ?`;
+      const params = [...scope.params, beforeId];
+      if (hideUpToId > 0) {
+        sql += ` AND id > ?`;
+        params.push(hideUpToId);
+      }
+      sql += ` ORDER BY id DESC LIMIT ${pageLimit}`;
+      db.all(sql, params, (err, rows) => {
+        if (err) {
+          logDbErr(err);
+          resolve({ rows: [], hasMore: false, oldestId: 0, newestId: 0 });
+          return;
+        }
+        resolve(pack((rows || []).slice().reverse(), pageLimit));
+      });
+    });
+  }
+
+  // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터
   if (dateStr && !keyword) {
+    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
+      ? Math.min(3000, limitRaw)
+      : CHAT_HISTORY_DATE;
     return new Promise((resolve) => {
       let findSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
       const findParams = [...scope.params, dateStr];
@@ -7327,7 +7369,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
       db.get(findSql, findParams, (err, row) => {
         const finishFromAnchor = (anchorId, resolvedDate) => {
           if (!anchorId) {
-            resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+            resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
             return;
           }
           let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id >= ?`;
@@ -7336,25 +7378,26 @@ ipcMain.handle('get-chat-history', async (event, args) => {
             sql += ` AND id > ?`;
             params.push(hideUpToId);
           }
-          sql += ` ORDER BY id ASC LIMIT 200`;
+          sql += ` ORDER BY id ASC LIMIT ${pageLimit}`;
           db.all(sql, params, (err2, rows) => {
             if (err2) {
               logDbErr(err2);
-              resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+              resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
               return;
             }
+            const packed = pack(rows || [], pageLimit);
             resolve({
-              rows: mapRows(rows),
+              ...packed,
               jumpedDate: resolvedDate || dateStr,
               requestedDate: dateStr,
-              empty: !(rows && rows.length)
+              empty: !packed.rows.length
             });
           });
         };
 
         if (err) {
           logDbErr(err);
-          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
           return;
         }
         if (row && row.minId) {
@@ -7385,7 +7428,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
               return;
             }
             if (typeof next === 'function') next();
-            else resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
+            else resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
           });
         };
         findNearestDay('<=', 'DESC', () => findNearestDay('>=', 'ASC'));
@@ -7394,6 +7437,9 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   }
 
   return new Promise((resolve) => {
+    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
+      ? Math.min(5000, limitRaw)
+      : (keyword ? 500 : CHAT_HISTORY_INITIAL);
     let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where}`;
     const params = [...scope.params];
 
@@ -7406,12 +7452,22 @@ ipcMain.handle('get-chat-history', async (event, args) => {
       sql += ` AND message LIKE ?`;
       params.push(`%${keyword}%`);
     }
-    sql += ` ORDER BY id DESC LIMIT 200`;
+    sql += ` ORDER BY id DESC LIMIT ${pageLimit}`;
 
     db.all(sql, params, (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        // 기존 호출부 호환: 검색은 배열도 허용했으므로 rows 형태로 통일
+        resolve(keyword ? [] : { rows: [], hasMore: false, oldestId: 0, newestId: 0 });
+        return;
+      }
       const ordered = (rows || []).slice().reverse();
-      // 기존 호출부 호환: 배열 그대로 반환
-      resolve(mapRows(ordered));
+      if (keyword) {
+        // 검색: 기존처럼 배열 반환(호출부 호환)
+        resolve(mapRows(ordered));
+        return;
+      }
+      resolve(pack(ordered, pageLimit));
     });
   });
 });
