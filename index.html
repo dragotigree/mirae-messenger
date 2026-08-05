@@ -8932,8 +8932,14 @@
       if (activeChatUser && activeChatUser.ip === data.targetIP) {
         appendMessageRow(data.message, data.createdAt, profileDisplayName(myProfile), true);
       }
-      refreshScheduledIndicator();
+      refreshScheduledIndicator({ skipFlush: true });
     });
+
+    // 예약 시각이 지났는데 배너가 남는 경우(체크 누락·포커스 복귀 등) 주기적으로 밀어낸다.
+    setInterval(() => {
+      if (!activeChatUser) return;
+      refreshScheduledIndicator();
+    }, 8000);
 
     async function manualRefreshUsers() {
       await window.api.refreshUsers();
@@ -16836,21 +16842,49 @@
       const content = document.getElementById('sch-msg-content').value.trim();
       if (!content) { await appAlert('전송할 내용을 입력해 주세요.'); return; }
       const sendAt = new Date(scheduleSendAt.getTime());
-      if (isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) await appAlert('현재 시각 이후로 설정해 주세요.');
+      if (isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {
+        await appAlert('현재 시각 이후로 설정해 주세요.');
+        return;
+      }
       if (!activeChatUser) return;
 
-      await window.api.scheduleMessage({
+      const result = await window.api.scheduleMessage({
         targetIP: activeChatUser.ip,
         isBroadcast: !!activeChatUser.isBroadcast,
         message: content,
         sendAt: sendAt.toISOString()
       });
+      if (!result || !result.success) {
+        await appAlert('예약 등록에 실패했습니다. 다시 시도해 주세요.');
+        return;
+      }
       closeScheduleMessageModal();
       document.getElementById('chat-textarea').value = '';
       refreshScheduledIndicator();
     }
 
-    async function refreshScheduledIndicator() {
+    let scheduledFlushInFlight = false;
+    async function flushOverdueScheduledIfNeeded(list) {
+      const rows = list || scheduledForCurrentChat || [];
+      const now = Date.now();
+      const overdue = rows.some((s) => {
+        const t = Date.parse(s.send_at);
+        return Number.isFinite(t) && t <= now;
+      });
+      if (!overdue || scheduledFlushInFlight) return;
+      if (!window.api.flushDueScheduledMessages) return;
+      scheduledFlushInFlight = true;
+      try {
+        await window.api.flushDueScheduledMessages();
+        await refreshScheduledIndicator({ skipFlush: true });
+      } catch (e) {
+        console.error('예약 전송 flush 실패:', e);
+      } finally {
+        scheduledFlushInFlight = false;
+      }
+    }
+
+    async function refreshScheduledIndicator(opts) {
       const indicatorEl = document.getElementById('scheduled-indicator');
       const listBoxEl = document.getElementById('scheduled-list-box');
       if (!activeChatUser) {
@@ -16869,11 +16903,18 @@
         return;
       }
       indicatorEl.style.display = 'block';
-      document.getElementById('scheduled-count-text').textContent = `예약 ${scheduledForCurrentChat.length}건 · 가장 빠른 전송 ${formatScheduleListTime(scheduledForCurrentChat[0].send_at)}`;
+      const first = scheduledForCurrentChat[0];
+      const firstAt = Date.parse(first.send_at);
+      const overdue = Number.isFinite(firstAt) && firstAt <= Date.now();
+      const timeLabel = formatScheduleListTime(first.send_at);
+      document.getElementById('scheduled-count-text').textContent = overdue
+        ? `예약 ${scheduledForCurrentChat.length}건 · ${timeLabel} 전송 중…`
+        : `예약 ${scheduledForCurrentChat.length}건 · 가장 빠른 전송 ${timeLabel}`;
       const toggleBtn = document.getElementById('scheduled-list-toggle');
       if (toggleBtn) toggleBtn.textContent = scheduledListExpanded ? '접기' : '펼치기';
       listBoxEl.style.display = scheduledListExpanded ? 'block' : 'none';
       if (scheduledListExpanded) renderScheduledList();
+      if (!opts || !opts.skipFlush) flushOverdueScheduledIfNeeded(scheduledForCurrentChat);
     }
 
     function formatScheduleListTime(iso) {

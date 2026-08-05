@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('api', {
   scheduleMessage: (data) => ipcRenderer.invoke('schedule-message', data),
   getScheduledMessages: (targetIP) => ipcRenderer.invoke('get-scheduled-messages', targetIP),
   cancelScheduledMessage: (id) => ipcRenderer.invoke('cancel-scheduled-message', id),
+  flushDueScheduledMessages: () => ipcRenderer.invoke('flush-due-scheduled-messages'),
 
   // 👤 프로필 및 연락처 (휴대폰 번호 포함)
   getMyProfile: () => ipcRenderer.invoke('get-my-profile'),

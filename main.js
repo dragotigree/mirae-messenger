@@ -9826,12 +9826,23 @@ ipcMain.handle('open-files-folder', async () => {
 });
 
 ipcMain.handle('schedule-message', async (event, { targetIP, isBroadcast, message, sendAt }) => {
+  const sendAtMs = Date.parse(sendAt);
+  if (!targetIP || !message || !Number.isFinite(sendAtMs)) {
+    return { success: false, error: '예약 정보가 올바르지 않습니다.' };
+  }
+  // 항상 UTC ISO로 저장해 SQL/JS 비교가 어긋나지 않게 한다.
+  const normalizedSendAt = new Date(sendAtMs).toISOString();
   return new Promise((resolve) => {
     db.run(
       `INSERT INTO scheduled_messages (target_ip, is_broadcast, message, send_at, sent) VALUES (?, ?, ?, ?, 0)`,
-      [targetIP, isBroadcast ? 1 : 0, message, sendAt],
+      [targetIP, isBroadcast ? 1 : 0, message, normalizedSendAt],
       function (err) {
-        resolve({ success: !err, id: err ? null : this.lastID });
+        if (err) logDbErr(err);
+        resolve({ success: !err, id: err ? null : this.lastID, sendAt: normalizedSendAt });
+        // 과거/직전 시각으로 등록된 경우 바로 전송 시도
+        if (!err && sendAtMs <= Date.now() + 500) {
+          setTimeout(() => checkAndSendDueScheduledMessages(), 50);
+        }
       }
     );
   });
@@ -9849,71 +9860,189 @@ ipcMain.handle('cancel-scheduled-message', async (event, id) => {
   });
 });
 
+/** 렌더러가 예약 시각이 지났는데 배너가 남아 있을 때 즉시 밀어내기 */
+ipcMain.handle('flush-due-scheduled-messages', async () => {
+  const n = await checkAndSendDueScheduledMessages();
+  return { success: true, dispatched: n || 0 };
+});
+
+let scheduledMessageCheckInFlight = false;
+
 function startScheduledMessageChecker() {
   checkAndSendDueScheduledMessages();
-  setInterval(checkAndSendDueScheduledMessages, 15000);
+  // 15초는 체감 지연이 커서 5초 간격으로  denser 체크
+  setInterval(checkAndSendDueScheduledMessages, 5000);
+}
+
+function parseScheduledSendAtMs(raw) {
+  if (raw == null) return NaN;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  const s = String(raw).trim();
+  if (!s) return NaN;
+  const direct = Date.parse(s);
+  if (Number.isFinite(direct)) return direct;
+  // SQLite CURRENT_TIMESTAMP 스타일 "YYYY-MM-DD HH:MM:SS" → UTC로 간주
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/);
+  if (m) return Date.parse(`${m[1]}T${m[2]}${m[2].length === 5 ? ':00' : ''}Z`);
+  return NaN;
 }
 
 function checkAndSendDueScheduledMessages() {
-  const nowIso = new Date().toISOString();
-  db.all(`SELECT * FROM scheduled_messages WHERE sent = 0 AND send_at <= ?`, [nowIso], (err, rows) => {
-    if (err || !rows || rows.length === 0) return;
-    rows.forEach(dispatchScheduledMessage);
+  if (scheduledMessageCheckInFlight) return Promise.resolve(0);
+  scheduledMessageCheckInFlight = true;
+  const nowMs = Date.now();
+  return new Promise((resolve) => {
+    db.all(`SELECT * FROM scheduled_messages WHERE sent = 0 ORDER BY send_at ASC`, [], (err, rows) => {
+      if (err) {
+        logDbErr(err);
+        scheduledMessageCheckInFlight = false;
+        resolve(0);
+        return;
+      }
+      const due = (rows || []).filter((row) => {
+        const at = parseScheduledSendAtMs(row.send_at);
+        return Number.isFinite(at) && at <= nowMs;
+      });
+      if (due.length === 0) {
+        scheduledMessageCheckInFlight = false;
+        resolve(0);
+        return;
+      }
+      logToRendererConsole('info', `예약 메시지 전송 시도 ${due.length}건 (now=${new Date(nowMs).toISOString()})`);
+      let remaining = due.length;
+      due.forEach((row) => {
+        dispatchScheduledMessage(row, () => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            scheduledMessageCheckInFlight = false;
+            resolve(due.length);
+          }
+        });
+      });
+    });
   });
 }
 
-function dispatchScheduledMessage(row) {
-  db.run(`UPDATE scheduled_messages SET sent = 1 WHERE id = ?`, [row.id], logDbErr);
-  const notifyRenderer = () => {
-    if (mainWindow) {
-      safeWebContentsSend('scheduled-message-sent', {
-        targetIP: row.is_broadcast ? 'BROADCAST' : row.target_ip,
-        message: row.message,
-        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-    }
-  };
-
-  if (row.is_broadcast) {
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status) VALUES (?, ?, 'BROADCAST', ?, 'SENT')`,
-      [senderLabelForMe(), MY_IP, row.message],
-      () => {
-        broadcastToOnlinePeers({ type: 'BROADCAST', sender: myProfile.username, message: row.message });
-        notifyRenderer();
-      }
-    );
-    appendChatLog('BROADCAST', '전체공지', myProfile.username, row.message);
-    return;
-  }
-
-  const client = new net.Socket();
-  let isConnected = false;
-  client.setTimeout(900);
-  const partnerName = (allKnownUsers.get(row.target_ip) || {}).username || row.target_ip;
-
-  client.connect(TCP_PORT, row.target_ip, () => {
-    isConnected = true;
-    client.write(JSON.stringify({ type: 'CHAT', sender: myProfile.username, message: row.message }) + '\n');
-    client.end();
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status) VALUES (?, ?, ?, ?, 'SENT')`,
-      [senderLabelForMe(), MY_IP, row.target_ip, row.message],
-      notifyRenderer
-    );
-    appendChatLog(`DM_${row.target_ip}`, partnerName, myProfile.username, row.message);
+function notifyScheduledMessageSent(row, extra) {
+  safeWebContentsSend('scheduled-message-sent', {
+    targetIP: row.is_broadcast ? 'BROADCAST' : row.target_ip,
+    message: row.message,
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    id: row.id,
+    ...(extra || {})
   });
+}
 
-  const handleFailure = () => {
-    if (isConnected) return;
-    client.destroy();
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status) VALUES (?, ?, ?, ?, 'PENDING')`,
-      [senderLabelForMe(), MY_IP, row.target_ip, row.message],
-      notifyRenderer
-    );
-    appendChatLog(`DM_${row.target_ip}`, partnerName, myProfile.username, row.message);
-  };
-  client.on('timeout', handleFailure);
-  client.on('error', handleFailure);
+function claimScheduledMessage(rowId, cb) {
+  db.run(
+    `UPDATE scheduled_messages SET sent = 1 WHERE id = ? AND sent = 0`,
+    [rowId],
+    function (err) {
+      if (err) {
+        logDbErr(err);
+        cb(false);
+        return;
+      }
+      cb(this.changes > 0);
+    }
+  );
+}
+
+function dispatchScheduledMessage(row, done) {
+  const finish = () => { if (typeof done === 'function') done(); };
+  claimScheduledMessage(row.id, (claimed) => {
+    if (!claimed) {
+      finish();
+      return;
+    }
+
+    // UI 배너는 전송 시도 시점에 바로 내려 체감 지연을 없앤다.
+    notifyScheduledMessageSent(row);
+
+    if (row.is_broadcast) {
+      const msgUid = generateMsgUid();
+      const wire = { type: 'BROADCAST', sender: myProfile.username, message: row.message, msgUid };
+      broadcastToOnlinePeers(wire);
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
+        [senderLabelForMe(), MY_IP, row.message, msgUid],
+        (err) => {
+          logDbErr(err);
+          appendChatLog('BROADCAST', '전체공지', myProfile.username, row.message);
+          finish();
+        }
+      );
+      return;
+    }
+
+    const targetIP = String(row.target_ip || '').trim();
+    if (!targetIP || isSyntheticReceiverKey(targetIP) || !looksLikeIpv4(targetIP)) {
+      logToRendererConsole('error', `예약 메시지 대상 IP 불가: ${targetIP}`);
+      finish();
+      return;
+    }
+
+    const msgUid = generateMsgUid();
+    const partnerName = (allKnownUsers.get(targetIP) || {}).username || targetIP;
+    const chatPayload = {
+      type: 'CHAT',
+      sender: myProfile.username,
+      message: row.message,
+      uid: msgUid
+    };
+
+    const insertOutbound = (status) => {
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, ?, ?)`,
+        [senderLabelForMe(), MY_IP, targetIP, row.message, status, msgUid],
+        (err) => {
+          logDbErr(err);
+          appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, row.message);
+          if (status === 'PENDING') {
+            // 오프라인/실패 시 일반 PENDING 재전송 루프에 맡긴다.
+            enqueuePendingPeerMessage(targetIP, row.message, msgUid);
+          }
+          finish();
+        }
+      );
+    };
+
+    if (isChatWireTooLarge(chatPayload)) {
+      logToRendererConsole('error', '예약 메시지가 전송 한도를 초과해 PENDING으로 저장합니다.');
+      insertOutbound('PENDING');
+      return;
+    }
+
+    const client = new net.Socket();
+    let isConnected = false;
+    let settled = false;
+    client.setTimeout(2000);
+
+    const settle = (status) => {
+      if (settled) return;
+      settled = true;
+      try { client.destroy(); } catch (e) { /* ignore */ }
+      insertOutbound(status);
+    };
+
+    client.connect(TCP_PORT, targetIP, () => {
+      isConnected = true;
+      try {
+        client.write(JSON.stringify(chatPayload) + '\n');
+        client.end();
+        armDmReadReceiptNotify(targetIP);
+        settle('SENT');
+      } catch (writeErr) {
+        console.error('예약 DM write 오류:', writeErr.message);
+        settle('PENDING');
+      }
+    });
+
+    const handleFailure = () => {
+      if (isConnected || settled) return;
+      settle('PENDING');
+    };
+    client.on('timeout', handleFailure);
+    client.on('error', handleFailure);
+  });
 }
