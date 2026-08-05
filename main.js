@@ -374,6 +374,8 @@ let silentModeEndTimer = null;
 let quickPhrasesCache = null;
 let appSettingsRowLoaded = false;
 const appSettingsRowWaiters = [];
+/** 대화방별 알림 뮤트 (channelKey) */
+let mutedChatKeys = new Set();
 const DEFAULT_QUICK_PHRASES = [
   '환자 이동 도움 요청드립니다.',
   '치료실 변경 안내드립니다.',
@@ -1014,6 +1016,43 @@ function canShowIncomingNotify(force) {
   return true;
 }
 
+function isChannelMuted(channelKey) {
+  const key = String(channelKey || '').trim();
+  if (!key) return false;
+  return mutedChatKeys.has(key);
+}
+
+function persistMutedChatKeys() {
+  try {
+    const payload = JSON.stringify({ v: 1, keys: [...mutedChatKeys] });
+    db.run(`UPDATE app_settings SET muted_chat_keys_json = ? WHERE id = 1`, [payload], logDbErr);
+  } catch (e) {
+    console.error('뮤트 채널 저장 오류:', e.message);
+  }
+}
+
+function setMutedChatKeysFromList(keys) {
+  mutedChatKeys = new Set(
+    (Array.isArray(keys) ? keys : [])
+      .map((k) => String(k || '').trim())
+      .filter(Boolean)
+      .slice(0, 500)
+  );
+  persistMutedChatKeys();
+  return [...mutedChatKeys];
+}
+
+function parseMutedChatKeysJson(raw) {
+  if (raw == null || raw === '') return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    const list = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.keys) ? parsed.keys : []);
+    return list.map((k) => String(k || '').trim()).filter(Boolean).slice(0, 500);
+  } catch (_) {
+    return [];
+  }
+}
+
 function shouldSuppressMessageToast(channelKey) {
   const key = String(channelKey || '').trim();
   if (!key || !toastUiState.focused) return false;
@@ -1133,6 +1172,7 @@ function notifyIncomingMessageNotification(opts) {
   const o = opts || {};
   const force = !!o.force;
   if (!canShowIncomingNotify(force)) return;
+  if (!force && isChannelMuted(o.channelKey)) return;
   // 코드 발령은 해당 채널을 보고 있어도 토스트·알림을 숨기지 않음
   if (!force && shouldSuppressMessageToast(o.channelKey)) return;
   const key = String(o.channelKey || '').trim() || '__unknown__';
@@ -2828,6 +2868,7 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_retention_days INTEGER DEFAULT 14`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN silent_mode_until_ms INTEGER DEFAULT 0`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN quick_phrases_json TEXT`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN muted_chat_keys_json TEXT`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (err) {
       logDbErr(err);
@@ -2879,6 +2920,7 @@ db.serialize(() => {
       } else if (!Array.isArray(quickPhrasesCache)) {
         quickPhrasesCache = null;
       }
+      mutedChatKeys = new Set(parseMutedChatKeysJson(row.muted_chat_keys_json));
       if (!row.update_source_path || rawPath !== updateSourcePath || !row.transport_webapp_url || !row.download_folder_path) {
         db.run(`UPDATE app_settings SET update_source_path = ?, transport_webapp_url = ?, download_folder_path = ? WHERE id = 1`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
       }
@@ -9762,6 +9804,82 @@ ipcMain.handle('set-quick-phrases', async (event, phrases) => {
   await whenAppSettingsRowLoaded();
   const saved = persistQuickPhrasesList(phrases);
   return { phrases: saved };
+});
+
+ipcMain.handle('get-muted-chat-keys', async () => {
+  await whenAppSettingsRowLoaded();
+  return [...mutedChatKeys];
+});
+
+ipcMain.handle('set-muted-chat-keys', async (event, keys) => {
+  await whenAppSettingsRowLoaded();
+  return setMutedChatKeysFromList(keys);
+});
+
+ipcMain.handle('snap-compact-window', async (event, edge) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  prepareWindowForBoundsChange();
+  const b = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(b) || screen.getDisplayNearestPoint({ x: b.x, y: b.y });
+  const area = display.workArea;
+  const width = Math.min(Math.max(b.width, COMPACT_MIN_WIDTH), area.width);
+  const height = Math.min(Math.max(b.height, COMPACT_MIN_HEIGHT), area.height);
+  const side = String(edge || '').toLowerCase();
+  let x = b.x;
+  let y = area.y + Math.max(0, Math.round((area.height - height) / 2));
+  if (side === 'left') x = area.x + 8;
+  else if (side === 'right') x = area.x + area.width - width - 8;
+  else if (side === 'top-right') {
+    x = area.x + area.width - width - 8;
+    y = area.y + 8;
+  } else if (side === 'bottom-right') {
+    x = area.x + area.width - width - 8;
+    y = area.y + area.height - height - 8;
+  } else {
+    x = area.x + area.width - width - 8;
+    y = area.y + area.height - height - 8;
+  }
+  const bounds = clampBoundsToWorkArea({ x, y, width, height });
+  mainWindow.setBounds(bounds);
+  return { success: true, bounds };
+});
+
+ipcMain.handle('set-compact-size-preset', async (event, preset) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  prepareWindowForBoundsChange();
+  const map = {
+    narrow: { width: 360, height: 560 },
+    normal: { width: COMPACT_DEFAULT_WIDTH, height: COMPACT_DEFAULT_HEIGHT },
+    wide: { width: 520, height: 720 }
+  };
+  const size = map[String(preset || 'normal')] || map.normal;
+  const cur = mainWindow.getBounds();
+  const bounds = clampBoundsToWorkArea({
+    x: cur.x,
+    y: cur.y,
+    width: size.width,
+    height: size.height
+  });
+  mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
+  mainWindow.setBounds(bounds);
+  return { success: true, bounds, preset: String(preset || 'normal') };
+});
+
+ipcMain.handle('set-main-window-opacity', async (event, opacity) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false, opacity: 1 };
+  const n = Number(opacity);
+  const clamped = Number.isFinite(n) ? Math.max(0.55, Math.min(1, n)) : 1;
+  try {
+    mainWindow.setOpacity(clamped);
+  } catch (e) {
+    return { success: false, opacity: 1, error: e.message };
+  }
+  return { success: true, opacity: clamped };
+});
+
+ipcMain.handle('get-main-window-opacity', async () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return 1;
+  try { return mainWindow.getOpacity(); } catch (_) { return 1; }
 });
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {

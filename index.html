@@ -4402,6 +4402,9 @@
           <span class="compact-rail-icon" data-ui-icon="moreDots"></span>
         </button>
         <div class="compact-rail-spacer"></div>
+        <button type="button" class="compact-rail-btn" onclick="openCompactCheatSheet()" title="단축키 치트시트 (?)">
+          <span class="compact-rail-help">?</span>
+        </button>
         <button type="button" class="compact-rail-btn" onclick="openSettingsModal()" title="설정">
           <span class="compact-rail-icon" data-ui-icon="settings"></span>
         </button>
@@ -4423,7 +4426,7 @@
           </div>
         </header>
         <div class="compact-shortcut-hint" id="compact-shortcut-hint" aria-hidden="true">
-          <kbd>1</kbd>직원 <kbd>2</kbd>채팅 <kbd>3</kbd>더보기 · 레일 달력=현황판 · <kbd>Ctrl</kbd>+<kbd>1</kbd>방전환 · <kbd>Alt</kbd>+<kbd>↑↓</kbd> · <kbd>Ctrl</kbd>+<kbd>U</kbd>안읽음
+          <kbd>1</kbd>직원 <kbd>2</kbd>채팅 <kbd>3</kbd>더보기 · <kbd>?</kbd>치트시트 · <kbd>Ctrl</kbd>+<kbd>U</kbd>안읽음 · <kbd>Ctrl</kbd>+<kbd>1</kbd>방전환
         </div>
         <div class="compact-pane" data-compact-pane="chat">
           <div class="compact-filter-row" id="compact-filter-row">
@@ -4431,6 +4434,13 @@
             <button type="button" class="compact-filter-chip" data-compact-filter="unread" onclick="setCompactListFilter('unread')">안읽음</button>
             <button type="button" class="compact-filter-chip" data-compact-filter="online" onclick="setCompactListFilter('online')">온라인</button>
             <button type="button" class="compact-filter-chip" data-compact-filter="favorite" onclick="setCompactListFilter('favorite')">즐겨찾기</button>
+            <button type="button" class="compact-filter-chip" data-compact-filter="muted" onclick="setCompactListFilter('muted')">뮤트</button>
+          </div>
+          <div class="compact-inbox-bar" id="compact-inbox-bar" hidden>
+            <span class="compact-inbox-count" id="compact-inbox-count">미읽음 0</span>
+            <button type="button" class="compact-inbox-btn" onclick="openFirstUnreadCompactChat()" title="가장 많은 미읽음 열기">열기</button>
+            <button type="button" class="compact-inbox-btn" onclick="openNextUnreadCompactChat()" title="다음 미읽음 (Ctrl+U)">다음</button>
+            <button type="button" class="compact-inbox-btn is-danger" onclick="markAllUnreadAsReadLocal()" title="미읽음 배지만 지우기 (대화 내용은 유지)">모두 처리</button>
           </div>
           <div class="compact-search" id="compact-search-wrap">
             <span class="compact-search-icon" data-ui-icon="search"></span>
@@ -4507,7 +4517,26 @@
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
               <button type="button" class="compact-more-cell" onclick="openGroupChatModal()"><span class="compact-more-cell-icon" data-ui-icon="users"></span>그룹</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
+              <button type="button" class="compact-more-cell" onclick="openCompactCheatSheet()"><span class="compact-more-cell-icon" style="font-weight:800;">?</span>단축키</button>
               <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
+            </div>
+            <div class="compact-window-tools">
+              <div class="compact-window-tools-title">미니 창 배치</div>
+              <div class="compact-window-tools-row">
+                <button type="button" onclick="snapCompactWindowEdge('left')">← 좌측</button>
+                <button type="button" onclick="snapCompactWindowEdge('right')">우측 →</button>
+                <button type="button" onclick="snapCompactWindowEdge('top-right')">↗ 우상</button>
+              </div>
+              <div class="compact-window-tools-row">
+                <button type="button" onclick="applyCompactSizePreset('narrow')">좁게</button>
+                <button type="button" onclick="applyCompactSizePreset('normal')">보통</button>
+                <button type="button" onclick="applyCompactSizePreset('wide')">넓게</button>
+              </div>
+              <label class="compact-opacity-row">
+                <span>투명도</span>
+                <input type="range" id="compact-opacity-slider" min="55" max="100" value="100" oninput="onCompactOpacityInput(this.value)">
+                <span id="compact-opacity-label">100%</span>
+              </label>
             </div>
             <div class="compact-more-footer">
               <span>Mirae Messenger</span>
@@ -4550,6 +4579,7 @@
             <button type="button" class="icon-btn-compact" id="compact-chat-prev-btn" onclick="cycleCompactChat(-1)" title="이전 대화 (Alt+↑)"><span data-ui-icon="chevronLeft"></span></button>
             <button type="button" class="icon-btn-compact" id="compact-chat-next-btn" onclick="cycleCompactChat(1)" title="다음 대화 (Alt+↓)"><span data-ui-icon="chevronRight"></span></button>
             <button type="button" class="icon-btn-compact" id="compact-chat-switch-btn" onclick="openChatQuickSwitcher()" title="대화방 바로 이동 (Ctrl+1)"><span data-ui-icon="chatBubble"></span></button>
+            <button type="button" class="icon-btn-compact" id="compact-chat-mute-btn" onclick="toggleActiveChatMute()" title="이 방 알림 끄기/켜기">🔔</button>
           </div>
           <div class="avatar-wrapper">
             <div class="avatar-circle" id="chat-header-avatar">상</div>
@@ -4973,6 +5003,47 @@
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="closeMasterWipeLogsModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="confirmMasterWipeLogs()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">영구 삭제 실행</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 미니모드 단축키 치트시트 -->
+  <div id="compact-cheat-sheet-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeCompactCheatSheet()">
+    <div class="modal-card compact-cheat-sheet-card" onclick="event.stopPropagation()">
+      <div class="compact-cheat-head">
+        <div>
+          <div class="compact-cheat-title">미니모드 치트시트</div>
+          <div class="compact-cheat-sub">키보드로 빠르게 · <kbd>?</kbd> 로 다시 열기</div>
+        </div>
+        <button type="button" class="compact-cheat-close" onclick="closeCompactCheatSheet()" title="닫기">✕</button>
+      </div>
+      <div class="compact-cheat-body">
+        <section>
+          <h4>이동</h4>
+          <div class="compact-cheat-row"><span><kbd>1</kbd></span><span>직원</span></div>
+          <div class="compact-cheat-row"><span><kbd>2</kbd></span><span>채팅</span></div>
+          <div class="compact-cheat-row"><span><kbd>3</kbd></span><span>더보기</span></div>
+          <div class="compact-cheat-row"><span><kbd>Esc</kbd></span><span>목록으로 / 닫기</span></div>
+        </section>
+        <section>
+          <h4>대화</h4>
+          <div class="compact-cheat-row"><span><kbd>Ctrl</kbd>+<kbd>1</kbd></span><span>방 빠른 전환</span></div>
+          <div class="compact-cheat-row"><span><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd></span><span>이전·다음 대화</span></div>
+          <div class="compact-cheat-row"><span><kbd>Ctrl</kbd>+<kbd>U</kbd></span><span>안 읽은 대화 / 다음 미읽음</span></div>
+          <div class="compact-cheat-row"><span><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></span><span>목록 검색</span></div>
+          <div class="compact-cheat-row"><span><kbd>Ctrl</kbd>+<kbd>F</kbd></span><span>대화 내용 검색</span></div>
+        </section>
+        <section>
+          <h4>메시지 · 알림</h4>
+          <div class="compact-cheat-row"><span>길게 누르기 / 우클릭</span><span>답장 · 전달 · 복사</span></div>
+          <div class="compact-cheat-row"><span>헤더 🔔</span><span>이 방 알림 끄기(뮤트)</span></div>
+          <div class="compact-cheat-row"><span>트레이 침묵모드</span><span>전체 알림만 끄기</span></div>
+        </section>
+        <section>
+          <h4>창</h4>
+          <div class="compact-cheat-row"><span>더보기 → 미니 창 배치</span><span>좌·우 스냅 · 크기 · 투명도</span></div>
+          <div class="compact-cheat-row"><span>레일 달력</span><span>병원 달력 · 현황판</span></div>
+        </section>
       </div>
     </div>
   </div>
@@ -5953,6 +6024,7 @@
     <div id="ctx-peer-items">
       <div class="ctx-menu-item" onclick="ctxViewUserInfo()">ℹ️ 정보보기</div>
       <div class="ctx-menu-item" id="ctx-favorite-item" onclick="ctxToggleFavorite()">⭐ 즐겨찾기 추가</div>
+      <div class="ctx-menu-item" id="ctx-mute-item" onclick="ctxToggleMuteChat()">🔕 알림 끄기</div>
       <div class="ctx-menu-item" onclick="ctxOpenIpmsgToUser()">✉️ 쪽지 보내기</div>
       <div class="ctx-menu-item" onclick="ctxOpenGroupInvite()">👥 그룹대화방 초대</div>
       <div class="ctx-menu-item" onclick="ctxDmSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
@@ -5968,12 +6040,14 @@
   <div id="dept-floor-context-menu">
     <div class="ctx-menu-item" onclick="ctxDeptFloorViewInfo()">ℹ️ 정보보기</div>
     <div class="ctx-menu-item" onclick="ctxDeptFloorOpenChat()">💬 채널 열기</div>
+    <div class="ctx-menu-item" id="ctx-dept-floor-mute-item" onclick="ctxToggleMuteDeptFloor()">🔕 알림 끄기</div>
     <div class="ctx-menu-item" onclick="ctxDeptFloorSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
     <div class="ctx-menu-item" id="ctx-dept-floor-reset-emoji" style="display:none;" onclick="ctxDeptFloorClearTitleEmoji()">↩️ 이모티콘 제거</div>
   </div>
 
   <div id="channel-context-menu">
     <div class="ctx-menu-item" onclick="ctxChannelViewInfo()">ℹ️ 정보보기</div>
+    <div class="ctx-menu-item" id="ctx-channel-mute-item" onclick="ctxToggleMuteChannel()">🔕 알림 끄기</div>
     <div class="ctx-menu-item" onclick="ctxChannelRenameDisplay()">✏️ 표시 이름 변경 (나만)</div>
     <div class="ctx-menu-item" id="ctx-channel-reset-name" style="display:none;" onclick="ctxChannelResetDisplayName()">↩️ 기본 이름으로</div>
     <div class="ctx-menu-item" onclick="ctxChannelSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
@@ -7624,6 +7698,182 @@
       localStorage.setItem('unreadCounts', JSON.stringify(unreadCounts));
     }
     let favoriteIps = new Set(JSON.parse(localStorage.getItem('favoriteIps') || '[]'));
+    let mutedChatKeys = new Set();
+    try {
+      const savedMute = JSON.parse(localStorage.getItem('mutedChatKeys') || '[]');
+      if (Array.isArray(savedMute)) mutedChatKeys = new Set(savedMute.map(String).filter(Boolean));
+    } catch (_) { mutedChatKeys = new Set(); }
+
+    function isChatMuted(key) {
+      const k = String(key || '').trim();
+      return !!k && mutedChatKeys.has(k);
+    }
+
+    function persistMutedChatKeysLocal() {
+      try {
+        localStorage.setItem('mutedChatKeys', JSON.stringify([...mutedChatKeys]));
+      } catch (_) {}
+    }
+
+    async function syncMutedChatKeysToMain() {
+      persistMutedChatKeysLocal();
+      if (window.api && window.api.setMutedChatKeys) {
+        try { await window.api.setMutedChatKeys([...mutedChatKeys]); } catch (_) {}
+      }
+      syncCompactMuteButtonUi();
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { renderCompactList(); } catch (_) {}
+      }
+    }
+
+    async function initMutedChatKeys() {
+      if (window.api && window.api.getMutedChatKeys) {
+        try {
+          const keys = await window.api.getMutedChatKeys();
+          if (Array.isArray(keys)) {
+            if (keys.length) {
+              mutedChatKeys = new Set(keys.map(String).filter(Boolean));
+              persistMutedChatKeysLocal();
+              try { localStorage.setItem('mutedChatKeysSyncedOnce', '1'); } catch (_) {}
+            } else if (mutedChatKeys.size && !localStorage.getItem('mutedChatKeysSyncedOnce')) {
+              await window.api.setMutedChatKeys([...mutedChatKeys]);
+              try { localStorage.setItem('mutedChatKeysSyncedOnce', '1'); } catch (_) {}
+            } else {
+              mutedChatKeys = new Set();
+              persistMutedChatKeysLocal();
+              try { localStorage.setItem('mutedChatKeysSyncedOnce', '1'); } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
+      syncCompactMuteButtonUi();
+    }
+
+    function setChatMuted(key, muted) {
+      const k = String(key || '').trim();
+      if (!k) return;
+      if (muted) mutedChatKeys.add(k);
+      else mutedChatKeys.delete(k);
+      void syncMutedChatKeysToMain();
+    }
+
+    function toggleChatMute(key) {
+      const k = String(key || '').trim();
+      if (!k) return false;
+      setChatMuted(k, !isChatMuted(k));
+      return isChatMuted(k);
+    }
+
+    function toggleActiveChatMute() {
+      if (!activeChatUser || !activeChatUser.ip) return;
+      const on = toggleChatMute(activeChatUser.ip);
+      syncCompactMuteButtonUi();
+      try {
+        const toast = document.createElement('div');
+        // lightweight feedback via title only
+        const btn = document.getElementById('compact-chat-mute-btn');
+        if (btn) btn.title = on ? '알림 켜기 (현재 뮤트)' : '이 방 알림 끄기';
+      } catch (_) {}
+    }
+
+    function syncCompactMuteButtonUi() {
+      const btn = document.getElementById('compact-chat-mute-btn');
+      if (!btn) return;
+      const key = activeChatUser && activeChatUser.ip ? activeChatUser.ip : '';
+      const muted = key && isChatMuted(key);
+      btn.textContent = muted ? '🔕' : '🔔';
+      btn.classList.toggle('is-muted', !!muted);
+      btn.title = muted ? '알림 켜기 (현재 뮤트됨)' : '이 방 알림 끄기';
+      btn.style.display = key ? '' : 'none';
+    }
+
+    function openCompactCheatSheet() {
+      const modal = document.getElementById('compact-cheat-sheet-modal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      setModalOpenState(true);
+    }
+
+    function closeCompactCheatSheet() {
+      const modal = document.getElementById('compact-cheat-sheet-modal');
+      if (!modal) return;
+      modal.style.display = 'none';
+      setModalOpenState(false);
+    }
+
+    async function snapCompactWindowEdge(edge) {
+      try {
+        if (window.api && window.api.snapCompactWindow) {
+          await window.api.snapCompactWindow(edge);
+        }
+      } catch (_) {}
+    }
+
+    async function applyCompactSizePreset(preset) {
+      try {
+        if (window.api && window.api.setCompactSizePreset) {
+          await window.api.setCompactSizePreset(preset);
+        }
+      } catch (_) {}
+    }
+
+    async function onCompactOpacityInput(value) {
+      const opacity = Math.max(0.55, Math.min(1, Number(value) / 100));
+      const label = document.getElementById('compact-opacity-label');
+      if (label) label.textContent = `${Math.round(opacity * 100)}%`;
+      try {
+        if (window.api && window.api.setMainWindowOpacity) {
+          await window.api.setMainWindowOpacity(opacity);
+        }
+      } catch (_) {}
+    }
+
+    async function loadCompactOpacityUi() {
+      const slider = document.getElementById('compact-opacity-slider');
+      const label = document.getElementById('compact-opacity-label');
+      if (!slider) return;
+      try {
+        const opacity = (window.api && window.api.getMainWindowOpacity)
+          ? await window.api.getMainWindowOpacity()
+          : 1;
+        const pct = Math.round((Number(opacity) || 1) * 100);
+        slider.value = String(pct);
+        if (label) label.textContent = `${pct}%`;
+      } catch (_) {
+        slider.value = '100';
+        if (label) label.textContent = '100%';
+      }
+    }
+
+    function ctxToggleMuteChat() {
+      if (!ctxMenuTargetUser || !ctxMenuTargetUser.ip) return;
+      toggleChatMute(ctxMenuTargetUser.ip);
+      const menu = document.getElementById('dm-context-menu');
+      if (menu) menu.style.display = 'none';
+      if (activeChatUser && activeChatUser.ip === ctxMenuTargetUser.ip) syncCompactMuteButtonUi();
+    }
+
+    function ctxToggleMuteChannel() {
+      const key = (ctxMenuTargetChannel && ctxMenuTargetChannel.key) || '';
+      if (!key) return;
+      toggleChatMute(key);
+      const menu = document.getElementById('channel-context-menu');
+      if (menu) menu.style.display = 'none';
+      syncCompactMuteButtonUi();
+    }
+
+    function ctxToggleMuteDeptFloor() {
+      if (!ctxMenuDeptFloor) return;
+      const key = ctxMenuDeptFloor.groupingKey === 'dept'
+        ? `DEPT:${ctxMenuDeptFloor.groupName}`
+        : `FLOOR:${ctxMenuDeptFloor.groupName}`;
+      toggleChatMute(key);
+      const menu = document.getElementById('dept-floor-context-menu');
+      if (menu) menu.style.display = 'none';
+      syncCompactMuteButtonUi();
+    }
+
+    initMutedChatKeys().catch(() => {});
     let myGroupChats = [];
     let ctxMenuTargetUser = null;
     let calendarViewDate = new Date();
@@ -9234,6 +9484,7 @@
 
     function getEscapeCloseOverlayStack() {
       return [
+        { test: () => isFlexOverlay('compact-cheat-sheet-modal'), close: () => closeCompactCheatSheet(), confirm: false },
         { test: () => isFlexOverlay('screen-capture-crop-modal'), close: () => cancelScreenCrop(), confirm: true, name: '화면 캡처' },
         { test: () => isFlexOverlay('screen-capture-source-modal'), close: () => closeScreenCaptureSourceModal(), confirm: true, name: '화면 캡처' },
         { test: () => isFlexOverlay('image-lightbox'), close: () => closeImageLightbox(), confirm: false },
@@ -9375,7 +9626,7 @@
         rememberPendingInbound(data.senderIP, data);
         markRecentDmUiFingerprint(fp);
       }
-      if (data.urgent && !isSilentModeActiveUi()) playUrgentSound();
+      if (data.urgent && !isSilentModeActiveUi() && !isChatMuted(data.senderIP)) playUrgentSound();
     });
 
     window.api.onReceiveBroadcast((data) => {
@@ -9384,7 +9635,7 @@
         : detectCodeAlertType(data && data.message);
       const urgent = !!(data && data.urgent) || !!codeType;
       if (codeType) playCodeAlertSound();
-      else if (urgent && !isSilentModeActiveUi()) playUrgentSound();
+      else if (urgent && !isSilentModeActiveUi() && !isChatMuted('BROADCAST')) playUrgentSound();
       if (activeChatUser && activeChatUser.isBroadcast) {
         void appendLiveMessageSafely(() => {
           appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), urgent, data.msgUid, data.messageId, data.senderIP);
@@ -10099,8 +10350,10 @@
       if (titleEl) titleEl.textContent = titles[tab] || '채팅';
       const subEl = document.getElementById('compact-online-count');
       if (subEl) subEl.style.display = (tab === 'more') ? 'none' : '';
-      if (tab === 'more') updateCompactMoreProfile();
-      else if (tab === 'calendar') refreshCompactCalendarPane();
+      if (tab === 'more') {
+        updateCompactMoreProfile();
+        loadCompactOpacityUi();
+      } else if (tab === 'calendar') refreshCompactCalendarPane();
       else updateCompactOnlineCount();
       // 달력 탭에서는 헤더 검색 숨김
       const searchBtn = document.getElementById('compact-header-search-btn');
@@ -10149,6 +10402,8 @@
       syncCompactChatNavUi();
       syncCompactListPrefChips();
       renderCompactRecentSwitcher();
+      syncCompactMuteButtonUi();
+      syncCompactInboxBar();
     }
 
     function openCompactNotice() {
@@ -10304,16 +10559,72 @@
 
     function openFirstUnreadCompactChat() {
       if (!isCompactMode) return false;
-      const entries = Object.entries(unreadCounts || {})
-        .filter(([, n]) => (n || 0) > 0)
-        .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+      const entries = getUnreadChatEntriesSorted();
       if (!entries.length) {
         setCompactRailTab('chat');
         setCompactListFilter('unread');
+        syncCompactInboxBar();
         return false;
       }
       setCompactRailTab('chat');
       return openCompactChatByKey(entries[0][0]);
+    }
+
+    function getUnreadChatEntriesSorted() {
+      return Object.entries(unreadCounts || {})
+        .filter(([, n]) => (n || 0) > 0)
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+    }
+
+    function openNextUnreadCompactChat() {
+      if (!isCompactMode) return false;
+      const entries = getUnreadChatEntriesSorted();
+      if (!entries.length) {
+        setCompactListFilter('unread');
+        syncCompactInboxBar();
+        return false;
+      }
+      const cur = activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : '';
+      let idx = entries.findIndex(([k]) => k === cur);
+      if (idx < 0) idx = -1;
+      const next = entries[(idx + 1) % entries.length];
+      setCompactRailTab('chat');
+      return openCompactChatByKey(next[0]);
+    }
+
+    function clearUnreadForKey(key) {
+      const k = String(key || '').trim();
+      if (!k || !unreadCounts[k]) return;
+      delete unreadCounts[k];
+      saveUnreadCounts();
+      refreshUnreadBadges();
+      invalidateCompactRecentConversations();
+      syncCompactInboxBar();
+    }
+
+    async function markAllUnreadAsReadLocal() {
+      const keys = Object.keys(unreadCounts || {}).filter((k) => (unreadCounts[k] || 0) > 0);
+      if (!keys.length) {
+        await appAlert('처리할 미읽음이 없습니다.');
+        return;
+      }
+      if (!await appConfirm(`미읽음 ${keys.length}개 방을 처리함으로 표시할까요?\n(대화 내용은 그대로 두고 배지만 지웁니다)`)) return;
+      keys.forEach((k) => { delete unreadCounts[k]; });
+      saveUnreadCounts();
+      refreshUnreadBadges();
+      invalidateCompactRecentConversations();
+      syncCompactInboxBar();
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+    }
+
+    function syncCompactInboxBar() {
+      const bar = document.getElementById('compact-inbox-bar');
+      const countEl = document.getElementById('compact-inbox-count');
+      if (!bar) return;
+      const total = getTotalUnread();
+      const show = isCompactMode && !activeChatUser && compactRailTab === 'chat' && compactListFilter === 'unread';
+      bar.hidden = !show;
+      if (countEl) countEl.textContent = total > 0 ? `미읽음 ${total}` : '미읽음 없음';
     }
 
     function cycleCompactChat(delta) {
@@ -10340,11 +10651,21 @@
       if (isPrivacyScreenLocked) return false;
       if (e.defaultPrevented) return false;
 
-      // Ctrl+U: 안 읽은 대화
+      // Ctrl+U: 안 읽은 대화 / 다음 미읽음
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'u' || e.key === 'U' || e.code === 'KeyU')) {
         e.preventDefault();
-        openFirstUnreadCompactChat();
+        if (activeChatUser && getTotalUnread() > 0) openNextUnreadCompactChat();
+        else openFirstUnreadCompactChat();
         return true;
+      }
+
+      // ?: 치트시트
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === '?' || (e.shiftKey && e.key === '/'))) {
+        if (!isEditableKeyboardTarget(e.target)) {
+          e.preventDefault();
+          openCompactCheatSheet();
+          return true;
+        }
       }
 
       // Alt+↑/↓: 이전·다음 대화
@@ -10419,6 +10740,7 @@
       compactListFilter = filter;
       localStorage.setItem('compactListFilter', filter);
       syncCompactFilterChipUi();
+      syncCompactInboxBar();
       renderCompactList();
     }
 
@@ -10763,11 +11085,12 @@
         ? formatCompactConversationTime(row.createdAtLocal)
         : (row.kind === 'dm' && row.user ? compactUserTimeLabel(row.user) : '');
       const timeClass = row.kind === 'dm' && row.user && row.user.online ? 'compact-item-time is-live' : 'compact-item-time';
+      const muted = row.user && row.user.ip && isChatMuted(row.user.ip);
       item.innerHTML = `
         <div class="compact-avatar ${row.avatarClass || ''}">${row.avatarHtml || ''}</div>
         <div class="compact-item-body">
           <div class="compact-item-top">
-            <span class="compact-item-name">${escapeHtml(row.name || '')}</span>
+            <span class="compact-item-name">${muted ? '🔕 ' : ''}${escapeHtml(row.name || '')}</span>
             <span class="${timeClass}">${escapeHtml(timeLabel || '')}</span>
           </div>
           <div class="compact-item-bottom">
@@ -10776,6 +11099,8 @@
           </div>
         </div>
       `;
+      if (muted) item.classList.add('is-muted-chat');
+      if (row.user && row.user.ip) item.dataset.chatKey = row.user.ip;
       item.onclick = row.onClick;
       if (row.kind === 'dm' && row.user) {
         item.oncontextmenu = (e) => showUserContextMenu(e, row.user);
@@ -10823,6 +11148,12 @@
       if (compactListFilter === 'unread') rows = rows.filter((r) => r.unread > 0);
       if (compactListFilter === 'online') rows = rows.filter((r) => r.kind !== 'dm' || r.isOnline);
       if (compactListFilter === 'favorite') rows = rows.filter((r) => r.isFavorite);
+      if (compactListFilter === 'muted') {
+        rows = rows.filter((r) => {
+          const key = r.user && r.user.ip ? r.user.ip : '';
+          return key && isChatMuted(key);
+        });
+      }
 
       if (userFilterKeyword) {
         const q = userFilterKeyword;
@@ -10842,12 +11173,15 @@
         emptyHintEl.textContent = compactListFilter === 'unread' ? '안 읽은 대화가 없습니다.' :
           compactListFilter === 'online' ? '온라인 상대와의 대화가 없습니다.' :
           compactListFilter === 'favorite' ? '즐겨찾기한 직원의 대화가 없습니다.' :
+          compactListFilter === 'muted' ? '알림을 끈 대화방이 없습니다.\n대화 헤더 🔔 또는 우클릭으로 뮤트할 수 있습니다.' :
           userFilterKeyword ? '검색 결과가 없습니다.' : '아직 대화가 없습니다.\n직원 탭에서 대화를 시작해 보세요.';
         container.appendChild(emptyHintEl);
+        syncCompactInboxBar();
         return;
       }
 
       rows.forEach((row) => appendCompactConversationItem(container, row));
+      syncCompactInboxBar();
     }
 
     function renderCompactStaffDirectory(container) {
@@ -11769,6 +12103,8 @@
       const key = groupingKey === 'dept' ? `DEPT:${groupName}` : `FLOOR:${groupName}`;
       const resetEl = document.getElementById('ctx-dept-floor-reset-emoji');
       if (resetEl) resetEl.style.display = getChannelTitleEmoji(key) ? 'block' : 'none';
+      const muteEl = document.getElementById('ctx-dept-floor-mute-item');
+      if (muteEl) muteEl.textContent = isChatMuted(key) ? '🔔 알림 켜기' : '🔕 알림 끄기';
       const menu = document.getElementById('dept-floor-context-menu');
       const menuWidth = 220;
       menu.style.left = Math.min(e.clientX, window.innerWidth - menuWidth) + 'px';
@@ -12196,6 +12532,8 @@
       const resetEl = document.getElementById('ctx-channel-reset-name');
       const resetEmojiEl = document.getElementById('ctx-channel-reset-emoji');
       const groupExtra = document.getElementById('channel-ctx-group-extra');
+      const muteEl = document.getElementById('ctx-channel-mute-item');
+      if (muteEl) muteEl.textContent = isChatMuted(entry.key) ? '🔔 알림 켜기' : '🔕 알림 끄기';
       const names = loadChannelDisplayNamesMap();
       if (resetEl) resetEl.style.display = names[entry.key] ? 'block' : 'none';
       if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(entry.key) ? 'block' : 'none';
@@ -12316,6 +12654,8 @@
       if (selfItems) selfItems.style.display = isSelf ? 'block' : 'none';
       if (!isSelf) {
         document.getElementById('ctx-favorite-item').textContent = favoriteIps.has(user.ip) ? '⭐ 즐겨찾기 해제' : '⭐ 즐겨찾기 추가';
+        const muteEl = document.getElementById('ctx-mute-item');
+        if (muteEl) muteEl.textContent = isChatMuted(user.ip) ? '🔔 알림 켜기' : '🔕 알림 끄기';
         const resetEmojiEl = document.getElementById('ctx-dm-reset-emoji');
         if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(`DM:${user.ip}`) ? 'block' : 'none';
       }
@@ -18866,6 +19206,44 @@
       e.stopPropagation();
       openMsgActionsForRow(row, e.clientX, e.clientY);
     });
+
+    (function bindCompactMsgLongPress() {
+      let timer = null;
+      let startX = 0;
+      let startY = 0;
+      const THRESH_MS = 420;
+      const MOVE_PX = 12;
+      const clearTimer = () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      };
+      chatMessagesAreaEl.addEventListener('pointerdown', (e) => {
+        if (!document.body.classList.contains('compact-mode')) return;
+        if (e.button !== 0) return;
+        if (e.target.closest('a, input, textarea, button, .msg-action-btns, .bubble-action-btns')) return;
+        const row = e.target.closest('.msg-row, .msg-row-bubble');
+        if (!row || !chatMessagesAreaEl.contains(row)) return;
+        startX = e.clientX;
+        startY = e.clientY;
+        clearTimer();
+        timer = setTimeout(() => {
+          timer = null;
+          try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+          row.classList.add('msg-longpress-active');
+          setTimeout(() => row.classList.remove('msg-longpress-active'), 180);
+          openMsgActionsForRow(row, startX, startY);
+        }, THRESH_MS);
+      });
+      chatMessagesAreaEl.addEventListener('pointermove', (e) => {
+        if (!timer) return;
+        if (Math.abs(e.clientX - startX) > MOVE_PX || Math.abs(e.clientY - startY) > MOVE_PX) clearTimer();
+      });
+      chatMessagesAreaEl.addEventListener('pointerup', clearTimer);
+      chatMessagesAreaEl.addEventListener('pointercancel', clearTimer);
+      chatMessagesAreaEl.addEventListener('lostpointercapture', clearTimer);
+    })();
 
     document.addEventListener('pointerdown', (e) => {
       if (!document.querySelector('.msg-actions-open')) return;

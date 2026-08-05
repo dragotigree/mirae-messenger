@@ -154,6 +154,12 @@ contextBridge.exposeInMainWorld('api', {
   setSpellcheckEnabled: (enabled) => ipcRenderer.invoke('set-spellcheck-enabled', enabled),
   getQuickPhrases: () => ipcRenderer.invoke('get-quick-phrases'),
   setQuickPhrases: (phrases) => ipcRenderer.invoke('set-quick-phrases', phrases),
+  getMutedChatKeys: () => ipcRenderer.invoke('get-muted-chat-keys'),
+  setMutedChatKeys: (keys) => ipcRenderer.invoke('set-muted-chat-keys', keys),
+  snapCompactWindow: (edge) => ipcRenderer.invoke('snap-compact-window', edge),
+  setCompactSizePreset: (preset) => ipcRenderer.invoke('set-compact-size-preset', preset),
+  setMainWindowOpacity: (opacity) => ipcRenderer.invoke('set-main-window-opacity', opacity),
+  getMainWindowOpacity: () => ipcRenderer.invoke('get-main-window-opacity'),
 
   // 📶 네트워크 상태 진단
   getNetworkStatus: () => ipcRenderer.invoke('get-network-status'),
