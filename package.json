@@ -23,7 +23,8 @@
     "stress:memory": "node --expose-gc scripts/stress-memory-churn.js",
     "stress:scheduled": "node scripts/stress-scheduled-automation.js",
     "stress:cpu-mem": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500",
-    "stress:cpu-mem:quick": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500 --quick"
+    "stress:cpu-mem:quick": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500 --quick",
+    "stress:until": "node scripts/stability-until.js --until=06:40 --tz=Asia/Seoul"
   },
   "dependencies": {
     "sqlite3": "^5.1.7"
