@@ -7127,10 +7127,25 @@ function deliverPendingChatRow(row, targetIP) {
   const releaseInflight = () => pendingResendInflight.delete(inflightKey);
   setTimeout(releaseInflight, 15000);
 
-  // SENT·PENDING 모두 재시도 상한 — ACK 실패 시 무한 재전송으로 수신측 폭주 방지
+  // SENT·PENDING 모두 재시도 상한 — 폭주 방지. 상한 도달 시 PENDING으로 되돌려
+  // 다음 flush 주기에서 다시 시도 (장시간 단절 후 영구 포기·유실 방지)
   const retryKey = row.msg_uid ? String(row.msg_uid) : inflightKey;
   const tries = sentAckRetryCount.get(retryKey) || 0;
   if (tries >= SENT_ACK_MAX_RETRIES) {
+    sentAckRetryCount.delete(retryKey);
+    if (row.msg_uid) {
+      db.run(
+        `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ? AND status IN ('SENT', 'PENDING')`,
+        [row.msg_uid, MY_IP],
+        logDbErr
+      );
+    } else if (row.id) {
+      db.run(
+        `UPDATE messages SET status = 'PENDING' WHERE id = ? AND status IN ('SENT', 'PENDING')`,
+        [row.id],
+        logDbErr
+      );
+    }
     releaseInflight();
     return;
   }
