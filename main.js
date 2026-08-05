@@ -2369,6 +2369,23 @@ db.serialize(() => {
     pinned_by_ip TEXT
   )`, logDbErr);
 
+  // 중요 표시(개인 북마크) — 이 PC에서만 보관, 로그에서 다시 볼 수 있음
+  db.run(`CREATE TABLE IF NOT EXISTS important_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_key TEXT NOT NULL UNIQUE,
+    msg_uid TEXT DEFAULT '',
+    message_id INTEGER DEFAULT 0,
+    channel_key TEXT DEFAULT '',
+    sender_name TEXT DEFAULT '',
+    sender_ip TEXT DEFAULT '',
+    receiver_ip TEXT DEFAULT '',
+    message_html TEXT DEFAULT '',
+    preview_text TEXT DEFAULT '',
+    msg_created_at TEXT DEFAULT '',
+    marked_at TEXT NOT NULL
+  )`, logDbErr);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_important_messages_marked ON important_messages(marked_at DESC)`, () => {});
+
   // 당직의 / 의료진 OFF (날짜별)
   db.run(`CREATE TABLE IF NOT EXISTS duty_roster (
     date_str TEXT NOT NULL,
@@ -7442,6 +7459,33 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
   return new Promise((resolve) => {
     const keyword = typeof opts === 'string' ? opts : ((opts && opts.keyword) || '');
     const kind = typeof opts === 'object' && opts && opts.kind ? String(opts.kind) : 'all';
+
+    // 중요 표시 목록 (개인 북마크 스냅샷)
+    if (kind === 'important') {
+      const clauses = [];
+      const params = [];
+      if (keyword) {
+        clauses.push(`(message_html LIKE ? OR preview_text LIKE ? OR sender_name LIKE ?)`);
+        params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+      }
+      let sql = `SELECT id, entry_key, msg_uid, message_id, channel_key, sender_name, sender_ip, receiver_ip,
+        message_html AS message, preview_text, msg_created_at, marked_at,
+        COALESCE(NULLIF(msg_created_at, ''), marked_at) AS created_time
+        FROM important_messages`;
+      if (clauses.length) sql += ` WHERE ` + clauses.join(' AND ');
+      sql += ` ORDER BY marked_at DESC, id DESC LIMIT 500`;
+      db.all(sql, params, (err, rows) => {
+        if (err) { logDbErr(err); resolve([]); return; }
+        resolve((rows || []).map((r) => ({
+          ...r,
+          sender_name: formatSenderDisplay(r.sender_name, r.sender_ip),
+          isMe: r.sender_ip === MY_IP || r.sender_name === senderLabelForMe(),
+          isImportant: true
+        })));
+      });
+      return;
+    }
+
     const clauses = [];
     const params = [];
 
@@ -7477,6 +7521,104 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
         });
       }
       resolve(list);
+    });
+  });
+});
+
+function importantEntryKeyFromPayload(p) {
+  const uid = String((p && (p.msgUid || p.msg_uid)) || '').trim();
+  if (uid) return uid;
+  const mid = parseInt((p && (p.messageId != null ? p.messageId : p.message_id)), 10);
+  if (Number.isFinite(mid) && mid > 0) return `mid:${mid}`;
+  return '';
+}
+
+ipcMain.handle('get-important-message-keys', async () => {
+  return new Promise((resolve) => {
+    db.all(`SELECT entry_key FROM important_messages`, [], (err, rows) => {
+      if (err) { logDbErr(err); resolve([]); return; }
+      resolve((rows || []).map((r) => r.entry_key).filter(Boolean));
+    });
+  });
+});
+
+ipcMain.handle('toggle-important-message', async (event, payload) => {
+  const p = payload || {};
+  const entryKey = importantEntryKeyFromPayload(p) || String(p.entryKey || p.entry_key || '').trim();
+  if (!entryKey) return { success: false, msg: '메시지를 식별할 수 없습니다.' };
+
+  return new Promise((resolve) => {
+    db.get(`SELECT id FROM important_messages WHERE entry_key = ?`, [entryKey], (err, existing) => {
+      if (err) {
+        logDbErr(err);
+        resolve({ success: false, msg: err.message || '저장 실패' });
+        return;
+      }
+      if (existing) {
+        db.run(`DELETE FROM important_messages WHERE entry_key = ?`, [entryKey], (delErr) => {
+          if (delErr) {
+            logDbErr(delErr);
+            resolve({ success: false, msg: delErr.message || '해제 실패' });
+            return;
+          }
+          if (mainWindow) safeWebContentsSend('important-messages-update');
+          resolve({ success: true, important: false, entryKey });
+        });
+        return;
+      }
+
+      const msgUid = String(p.msgUid || p.msg_uid || '').trim();
+      const messageId = parseInt(p.messageId != null ? p.messageId : p.message_id, 10) || 0;
+      const html = String(p.messageHtml || p.message_html || '');
+      if (!html || html.indexOf('deleted-msg-flag') !== -1 || html.indexOf('system-notice-flag') !== -1) {
+        resolve({ success: false, msg: '삭제된 메시지/시스템 안내는 중요 표시할 수 없습니다.' });
+        return;
+      }
+      const preview = String(p.previewText || p.preview_text || '').slice(0, 240);
+      const markedAt = new Date().toISOString();
+      db.run(
+        `INSERT INTO important_messages
+          (entry_key, msg_uid, message_id, channel_key, sender_name, sender_ip, receiver_ip, message_html, preview_text, msg_created_at, marked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          entryKey,
+          msgUid,
+          messageId,
+          String(p.channelKey || p.channel_key || ''),
+          String(p.senderName || p.sender_name || ''),
+          String(p.senderIp || p.sender_ip || ''),
+          String(p.receiverIp || p.receiver_ip || ''),
+          html,
+          preview,
+          String(p.msgCreatedAt || p.msg_created_at || ''),
+          markedAt
+        ],
+        (insErr) => {
+          if (insErr) {
+            logDbErr(insErr);
+            resolve({ success: false, msg: insErr.message || '저장 실패' });
+            return;
+          }
+          if (mainWindow) safeWebContentsSend('important-messages-update');
+          resolve({ success: true, important: true, entryKey });
+        }
+      );
+    });
+  });
+});
+
+ipcMain.handle('remove-important-message', async (event, entryKey) => {
+  const key = String(entryKey || '').trim();
+  if (!key) return { success: false };
+  return new Promise((resolve) => {
+    db.run(`DELETE FROM important_messages WHERE entry_key = ?`, [key], (err) => {
+      if (err) {
+        logDbErr(err);
+        resolve({ success: false, msg: err.message });
+        return;
+      }
+      if (mainWindow) safeWebContentsSend('important-messages-update');
+      resolve({ success: true, important: false, entryKey: key });
     });
   });
 });
@@ -9669,6 +9811,7 @@ async function performClearAllChatHistory(opts) {
     'messages',
     'chat_view_clears',
     'chat_pins',
+    'important_messages',
     'scheduled_messages',
     'channel_read_cursors'
   ];

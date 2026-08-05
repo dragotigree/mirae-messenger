@@ -119,6 +119,12 @@ contextBridge.exposeInMainWorld('api', {
   clearChatPin: (channelKey) => ipcRenderer.invoke('clear-chat-pin', channelKey),
   onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
 
+  // ⭐ 중요 메시지 (개인 북마크 → 전체 로그에서 조회)
+  getImportantMessageKeys: () => ipcRenderer.invoke('get-important-message-keys'),
+  toggleImportantMessage: (payload) => ipcRenderer.invoke('toggle-important-message', payload),
+  removeImportantMessage: (entryKey) => ipcRenderer.invoke('remove-important-message', entryKey),
+  onImportantMessagesUpdate: (callback) => ipcRenderer.on('important-messages-update', () => callback()),
+
   // 🩺 당직의 / 의료진 OFF
   getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),
   setDutyRosterForDate: (payload) => ipcRenderer.invoke('set-duty-roster-for-date', payload),

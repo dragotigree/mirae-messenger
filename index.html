@@ -1203,8 +1203,8 @@
     .msg-row.is-other .msg-action-btns, .msg-row-bubble.is-other .bubble-action-btns { justify-content: flex-start; }
     .msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open { z-index: 5; }
 
-    .pin-btn, .copy-btn, .msg-edit-btn, .msg-delete-btn, .msg-react-btn, .share-btn, .reply-btn,
-    .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn {
+    .pin-btn, .copy-btn, .msg-edit-btn, .msg-delete-btn, .msg-react-btn, .share-btn, .reply-btn, .important-btn,
+    .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn, .bubble-important-btn {
       position: static; flex-shrink: 0;
       background: rgba(255, 255, 255, 0.96); color: var(--text-primary);
       border: 1px solid rgba(226, 232, 240, 0.95); border-radius: 10px;
@@ -1214,10 +1214,32 @@
       transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
       -webkit-app-region: no-drag;
     }
-    .pin-btn:hover, .copy-btn:hover, .msg-edit-btn:hover, .msg-delete-btn:hover, .msg-react-btn:hover, .share-btn:hover, .reply-btn:hover,
-    .bubble-copy-btn:hover, .bubble-share-btn:hover, .bubble-edit-btn:hover, .bubble-delete-btn:hover {
+    .pin-btn:hover, .copy-btn:hover, .msg-edit-btn:hover, .msg-delete-btn:hover, .msg-react-btn:hover, .share-btn:hover, .reply-btn:hover, .important-btn:hover,
+    .bubble-copy-btn:hover, .bubble-share-btn:hover, .bubble-edit-btn:hover, .bubble-delete-btn:hover, .bubble-important-btn:hover {
       transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1); background: #fff;
     }
+    .important-btn.is-on, .bubble-important-btn.is-on {
+      background: #fffbeb; border-color: #fcd34d; color: #b45309;
+    }
+    .msg-row.is-important .msg-text,
+    .msg-row-bubble.is-important .chat-bubble {
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
+    }
+    .msg-important-badge {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 10px; font-weight: 700; color: #b45309;
+      margin: 0 0 4px; letter-spacing: -0.02em;
+    }
+    .log-card-item.is-important-mark .log-card-rail { background: linear-gradient(180deg, #f59e0b, #fbbf24); }
+    .log-card-important-actions {
+      display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+    }
+    .log-card-important-actions button {
+      border: 1px solid #e2e8f0; background: #fff; color: #475569;
+      border-radius: 8px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .log-card-important-actions button:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .log-card-important-actions .log-unmark-btn { color: #b45309; border-color: #fde68a; background: #fffbeb; }
     .msg-delete-btn, .bubble-delete-btn { color: #dc2626; }
     #share-message-preview { max-height: 120px; overflow: hidden; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12px; color: #475569; line-height: 1.45; word-break: break-word; }
     #share-message-preview img { max-width: 100%; max-height: 80px; border-radius: 8px; }
@@ -4820,6 +4842,7 @@
         </div>
         <div class="all-logs-filterbar" role="tablist" aria-label="대화 기록 종류">
           <button type="button" class="all-logs-filter-tab is-active" data-all-logs-filter="all" onclick="setAllLogsFilter('all')">전체</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="important" onclick="setAllLogsFilter('important')">중요</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="photo" onclick="setAllLogsFilter('photo')">사진</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="file" onclick="setAllLogsFilter('file')">파일</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
@@ -8408,6 +8431,8 @@
     applyChannelsSectionCollapseState();
     let allLogsSearchDebounce = null;
     let allLogsFilter = 'all';
+    /** @type {Set<string>} 중요 표시된 메시지 entry_key (msg_uid 또는 mid:id) */
+    let importantMsgKeys = new Set();
     let cachedNoticesList = [];
     let chatSearchDebounce = null;
     let scheduledForCurrentChat = [];
@@ -8567,6 +8592,10 @@
     window.api.onSchedulesUpdate(() => { refreshSchedulesFromServer(); });
     window.api.onDutyRosterUpdate(() => { refreshDutyRosterFromServer(); });
     window.api.onChatPinsUpdate(() => { refreshActiveChatPinBanner(); });
+    if (window.api && typeof window.api.onImportantMessagesUpdate === 'function') {
+      window.api.onImportantMessagesUpdate(() => { refreshImportantMessageKeys(); });
+    }
+    refreshImportantMessageKeys().catch(() => {});
     refreshSchedulesFromServer();
     refreshDutyRosterFromServer();
     window.api.onGroupChatsUpdate(() => { refreshGroupChats().catch((e) => console.error('그룹 갱신 실패:', e)); });
@@ -13431,7 +13460,7 @@
     }
 
     function setAllLogsFilter(kind) {
-      const next = ['all', 'photo', 'file', 'link'].includes(kind) ? kind : 'all';
+      const next = ['all', 'important', 'photo', 'file', 'link'].includes(kind) ? kind : 'all';
       allLogsFilter = next;
       document.querySelectorAll('.all-logs-filter-tab').forEach((btn) => {
         btn.classList.toggle('is-active', btn.getAttribute('data-all-logs-filter') === next);
@@ -13475,7 +13504,15 @@
     }
 
     function formatAllLogTimeParts(createdTime) {
-      const raw = String(createdTime || '').trim();
+      let raw = String(createdTime || '').trim();
+      // ISO(2026-08-05T12:34:56.000Z) → 로컬 표시용으로 변환
+      if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) {
+          const pad = (n) => String(n).padStart(2, '0');
+          raw = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+      }
       const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
       if (!m) return { dateKey: raw.slice(0, 10) || '기타', dateLabel: raw.slice(0, 10) || '기타', timeLabel: raw };
       const dateKey = `${m[1]}-${m[2]}-${m[3]}`;
@@ -13550,6 +13587,7 @@
 
       const emptyByKind = {
         all: keyword ? '검색어에 일치하는 대화 내역이 없습니다.' : '아직 기록된 대화 내역이 없습니다.',
+        important: keyword ? '검색 조건에 맞는 중요 표시가 없습니다.' : '중요로 표시한 메시지가 없습니다.<br>채팅에서 ⭐로 표시하면 여기에 모입니다.',
         photo: keyword ? '검색 조건에 맞는 사진이 없습니다.' : '사진이 포함된 대화가 없습니다.',
         file: keyword ? '검색 조건에 맞는 파일이 없습니다.' : '파일이 포함된 대화가 없습니다.',
         link: keyword ? '검색 조건에 맞는 링크가 없습니다.' : '링크가 포함된 대화가 없습니다.'
@@ -13581,10 +13619,11 @@
 
         const card = document.createElement('div');
         card.className = `log-card-item ${typeMeta.class} ${dirClass}`;
+        if (kind === 'important' || item.isImportant) card.classList.add('is-important-mark');
         card.style.animationDelay = `${Math.min(idx, 12) * 12}ms`;
         const senderName = item.sender_name || '익명';
         const peerLabel = resolveAllLogPeerLabel(item, isSent);
-        const media = extractAllLogMediaMeta(item.message, kind === 'all' ? '' : kind);
+        const media = extractAllLogMediaMeta(item.message, kind === 'all' || kind === 'important' ? '' : kind);
         const preview = media.preview || logMessagePreview(item.message);
         const dirLabel = isSent ? '보냄' : '받음';
         const contextLabel = typeMeta.class === 'is-dm'
@@ -13598,7 +13637,16 @@
           sideHtml = `<div class="log-card-file-icon" aria-hidden="true">📄</div>`;
         } else if (kind === 'link') {
           sideHtml = `<div class="log-card-file-icon" aria-hidden="true">🔗</div>`;
+        } else if (kind === 'important') {
+          sideHtml = `<div class="log-card-file-icon" aria-hidden="true">⭐</div>`;
         }
+
+        const entryKey = String(item.entry_key || item.msg_uid || (item.message_id ? `mid:${item.message_id}` : '') || '');
+        const importantActions = (kind === 'important' && entryKey)
+          ? `<div class="log-card-important-actions">
+              <button type="button" class="log-unmark-btn" data-unmark-key="${escapeHtml(entryKey)}">중요 해제</button>
+            </div>`
+          : '';
 
         card.innerHTML = `
           <div class="log-card-rail" aria-hidden="true"></div>
@@ -13611,8 +13659,19 @@
               <span class="log-card-time" title="${escapeHtml(item.created_time || '')}">${escapeHtml(timeParts.timeLabel)}</span>
             </div>
             <div class="log-card-body">${escapeHtml(preview)}</div>
+            ${importantActions}
           </div>
         `;
+
+        if (kind === 'important' && entryKey) {
+          const unmarkBtn = card.querySelector('.log-unmark-btn');
+          if (unmarkBtn) {
+            unmarkBtn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              await unmarkImportantFromLogs(entryKey);
+            });
+          }
+        }
 
         if (kind === 'link' && media.url) {
           card.classList.add('is-clickable');
@@ -15741,6 +15800,7 @@
         }
         updateMineOutboundStatusLabels();
         await refreshAllVisibleReactions();
+        await refreshImportantMessageKeys();
         if (!keyword) {
           await markChannelReadFromHistory(history);
           await refreshChannelMessageUnreadCounts();
@@ -18234,6 +18294,16 @@
       const canReply = reactionKey && !isDeletedAlready && !isSystemNotice && activeChatUser;
       const replyBtnHtml = canReply ? `<button type="button" class="reply-btn" title="답장" onclick="replyThisMessage(this)">↩️</button>` : '';
       const reactionsHostHtml = canReact ? `<div class="msg-reactions" data-reaction-host="${escapeMsgUidAttr(reactionKey)}"></div>` : '';
+      const importantKey = getImportantEntryKey(msgUid, messageId);
+      const canMarkImportant = !!importantKey && !isDeletedAlready && !isSystemNotice;
+      const isImportantMsg = canMarkImportant && importantMsgKeys.has(importantKey);
+      const importantBtnHtml = canMarkImportant
+        ? `<button type="button" class="important-btn${isImportantMsg ? ' is-on' : ''}" title="${isImportantMsg ? '중요 표시 해제' : '중요로 표시 (로그에서 다시 보기)'}" onclick="toggleImportantMessage(this)">${isImportantMsg ? '⭐' : '☆'}</button>`
+        : '';
+      const bubbleImportantBtnHtml = canMarkImportant
+        ? `<button type="button" class="bubble-important-btn${isImportantMsg ? ' is-on' : ''}" title="${isImportantMsg ? '중요 표시 해제' : '중요로 표시 (로그에서 다시 보기)'}" onclick="toggleImportantMessage(this)">${isImportantMsg ? '⭐' : '☆'}</button>`
+        : '';
+      const importantBadgeHtml = isImportantMsg ? `<div class="msg-important-badge">⭐ 중요</div>` : '';
       const unreadCountHtml = (isMe && isGroupChannel && msgUid)
         ? `<span class="msg-unread-count"></span>` : '';
       const displayMsg = normalizeChatFileBoxHtml(
@@ -18257,13 +18327,14 @@
         : '';
 
       if (useBubbleLayout) {
-        row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
+        row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''} ${isImportantMsg ? 'is-important' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
         if (!skipEnterAnim) row.classList.add('is-live-enter');
         const showName = !isMe && isGroupChannel;
         row.innerHTML = `
           ${showName ? `<div class="bubble-sender">${displayName}</div>` : ''}
           ${urgentBadgeHtml}
+          ${importantBadgeHtml}
           <div class="bubble-block">
             <div class="bubble-stack">
               <div class="bubble-line">
@@ -18271,14 +18342,14 @@
                 <div class="chat-bubble">${displayMsg}</div>
                 ${bubbleMetaAfter}
               </div>
-              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button><button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌</button></span>
+              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button>${bubbleImportantBtnHtml}<button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌</button></span>
             </div>
             ${pendingNoticeHtml}
             ${reactionsHostHtml}
           </div>
         `;
       } else {
-        row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
+        row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''} ${isImportantMsg ? 'is-important' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
         if (!skipEnterAnim) row.classList.add('is-live-enter');
         const avatarClass = isMe ? 'avatar-me' : (isGroupChannel ? 'avatar-broadcast' : 'avatar-other');
@@ -18292,6 +18363,7 @@
               <span class="msg-sender-name ${isMe ? 'is-me' : 'is-other'}">${displayName}</span>${sendStatusHtml}
             </div>
             ${urgentBadgeHtml}
+            ${importantBadgeHtml}
             <div class="msg-bubble-stack">
               <div class="msg-content-line">
                 ${sideMetaBefore}
@@ -18305,6 +18377,7 @@
                 ${reactBtnHtml}
                 <button type="button" class="copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button>
                 <button type="button" class="share-btn" title="다른 사람에게 전달" onclick="shareThisMessage(this)">↪️</button>
+                ${importantBtnHtml}
                 <button type="button" class="pin-btn chat-pin-msg-btn" title="이 대화 공지로 고정" onclick="pinMessageAsChatNotice(this)">📌</button>
               </div>
             </div>
@@ -18708,6 +18781,152 @@
       } catch (e) {
         renderChatPinBanner(null);
       }
+    }
+
+    function getImportantEntryKey(msgUid, messageId) {
+      const uid = String(msgUid || '').trim();
+      if (uid) return uid;
+      const mid = parseInt(messageId, 10);
+      if (Number.isFinite(mid) && mid > 0) return `mid:${mid}`;
+      return '';
+    }
+
+    function getImportantEntryKeyFromRow(row) {
+      if (!row) return '';
+      return getImportantEntryKey(row.getAttribute('data-msg-uid'), row.getAttribute('data-msg-id'));
+    }
+
+    function applyImportantStateToRow(row, isOn) {
+      if (!row) return;
+      row.classList.toggle('is-important', !!isOn);
+      const btn = row.querySelector('.important-btn, .bubble-important-btn');
+      if (btn) {
+        btn.classList.toggle('is-on', !!isOn);
+        btn.textContent = isOn ? '⭐' : '☆';
+        btn.title = isOn ? '중요 표시 해제' : '중요로 표시 (로그에서 다시 보기)';
+      }
+      let badge = row.querySelector('.msg-important-badge');
+      if (isOn) {
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'msg-important-badge';
+          badge.textContent = '⭐ 중요';
+          const after = row.querySelector('.urgent-badge');
+          if (after && after.parentNode) after.insertAdjacentElement('afterend', badge);
+          else {
+            const body = row.querySelector('.msg-body, .bubble-block');
+            if (body) body.insertAdjacentElement('afterbegin', badge);
+            else row.insertAdjacentElement('afterbegin', badge);
+          }
+        }
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+
+    async function refreshImportantMessageKeys() {
+      if (!window.api || typeof window.api.getImportantMessageKeys !== 'function') {
+        importantMsgKeys = new Set();
+        return;
+      }
+      try {
+        const keys = await window.api.getImportantMessageKeys();
+        importantMsgKeys = new Set(Array.isArray(keys) ? keys.filter(Boolean) : []);
+      } catch (_) {
+        importantMsgKeys = new Set();
+      }
+      document.querySelectorAll('#chat-messages-area .msg-row, #chat-messages-area .msg-row-bubble').forEach((row) => {
+        const key = getImportantEntryKeyFromRow(row);
+        applyImportantStateToRow(row, !!(key && importantMsgKeys.has(key)));
+      });
+    }
+
+    async function toggleImportantMessage(btn) {
+      const row = btn && btn.closest ? btn.closest('.msg-row, .msg-row-bubble') : null;
+      if (!row) return;
+      const textEl = row.querySelector('.msg-text, .chat-bubble');
+      if (!textEl) return;
+      const html = textEl.innerHTML || '';
+      if (html.indexOf('deleted-msg-flag') !== -1 || html.indexOf('system-notice-flag') !== -1) {
+        await appAlert('삭제된 메시지/시스템 안내는 중요 표시할 수 없습니다.');
+        return;
+      }
+      const msgUid = row.getAttribute('data-msg-uid') || '';
+      const messageId = parseInt(row.getAttribute('data-msg-id'), 10) || 0;
+      const entryKey = getImportantEntryKey(msgUid, messageId);
+      if (!entryKey) {
+        await appAlert('이 메시지는 중요 표시할 수 없습니다.');
+        return;
+      }
+      const currentlyOn = importantMsgKeys.has(entryKey);
+      const senderEl = row.querySelector('.msg-sender-name, .bubble-sender');
+      let senderName = senderEl ? senderEl.textContent.replace(/\s*·\s*(보냄|읽음|오류)\s*$/, '').trim() : '';
+      const isMe = row.classList.contains('is-me');
+      if (!senderName && isMe) senderName = profileDisplayName(myProfile);
+      const channelKey = getActiveChatChannelKey();
+      const timeEl = row.querySelector('.msg-time, .bubble-time');
+      const timeLabel = timeEl ? (timeEl.textContent || '').trim() : '';
+      const dateKey = row.getAttribute('data-chat-date-key') || formatDateStr(new Date());
+      const msgCreatedAt = timeLabel
+        ? (/^\d{4}-\d{2}-\d{2}/.test(timeLabel) ? timeLabel : `${dateKey} ${timeLabel}`)
+        : dateKey;
+      let senderIp = '';
+      let receiverIp = channelKey || '';
+      if (isMe) {
+        senderIp = (myProfile && myProfile.ip) || '';
+        receiverIp = channelKey || '';
+      } else {
+        senderIp = channelKey || '';
+        receiverIp = (myProfile && myProfile.ip) || '';
+        // 그룹/공지 채널이면 receiver는 채널 키
+        if (activeChatUser && (activeChatUser.isBroadcast || activeChatUser.isDept || activeChatUser.isFloor || activeChatUser.isGroup)) {
+          receiverIp = channelKey;
+        }
+      }
+
+      if (!window.api || typeof window.api.toggleImportantMessage !== 'function') {
+        await appAlert('중요 표시 기능을 사용할 수 없습니다.');
+        return;
+      }
+      const res = await window.api.toggleImportantMessage({
+        entryKey,
+        msgUid,
+        messageId,
+        channelKey,
+        senderName: senderName || '',
+        senderIp,
+        receiverIp,
+        messageHtml: html,
+        previewText: stripHtmlToPreview(html),
+        msgCreatedAt
+      });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '중요 표시에 실패했습니다.');
+        return;
+      }
+      if (res.important) importantMsgKeys.add(entryKey);
+      else importantMsgKeys.delete(entryKey);
+      applyImportantStateToRow(row, !!res.important);
+      if (isFlexOverlay('all-logs-modal') && allLogsFilter === 'important') {
+        const kw = (document.getElementById('all-logs-search-input')?.value || '').trim();
+        loadAllChatLogs(kw);
+      }
+    }
+
+    async function unmarkImportantFromLogs(entryKey) {
+      const key = String(entryKey || '').trim();
+      if (!key || !window.api || typeof window.api.removeImportantMessage !== 'function') return;
+      const res = await window.api.removeImportantMessage(key);
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '중요 해제에 실패했습니다.');
+        return;
+      }
+      importantMsgKeys.delete(key);
+      document.querySelectorAll('#chat-messages-area .msg-row, #chat-messages-area .msg-row-bubble').forEach((row) => {
+        if (getImportantEntryKeyFromRow(row) === key) applyImportantStateToRow(row, false);
+      });
+      const kw = (document.getElementById('all-logs-search-input')?.value || '').trim();
+      loadAllChatLogs(kw);
     }
 
     async function pinMessageAsChatNotice(btn) {
@@ -22418,7 +22637,7 @@
       const el = document.getElementById('chat-clear-all-result');
       const firstOk = await appConfirm(
         '이 PC의 모든 대화 내용과 로그를 삭제할까요?\n\n' +
-          '· 저장된 메시지·반응·고정 공지·예약 메시지·읽음 기록이 삭제됩니다.\n' +
+          '· 저장된 메시지·반응·고정 공지·중요 표시·예약 메시지·읽음 기록이 삭제됩니다.\n' +
           '· 일별 채팅 로그(chat_logs)·앱 로그·자동 DB 백업도 함께 삭제됩니다.\n' +
           '· 공지사항·일정·프로필·직원 목록은 유지됩니다.\n' +
           '· 다른 PC에 저장된 대화는 영향 없습니다.\n\n' +
