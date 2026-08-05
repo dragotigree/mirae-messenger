@@ -378,6 +378,46 @@
     .section-label { text-transform: uppercase; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.62); padding: 6px 12px 3px 12px; letter-spacing: 0.02em; }
     .section-label .group-chevron { display: inline-block; transition: transform var(--transition-fast); margin-right: 4px; font-size: 11px; opacity: .75; }
     .section-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
+
+    /* 쪽지 · 코드 — 섹션 아래 전폭 쌍둥이 버튼 */
+    .sidebar-quick-actions {
+      display: flex; align-items: stretch; gap: 6px;
+      padding: 2px 10px 8px 10px; flex-shrink: 0;
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn,
+    .sidebar-quick-actions .sidebar-code-alert-btn {
+      flex: 1 1 0; min-width: 0;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 7px 8px; border-radius: 9px;
+      font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
+      white-space: nowrap; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn {
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.94);
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.28);
+    }
+    .sidebar-quick-actions .sidebar-code-alert-btn {
+      border: 1px solid rgba(248,113,113,0.4);
+      background: rgba(239,68,68,0.16);
+      color: #fecaca;
+    }
+    .sidebar-quick-actions .sidebar-code-alert-btn:hover {
+      background: rgba(239,68,68,0.26);
+      border-color: rgba(252,165,165,0.65);
+      color: #fff;
+    }
+    .sidebar-quick-actions .sidebar-ipmsg-btn:active,
+    .sidebar-quick-actions .sidebar-code-alert-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* 레거시 단독 버튼 스타일 (다른 위치 호환) */
     .sidebar-ipmsg-btn {
       padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08);
       color: rgba(255,255,255,0.92); font-size: 11.5px; font-weight: 700; cursor: pointer; letter-spacing: 0;
@@ -546,11 +586,10 @@
     .user-search-box input:focus { border-color: rgba(14, 165, 233, 0.45); background: rgba(255,255,255,0.1); box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12); }
     .user-search-box input::placeholder { color: rgba(255,255,255,0.42); }
 
-    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 작은 세그먼트 */
+    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트 */
     .sidebar-list-prefs {
-      display: flex; flex-wrap: nowrap; align-items: center; gap: 5px;
-      padding: 0 10px 7px 10px; flex-shrink: 0;
-      overflow: hidden;
+      display: flex; flex-wrap: nowrap; align-items: stretch; gap: 5px;
+      padding: 0 10px 8px 10px; flex-shrink: 0;
     }
     .sidebar-block-head {
       white-space: nowrap;
@@ -558,33 +597,32 @@
       min-width: 0;
     }
     .sidebar-block-head > span:first-child {
-      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     }
-    #dm-section-label > span:last-child {
+    #dm-section-label > span:last-child,
+    #channels-section-label > span:last-child {
       flex: 0 0 auto;
     }
-    #users-section-label > span:last-child,
-    #channels-section-label > span:last-child {
-      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-    }
-    .sidebar-ipmsg-btn,
-    .sidebar-code-alert-btn {
-      flex-shrink: 0;
-      white-space: nowrap;
+    .sidebar-users-hint {
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.38); letter-spacing: -0.02em;
+      flex: 0 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .sidebar-pref-seg {
-      display: inline-flex; align-items: stretch;
-      border-radius: 7px; overflow: hidden;
+      display: inline-flex; align-items: stretch; flex: 1 1 0; min-width: 0;
+      border-radius: 8px; overflow: hidden;
       border: 1px solid rgba(255,255,255,0.12);
       background: rgba(0,0,0,0.18);
-      flex: 0 0 auto;
     }
     .sidebar-pref-chip {
-      border: none; margin: 0; padding: 3px 7px;
-      font-size: 10px; font-weight: 700; letter-spacing: -0.04em;
+      flex: 1 1 0; min-width: 0;
+      border: none; margin: 0; padding: 5px 4px;
+      font-size: 10.5px; font-weight: 700; letter-spacing: -0.04em;
       line-height: 1.2; color: rgba(255,255,255,0.55);
       background: transparent; cursor: pointer;
-      white-space: nowrap; -webkit-app-region: no-drag;
+      white-space: nowrap; text-align: center;
+      -webkit-app-region: no-drag;
       transition: background 0.12s, color 0.12s;
     }
     .sidebar-pref-chip + .sidebar-pref-chip {
@@ -3600,26 +3638,26 @@
 
     <div id="sidebar-main-sections" class="sidebar-main-sections">
       <div id="sidebar-block-dm" class="sidebar-main-block" data-sidebar-block="dm">
-        <div class="section-label sidebar-block-head" id="dm-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
+        <div class="section-label sidebar-block-head" id="dm-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span>💬 다이렉트 메시지</span>
           </span>
-          <span style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="sidebar-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)">✉️ 쪽지</button>
-            <button type="button" class="sidebar-code-alert-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드 긴급 발령">🚨 코드</button>
-            <span class="unread-badge" id="dm-section-unread-badge" style="display:none;">0</span>
-          </span>
+          <span class="unread-badge" id="dm-section-unread-badge" style="display:none;">0</span>
+        </div>
+        <div class="sidebar-quick-actions" role="group" aria-label="빠른 전송">
+          <button type="button" class="sidebar-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)">✉️ 쪽지</button>
+          <button type="button" class="sidebar-code-alert-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드 긴급 발령">🚨 코드</button>
         </div>
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
+        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span>👥 사용자</span>
           </span>
-          <span style="font-size:10px; font-weight:600; color:var(--sidebar-text-dim); letter-spacing:-0.02em;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">Ctrl+클릭 다중선택</span>
+          <span class="sidebar-users-hint">Ctrl+클릭</span>
         </div>
         <div class="user-search-box" id="user-search-box">
           <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
@@ -6613,7 +6651,7 @@
     // ↔️ 좌·우 사이드바 크기 조절 · 접기/펼치기
     (function initSidebarResize() {
       // 목록 글씨는 nowrap+ellipsis. 고정 UI(쪽지·코드·필터칩)가 깨지지 않는 폭까지만 축소.
-      const SIDEBAR_MIN_FLOOR = 260;
+      const SIDEBAR_MIN_FLOOR = 240;
       const SIDEBAR_MAX = 480;
       // 우측: 버튼·제목 글씨가 잘리지 않는 실제 최소 너비를 동적으로 측정 (아래 floor는 하한)
       const SIDEBAR_RIGHT_MIN_FLOOR = 220;
@@ -6661,14 +6699,15 @@
           host.appendChild(clone);
         }
 
-        const dmHead = left.querySelector('#dm-section-label');
-        if (dmHead) {
-          const clone = dmHead.cloneNode(true);
+        const actions = left.querySelector('.sidebar-quick-actions');
+        if (actions) {
+          const clone = actions.cloneNode(true);
           clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-          clone.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;width:max-content;white-space:nowrap;padding:5px 16px 3px 12px;box-sizing:border-box;';
+          clone.style.cssText = 'display:flex;align-items:stretch;gap:6px;width:max-content;padding:0 10px;box-sizing:border-box;';
           clone.querySelectorAll('button').forEach((btn) => {
             btn.style.flex = '0 0 auto';
             btn.style.whiteSpace = 'nowrap';
+            btn.style.minWidth = 'max-content';
           });
           host.appendChild(clone);
         }
@@ -6680,6 +6719,10 @@
           clone.style.cssText = 'display:flex;flex-wrap:nowrap;align-items:center;gap:5px;width:max-content;padding:0 10px;box-sizing:border-box;';
           clone.querySelectorAll('.sidebar-pref-seg').forEach((seg) => {
             seg.style.flex = '0 0 auto';
+          });
+          clone.querySelectorAll('.sidebar-pref-chip').forEach((chip) => {
+            chip.style.flex = '0 0 auto';
+            chip.style.padding = '5px 7px';
           });
           host.appendChild(clone);
         }
