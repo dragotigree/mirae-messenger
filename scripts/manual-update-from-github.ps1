@@ -111,7 +111,7 @@ foreach ($rel in $files) {
     $wc.DownloadFile($url, $dst)
     $copied++
   } catch {
-    if ($rel -match 'splash\.png$') {
+    if ($rel -match 'splash\.png$|compact-overlay\.css$|phosphor-paths\.json$|excalidraw-app\.(js|css)$') {
       Write-Host "  건너뜀(선택): $rel" -ForegroundColor DarkGray
       continue
     }

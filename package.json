@@ -1,6 +1,6 @@
 {
   "name": "mirae-messenger",
-  "version": "1.0.469",
+  "version": "1.0.470",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -8,31 +8,13 @@
     "package": "powershell -ExecutionPolicy Bypass -File build.ps1",
     "installer": "powershell -ExecutionPolicy Bypass -File installer\\build-installer.ps1",
     "publish:github": "powershell -ExecutionPolicy Bypass -File scripts\\publish-to-github.ps1",
-    "build:compact": "node scripts/build-compact-ui.js",
-    "build:excalidraw": "node scripts/build-excalidraw.mjs",
-    "stress:hospital": "node scripts/stress-hospital-load-suite.js --users=500",
-    "stress:hospital:quick": "node scripts/stress-hospital-load-suite.js --users=500 --quick",
-    "stress:s13": "node scripts/stress-scenarios-1-3-suite.js --users=200",
-    "stress:s13:quick": "node scripts/stress-scenarios-1-3-suite.js --users=80 --quick",
-    "stress:s46": "node scripts/stress-scenarios-4-6-suite.js",
-    "stress:s46:quick": "node scripts/stress-scenarios-4-6-suite.js --quick",
-    "stress:traffic": "node scripts/stress-concurrent-traffic.js --users=200",
-    "stress:file-cross": "node scripts/stress-file-cross-subnet.js",
-    "stress:db-conc": "node scripts/stress-db-concurrency.js",
-    "stress:reconnect": "node scripts/stress-reconnect-resilience.js",
-    "stress:memory": "node --expose-gc scripts/stress-memory-churn.js",
-    "stress:scheduled": "node scripts/stress-scheduled-automation.js",
-    "stress:cpu-mem": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500",
-    "stress:cpu-mem:quick": "node --expose-gc scripts/stress-cpu-mem-storm.js --users=500 --quick",
-    "stress:until": "node scripts/stability-until.js --until=06:40 --tz=Asia/Seoul"
+    "build:excalidraw": "node scripts/build-excalidraw.mjs"
   },
   "dependencies": {
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "@phosphor-icons/core": "^2.1.1",
     "electron": "28.2.0",
-    "electron-packager": "^17.1.2",
-    "tailwindcss": "^3.4.17"
+    "electron-packager": "^17.1.2"
   }
 }

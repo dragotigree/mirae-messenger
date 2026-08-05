@@ -21,12 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   notifyChannelRead: (channelKey, lastReadMsgUid) => ipcRenderer.invoke('notify-channel-read', { channelKey, lastReadMsgUid }),
   getMessageUnreadCounts: (channelKey, messages) => ipcRenderer.invoke('get-message-unread-counts', { channelKey, messages }),
   onChannelReadUpdate: (callback) => ipcRenderer.on('channel-read-update', (e, data) => callback(data)),
-  getChatHistory: (targetIPOrOpts, dateStr, keyword) => {
-    if (targetIPOrOpts && typeof targetIPOrOpts === 'object' && !Array.isArray(targetIPOrOpts)) {
-      return ipcRenderer.invoke('get-chat-history', targetIPOrOpts);
-    }
-    return ipcRenderer.invoke('get-chat-history', { targetIP: targetIPOrOpts, dateStr, keyword });
-  },
+  getChatHistory: (targetIP, dateStr, keyword) => ipcRenderer.invoke('get-chat-history', { targetIP, dateStr, keyword }),
   getChatMessageDates: (targetIP, month) => ipcRenderer.invoke('get-chat-message-dates', { targetIP, month }),
   getRecentConversations: () => ipcRenderer.invoke('get-recent-conversations'),
   getChatSharedArchive: (targetIP) => ipcRenderer.invoke('get-chat-shared-archive', targetIP),
@@ -124,12 +119,6 @@ contextBridge.exposeInMainWorld('api', {
   clearChatPin: (channelKey) => ipcRenderer.invoke('clear-chat-pin', channelKey),
   onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
 
-  // ⭐ 중요 메시지 (개인 북마크 → 전체 로그에서 조회)
-  getImportantMessageKeys: () => ipcRenderer.invoke('get-important-message-keys'),
-  toggleImportantMessage: (payload) => ipcRenderer.invoke('toggle-important-message', payload),
-  removeImportantMessage: (entryKey) => ipcRenderer.invoke('remove-important-message', entryKey),
-  onImportantMessagesUpdate: (callback) => ipcRenderer.on('important-messages-update', () => callback()),
-
   // 🩺 당직의 / 의료진 OFF
   getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),
   setDutyRosterForDate: (payload) => ipcRenderer.invoke('set-duty-roster-for-date', payload),
@@ -142,9 +131,6 @@ contextBridge.exposeInMainWorld('api', {
   getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
-  getAutoBackupSettings: () => ipcRenderer.invoke('get-auto-backup-settings'),
-  setAutoBackupSettings: (settings) => ipcRenderer.invoke('set-auto-backup-settings', settings),
-  runAutoBackupNow: () => ipcRenderer.invoke('run-auto-backup-now'),
   clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),
   setNotificationPreviewSetting: (enabled) => ipcRenderer.invoke('set-notification-preview-setting', enabled),
@@ -152,14 +138,6 @@ contextBridge.exposeInMainWorld('api', {
   setMessageNotificationSettings: (settings) => ipcRenderer.invoke('set-message-notification-settings', settings),
   getSpellcheckEnabled: () => ipcRenderer.invoke('get-spellcheck-enabled'),
   setSpellcheckEnabled: (enabled) => ipcRenderer.invoke('set-spellcheck-enabled', enabled),
-  getQuickPhrases: () => ipcRenderer.invoke('get-quick-phrases'),
-  setQuickPhrases: (phrases) => ipcRenderer.invoke('set-quick-phrases', phrases),
-  getMutedChatKeys: () => ipcRenderer.invoke('get-muted-chat-keys'),
-  setMutedChatKeys: (keys) => ipcRenderer.invoke('set-muted-chat-keys', keys),
-  snapCompactWindow: (edge) => ipcRenderer.invoke('snap-compact-window', edge),
-  setCompactSizePreset: (preset) => ipcRenderer.invoke('set-compact-size-preset', preset),
-  setMainWindowOpacity: (opacity) => ipcRenderer.invoke('set-main-window-opacity', opacity),
-  getMainWindowOpacity: () => ipcRenderer.invoke('get-main-window-opacity'),
 
   // 📶 네트워크 상태 진단
   getNetworkStatus: () => ipcRenderer.invoke('get-network-status'),
@@ -214,19 +192,6 @@ contextBridge.exposeInMainWorld('api', {
   onPendingStatusUpdate: (callback) => ipcRenderer.on('pending-status-update', (e, data) => callback(data)),
   onTriggerOpenAllLogs: (callback) => ipcRenderer.on('trigger-open-all-logs', () => callback()),
   onTriggerOpenSettings: (callback) => ipcRenderer.on('trigger-open-settings', () => callback()),
-  onTriggerOpenNoticeBoard: (callback) => ipcRenderer.on('trigger-open-notice-board', () => callback()),
-  onTriggerOpenBroadcast: (callback) => ipcRenderer.on('trigger-open-broadcast', () => callback()),
-  onTriggerOpenTransport: (callback) => ipcRenderer.on('trigger-open-transport', () => callback()),
-  onTriggerOpenCodeAlert: (callback) => ipcRenderer.on('trigger-open-code-alert', () => callback()),
-  onTriggerOpenIpmsg: (callback) => ipcRenderer.on('trigger-open-ipmsg', () => callback()),
-  onTriggerOpenGroupModal: (callback) => ipcRenderer.on('trigger-open-group-modal', () => callback()),
-  onTriggerPrivacyLock: (callback) => ipcRenderer.on('trigger-privacy-lock', () => callback()),
-  getSilentModeState: () => ipcRenderer.invoke('get-silent-mode-state'),
-  setSilentModeMinutes: (minutes) => ipcRenderer.invoke('set-silent-mode-minutes', minutes),
-  setSilentModeUntil: (untilMs) => ipcRenderer.invoke('set-silent-mode-until', untilMs),
-  clearSilentMode: () => ipcRenderer.invoke('clear-silent-mode'),
-  onSilentModeChanged: (callback) => ipcRenderer.on('silent-mode-changed', (e, data) => callback(data)),
-  onTriggerSilentModeCustom: (callback) => ipcRenderer.on('trigger-silent-mode-custom', () => callback()),
   onMainProcessLog: (callback) => ipcRenderer.on('main-process-log', (e, data) => callback(data)),
   windowMinimize: () => ipcRenderer.invoke('window-minimize'),
   windowMaximizeToggle: () => ipcRenderer.invoke('window-maximize-toggle'),

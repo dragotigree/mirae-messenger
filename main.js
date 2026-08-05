@@ -48,13 +48,8 @@ try {
 } catch (e) {
   /* ignore */
 }
-app.on('second-instance', (event, commandLine) => {
-  const action = parseMiraeLaunchAction(commandLine || []);
-  if (action) {
-    queueOrRunShellLaunchAction(action);
-  } else {
-    showAndFocusWindow();
-  }
+app.on('second-instance', () => {
+  showAndFocusWindow();
 });
 
 // 🛡 마지막 안전장치: 여기서 잡지 못한 예외/Promise 거부가 있어도 병원 업무 중에
@@ -140,18 +135,6 @@ function pendingRelFromSafe(safe) {
 
 function sleepMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Promise에 타임아웃을 건다. 만료 시 reject (원본 작업은 백그라운드에 남을 수 있음). */
-function withTimeout(promise, ms, label) {
-  let timer = null;
-  const timeoutPromise = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label || 'operation'} timeout ${ms}ms`)), ms);
-  });
-  return Promise.race([
-    Promise.resolve(promise).finally(() => { if (timer) clearTimeout(timer); }),
-    timeoutPromise
-  ]);
 }
 
 async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
@@ -271,11 +254,11 @@ function getToastPreloadPath() {
   return resolvedToastPreloadPath;
 }
 
-// 미니 모드(Discord Overlay 스타일) — 컴팩트 창 크기
-const COMPACT_DEFAULT_WIDTH = 420;
-const COMPACT_DEFAULT_HEIGHT = 640;
-const COMPACT_MIN_WIDTH = 360;
-const COMPACT_MIN_HEIGHT = 480;
+// 미니 모드 상단 툴바(공지·관리·파일·기록·새로고침 등)가 잘리지 않도록 최소 너비 확보
+const COMPACT_DEFAULT_WIDTH = 480;
+const COMPACT_DEFAULT_HEIGHT = 680;
+const COMPACT_MIN_WIDTH = 480;
+const COMPACT_MIN_HEIGHT = 520;
 const NORMAL_MIN_WIDTH = 1040;
 const NORMAL_MIN_HEIGHT = 600;
 
@@ -298,10 +281,6 @@ const FILE_XFER_CHUNK_RAW_BYTES = 280 * 1024;
 const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 8 * 60 * 1000;
 /** 전송 TCP 타임아웃 (피어당, 50MB 여유) */
 const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
-/** 동시에 조립 중인 수신 파일 상한 (다수 대용량 동시 수신 시 RAM 보호) */
-const MAX_PENDING_FILE_XFERS = 24;
-/** 조립 중 파일 합계 바이트 상한 (~256MB) */
-const MAX_PENDING_FILE_XFER_BYTES = 256 * 1024 * 1024;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
@@ -328,15 +307,6 @@ function buildKnownSubnetHostIps() {
   return ips;
 }
 const KNOWN_SUBNET_HOST_IPS = buildKnownSubnetHostIps();
-/** 전체 서브넷 유니캐스트 프로브 주기(PING 횟수). 평소엔 아는 상대만 유니캐스트 */
-const PRESENCE_FULL_SUBNET_PROBE_EVERY = 8;
-let presenceBroadcastTick = 0;
-
-/** 상대가 처음 온라인일 때 TCP 동기화 동시 연결 상한 (500대 동시 기동 대비) */
-const PEER_ONLINE_WORK_CONCURRENCY = 8;
-const peerOnlineWorkQueue = [];
-const peerOnlineWorkQueued = new Set();
-let peerOnlineWorkActive = 0;
 
 const allKnownUsers = new Map();
 const persistedPhotos = {}; // ip -> photo (재시작 후에도 사진이 바로 보이도록 DB에서 미리 불러옴)
@@ -379,21 +349,6 @@ let notifyReadReceipts = true;
 let incomingNotifyMode = 'toast';
 /** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
 let toastDurationSeconds = 7;
-/** 침묵모드 종료 시각(ms). 0이면 꺼짐 — 메시지 송수신은 유지, 알림만 억제 */
-let silentModeUntilMs = 0;
-let silentModeEndTimer = null;
-/** 자주 쓰는 문구 — null이면 아직 DB 미설정(렌더러가 localStorage에서 이관) */
-let quickPhrasesCache = null;
-let appSettingsRowLoaded = false;
-const appSettingsRowWaiters = [];
-/** 대화방별 알림 뮤트 (channelKey) */
-let mutedChatKeys = new Set();
-const DEFAULT_QUICK_PHRASES = [
-  '환자 이동 도움 요청드립니다.',
-  '치료실 변경 안내드립니다.',
-  '확인했습니다.',
-  '잠시 후 연락드리겠습니다.'
-];
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -421,23 +376,14 @@ const Z_BRIDGE_MIRROR_FILES = [
   'excalidraw-editor.html',
   'preload-excalidraw.js',
   'lib/excalidraw-app.js',
-  'lib/excalidraw-app.css',
-  'assets/compact/compact-overlay.css',
-  'assets/compact/phosphor-paths.json'
+  'lib/excalidraw-app.css'
 ];
 const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
-let updateApplyInFlight = false;
 /** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
 let updateMode = 'auto';
-/** 자동 DB 백업 주기(시간). 0=끔. 기본 24(매일) */
-let autoBackupIntervalHours = 24;
-/** 자동 백업 파일 보관 일수 */
-let autoBackupRetentionDays = 14;
-let autoBackupTimer = null;
-let autoBackupLogCleanupTimer = null;
 
 // 🚑 이동요청시스템(mirae-transport) 연동: 이동기사에게 이동 요청을 전달하는 앱스크립트 웹앱 주소.
 let transportWebappUrl = '';
@@ -458,16 +404,6 @@ function compareVersions(a, b) {
 /** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
 async function mirrorLocalInstallToZBridge(opts = {}) {
   const force = !!(opts && opts.force);
-  const timeoutMs = Number(opts && opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 15000;
-  try {
-    return await withTimeout(mirrorLocalInstallToZBridgeInner({ force }), timeoutMs, 'Z-bridge mirror');
-  } catch (e) {
-    return { mirrored: false, reason: e && e.message ? e.message : String(e) };
-  }
-}
-
-async function mirrorLocalInstallToZBridgeInner(opts = {}) {
-  const force = !!(opts && opts.force);
   const destRoot = Z_BRIDGE_UPDATE_SOURCE_PATH;
   let localVer = APP_VERSION;
   try {
@@ -476,7 +412,7 @@ async function mirrorLocalInstallToZBridgeInner(opts = {}) {
   } catch (e) {}
 
   try {
-    await withTimeout(fs.promises.access(path.dirname(destRoot)), 4000, 'Z-drive access');
+    await fs.promises.access(path.dirname(destRoot));
   } catch (e) {
     return { mirrored: false, reason: 'Z드라이브에 연결되지 않았습니다.' };
   }
@@ -707,12 +643,7 @@ async function readUpdateSourceBytes(relPath) {
     return fetchGithubUpdateFile(meta, relPath);
   }
   if (meta.kind === 'folder') {
-    // Z:/공유폴더 행 시 UI 프리징 방지
-    return withTimeout(
-      fs.promises.readFile(path.join(meta.dir, relPath)),
-      12000,
-      `update-read ${relPath}`
-    );
+    return fs.promises.readFile(path.join(meta.dir, relPath));
   }
   throw new Error('업데이트 소스가 설정되지 않았습니다.');
 }
@@ -922,167 +853,6 @@ function detectCodeAlertType(message) {
   return null;
 }
 
-function isSilentModeActive() {
-  return Number(silentModeUntilMs) > Date.now();
-}
-
-function getSilentModeState() {
-  const active = isSilentModeActive();
-  const untilMs = active ? Number(silentModeUntilMs) : 0;
-  const remainingMs = active ? Math.max(0, untilMs - Date.now()) : 0;
-  return {
-    active,
-    untilMs,
-    remainingMs,
-    label: formatSilentModeRemainingLabel()
-  };
-}
-
-function formatSilentModeRemainingLabel() {
-  if (!isSilentModeActive()) return '꺼짐';
-  const rem = Math.max(0, silentModeUntilMs - Date.now());
-  const mins = Math.max(1, Math.ceil(rem / 60000));
-  const end = new Date(silentModeUntilMs);
-  const endStr = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
-  if (mins < 60) return `${mins}분 남음 (∼${endStr})`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m ? `${h}시간 ${m}분 남음 (∼${endStr})` : `${h}시간 남음 (∼${endStr})`;
-}
-
-function persistSilentModeUntil() {
-  try {
-    db.run(
-      `UPDATE app_settings SET silent_mode_until_ms = ? WHERE id = 1`,
-      [isSilentModeActive() ? silentModeUntilMs : 0],
-      logDbErr
-    );
-  } catch (e) {
-    console.error('침묵모드 저장 오류:', e.message);
-  }
-}
-
-function updateTraySilentUi() {
-  if (tray && !tray.isDestroyed()) {
-    const state = getSilentModeState();
-    tray.setToolTip(
-      state.active
-        ? `미래병원 사내 메신저 · 침묵모드 (${state.label})`
-        : '미래병원 사내 메신저'
-    );
-  }
-  refreshShellMenus();
-}
-
-function scheduleSilentModeEnd() {
-  if (silentModeEndTimer) {
-    clearTimeout(silentModeEndTimer);
-    silentModeEndTimer = null;
-  }
-  if (!isSilentModeActive()) return;
-  const delay = Math.min(Math.max(200, silentModeUntilMs - Date.now() + 80), 2147483647);
-  silentModeEndTimer = setTimeout(() => {
-    silentModeEndTimer = null;
-    if (isSilentModeActive()) {
-      scheduleSilentModeEnd();
-      return;
-    }
-    silentModeUntilMs = 0;
-    persistSilentModeUntil();
-    updateTraySilentUi();
-    safeWebContentsSend('silent-mode-changed', getSilentModeState());
-  }, delay);
-}
-
-function setSilentModeUntil(untilMs) {
-  const until = Number(untilMs) || 0;
-  if (!Number.isFinite(until) || until <= Date.now()) {
-    return clearSilentMode();
-  }
-  // 최대 48시간
-  const maxUntil = Date.now() + 48 * 60 * 60 * 1000;
-  silentModeUntilMs = Math.min(until, maxUntil);
-  persistSilentModeUntil();
-  scheduleSilentModeEnd();
-  updateTraySilentUi();
-  safeWebContentsSend('silent-mode-changed', getSilentModeState());
-  return getSilentModeState();
-}
-
-function setSilentModeForMinutes(minutes) {
-  const mins = Math.max(1, Math.min(48 * 60, Math.round(Number(minutes) || 0)));
-  return setSilentModeUntil(Date.now() + mins * 60 * 1000);
-}
-
-function setSilentModeUntilMidnight() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(0, 0, 0, 0);
-  return setSilentModeUntil(d.getTime());
-}
-
-function clearSilentMode() {
-  silentModeUntilMs = 0;
-  if (silentModeEndTimer) {
-    clearTimeout(silentModeEndTimer);
-    silentModeEndTimer = null;
-  }
-  persistSilentModeUntil();
-  updateTraySilentUi();
-  safeWebContentsSend('silent-mode-changed', getSilentModeState());
-  return getSilentModeState();
-}
-
-function openSilentModeCustomPrompt() {
-  openMainWindowWithViewMode(trayLaunchViewMode);
-  setTimeout(() => safeWebContentsSend('trigger-silent-mode-custom'), 160);
-}
-
-/** 일반 메시지 알림 표시 가능 여부 (코드 발령 force는 예외) */
-function canShowIncomingNotify(force) {
-  if (force) return true;
-  if (!notifyIncomingMessages) return false;
-  if (isSilentModeActive()) return false;
-  return true;
-}
-
-function isChannelMuted(channelKey) {
-  const key = String(channelKey || '').trim();
-  if (!key) return false;
-  return mutedChatKeys.has(key);
-}
-
-function persistMutedChatKeys() {
-  try {
-    const payload = JSON.stringify({ v: 1, keys: [...mutedChatKeys] });
-    db.run(`UPDATE app_settings SET muted_chat_keys_json = ? WHERE id = 1`, [payload], logDbErr);
-  } catch (e) {
-    console.error('뮤트 채널 저장 오류:', e.message);
-  }
-}
-
-function setMutedChatKeysFromList(keys) {
-  mutedChatKeys = new Set(
-    (Array.isArray(keys) ? keys : [])
-      .map((k) => String(k || '').trim())
-      .filter(Boolean)
-      .slice(0, 500)
-  );
-  persistMutedChatKeys();
-  return [...mutedChatKeys];
-}
-
-function parseMutedChatKeysJson(raw) {
-  if (raw == null || raw === '') return [];
-  try {
-    const parsed = JSON.parse(String(raw));
-    const list = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.keys) ? parsed.keys : []);
-    return list.map((k) => String(k || '').trim()).filter(Boolean).slice(0, 500);
-  } catch (_) {
-    return [];
-  }
-}
-
 function shouldSuppressMessageToast(channelKey) {
   const key = String(channelKey || '').trim();
   if (!key || !toastUiState.focused) return false;
@@ -1118,7 +888,6 @@ function truncateToastText(text, maxLen) {
 }
 
 function showMessageToast({ title, body, urgent, channelKey, codeType, force }) {
-  if (!force && !canShowIncomingNotify(false)) return;
   if (!force && !notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
   const work = display.workArea || display.bounds;
@@ -1176,8 +945,7 @@ function showMessageToast({ title, body, urgent, channelKey, codeType, force }) 
   toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
 }
 
-function showDesktopNotification({ title, body, urgent, channelKey, force }) {
-  if (!force && isSilentModeActive()) return;
+function showDesktopNotification({ title, body, urgent, channelKey }) {
   if (!Notification.isSupported()) return;
   try {
     const notification = new Notification({
@@ -1201,8 +969,7 @@ function showDesktopNotification({ title, body, urgent, channelKey, force }) {
 function notifyIncomingMessageNotification(opts) {
   const o = opts || {};
   const force = !!o.force;
-  if (!canShowIncomingNotify(force)) return;
-  if (!force && isChannelMuted(o.channelKey)) return;
+  if (!force && !notifyIncomingMessages) return;
   // 코드 발령은 해당 채널을 보고 있어도 토스트·알림을 숨기지 않음
   if (!force && shouldSuppressMessageToast(o.channelKey)) return;
   const key = String(o.channelKey || '').trim() || '__unknown__';
@@ -1223,8 +990,7 @@ function notifyIncomingMessageNotification(opts) {
       title: o.title || '새 메시지',
       body: o.body || '메시지가 도착했습니다.',
       urgent: !!o.urgent || !!code,
-      channelKey: o.channelKey,
-      force
+      channelKey: o.channelKey
     });
   } else {
     showMessageToast(o);
@@ -1361,32 +1127,6 @@ async function writeReceivedFileAsync(storedName, buffer) {
   return filePath;
 }
 
-function pendingFileXferTotalBytes() {
-  let n = 0;
-  pendingFileXfers.forEach((e) => {
-    n += Number(e && e.size) || 0;
-  });
-  return n;
-}
-
-function canAcceptFileXfer(sizeBytes) {
-  const size = Number(sizeBytes) || 0;
-  if (pendingFileXfers.size >= MAX_PENDING_FILE_XFERS) return false;
-  if (pendingFileXferTotalBytes() + size > MAX_PENDING_FILE_XFER_BYTES) return false;
-  return true;
-}
-
-function replyFileXferOnSocket(socket, senderIP, payload) {
-  const line = JSON.stringify(payload) + '\n';
-  try {
-    if (socket && !socket.destroyed && socket.writable) {
-      socket.write(line);
-      return;
-    }
-  } catch (e) { /* fall through */ }
-  if (senderIP) sendToIpDirect(senderIP, payload);
-}
-
 function writeJsonLinesToIp(ip, payloads, timeoutMs) {
   return new Promise((resolve) => {
     if (!ip || ip === MY_IP) {
@@ -1423,106 +1163,6 @@ function writeJsonLinesToIp(ip, payloads, timeoutMs) {
         else setImmediate(writeNext);
       };
       writeNext();
-    });
-    client.on('close', () => done(success));
-    client.on('error', () => done(false));
-    client.on('timeout', () => done(false));
-  });
-}
-
-/**
- * FILE_XFER: START 후 수신측 ACCEPT를 같은 소켓으로 기다린 뒤 청크 전송.
- * (수신 폭주 시 ABORT → 송신 실패로 정확히 반영)
- * 구버전(ACCEPT 미전송)은 짧은 대기 후 청크 전송으로 호환.
- */
-function writeFileXferToIp(ip, buf, meta, timeoutMs) {
-  return new Promise((resolve) => {
-    if (!ip || ip === MY_IP || !buf || !meta || !meta.xferUid) {
-      resolve(false);
-      return;
-    }
-    const payloads = buildFileXferPayloads(buf, meta);
-    if (payloads.length < 2) {
-      resolve(false);
-      return;
-    }
-    const startPayload = payloads[0];
-    const restPayloads = payloads.slice(1);
-    const client = new net.Socket();
-    let settled = false;
-    let success = false;
-    let phase = 'wait-accept';
-    let recvBuf = '';
-    let legacyTimer = null;
-    const done = (ok) => {
-      if (settled) return;
-      settled = true;
-      if (legacyTimer) { clearTimeout(legacyTimer); legacyTimer = null; }
-      try { client.destroy(); } catch (e) { /* ignore */ }
-      resolve(!!ok);
-    };
-    const writeRest = () => {
-      if (legacyTimer) { clearTimeout(legacyTimer); legacyTimer = null; }
-      let i = 0;
-      const writeNext = () => {
-        if (settled) return;
-        if (i >= restPayloads.length) {
-          success = true;
-          phase = 'done';
-          client.end();
-          return;
-        }
-        const line = JSON.stringify(restPayloads[i++]) + '\n';
-        if (Buffer.byteLength(line, 'utf8') > MAX_TCP_LINE_BUFFER - 2048) {
-          done(false);
-          return;
-        }
-        const ok = client.write(line);
-        if (!ok) client.once('drain', () => setImmediate(writeNext));
-        else setImmediate(writeNext);
-      };
-      writeNext();
-    };
-    client.setTimeout(timeoutMs || FILE_XFER_SEND_TIMEOUT_MS);
-    client.connect(TCP_PORT, ip, () => {
-      const startLine = JSON.stringify(startPayload) + '\n';
-      client.write(startLine);
-      // 구버전 수신측은 ACCEPT를 안 보냄 → 0.8초 후 청크 진행
-      legacyTimer = setTimeout(() => {
-        if (settled || phase !== 'wait-accept') return;
-        phase = 'sending-legacy';
-        writeRest();
-      }, 800);
-    });
-    client.on('data', (chunk) => {
-      if (settled || phase !== 'wait-accept') return;
-      recvBuf += chunk.toString('utf8');
-      if (recvBuf.length > MAX_TCP_LINE_BUFFER) {
-        done(false);
-        return;
-      }
-      let idx;
-      while ((idx = recvBuf.indexOf('\n')) !== -1) {
-        const line = recvBuf.slice(0, idx);
-        recvBuf = recvBuf.slice(idx + 1);
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg && msg.xferUid && msg.xferUid !== meta.xferUid) continue;
-          if (msg && msg.type === 'FILE_XFER_ACCEPT') {
-            phase = 'sending';
-            writeRest();
-            return;
-          }
-          if (msg && msg.type === 'FILE_XFER_ABORT') {
-            done(false);
-            return;
-          }
-        } catch (e) {
-          done(false);
-          return;
-        }
-      }
     });
     client.on('close', () => done(success));
     client.on('error', () => done(false));
@@ -1611,18 +1251,13 @@ function buildFileXferPayloads(buf, meta) {
   return payloads;
 }
 
-function handleFileXferStart(payload, senderIP, socket) {
+function handleFileXferStart(payload, senderIP) {
   const xferUid = payload && payload.xferUid;
   if (!xferUid || !senderIP) return;
   const size = Number(payload.size) || 0;
   const totalChunks = Number(payload.totalChunks) || 0;
   if (size <= 0 || size > MAX_FILE_XFER_BYTES || totalChunks <= 0 || totalChunks > 512) {
-    replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'size_or_chunks' });
-    return;
-  }
-  if (!canAcceptFileXfer(size)) {
-    writeToLogFile('warn', `[FILE_XFER] 수신 상한 초과로 거절 uid=${xferUid} from=${senderIP} pending=${pendingFileXfers.size}`);
-    replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'receiver_busy' });
+    sendToIpDirect(senderIP, { type: 'FILE_XFER_ABORT', xferUid, reason: 'size_or_chunks' });
     return;
   }
   clearPendingFileXfer(xferUid);
@@ -1643,7 +1278,6 @@ function handleFileXferStart(payload, senderIP, socket) {
     clearPendingFileXfer(xferUid);
   }, FILE_XFER_ASSEMBLE_TIMEOUT_MS);
   pendingFileXfers.set(xferUid, entry);
-  replyFileXferOnSocket(socket, senderIP, { type: 'FILE_XFER_ACCEPT', xferUid });
 }
 
 function handleFileXferChunk(payload, senderIP) {
@@ -2735,23 +2369,6 @@ db.serialize(() => {
     pinned_by_ip TEXT
   )`, logDbErr);
 
-  // 중요 표시(개인 북마크) — 이 PC에서만 보관, 로그에서 다시 볼 수 있음
-  db.run(`CREATE TABLE IF NOT EXISTS important_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    entry_key TEXT NOT NULL UNIQUE,
-    msg_uid TEXT DEFAULT '',
-    message_id INTEGER DEFAULT 0,
-    channel_key TEXT DEFAULT '',
-    sender_name TEXT DEFAULT '',
-    sender_ip TEXT DEFAULT '',
-    receiver_ip TEXT DEFAULT '',
-    message_html TEXT DEFAULT '',
-    preview_text TEXT DEFAULT '',
-    msg_created_at TEXT DEFAULT '',
-    marked_at TEXT NOT NULL
-  )`, logDbErr);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_important_messages_marked ON important_messages(marked_at DESC)`, () => {});
-
   // 당직의 / 의료진 OFF (날짜별)
   db.run(`CREATE TABLE IF NOT EXISTS duty_roster (
     date_str TEXT NOT NULL,
@@ -2894,25 +2511,13 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'auto'`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_interval_hours INTEGER DEFAULT 24`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_retention_days INTEGER DEFAULT 14`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN silent_mode_until_ms INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN quick_phrases_json TEXT`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN muted_chat_keys_json TEXT`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
-    if (err) {
-      logDbErr(err);
-      markAppSettingsRowLoaded();
-      return;
-    }
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
       transportWebappUrl = DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = app.getPath('downloads');
       updateMode = 'auto';
-      autoBackupIntervalHours = 24;
-      autoBackupRetentionDays = 14;
-      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode, auto_backup_interval_hours, auto_backup_retention_days) VALUES (1, 1, ?, ?, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode, autoBackupIntervalHours, autoBackupRetentionDays], logDbErr);
+      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode) VALUES (1, 1, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode], logDbErr);
     } else {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
@@ -2927,69 +2532,40 @@ db.serialize(() => {
         incomingNotifyMode = 'toast';
       }
       updateMode = row.update_mode === 'manual' ? 'manual' : 'auto';
-      autoBackupIntervalHours = normalizeAutoBackupIntervalHours(row.auto_backup_interval_hours);
-      autoBackupRetentionDays = normalizeAutoBackupRetentionDays(row.auto_backup_retention_days);
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
       transportWebappUrl = row.transport_webapp_url || DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = row.download_folder_path || app.getPath('downloads');
       trayLaunchViewMode = row.tray_launch_view_mode === 'compact' ? 'compact' : 'normal';
-      const silentUntil = Number(row.silent_mode_until_ms) || 0;
-      if (silentUntil > Date.now()) {
-        silentModeUntilMs = silentUntil;
-        scheduleSilentModeEnd();
-        try { updateTraySilentUi(); } catch (_) { /* tray 아직 없을 수 있음 */ }
-      } else {
-        silentModeUntilMs = 0;
-      }
-      // 렌더러가 먼저 이관한 경우(배열)를 DB 미설정 NULL로 덮어쓰지 않음
-      const parsedPhrases = parseQuickPhrasesJson(row.quick_phrases_json);
-      if (parsedPhrases) {
-        quickPhrasesCache = parsedPhrases;
-      } else if (!Array.isArray(quickPhrasesCache)) {
-        quickPhrasesCache = null;
-      }
-      mutedChatKeys = new Set(parseMutedChatKeysJson(row.muted_chat_keys_json));
       if (!row.update_source_path || rawPath !== updateSourcePath || !row.transport_webapp_url || !row.download_folder_path) {
         db.run(`UPDATE app_settings SET update_source_path = ?, transport_webapp_url = ?, download_folder_path = ? WHERE id = 1`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
       }
     }
-    markAppSettingsRowLoaded();
   });
 
-  // 과거「나에게 보내기」실패분이 PENDING으로 남은 경우 SENT로 정리
-  db.run(
-    `UPDATE messages SET status = 'SENT' WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'`,
-    [MY_IP, MY_IP],
-    logDbErr
-  );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
-  // msg_uid 단독 UNIQUE는 전체/부서/층 PENDING 팬아웃(동일 uid·다른 receiver)을 막음.
-  // (msg_uid, receiver_ip) 단위로만 중복 금지. 구버전 단독 unique 인덱스는 제거.
-  db.run(`DROP INDEX IF EXISTS idx_messages_msg_uid_unique`, (dropErr) => {
-    if (dropErr) logDbErr(dropErr);
-    db.run(
-      `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-        AND id NOT IN (
-          SELECT MIN(id) FROM messages
-          WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
-          GROUP BY msg_uid, IFNULL(receiver_ip, '')
-        )`,
-      (delErr) => {
-        if (delErr) logDbErr(delErr);
-        db.run(
-          `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_receiver_unique
-           ON messages(msg_uid, receiver_ip) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
-          (idxErr) => {
-            if (idxErr) console.error('msg_uid+receiver unique index:', idxErr.message || idxErr);
-          }
-        );
-      }
-    );
-  });
+  // 동일 msg_uid 중복 INSERT 방지 (재전송 레이스). 기존 중복이 있으면 한 건만 남기고 인덱스 생성.
+  db.run(
+    `DELETE FROM messages WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+      AND id NOT IN (
+        SELECT MIN(id) FROM messages
+        WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''
+        GROUP BY msg_uid
+      )`,
+    (delErr) => {
+      if (delErr) logDbErr(delErr);
+      db.run(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_msg_uid_unique
+         ON messages(msg_uid) WHERE msg_uid IS NOT NULL AND trim(msg_uid) != ''`,
+        (idxErr) => {
+          if (idxErr) console.error('msg_uid unique index:', idxErr.message || idxErr);
+        }
+      );
+    }
+  );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pending_out ON messages(sender_ip, status, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_scheduled_pending ON scheduled_messages(sent, send_at)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_hospital_schedules_time ON hospital_schedules(time_str)`, logDbErr);
@@ -3046,7 +2622,7 @@ function setTrayLaunchViewMode(mode, persist) {
   if (persist !== false) {
     db.run(`UPDATE app_settings SET tray_launch_view_mode = ? WHERE id = 1`, [trayLaunchViewMode], logDbErr);
   }
-  refreshShellMenus();
+  if (tray) tray.setContextMenu(buildTrayContextMenu());
   safeWebContentsSend('tray-launch-view-mode-changed', trayLaunchViewMode);
 }
 
@@ -3056,308 +2632,34 @@ function openMainWindowWithViewMode(mode) {
   safeWebContentsSend('apply-tray-view-mode', resolved);
 }
 
-/** Jump List로 앱이 식기 전에 눌린 액션 (cold start) */
-let pendingShellAction = '';
-
-/** 작업표시줄 Jump List / 트레이 메뉴 공통 액션 */
-function parseMiraeLaunchAction(argv) {
-  const args = Array.isArray(argv) ? argv : [];
-  for (const raw of args) {
-    const s = String(raw || '');
-    const m = s.match(/^--mirae-action(?:=|\s+)([a-z0-9-]+)$/i);
-    if (m) return m[1].toLowerCase();
-    if (s.startsWith('--mirae-action=')) {
-      return s.slice('--mirae-action='.length).toLowerCase();
-    }
-  }
-  return '';
-}
-
-function isMainRendererReady() {
-  return !!(
-    mainWindow
-    && !mainWindow.isDestroyed()
-    && mainWindow.webContents
-    && !mainWindow.webContents.isDestroyed()
-    && !mainWindow.webContents.isLoading()
-  );
-}
-
-function queueOrRunShellLaunchAction(action) {
-  const act = String(action || '').toLowerCase();
-  if (!act) return;
-  if (!isMainRendererReady()) {
-    pendingShellAction = act;
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      try { createWindow(); } catch (_) { /* ignore */ }
-    }
-    return;
-  }
-  runShellLaunchAction(act);
-}
-
-function flushPendingShellAction() {
-  if (!pendingShellAction) return;
-  const act = pendingShellAction;
-  pendingShellAction = '';
-  setTimeout(() => runShellLaunchAction(act), 200);
-}
-
-function runShellLaunchAction(action) {
-  const act = String(action || '').toLowerCase();
-  if (!act) {
-    showAndFocusWindow();
-    return;
-  }
-
-  if (act === 'open-normal') {
-    openMainWindowWithViewMode('normal');
-    return;
-  }
-  if (act === 'open-compact') {
-    openMainWindowWithViewMode('compact');
-    return;
-  }
-  if (act === 'open' || act === 'show') {
-    openMainWindowWithViewMode(trayLaunchViewMode);
-    return;
-  }
-  if (act === 'quit') {
-    beginAppQuit();
-    return;
-  }
-  if (act === 'devtools') {
-    openMainWindowWithViewMode(trayLaunchViewMode);
-    if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.openDevTools({ mode: 'right' });
-    }
-    return;
-  }
-  if (act === 'schedule-board') {
-    openScheduleBoardWindow({});
-    return;
-  }
-
-  // 렌더러 모달/화면 트리거
-  openMainWindowWithViewMode(trayLaunchViewMode);
-  const triggerMap = {
-    logs: 'trigger-open-all-logs',
-    settings: 'trigger-open-settings',
-    notice: 'trigger-open-notice-board',
-    broadcast: 'trigger-open-broadcast',
-    transport: 'trigger-open-transport',
-    code: 'trigger-open-code-alert',
-    ipmsg: 'trigger-open-ipmsg',
-    group: 'trigger-open-group-modal',
-    'privacy-lock': 'trigger-privacy-lock'
-  };
-  const channel = triggerMap[act];
-  if (channel) {
-    // 창 로드 직후 트리거가 누락되지 않도록 약간 지연
-    setTimeout(() => safeWebContentsSend(channel), 120);
-  }
-}
-
-function getJumpListProgramAndPrefix() {
-  // 패키징된 앱: execPath가 메신저 exe. 개발: electron.exe + 프로젝트 경로
-  const isPackaged = app.isPackaged;
-  if (isPackaged) {
-    return { program: process.execPath, argsPrefix: '' };
-  }
-  return {
-    program: process.execPath,
-    argsPrefix: `"${app.getAppPath()}" `
-  };
-}
-
-function makeJumpTask(title, description, action) {
-  const { program, argsPrefix } = getJumpListProgramAndPrefix();
-  return {
-    type: 'task',
-    title,
-    description,
-    program,
-    args: `${argsPrefix}--mirae-action=${action}`.trim(),
-    iconPath: program,
-    iconIndex: 0
-  };
-}
-
-function updateWindowsJumpList() {
-  if (process.platform !== 'win32') return;
-  try {
-    app.setJumpList([
-      {
-        type: 'custom',
-        name: '화면 모드',
-        items: [
-          makeJumpTask('기본 화면으로 열기', '3단 기본 화면으로 메신저를 엽니다', 'open-normal'),
-          makeJumpTask('미니 화면으로 열기', '컴팩트 미니모드로 엽니다', 'open-compact')
-        ]
-      },
-      {
-        type: 'custom',
-        name: '빠른 실행',
-        items: [
-          makeJumpTask('쪽지 보내기', '채팅방 없이 쪽지를 보냅니다', 'ipmsg'),
-          makeJumpTask('원내 공지', '원내 공지사항 게시판을 엽니다', 'notice'),
-          makeJumpTask('전체 공지 채널', '전체 공지 대화방을 엽니다', 'broadcast'),
-          makeJumpTask('이동기사 요청', '환자 이동 요청을 작성합니다', 'transport'),
-          makeJumpTask('코드 발령', '코드블루·코드레드를 발령합니다', 'code'),
-          makeJumpTask('병동 일정 현황판', '일정 현황판을 엽니다', 'schedule-board'),
-          makeJumpTask('그룹 만들기', '새 그룹 대화방을 만듭니다', 'group'),
-          makeJumpTask('전체 대화 기록', '주고받은 메시지 기록을 엽니다', 'logs'),
-          makeJumpTask('환경 설정', '메신저 설정을 엽니다', 'settings')
-        ]
-      },
-      { type: 'recent' },
-      {
-        type: 'tasks',
-        items: [
-          makeJumpTask('화면 잠금', '사생활 보호 화면 잠금', 'privacy-lock'),
-          makeJumpTask('종료', '메신저를 종료합니다', 'quit')
-        ]
-      }
-    ]);
-  } catch (e) {
-    console.error('Jump List 설정 오류:', e.message);
-    // fallback: UserTasks만 (형식: program/arguments/title/…)
-    try {
-      const toUserTask = (title, description, action) => {
-        const t = makeJumpTask(title, description, action);
-        return {
-          program: t.program,
-          arguments: t.args,
-          title: t.title,
-          description: t.description,
-          iconPath: t.iconPath,
-          iconIndex: t.iconIndex
-        };
-      };
-      app.setUserTasks([
-        toUserTask('기본 화면으로 열기', '기본 화면', 'open-normal'),
-        toUserTask('미니 화면으로 열기', '미니 화면', 'open-compact'),
-        toUserTask('쪽지 보내기', '쪽지', 'ipmsg'),
-        toUserTask('원내 공지', '공지', 'notice'),
-        toUserTask('이동기사 요청', '이동', 'transport'),
-        toUserTask('코드 발령', '코드', 'code'),
-        toUserTask('환경 설정', '설정', 'settings')
-      ]);
-    } catch (e2) {
-      console.error('UserTasks 설정 오류:', e2.message);
-    }
-  }
-}
-
-function refreshShellMenus() {
-  if (tray && !tray.isDestroyed()) {
-    tray.setContextMenu(buildTrayContextMenu());
-  }
-  updateWindowsJumpList();
-}
-
 function buildTrayContextMenu() {
   return Menu.buildFromTemplate([
     {
-      label: '열기',
-      submenu: [
-        {
-          label: '기본 화면으로 열기',
-          click: () => runShellLaunchAction('open-normal')
-        },
-        {
-          label: '미니 화면으로 열기',
-          click: () => runShellLaunchAction('open-compact')
-        },
-        { type: 'separator' },
-        {
-          label: '마지막 모드로 열기',
-          accelerator: 'CommandOrControl+Alt+S',
-          click: () => runShellLaunchAction('open')
-        }
-      ]
+      label: '💬 메시지 보내기 (Ctrl+Alt+S)',
+      click: () => openMainWindowWithViewMode(trayLaunchViewMode)
+    },
+    {
+      label: '📜 전체 주고받은 메시지 열기 (Ctrl+Alt+E)',
+      click: () => {
+        openMainWindowWithViewMode(trayLaunchViewMode);
+        safeWebContentsSend('trigger-open-all-logs');
+      }
+    },
+    {
+      label: '⚙️ 환경 설정',
+      click: () => {
+        openMainWindowWithViewMode(trayLaunchViewMode);
+        safeWebContentsSend('trigger-open-settings');
+      }
     },
     { type: 'separator' },
     {
-      label: '빠른 실행',
-      submenu: [
-        {
-          label: '쪽지 보내기',
-          click: () => runShellLaunchAction('ipmsg')
-        },
-        {
-          label: '원내 공지',
-          click: () => runShellLaunchAction('notice')
-        },
-        {
-          label: '전체 공지 채널',
-          click: () => runShellLaunchAction('broadcast')
-        },
-        {
-          label: '이동기사 요청',
-          click: () => runShellLaunchAction('transport')
-        },
-        {
-          label: '코드 발령 (블루·레드)',
-          click: () => runShellLaunchAction('code')
-        },
-        {
-          label: '병동 일정 현황판',
-          click: () => runShellLaunchAction('schedule-board')
-        },
-        {
-          label: '그룹 만들기',
-          click: () => runShellLaunchAction('group')
-        }
-      ]
+      label: '🖥️ 기본 화면으로 열기',
+      click: () => openMainWindowWithViewMode('normal')
     },
     {
-      label: '기록 · 설정',
-      submenu: [
-        {
-          label: '전체 주고받은 메시지',
-          accelerator: 'CommandOrControl+Alt+E',
-          click: () => runShellLaunchAction('logs')
-        },
-        {
-          label: '환경 설정',
-          click: () => runShellLaunchAction('settings')
-        },
-        {
-          label: '화면 잠금',
-          click: () => runShellLaunchAction('privacy-lock')
-        }
-      ]
-    },
-    { type: 'separator' },
-    {
-      label: isSilentModeActive()
-        ? `침묵모드 · ${formatSilentModeRemainingLabel()}`
-        : '침묵모드 (알림만 끄기)',
-      submenu: [
-        {
-          label: isSilentModeActive()
-            ? `상태: 켜짐 · ${formatSilentModeRemainingLabel()}`
-            : '상태: 꺼짐 — 메시지 송수신은 그대로, 알림만 숨김',
-          enabled: false
-        },
-        { type: 'separator' },
-        { label: '15분', click: () => setSilentModeForMinutes(15) },
-        { label: '30분', click: () => setSilentModeForMinutes(30) },
-        { label: '1시간', click: () => setSilentModeForMinutes(60) },
-        { label: '2시간', click: () => setSilentModeForMinutes(120) },
-        { label: '4시간', click: () => setSilentModeForMinutes(240) },
-        { label: '8시간', click: () => setSilentModeForMinutes(480) },
-        { label: '오늘 자정까지', click: () => setSilentModeUntilMidnight() },
-        { type: 'separator' },
-        { label: '시간 직접 지정…', click: () => openSilentModeCustomPrompt() },
-        { type: 'separator' },
-        {
-          label: '침묵모드 해제',
-          enabled: isSilentModeActive(),
-          click: () => clearSilentMode()
-        }
-      ]
+      label: '📱 미니 화면으로 열기',
+      click: () => openMainWindowWithViewMode('compact')
     },
     { type: 'separator' },
     { label: '트레이·단축키로 열 때', enabled: false },
@@ -3375,11 +2677,16 @@ function buildTrayContextMenu() {
     },
     { type: 'separator' },
     {
-      label: '문제 진단 화면 열기',
-      click: () => runShellLaunchAction('devtools')
+      label: '🛠️ 문제 진단 화면 열기',
+      click: () => {
+        openMainWindowWithViewMode(trayLaunchViewMode);
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.openDevTools({ mode: 'right' });
+        }
+      }
     },
     { type: 'separator' },
-    { label: '종료', click: () => runShellLaunchAction('quit') }
+    { label: '종료', click: () => { beginAppQuit(); } }
   ]);
 }
 
@@ -3387,17 +2694,9 @@ function createTray() {
   const icon = getTrayIcon();
   tray = new Tray(icon);
 
-  tray.setToolTip(
-    isSilentModeActive()
-      ? `미래병원 사내 메신저 · 침묵모드 (${formatSilentModeRemainingLabel()})`
-      : '미래병원 사내 메신저'
-  );
+  tray.setToolTip('미래병원 사내 메신저');
   tray.setContextMenu(buildTrayContextMenu());
   tray.on('double-click', () => openMainWindowWithViewMode(trayLaunchViewMode));
-  tray.on('click', () => {
-    // Windows에서 좌클릭만으로도 메뉴가 안 뜨는 환경이 있어 포커스만
-  });
-  updateWindowsJumpList();
 }
 
 function showAndFocusWindow() {
@@ -3470,7 +2769,6 @@ function createWindow() {
   mainWindow.loadFile('index.html');
   mainWindow.webContents.once('did-finish-load', () => {
     notifyUsageLockState();
-    flushPendingShellAction();
   });
 
   mainWindow.on('hide', () => {
@@ -4041,11 +3339,6 @@ app.whenReady().then(async () => {
   }
   initSpellCheckerSession();
   registerMiraeFileProtocol();
-  // Jump List cold-start: createWindow 전에 큐잉 (did-finish-load 레이스 방지)
-  const bootAction = parseMiraeLaunchAction(process.argv);
-  if (bootAction) {
-    pendingShellAction = bootAction;
-  }
   createWindow();
   createTray();
   registerGlobalShortcuts();
@@ -4057,12 +3350,11 @@ app.whenReady().then(async () => {
   startAutoBackup();
   startUpdateChecker();
   startPendingWipeRetryLoop();
-  // Z 미러는 업데이트 검사와 겹치지 않게 늦게·짧게. Z: 행 시 프리징 방지.
   setTimeout(() => {
-    mirrorLocalInstallToZBridge({ timeoutMs: 12000 }).catch((e) => {
+    mirrorLocalInstallToZBridge().catch((e) => {
       console.warn('[Z브리지] 시작 시 미러 생략:', e.message || e);
     });
-  }, 45000);
+  }, 8000);
   // 부팅 직후: 다른 PC에 내 IP 대상 삭제 예약이 있으면 받아 즉시 적용
   setTimeout(() => {
     broadcastWipeClaim();
@@ -4207,7 +3499,16 @@ function startUdpDiscovery() {
         if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
-          enqueuePeerOnlineWork(rinfo.address);
+          resendPendingMessages(rinfo.address);
+          requestNoticeSync(rinfo.address);
+          syncGroupsWithPeer(rinfo.address);
+          tryDeliverPendingWipe(rinfo.address);
+          maybeSyncServicePauseToPeer(rinfo.address);
+          if (myProfile.photo) {
+            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
+          } else {
+            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_REQUEST' });
+          }
         }
       }
     } catch (e) {}
@@ -4289,78 +3590,12 @@ function broadcastPresence(socket) {
     statusState: myProfile.statusState,
     appVersion: APP_VERSION
   }));
-  // 같은 대역은 브로드캐스트로 빠르게 전달
+  // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
   socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
-
-  presenceBroadcastTick = (presenceBroadcastTick + 1) % 1e9;
-  const fullProbe = (presenceBroadcastTick % PRESENCE_FULL_SUBNET_PROBE_EVERY) === 1;
-  const myPrefix = String(MY_IP || '').split('.').slice(0, 3).join('.');
-  const targets = new Set();
-
-  if (fullProbe) {
-    // 신규 상대 발견용: 가끔만 전체 호스트 유니캐스트 (500대×매회 508발 폭주 방지)
-    KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
-      if (ip !== MY_IP) targets.add(ip);
-    });
-  } else {
-    // 평소: 다른 대역의 "이미 아는" 상대에게만 유니캐스트 (같은 대역은 브로드캐스트로 충분)
-    allKnownUsers.forEach((_, ip) => {
-      if (!ip || ip === MY_IP || !looksLikeIpv4(ip)) return;
-      if (isSyntheticReceiverKey(ip)) return;
-      const prefix = String(ip).split('.').slice(0, 3).join('.');
-      if (prefix && prefix !== myPrefix) targets.add(ip);
-    });
-    onlineUsers.forEach((_, ip) => {
-      if (!ip || ip === MY_IP || !looksLikeIpv4(ip)) return;
-      const prefix = String(ip).split('.').slice(0, 3).join('.');
-      if (prefix && prefix !== myPrefix) targets.add(ip);
-    });
-  }
-
-  targets.forEach((ip) => {
+  // 다른 층 대역은 라우터의 브로드캐스트 차단 여부와 상관없이 전달되도록 호스트별 유니캐스트로 전송
+  KNOWN_SUBNET_HOST_IPS.forEach(ip => {
     try { socket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
-}
-
-function enqueuePeerOnlineWork(peerIp) {
-  const ip = String(peerIp || '').trim();
-  if (!ip || ip === MY_IP) return;
-  if (peerOnlineWorkQueued.has(ip)) return;
-  peerOnlineWorkQueued.add(ip);
-  peerOnlineWorkQueue.push(ip);
-  drainPeerOnlineWork();
-}
-
-function drainPeerOnlineWork() {
-  while (peerOnlineWorkActive < PEER_ONLINE_WORK_CONCURRENCY && peerOnlineWorkQueue.length) {
-    const ip = peerOnlineWorkQueue.shift();
-    peerOnlineWorkActive += 1;
-    try {
-      runPeerOnlineWork(ip);
-    } catch (e) {
-      console.error('peer online work:', e && e.message ? e.message : e);
-    } finally {
-      // TCP는 비동기 fire-and-forget — 슬롯은 짧게 잡은 뒤 양보해 폭주를 완화
-      setTimeout(() => {
-        peerOnlineWorkQueued.delete(ip);
-        peerOnlineWorkActive = Math.max(0, peerOnlineWorkActive - 1);
-        drainPeerOnlineWork();
-      }, 40);
-    }
-  }
-}
-
-function runPeerOnlineWork(ip) {
-  resendPendingMessages(ip);
-  requestNoticeSync(ip);
-  syncGroupsWithPeer(ip);
-  tryDeliverPendingWipe(ip);
-  maybeSyncServicePauseToPeer(ip);
-  if (myProfile.photo) {
-    sendToIps([ip], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
-  } else {
-    sendToIps([ip], { type: 'PROFILE_PHOTO_REQUEST' });
-  }
 }
 
 function broadcastGoodbye() {
@@ -4626,98 +3861,54 @@ function userObjFromKnownUsersRow(row) {
   return obj;
 }
 
-let persistKnownInFlight = 0;
-const persistKnownWaitQueue = [];
-const PERSIST_KNOWN_MAX_INFLIGHT = 24;
-
 function persistKnownUserSnapshot(u) {
   if (!u || !u.ip) return;
   if (isSyntheticReceiverKey(u.ip)) return;
-  const job = () => {
-    persistKnownInFlight += 1;
-    const finish = () => {
-      persistKnownInFlight = Math.max(0, persistKnownInFlight - 1);
-      if (persistKnownWaitQueue.length) {
-        const next = persistKnownWaitQueue.shift();
-        try { next(); } catch (e) { /* ignore */ }
-      }
-    };
-    db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
-      if (err) {
-        logDbErr(err);
-        finish();
-        return;
-      }
-      const existing = row ? userObjFromKnownUsersRow(row) : null;
-      const merged = mergeUserProfile(existing, u, !!u.online);
-      const mergedForStore = applyStoredProfileOverride(merged);
-      let lastSeen = mergedForStore.lastSeen || merged.lastSeen || 0;
-      if (u.online) {
-        // 접속 중에는 DB의 last_seen_at(마지막 종료 시각)을 유지한다.
-        // (예전처럼 Date.now()로 덮으면 '프로그램 시작 시각'처럼 보일 수 있음)
-        if (existing && existing.lastSeen) {
-          lastSeen = Math.max(lastSeen, existing.lastSeen);
-        }
-      } else if (!lastSeen && existing && existing.lastSeen) {
-        lastSeen = existing.lastSeen;
-      } else if (existing && existing.lastSeen) {
+  db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
+    if (err) logDbErr(err);
+    const existing = row ? userObjFromKnownUsersRow(row) : null;
+    const merged = mergeUserProfile(existing, u, !!u.online);
+    const mergedForStore = applyStoredProfileOverride(merged);
+    let lastSeen = mergedForStore.lastSeen || merged.lastSeen || 0;
+    if (u.online) {
+      // 접속 중에는 DB의 last_seen_at(마지막 종료 시각)을 유지한다.
+      // (예전처럼 Date.now()로 덮으면 '프로그램 시작 시각'처럼 보일 수 있음)
+      if (existing && existing.lastSeen) {
         lastSeen = Math.max(lastSeen, existing.lastSeen);
       }
-
-      const photoToStore = isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '';
-      const statusToStore = mergedForStore.statusState || 'OFFLINE';
-      // PING마다 동일 프로필을 UPSERT하면 500대 규모에서 디스크·이벤트루프를 불필요하게 소모함
-      if (row) {
-        const sameProfile =
-          (row.username || '') === (mergedForStore.username || '') &&
-          (row.rank || '') === (mergedForStore.rank || '') &&
-          (row.dept || '') === (mergedForStore.dept || '') &&
-          (row.floor || '') === (mergedForStore.floor || '') &&
-          (row.ext_no || '') === (mergedForStore.extNo || '') &&
-          (row.phone_no || '') === (mergedForStore.phone || '') &&
-          (row.status_state || '') === statusToStore &&
-          (row.photo || '') === photoToStore &&
-          (Number(row.last_seen_at) || 0) === (Number(lastSeen) || 0);
-        if (sameProfile) {
-          finish();
-          return;
-        }
-      }
-
-      db.run(
-      `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(ip) DO UPDATE SET
-         username = excluded.username,
-         rank = excluded.rank,
-         dept = CASE WHEN excluded.dept != '' THEN excluded.dept ELSE known_users.dept END,
-         floor = CASE WHEN excluded.floor != '' THEN excluded.floor ELSE known_users.floor END,
-         ext_no = CASE WHEN excluded.ext_no != '' THEN excluded.ext_no ELSE known_users.ext_no END,
-         phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
-         status_state = excluded.status_state,
-         photo = CASE WHEN excluded.photo != '' THEN excluded.photo ELSE known_users.photo END,
-         last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0))`,
-      [
-        mergedForStore.ip,
-        mergedForStore.username || '',
-        mergedForStore.rank || '',
-        mergedForStore.dept || '',
-        mergedForStore.floor || '',
-        mergedForStore.extNo || '',
-        mergedForStore.phone || '',
-        statusToStore,
-        photoToStore,
-        lastSeen
-      ],
-      (runErr) => {
-        logDbErr(runErr);
-        finish();
-      }
-      );
-    });
-  };
-  if (persistKnownInFlight >= PERSIST_KNOWN_MAX_INFLIGHT) persistKnownWaitQueue.push(job);
-  else job();
+    } else if (!lastSeen && existing && existing.lastSeen) {
+      lastSeen = existing.lastSeen;
+    } else if (existing && existing.lastSeen) {
+      lastSeen = Math.max(lastSeen, existing.lastSeen);
+    }
+    db.run(
+    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(ip) DO UPDATE SET
+       username = excluded.username,
+       rank = excluded.rank,
+       dept = CASE WHEN excluded.dept != '' THEN excluded.dept ELSE known_users.dept END,
+       floor = CASE WHEN excluded.floor != '' THEN excluded.floor ELSE known_users.floor END,
+       ext_no = CASE WHEN excluded.ext_no != '' THEN excluded.ext_no ELSE known_users.ext_no END,
+       phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
+       status_state = excluded.status_state,
+       photo = CASE WHEN excluded.photo != '' THEN excluded.photo ELSE known_users.photo END,
+       last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0))`,
+    [
+      mergedForStore.ip,
+      mergedForStore.username || '',
+      mergedForStore.rank || '',
+      mergedForStore.dept || '',
+      mergedForStore.floor || '',
+      mergedForStore.extNo || '',
+      mergedForStore.phone || '',
+      mergedForStore.statusState || 'OFFLINE',
+      isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '',
+      lastSeen
+    ],
+    logDbErr
+    );
+  });
 }
 
 function loadPersistedKnownUsers(callback) {
@@ -5188,13 +4379,13 @@ function parseAndRoute(line, socket) {
     const payload = JSON.parse(line);
     const senderIP = (socket.remoteAddress || '').replace('::ffff:', '');
     if (!senderIP) return;
-    routeIncomingPayload(payload, senderIP, socket);
+    routeIncomingPayload(payload, senderIP);
   } catch (e) {
     console.error('TCP 페이로드 파싱 오류:', e.message);
   }
 }
 
-function routeIncomingPayload(payload, senderIP, socket) {
+function routeIncomingPayload(payload, senderIP) {
   try {
     touchPeerPresence(senderIP);
     const type = payload.type || 'CHAT';
@@ -5219,7 +4410,7 @@ function routeIncomingPayload(payload, senderIP, socket) {
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
     case 'SCHEDULE_DELETE': handleScheduleDelete(payload.uid); break;
     case 'SCHEDULE_EDIT': handleScheduleEdit(payload.schedule); break;
-    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload, senderIP); break;
+    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload); break;
     case 'MESSAGE_REACTION': handleIncomingMessageReaction(payload, senderIP); break;
     case 'MSG_ACK': handleMsgAck(payload); break;
     case 'GROUP_SYNC': handleGroupSync(payload.group); break;
@@ -5288,7 +4479,7 @@ function routeIncomingPayload(payload, senderIP, socket) {
     case 'PROFILE_PHOTO_SYNC': handleProfilePhotoSync(payload.ip || senderIP, payload.photo); break;
     case 'PROFILE_PHOTO_REQUEST': handleProfilePhotoRequest(senderIP); break;
     case 'PROFILE_OVERRIDE_SYNC': handleProfileOverrideSync(payload); break;
-    case 'FILE_XFER_START': handleFileXferStart(payload, senderIP, socket); break;
+    case 'FILE_XFER_START': handleFileXferStart(payload, senderIP); break;
     case 'FILE_XFER_CHUNK': handleFileXferChunk(payload, senderIP); break;
     case 'FILE_XFER_END':
       handleFileXferEnd(payload, senderIP).catch((e) => {
@@ -5296,7 +4487,6 @@ function routeIncomingPayload(payload, senderIP, socket) {
       });
       break;
     case 'FILE_XFER_ABORT': handleFileXferAbort(payload); break;
-    case 'FILE_XFER_ACCEPT': break; // 송신측 전용 응답
     default: break;
     }
   } catch (e) {
@@ -5394,10 +4584,10 @@ function handleIncomingChat(payload, senderIP) {
   };
 
   if (uid && isIncomingChatUidBusy(uid)) {
-    db.get(`SELECT id FROM messages WHERE msg_uid = ? AND receiver_ip = ? LIMIT 1`, [uid, MY_IP], (err, row) => {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
-        // DB 확인 실패 시 ACK 금지 — 발신이 재시도해야 유실 방지
+        ackIfUid();
         return;
       }
       if (row) {
@@ -5405,8 +4595,9 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
-      // INSERT 진행 중 재전송 — ACK하지 않음(실패 시 유실 방지). 발신은 타임아웃 후 재시도.
+      // INSERT 진행 중 재전송 — UI 없이 즉시 ACK (발신 재시도 중지)
       if (incomingChatUidInflight.has(String(uid))) {
+        ackIfUid();
         return;
       }
       incomingChatUidInflight.add(String(uid));
@@ -5417,10 +4608,10 @@ function handleIncomingChat(payload, senderIP) {
 
   if (uid) {
     if (!claimIncomingChatUid(uid)) {
-      // 다른 처리가 점유 중 — ACK 보류 (완료 후 DB에 있으면 재시도 시 ACK)
+      ackIfUid();
       return;
     }
-    db.get(`SELECT id FROM messages WHERE msg_uid = ? AND receiver_ip = ? LIMIT 1`, [uid, MY_IP], (err, row) => {
+    db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [uid], (err, row) => {
       if (err) {
         logDbErr(err);
         persist({ showUi: true });
@@ -5431,7 +4622,8 @@ function handleIncomingChat(payload, senderIP) {
         ackIfUid();
         return;
       }
-      // ACK는 INSERT 성공 콜백에서만 (조기 ACK 후 INSERT 실패 = 조용한 유실)
+      // 수락 확정 직후 ACK → INSERT 완료 전 재전송 폭주 방지
+      ackIfUid();
       persist({ showUi: true });
     });
     return;
@@ -6908,27 +6100,24 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
       ? { kind: 'group', groupUid: chatTarget.groupUid, groupName: targets.groupName || chatTarget.groupName || '그룹' }
       : { kind: 'dm' };
 
-    const xferMeta = {
+    const payloads = buildFileXferPayloads(buf, {
       xferUid,
       fileName,
       mime,
       chatTarget: wireChatTarget,
       sender: myProfile.username,
       msgUid
-    };
+    });
 
     let okCount = 0;
     for (const ip of targets.ips) {
-      const ok = await writeFileXferToIp(ip, buf, xferMeta, FILE_XFER_SEND_TIMEOUT_MS);
+      const ok = await writeJsonLinesToIp(ip, payloads, FILE_XFER_SEND_TIMEOUT_MS);
       if (ok) okCount += 1;
       await new Promise((r) => setImmediate(r));
     }
 
     if (okCount === 0) {
-      return {
-        status: 'ERROR',
-        error: '파일 전송에 실패했습니다. 상대가 바쁘거나(동시 수신 한도) 오프라인일 수 있습니다. 잠시 후 다시 시도해 주세요.'
-      };
+      return { status: 'ERROR', error: '파일 전송에 실패했습니다. 상대가 오프라인이거나 연결할 수 없습니다.' };
     }
 
     const sentAt = new Date();
@@ -7009,26 +6198,6 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
         error: '첨부/메시지가 너무 큽니다. 네트워크 전송 한도(약 400KB)를 초과합니다. 이미지는 자동 압축되며, 큰 파일은 공유 폴더를 이용해 주세요.',
         uid: msgUid
       });
-      return;
-    }
-
-    // 나에게 보내기: 수신측이 senderIP===MY_IP 를 무시하므로 TCP 불필요. 로컬 SENT로 보관.
-    if (targetIP === MY_IP) {
-      extractAndSaveAttachments(message, { msgUid });
-      appendChatLog(`DM_${targetIP}`, partnerName || senderLabelForMe(), myProfile.username, message);
-      db.run(
-        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-        [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
-        function (insertErr) {
-          if (insertErr) {
-            logDbErr(insertErr);
-            finish({ status: 'ERROR', error: insertErr.message || 'DB 저장 실패', uid: msgUid });
-            return;
-          }
-          compactMessageRowById(this.lastID, msgUid, message);
-          finish({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
-        }
-      );
       return;
     }
 
@@ -7677,25 +6846,10 @@ function deliverPendingChatRow(row, targetIP) {
   const releaseInflight = () => pendingResendInflight.delete(inflightKey);
   setTimeout(releaseInflight, 15000);
 
-  // SENT·PENDING 모두 재시도 상한 — 폭주 방지. 상한 도달 시 PENDING으로 되돌려
-  // 다음 flush 주기에서 다시 시도 (장시간 단절 후 영구 포기·유실 방지)
+  // SENT·PENDING 모두 재시도 상한 — ACK 실패 시 무한 재전송으로 수신측 폭주 방지
   const retryKey = row.msg_uid ? String(row.msg_uid) : inflightKey;
   const tries = sentAckRetryCount.get(retryKey) || 0;
   if (tries >= SENT_ACK_MAX_RETRIES) {
-    sentAckRetryCount.delete(retryKey);
-    if (row.msg_uid) {
-      db.run(
-        `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ? AND status IN ('SENT', 'PENDING')`,
-        [row.msg_uid, MY_IP],
-        logDbErr
-      );
-    } else if (row.id) {
-      db.run(
-        `UPDATE messages SET status = 'PENDING' WHERE id = ? AND status IN ('SENT', 'PENDING')`,
-        [row.id],
-        logDbErr
-      );
-    }
     releaseInflight();
     return;
   }
@@ -8118,15 +7272,6 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   const dateStr = (typeof dateStrRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStrRaw.trim()))
     ? dateStrRaw.trim()
     : null;
-  const beforeIdRaw = args && typeof args === 'object' ? parseInt(args.beforeId, 10) : 0;
-  const beforeId = Number.isFinite(beforeIdRaw) && beforeIdRaw > 0 ? beforeIdRaw : 0;
-  const afterIdRaw = args && typeof args === 'object' ? parseInt(args.afterId, 10) : 0;
-  const afterId = Number.isFinite(afterIdRaw) && afterIdRaw > 0 ? afterIdRaw : 0;
-  const limitRaw = args && typeof args === 'object' ? parseInt(args.limit, 10) : 0;
-  // 성능을 위해 화면에는 적게 올리고, 스크롤로 이어 불러온다.
-  const CHAT_HISTORY_INITIAL = 120;
-  const CHAT_HISTORY_PAGE = 80;
-  const CHAT_HISTORY_DATE = 160;
   const hideUpToId = await getChatViewHideUpToId(targetIP);
   const scope = chatHistoryScopeSql(targetIP);
 
@@ -8139,69 +7284,10 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     }));
   };
 
-  const pack = (rowsAsc, pageLimit) => {
-    const list = mapRows(rowsAsc);
-    const oldestId = list.length ? (list[0].id || 0) : 0;
-    const newestId = list.length ? (list[list.length - 1].id || 0) : 0;
-    const hasMore = list.length >= pageLimit;
-    return { rows: list, hasMore, oldestId, newestId };
-  };
-
   const selectCols = `DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
 
-  // 아래로 스크롤: afterId 이후(더 최근) 메시지
-  if (afterId && !keyword && !dateStr && !beforeId) {
-    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(300, limitRaw)
-      : CHAT_HISTORY_PAGE;
-    return new Promise((resolve) => {
-      let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id > ?`;
-      const params = [...scope.params, afterId];
-      if (hideUpToId > 0) {
-        sql += ` AND id > ?`;
-        params.push(hideUpToId);
-      }
-      sql += ` ORDER BY id ASC LIMIT ${pageLimit}`;
-      db.all(sql, params, (err, rows) => {
-        if (err) {
-          logDbErr(err);
-          resolve({ rows: [], hasMore: false, oldestId: 0, newestId: 0 });
-          return;
-        }
-        resolve(pack(rows || [], pageLimit));
-      });
-    });
-  }
-
-  // 위로 스크롤: beforeId 이전(더 오래된) 메시지
-  if (beforeId && !keyword && !dateStr) {
-    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(300, limitRaw)
-      : CHAT_HISTORY_PAGE;
-    return new Promise((resolve) => {
-      let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id < ?`;
-      const params = [...scope.params, beforeId];
-      if (hideUpToId > 0) {
-        sql += ` AND id > ?`;
-        params.push(hideUpToId);
-      }
-      sql += ` ORDER BY id DESC LIMIT ${pageLimit}`;
-      db.all(sql, params, (err, rows) => {
-        if (err) {
-          logDbErr(err);
-          resolve({ rows: [], hasMore: false, oldestId: 0, newestId: 0 });
-          return;
-        }
-        resolve(pack((rows || []).slice().reverse(), pageLimit));
-      });
-    });
-  }
-
-  // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터
+  // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터 최대 200건
   if (dateStr && !keyword) {
-    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(400, limitRaw)
-      : CHAT_HISTORY_DATE;
     return new Promise((resolve) => {
       let findSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
       const findParams = [...scope.params, dateStr];
@@ -8212,7 +7298,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
       db.get(findSql, findParams, (err, row) => {
         const finishFromAnchor = (anchorId, resolvedDate) => {
           if (!anchorId) {
-            resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
+            resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
             return;
           }
           let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id >= ?`;
@@ -8221,26 +7307,25 @@ ipcMain.handle('get-chat-history', async (event, args) => {
             sql += ` AND id > ?`;
             params.push(hideUpToId);
           }
-          sql += ` ORDER BY id ASC LIMIT ${pageLimit}`;
+          sql += ` ORDER BY id ASC LIMIT 200`;
           db.all(sql, params, (err2, rows) => {
             if (err2) {
               logDbErr(err2);
-              resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
+              resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
               return;
             }
-            const packed = pack(rows || [], pageLimit);
             resolve({
-              ...packed,
+              rows: mapRows(rows),
               jumpedDate: resolvedDate || dateStr,
               requestedDate: dateStr,
-              empty: !packed.rows.length
+              empty: !(rows && rows.length)
             });
           });
         };
 
         if (err) {
           logDbErr(err);
-          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
+          resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
           return;
         }
         if (row && row.minId) {
@@ -8271,7 +7356,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
               return;
             }
             if (typeof next === 'function') next();
-            else resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true, hasMore: false, oldestId: 0, newestId: 0 });
+            else resolve({ rows: [], jumpedDate: null, requestedDate: dateStr, empty: true });
           });
         };
         findNearestDay('<=', 'DESC', () => findNearestDay('>=', 'ASC'));
@@ -8280,9 +7365,6 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   }
 
   return new Promise((resolve) => {
-    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(5000, limitRaw)
-      : (keyword ? 500 : CHAT_HISTORY_INITIAL);
     let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where}`;
     const params = [...scope.params];
 
@@ -8295,22 +7377,12 @@ ipcMain.handle('get-chat-history', async (event, args) => {
       sql += ` AND message LIKE ?`;
       params.push(`%${keyword}%`);
     }
-    sql += ` ORDER BY id DESC LIMIT ${pageLimit}`;
+    sql += ` ORDER BY id DESC LIMIT 200`;
 
     db.all(sql, params, (err, rows) => {
-      if (err) {
-        logDbErr(err);
-        // 기존 호출부 호환: 검색은 배열도 허용했으므로 rows 형태로 통일
-        resolve(keyword ? [] : { rows: [], hasMore: false, oldestId: 0, newestId: 0 });
-        return;
-      }
       const ordered = (rows || []).slice().reverse();
-      if (keyword) {
-        // 검색: 기존처럼 배열 반환(호출부 호환)
-        resolve(mapRows(ordered));
-        return;
-      }
-      resolve(pack(ordered, pageLimit));
+      // 기존 호출부 호환: 배열 그대로 반환
+      resolve(mapRows(ordered));
     });
   });
 });
@@ -8370,33 +7442,6 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
   return new Promise((resolve) => {
     const keyword = typeof opts === 'string' ? opts : ((opts && opts.keyword) || '');
     const kind = typeof opts === 'object' && opts && opts.kind ? String(opts.kind) : 'all';
-
-    // 중요 표시 목록 (개인 북마크 스냅샷)
-    if (kind === 'important') {
-      const clauses = [];
-      const params = [];
-      if (keyword) {
-        clauses.push(`(message_html LIKE ? OR preview_text LIKE ? OR sender_name LIKE ?)`);
-        params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
-      }
-      let sql = `SELECT id, entry_key, msg_uid, message_id, channel_key, sender_name, sender_ip, receiver_ip,
-        message_html AS message, preview_text, msg_created_at, marked_at,
-        COALESCE(NULLIF(msg_created_at, ''), marked_at) AS created_time
-        FROM important_messages`;
-      if (clauses.length) sql += ` WHERE ` + clauses.join(' AND ');
-      sql += ` ORDER BY marked_at DESC, id DESC LIMIT 500`;
-      db.all(sql, params, (err, rows) => {
-        if (err) { logDbErr(err); resolve([]); return; }
-        resolve((rows || []).map((r) => ({
-          ...r,
-          sender_name: formatSenderDisplay(r.sender_name, r.sender_ip),
-          isMe: r.sender_ip === MY_IP || r.sender_name === senderLabelForMe(),
-          isImportant: true
-        })));
-      });
-      return;
-    }
-
     const clauses = [];
     const params = [];
 
@@ -8436,104 +7481,6 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
   });
 });
 
-function importantEntryKeyFromPayload(p) {
-  const uid = String((p && (p.msgUid || p.msg_uid)) || '').trim();
-  if (uid) return uid;
-  const mid = parseInt((p && (p.messageId != null ? p.messageId : p.message_id)), 10);
-  if (Number.isFinite(mid) && mid > 0) return `mid:${mid}`;
-  return '';
-}
-
-ipcMain.handle('get-important-message-keys', async () => {
-  return new Promise((resolve) => {
-    db.all(`SELECT entry_key FROM important_messages`, [], (err, rows) => {
-      if (err) { logDbErr(err); resolve([]); return; }
-      resolve((rows || []).map((r) => r.entry_key).filter(Boolean));
-    });
-  });
-});
-
-ipcMain.handle('toggle-important-message', async (event, payload) => {
-  const p = payload || {};
-  const entryKey = importantEntryKeyFromPayload(p) || String(p.entryKey || p.entry_key || '').trim();
-  if (!entryKey) return { success: false, msg: '메시지를 식별할 수 없습니다.' };
-
-  return new Promise((resolve) => {
-    db.get(`SELECT id FROM important_messages WHERE entry_key = ?`, [entryKey], (err, existing) => {
-      if (err) {
-        logDbErr(err);
-        resolve({ success: false, msg: err.message || '저장 실패' });
-        return;
-      }
-      if (existing) {
-        db.run(`DELETE FROM important_messages WHERE entry_key = ?`, [entryKey], (delErr) => {
-          if (delErr) {
-            logDbErr(delErr);
-            resolve({ success: false, msg: delErr.message || '해제 실패' });
-            return;
-          }
-          if (mainWindow) safeWebContentsSend('important-messages-update');
-          resolve({ success: true, important: false, entryKey });
-        });
-        return;
-      }
-
-      const msgUid = String(p.msgUid || p.msg_uid || '').trim();
-      const messageId = parseInt(p.messageId != null ? p.messageId : p.message_id, 10) || 0;
-      const html = String(p.messageHtml || p.message_html || '');
-      if (!html || html.indexOf('deleted-msg-flag') !== -1 || html.indexOf('system-notice-flag') !== -1) {
-        resolve({ success: false, msg: '삭제된 메시지/시스템 안내는 중요 표시할 수 없습니다.' });
-        return;
-      }
-      const preview = String(p.previewText || p.preview_text || '').slice(0, 240);
-      const markedAt = new Date().toISOString();
-      db.run(
-        `INSERT INTO important_messages
-          (entry_key, msg_uid, message_id, channel_key, sender_name, sender_ip, receiver_ip, message_html, preview_text, msg_created_at, marked_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          entryKey,
-          msgUid,
-          messageId,
-          String(p.channelKey || p.channel_key || ''),
-          String(p.senderName || p.sender_name || ''),
-          String(p.senderIp || p.sender_ip || ''),
-          String(p.receiverIp || p.receiver_ip || ''),
-          html,
-          preview,
-          String(p.msgCreatedAt || p.msg_created_at || ''),
-          markedAt
-        ],
-        (insErr) => {
-          if (insErr) {
-            logDbErr(insErr);
-            resolve({ success: false, msg: insErr.message || '저장 실패' });
-            return;
-          }
-          if (mainWindow) safeWebContentsSend('important-messages-update');
-          resolve({ success: true, important: true, entryKey });
-        }
-      );
-    });
-  });
-});
-
-ipcMain.handle('remove-important-message', async (event, entryKey) => {
-  const key = String(entryKey || '').trim();
-  if (!key) return { success: false };
-  return new Promise((resolve) => {
-    db.run(`DELETE FROM important_messages WHERE entry_key = ?`, [key], (err) => {
-      if (err) {
-        logDbErr(err);
-        resolve({ success: false, msg: err.message });
-        return;
-      }
-      if (mainWindow) safeWebContentsSend('important-messages-update');
-      resolve({ success: true, important: false, entryKey: key });
-    });
-  });
-});
-
 ipcMain.handle('get-my-profile', async () => ({ ...myProfile, ip: MY_IP }));
 
 function waitForProfileLoaded(timeoutMs) {
@@ -8568,17 +7515,12 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
 });
 
 // 🔑 마스터 아이디 + 비밀번호 검증 IPC 핸들러
-ipcMain.handle('verify-master-auth', async (event, payload) => {
-  const p = payload || {};
-  const id = p.id;
-  const password = p.password;
-  // elevateSession === false: 화면잠금 해제 등 — 인증만 하고 마스터 세션은 올리지 않음
-  const elevateSession = p.elevateSession !== false;
+ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
   return new Promise((resolve) => {
     db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
       const currentId = row && row.master_id ? row.master_id : 'admin';
       if (row && currentId === id && row.master_password === password) {
-        if (elevateSession) masterSessionActive = true;
+        masterSessionActive = true;
         resolve({ success: true });
       } else {
         resolve({ success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' });
@@ -8823,20 +7765,14 @@ ipcMain.handle('get-notices', async () => {
 });
 
 ipcMain.handle('add-notice', async (event, { title, content, authorName, images }) => {
-  if (!masterSessionActive && !noticeOperatorSessionActive) {
-    return { success: false, error: '작성 권한자로 로그인한 뒤 공지를 등록할 수 있습니다.' };
-  }
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
-    const sessionAuthor = noticeOperatorDisplayNameSession || noticeOperatorUsernameSession || '';
     const imagesJson = normalizeNoticeImagesField(images);
     const record = {
       uid: generateNoticeUid(),
       title,
       content,
-      author_name: (authorName && String(authorName).trim())
-        || sessionAuthor
-        || fallbackAuthor,
+      author_name: (authorName && String(authorName).trim()) || fallbackAuthor,
       author_ip: MY_IP,
       created_at: new Date().toISOString(),
       images: imagesJson
@@ -8943,7 +7879,6 @@ ipcMain.handle('update-notice-operator-display-name', async (event, { username, 
 });
 
 ipcMain.handle('add-notice-operator', async (event, { username, password, displayName, canManageDuty }) => {
-  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
     const password_hash = hashPassword(password);
@@ -8978,7 +7913,6 @@ ipcMain.handle('set-notice-operator-duty-perm', async (event, { username, canMan
 });
 
 ipcMain.handle('delete-notice-operator', async (event, username) => {
-  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], (err) => {
       if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DELETE', username });
@@ -9163,46 +8097,18 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
 });
 
 ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty, meta) => {
-  // 로그아웃은 항상 허용
-  if (!active) {
-    noticeOperatorSessionActive = false;
-    noticeOperatorCanManageDutySession = false;
+  noticeOperatorSessionActive = !!active;
+  // 작성 권한자 세션이 활성면 당직·OFF도 허용 (별도 플래그 무시)
+  noticeOperatorCanManageDutySession = !!active;
+  if (active) {
+    const m = (meta && typeof meta === 'object') ? meta : {};
+    noticeOperatorDisplayNameSession = String(m.displayName || m.display_name || '').trim();
+    noticeOperatorUsernameSession = String(m.username || '').trim();
+  } else {
     noticeOperatorDisplayNameSession = '';
     noticeOperatorUsernameSession = '';
-    return { success: true };
   }
-  // 활성화: DB에 실제 등록된 계정만 허용 (임의 IPC로 위조 세션 방지).
-  // 표시 이름은 클라이언트 입력이 아니라 DB 값을 사용.
-  const m = (meta && typeof meta === 'object') ? meta : {};
-  const username = String(m.username || '').trim();
-  if (!username) {
-    return { success: false, msg: '작성 권한자 계정이 없습니다.' };
-  }
-  return new Promise((resolve) => {
-    db.get(
-      `SELECT username, display_name FROM notice_operators WHERE username = ?`,
-      [username],
-      (err, row) => {
-        if (err || !row) {
-          noticeOperatorSessionActive = false;
-          noticeOperatorCanManageDutySession = false;
-          noticeOperatorDisplayNameSession = '';
-          noticeOperatorUsernameSession = '';
-          resolve({ success: false, msg: '등록되지 않은 작성 권한자입니다.' });
-          return;
-        }
-        noticeOperatorSessionActive = true;
-        noticeOperatorCanManageDutySession = true;
-        noticeOperatorUsernameSession = String(row.username || '').trim();
-        noticeOperatorDisplayNameSession = String(row.display_name || '').trim() || noticeOperatorUsernameSession;
-        resolve({
-          success: true,
-          displayName: noticeOperatorDisplayNameSession,
-          username: noticeOperatorUsernameSession
-        });
-      }
-    );
-  });
+  return { success: true };
 });
 
 function isAuthorOfRecord(row) {
@@ -9600,29 +8506,12 @@ ipcMain.handle('edit-message', async (event, { msgUid, targetIP, groupUid, newMe
   });
 });
 
-function handleIncomingMessageEdit(payload, senderIP) {
+function handleIncomingMessageEdit(payload) {
   if (!payload || !payload.msgUid) return;
-  const uid = String(payload.msgUid || '').trim();
-  const fromIp = String(senderIP || '').trim();
-  if (!uid || !fromIp) return;
-  // 발신 IP와 일치하는 행만 수정 — 임의 PC가 타인 메시지를 위조 편집하지 못함
-  db.run(
-    `UPDATE messages SET message = ? WHERE msg_uid = ? AND sender_ip = ?`,
-    [payload.newMessage, uid, fromIp],
-    function (err) {
-      if (err) {
-        logDbErr(err);
-        return;
-      }
-      if (!this.changes) {
-        writeToLogFile('warn', `[MESSAGE_EDIT] 거부 uid=${uid} from=${fromIp} (발신자 불일치 또는 없음)`);
-        return;
-      }
-      if (mainWindow) {
-        safeWebContentsSend('message-edited', { msgUid: uid, newMessage: payload.newMessage });
-      }
-    }
-  );
+  db.run(`UPDATE messages SET message = ? WHERE msg_uid = ?`, [payload.newMessage, payload.msgUid], logDbErr);
+  if (mainWindow) {
+    safeWebContentsSend('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
+  }
 }
 
 function fetchReactionSummariesForKeys(keys, callback) {
@@ -9786,176 +8675,8 @@ ipcMain.handle('get-message-notification-settings', async () => ({
   notifyIncomingMessages,
   notifyReadReceipts,
   toastDurationSeconds,
-  incomingNotifyMode,
-  silentMode: getSilentModeState()
+  incomingNotifyMode
 }));
-
-ipcMain.handle('get-silent-mode-state', async () => getSilentModeState());
-
-ipcMain.handle('set-silent-mode-minutes', async (event, minutes) => setSilentModeForMinutes(minutes));
-
-ipcMain.handle('set-silent-mode-until', async (event, untilMs) => setSilentModeUntil(untilMs));
-
-ipcMain.handle('clear-silent-mode', async () => clearSilentMode());
-
-function normalizeQuickPhrasesList(list) {
-  if (!Array.isArray(list)) return null;
-  const out = [];
-  const seen = new Set();
-  for (const raw of list) {
-    const s = String(raw == null ? '' : raw).trim();
-    if (!s || seen.has(s)) continue;
-    seen.add(s);
-    out.push(s.slice(0, 500));
-    if (out.length >= 100) break;
-  }
-  return out;
-}
-
-/** null = DB에 저장 이력 없음. 배열(빈 배열 포함) = 사용자 상태 */
-function parseQuickPhrasesJson(raw) {
-  if (raw == null || raw === '') return null;
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (Array.isArray(parsed)) return normalizeQuickPhrasesList(parsed) || [];
-    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.items)) {
-      return normalizeQuickPhrasesList(parsed.items) || [];
-    }
-  } catch (e) {
-    console.error('자주 쓰는 문구 파싱 오류:', e.message);
-  }
-  return null;
-}
-
-function markAppSettingsRowLoaded() {
-  if (appSettingsRowLoaded) return;
-  appSettingsRowLoaded = true;
-  const waiters = appSettingsRowWaiters.splice(0, appSettingsRowWaiters.length);
-  waiters.forEach((fn) => {
-    try { fn(); } catch (_) { /* ignore */ }
-  });
-}
-
-function whenAppSettingsRowLoaded() {
-  if (appSettingsRowLoaded) return Promise.resolve();
-  return new Promise((resolve) => {
-    let settled = false;
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    appSettingsRowWaiters.push(done);
-    setTimeout(() => {
-      // DB 로드가 지연돼도 IPC가 영원히 기다리지 않음 (프리징 방지)
-      if (!appSettingsRowLoaded) {
-        console.warn('[app_settings] 로드 대기 타임아웃 — 기본값으로 진행');
-        markAppSettingsRowLoaded();
-      }
-      done();
-    }, 5000);
-  });
-}
-
-function persistQuickPhrasesList(list) {
-  const items = normalizeQuickPhrasesList(list) || [];
-  quickPhrasesCache = items;
-  const payload = JSON.stringify({ v: 1, items });
-  db.run(`UPDATE app_settings SET quick_phrases_json = ? WHERE id = 1`, [payload], logDbErr);
-  return items;
-}
-
-ipcMain.handle('get-quick-phrases', async () => {
-  await whenAppSettingsRowLoaded();
-  if (Array.isArray(quickPhrasesCache)) {
-    return { phrases: quickPhrasesCache.slice(), source: 'db' };
-  }
-  return { phrases: null, source: 'unset' };
-});
-
-ipcMain.handle('set-quick-phrases', async (event, phrases) => {
-  await whenAppSettingsRowLoaded();
-  const saved = persistQuickPhrasesList(phrases);
-  return { phrases: saved };
-});
-
-ipcMain.handle('get-muted-chat-keys', async () => {
-  await whenAppSettingsRowLoaded();
-  return [...mutedChatKeys];
-});
-
-ipcMain.handle('set-muted-chat-keys', async (event, keys) => {
-  await whenAppSettingsRowLoaded();
-  return setMutedChatKeysFromList(keys);
-});
-
-ipcMain.handle('snap-compact-window', async (event, edge) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
-  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
-  prepareWindowForBoundsChange();
-  const b = mainWindow.getBounds();
-  const display = screen.getDisplayMatching(b) || screen.getDisplayNearestPoint({ x: b.x, y: b.y });
-  const area = display.workArea;
-  const width = Math.min(Math.max(b.width, COMPACT_MIN_WIDTH), area.width);
-  const height = Math.min(Math.max(b.height, COMPACT_MIN_HEIGHT), area.height);
-  const side = String(edge || '').toLowerCase();
-  let x = b.x;
-  let y = area.y + Math.max(0, Math.round((area.height - height) / 2));
-  if (side === 'left') x = area.x + 8;
-  else if (side === 'right') x = area.x + area.width - width - 8;
-  else if (side === 'top-right') {
-    x = area.x + area.width - width - 8;
-    y = area.y + 8;
-  } else if (side === 'bottom-right') {
-    x = area.x + area.width - width - 8;
-    y = area.y + area.height - height - 8;
-  } else {
-    x = area.x + area.width - width - 8;
-    y = area.y + area.height - height - 8;
-  }
-  const bounds = clampBoundsToWorkArea({ x, y, width, height });
-  mainWindow.setBounds(bounds);
-  return { success: true, bounds };
-});
-
-ipcMain.handle('set-compact-size-preset', async (event, preset) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
-  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
-  prepareWindowForBoundsChange();
-  const map = {
-    narrow: { width: 360, height: 560 },
-    normal: { width: COMPACT_DEFAULT_WIDTH, height: COMPACT_DEFAULT_HEIGHT },
-    wide: { width: 520, height: 720 }
-  };
-  const size = map[String(preset || 'normal')] || map.normal;
-  const cur = mainWindow.getBounds();
-  const bounds = clampBoundsToWorkArea({
-    x: cur.x,
-    y: cur.y,
-    width: size.width,
-    height: size.height
-  });
-  mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
-  mainWindow.setBounds(bounds);
-  return { success: true, bounds, preset: String(preset || 'normal') };
-});
-
-ipcMain.handle('set-main-window-opacity', async (event, opacity) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return { success: false, opacity: 1 };
-  const n = Number(opacity);
-  const clamped = Number.isFinite(n) ? Math.max(0.55, Math.min(1, n)) : 1;
-  try {
-    mainWindow.setOpacity(clamped);
-  } catch (e) {
-    return { success: false, opacity: 1, error: e.message };
-  }
-  return { success: true, opacity: clamped };
-});
-
-ipcMain.handle('get-main-window-opacity', async () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return 1;
-  try { return mainWindow.getOpacity(); } catch (_) { return 1; }
-});
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
   if (settings && typeof settings.notifyIncomingMessages === 'boolean') {
@@ -10087,9 +8808,7 @@ async function applyUpdateFiles() {
     'excalidraw-editor.html',
     'preload-excalidraw.js',
     'lib/excalidraw-app.js',
-    'lib/excalidraw-app.css',
-    'assets/compact/compact-overlay.css',
-    'assets/compact/phosphor-paths.json'
+    'lib/excalidraw-app.css'
   ];
   const optionalAssets = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
   try {
@@ -10203,9 +8922,9 @@ async function applyUpdateFiles() {
     );
   }
 
-  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패·타임아웃해도 업데이트는 성공)
+  // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패해도 업데이트는 성공)
   try {
-    const zRes = await mirrorLocalInstallToZBridge({ force: true, timeoutMs: 12000 });
+    const zRes = await mirrorLocalInstallToZBridge({ force: true });
     if (zRes && zRes.mirrored) {
       console.log('[업데이트] Z 브리지 미러 완료:', zRes.version);
     } else if (zRes && zRes.reason && zRes.reason !== 'already-latest') {
@@ -10219,16 +8938,12 @@ async function applyUpdateFiles() {
 ipcMain.handle('apply-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
-  if (updateApplyInFlight) return { success: false, msg: '업데이트가 이미 진행 중입니다.' };
-  updateApplyInFlight = true;
   try {
     await applyUpdateFiles();
     setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
-  } finally {
-    updateApplyInFlight = false;
   }
 });
 
@@ -10657,7 +9372,6 @@ async function autoCheckAndApplyUpdate() {
   if (!updateSourcePath || !mainWindow) return;
   if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
-  if (updateApplyInFlight) return;
   let remote;
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
@@ -10668,11 +9382,10 @@ async function autoCheckAndApplyUpdate() {
     return;
   }
 
-  updateApplyInFlight = true;
-  autoUpdateAlreadyApplied = true; // 중복 적용 방지 (실패 시 아래에서 해제)
   try {
     // 새 버전을 발견하면 바로 파일을 교체해 둔다. (실제 반영은 재시작해야 이루어짐)
     await applyUpdateFiles();
+    autoUpdateAlreadyApplied = true;
     pendingUpdateRemoteVersion = remote.version;
     safeWebContentsSend('auto-update-ready', {
       remoteVersion: remote.version,
@@ -10688,12 +9401,9 @@ async function autoCheckAndApplyUpdate() {
       app.exit();
     }, 30000);
   } catch (e) {
-    autoUpdateAlreadyApplied = false;
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
     // 혼란이 생기지 않도록 한다.
     safeWebContentsSend('auto-update-failed', { msg: e.message });
-  } finally {
-    updateApplyInFlight = false;
   }
 }
 
@@ -10726,28 +9436,11 @@ function startUpdateChecker() {
 }
 
 ipcMain.handle('set-auto-launch', async (event, enable) => {
-  const openAtLogin = !!enable;
-  const settings = {
-    openAtLogin,
-    openAsHidden: false,
-    path: process.execPath,
-    args: []
-  };
-  // Windows 시작 프로그램 목록에 표시될 이름
-  if (process.platform === 'win32') {
-    settings.name = '미래병원 사내 메신저';
-  }
-  app.setLoginItemSettings(settings);
-  return app.getLoginItemSettings().openAtLogin === openAtLogin;
+  app.setLoginItemSettings({ openAtLogin: enable, path: app.getPath('exe') });
+  return true;
 });
 
-ipcMain.handle('get-auto-launch', async () => {
-  try {
-    return !!app.getLoginItemSettings().openAtLogin;
-  } catch (_) {
-    return false;
-  }
-});
+ipcMain.handle('get-auto-launch', async () => app.getLoginItemSettings().openAtLogin);
 
 function getDefaultCompactBounds(width = COMPACT_DEFAULT_WIDTH, height = COMPACT_DEFAULT_HEIGHT) {
   const current = mainWindow ? mainWindow.getBounds() : { x: 0, y: 0, width, height };
@@ -10959,7 +9652,6 @@ async function performClearAllChatHistory(opts) {
     'messages',
     'chat_view_clears',
     'chat_pins',
-    'important_messages',
     'scheduled_messages',
     'channel_read_cursors'
   ];
@@ -11333,42 +10025,7 @@ ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
   return { success: true };
 });
 
-const AUTO_BACKUP_INTERVAL_OPTIONS = [0, 1, 6, 12, 24, 168];
-const AUTO_BACKUP_RETENTION_OPTIONS = [7, 14, 30, 60];
-
-function normalizeAutoBackupIntervalHours(raw) {
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  if (AUTO_BACKUP_INTERVAL_OPTIONS.includes(n)) return n;
-  // 가장 가까운 허용 값
-  let best = 24;
-  let bestDiff = Infinity;
-  for (const opt of AUTO_BACKUP_INTERVAL_OPTIONS) {
-    if (opt === 0) continue;
-    const d = Math.abs(opt - n);
-    if (d < bestDiff) { bestDiff = d; best = opt; }
-  }
-  return best;
-}
-
-function normalizeAutoBackupRetentionDays(raw) {
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) return 14;
-  if (AUTO_BACKUP_RETENTION_OPTIONS.includes(n)) return n;
-  let best = 14;
-  let bestDiff = Infinity;
-  for (const opt of AUTO_BACKUP_RETENTION_OPTIONS) {
-    const d = Math.abs(opt - n);
-    if (d < bestDiff) { bestDiff = d; best = opt; }
-  }
-  return best;
-}
-
-function autoBackupStamp() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
+const AUTO_BACKUP_RETENTION_DAYS = 14;
 
 async function getAutoBackupDir() {
   const dir = path.join(app.getPath('userData'), 'backups');
@@ -11380,163 +10037,36 @@ async function getAutoBackupDir() {
   return dir;
 }
 
-async function listAutoBackupFiles(dir) {
-  const names = await fs.promises.readdir(dir).catch(() => []);
-  const files = [];
-  for (const name of names) {
-    if (!name.startsWith('auto_backup_') || !name.endsWith('.db')) continue;
-    const filePath = path.join(dir, name);
-    try {
+async function performAutoBackupIfNeeded() {
+  try {
+    const dir = await getAutoBackupDir();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayFile = path.join(dir, `auto_backup_${todayStr}.db`);
+    let alreadyExists = true;
+    try { await fs.promises.access(todayFile); } catch (e) { alreadyExists = false; }
+    if (!alreadyExists) {
+      await checkpointWal();
+      await fs.promises.copyFile(dbPath, todayFile);
+    }
+    const cutoff = Date.now() - AUTO_BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const names = await fs.promises.readdir(dir);
+    for (const name of names) {
+      if (!name.startsWith('auto_backup_')) continue;
+      const filePath = path.join(dir, name);
       const stat = await fs.promises.stat(filePath);
-      files.push({ name, filePath, mtimeMs: stat.mtimeMs });
-    } catch (_) { /* skip */ }
-  }
-  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return files;
-}
-
-async function getLastAutoBackupInfo() {
-  try {
-    const dir = await getAutoBackupDir();
-    const files = await listAutoBackupFiles(dir);
-    if (!files.length) return null;
-    const f = files[0];
-    const d = new Date(f.mtimeMs);
-    const pad = (n) => String(n).padStart(2, '0');
-    const label = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return { name: f.name, path: f.filePath, mtimeMs: f.mtimeMs, label, count: files.length };
-  } catch (_) {
-    return null;
-  }
-}
-
-async function performAutoBackupIfNeeded(opts) {
-  const force = !!(opts && opts.force);
-  const retentionOnly = !!(opts && opts.retentionOnly);
-  try {
-    if (!force && !retentionOnly && autoBackupIntervalHours <= 0) {
-      // 백업은 안 만들지만 보관기간 정리는 수행
-      const dirOff = await getAutoBackupDir();
-      const retentionDaysOff = Math.max(1, autoBackupRetentionDays || 14);
-      const cutoffOff = Date.now() - retentionDaysOff * 24 * 60 * 60 * 1000;
-      const afterOff = await listAutoBackupFiles(dirOff);
-      for (const f of afterOff) {
-        if (f.mtimeMs < cutoffOff) {
-          try { await fs.promises.unlink(f.filePath); } catch (_) { /* ignore */ }
-        }
-      }
-      return { created: false, reason: 'disabled' };
+      if (stat.mtimeMs < cutoff) await fs.promises.unlink(filePath);
     }
-    const dir = await getAutoBackupDir();
-    const files = await listAutoBackupFiles(dir);
-    let created = false;
-    let createdPath = '';
-    if (!retentionOnly) {
-      const intervalMs = Math.max(1, autoBackupIntervalHours) * 60 * 60 * 1000;
-      const newest = files[0] || null;
-      const due = force || !newest || (Date.now() - newest.mtimeMs) >= intervalMs;
-      if (due) {
-        await checkpointWal();
-        createdPath = path.join(dir, `auto_backup_${autoBackupStamp()}.db`);
-        await fs.promises.copyFile(dbPath, createdPath);
-        created = true;
-      }
-      if (!due) {
-        // not due — still prune below
-      }
-    }
-    const retentionDays = Math.max(1, autoBackupRetentionDays || 14);
-    const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-    const after = await listAutoBackupFiles(dir);
-    for (const f of after) {
-      if (f.mtimeMs < cutoff) {
-        try { await fs.promises.unlink(f.filePath); } catch (_) { /* ignore */ }
-      }
-    }
-    if (retentionOnly) return { created: false, reason: 'retention-only' };
-    return { created, path: createdPath, reason: created ? 'created' : 'not-due' };
   } catch (e) {
     console.error('자동 백업 오류:', e.message);
-    return { created: false, reason: 'error', msg: e.message };
   }
-}
-
-function stopAutoBackupTimers() {
-  if (autoBackupTimer) { clearInterval(autoBackupTimer); autoBackupTimer = null; }
-  if (autoBackupLogCleanupTimer) { clearInterval(autoBackupLogCleanupTimer); autoBackupLogCleanupTimer = null; }
 }
 
 function startAutoBackup() {
-  stopAutoBackupTimers();
-  // 로그 정리는 백업과 무관하게 6시간마다
-  cleanupOldLogFiles();
-  autoBackupLogCleanupTimer = setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
-
-  const pruneRetentionOnly = () => {
-    performAutoBackupIfNeeded({ force: false, retentionOnly: true }).catch(() => {});
-  };
-
-  if (autoBackupIntervalHours <= 0) {
-    console.log('[자동백업] 꺼짐 (보관기간 정리만 유지)');
-    pruneRetentionOnly();
-    // 꺼져 있어도 오래된 자동백업 파일은 주기적으로 정리
-    autoBackupTimer = setInterval(pruneRetentionOnly, 6 * 60 * 60 * 1000);
-    return;
-  }
   performAutoBackupIfNeeded();
-  // 검사 주기: 설정 주기의 1/4 (최소 30분, 최대 6시간)
-  const checkMs = Math.min(
-    6 * 60 * 60 * 1000,
-    Math.max(30 * 60 * 1000, Math.floor(autoBackupIntervalHours * 60 * 60 * 1000 / 4))
-  );
-  autoBackupTimer = setInterval(() => { performAutoBackupIfNeeded(); }, checkMs);
-  console.log(`[자동백업] ${autoBackupIntervalHours}시간마다 · 보관 ${autoBackupRetentionDays}일 · 검사 ${Math.round(checkMs / 60000)}분`);
+  cleanupOldLogFiles();
+  setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
+  setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
 }
-
-function persistAutoBackupSettings() {
-  db.run(
-    `UPDATE app_settings SET auto_backup_interval_hours = ?, auto_backup_retention_days = ? WHERE id = 1`,
-    [autoBackupIntervalHours, autoBackupRetentionDays],
-    logDbErr
-  );
-}
-
-ipcMain.handle('get-auto-backup-settings', async () => {
-  const last = await getLastAutoBackupInfo();
-  return {
-    intervalHours: autoBackupIntervalHours,
-    retentionDays: autoBackupRetentionDays,
-    lastBackup: last
-  };
-});
-
-ipcMain.handle('set-auto-backup-settings', async (event, payload) => {
-  const p = payload || {};
-  autoBackupIntervalHours = normalizeAutoBackupIntervalHours(
-    p.intervalHours != null ? p.intervalHours : autoBackupIntervalHours
-  );
-  autoBackupRetentionDays = normalizeAutoBackupRetentionDays(
-    p.retentionDays != null ? p.retentionDays : autoBackupRetentionDays
-  );
-  persistAutoBackupSettings();
-  startAutoBackup();
-  const last = await getLastAutoBackupInfo();
-  return {
-    success: true,
-    intervalHours: autoBackupIntervalHours,
-    retentionDays: autoBackupRetentionDays,
-    lastBackup: last
-  };
-});
-
-ipcMain.handle('run-auto-backup-now', async () => {
-  const res = await performAutoBackupIfNeeded({ force: true });
-  const last = await getLastAutoBackupInfo();
-  if (!res || !res.created) {
-    return { success: false, msg: (res && res.msg) || '자동 백업에 실패했습니다.', lastBackup: last };
-  }
-  return { success: true, path: res.path, lastBackup: last };
-});
 
 ipcMain.handle('get-network-status', async () => ({
   myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()
