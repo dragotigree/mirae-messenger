@@ -4387,6 +4387,9 @@
         <button type="button" class="compact-rail-btn compact-rail-action" id="compact-rail-code-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드">
           <span class="compact-rail-emoji" aria-hidden="true">🚨</span>
         </button>
+        <button type="button" class="compact-rail-btn" data-rail="calendar" onclick="setCompactRailTab('calendar')" title="병원 달력 · 현황판">
+          <span class="compact-rail-icon" data-ui-icon="calendar"></span>
+        </button>
         <div class="compact-rail-divider" aria-hidden="true"></div>
         <button type="button" class="compact-rail-btn" data-rail="friends" onclick="setCompactRailTab('friends')" title="직원 (1)">
           <span class="compact-rail-icon" data-ui-icon="users"></span>
@@ -4420,7 +4423,7 @@
           </div>
         </header>
         <div class="compact-shortcut-hint" id="compact-shortcut-hint" aria-hidden="true">
-          <kbd>1</kbd>직원 <kbd>2</kbd>채팅 <kbd>3</kbd>더보기 · <kbd>Ctrl</kbd>+<kbd>1</kbd>방전환 · <kbd>Alt</kbd>+<kbd>↑↓</kbd> · <kbd>Ctrl</kbd>+<kbd>U</kbd>안읽음
+          <kbd>1</kbd>직원 <kbd>2</kbd>채팅 <kbd>3</kbd>더보기 · 레일 달력=현황판 · <kbd>Ctrl</kbd>+<kbd>1</kbd>방전환 · <kbd>Alt</kbd>+<kbd>↑↓</kbd> · <kbd>Ctrl</kbd>+<kbd>U</kbd>안읽음
         </div>
         <div class="compact-pane" data-compact-pane="chat">
           <div class="compact-filter-row" id="compact-filter-row">
@@ -4455,6 +4458,31 @@
           </div>
           <div id="compact-friends-list-items"></div>
         </div>
+        <div class="compact-pane" data-compact-pane="calendar" hidden>
+          <div class="compact-cal-scroll">
+            <div class="compact-cal-toolbar">
+              <button type="button" class="compact-cal-tool-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">새로고침</button>
+              <button type="button" class="compact-cal-tool-btn is-primary" onclick="openScheduleBoardFromSidebarCalendar()" title="병동 일정 현황판">📋 현황판</button>
+              <button type="button" class="compact-cal-tool-btn" onclick="openDutyRosterModal()" title="주치의 OFF · 당직의 등록">일정등록</button>
+            </div>
+            <div class="compact-cal-panel schedule-box">
+              <div class="mini-calendar compact-mini-calendar">
+                <div class="mini-cal-header">
+                  <span class="mini-cal-nav" onclick="calendarChangeMonth(-1)" title="이전 달">‹</span>
+                  <span id="compact-mini-cal-title">달력</span>
+                  <span class="mini-cal-nav" onclick="calendarChangeMonth(1)" title="다음 달">›</span>
+                </div>
+                <div class="mini-cal-weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+                <div id="compact-mini-cal-grid" class="mini-cal-grid"></div>
+              </div>
+              <div class="compact-cal-day-label" id="compact-cal-day-label"></div>
+              <div id="compact-sidebar-calendar-day" class="sidebar-calendar-day">
+                <div class="sidebar-cal-day-duty" id="compact-cal-day-duty"></div>
+                <div class="sidebar-cal-day-body" id="compact-cal-day-body"></div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="compact-pane" data-compact-pane="more" hidden>
           <div class="compact-more-scroll">
             <div class="compact-more-profile">
@@ -4466,6 +4494,8 @@
               </div>
             </div>
             <div class="compact-more-grid">
+              <button type="button" class="compact-more-cell" onclick="setCompactRailTab('calendar')"><span class="compact-more-cell-icon" data-ui-icon="calendar"></span>달력</button>
+              <button type="button" class="compact-more-cell" onclick="openScheduleBoardModal()"><span class="compact-more-cell-icon" style="font-size:16px;line-height:1;">📋</span>현황판</button>
               <button type="button" class="compact-more-cell" onclick="openBoardModal()"><span class="compact-more-cell-icon" data-ui-icon="notice"></span>공지</button>
               <button type="button" class="compact-more-cell" onclick="openCompactBroadcastChat()"><span class="compact-more-cell-icon" data-ui-icon="chatBubble"></span>전체공지</button>
               <button type="button" class="compact-more-cell" onclick="openTransportRequestModal()"><span class="compact-more-cell-icon" style="font-size:18px;line-height:1;">🚑</span>이동</button>
@@ -9919,17 +9949,42 @@
       document.querySelectorAll('.compact-pane').forEach((pane) => {
         pane.hidden = pane.dataset.compactPane !== tab;
       });
-      const titles = { chat: '채팅', friends: '직원', more: '더보기' };
+      const titles = { chat: '채팅', friends: '직원', more: '더보기', calendar: '병원 달력' };
       const titleEl = document.getElementById('compact-header-title');
       if (titleEl) titleEl.textContent = titles[tab] || '채팅';
       const subEl = document.getElementById('compact-online-count');
-      if (subEl) subEl.style.display = tab === 'more' ? 'none' : '';
+      if (subEl) subEl.style.display = (tab === 'more') ? 'none' : '';
       if (tab === 'more') updateCompactMoreProfile();
+      else if (tab === 'calendar') refreshCompactCalendarPane();
       else updateCompactOnlineCount();
+      // 달력 탭에서는 헤더 검색 숨김
+      const searchBtn = document.getElementById('compact-header-search-btn');
+      if (searchBtn) searchBtn.style.display = (tab === 'calendar' || tab === 'more') ? 'none' : '';
       syncCompactFilterChipUi();
       syncCompactUnreadJumpUi();
       syncCompactConvenienceUi();
-      if (tab !== 'more') renderCompactList();
+      if (tab !== 'more' && tab !== 'calendar') renderCompactList();
+    }
+
+    function refreshCompactCalendarPane() {
+      if (!selectedCalendarDateStr) selectedCalendarDateStr = formatDateStr(new Date());
+      renderMiniCalendar();
+      renderSidebarCalendarDay(selectedCalendarDateStr);
+      updateCompactCalendarDayLabel();
+      updateCompactOnlineCount();
+    }
+
+    function updateCompactCalendarDayLabel() {
+      const el = document.getElementById('compact-cal-day-label');
+      if (!el) return;
+      const d = selectedCalendarDateStr || formatDateStr(new Date());
+      try {
+        el.textContent = typeof formatCalendarDayHeader === 'function'
+          ? formatCalendarDayHeader(d)
+          : d;
+      } catch (_) {
+        el.textContent = d;
+      }
     }
 
 
@@ -9938,7 +9993,7 @@
       const countEl = document.getElementById('compact-unread-jump-count');
       const total = getTotalUnread();
       if (!btn) return;
-      const show = isCompactMode && !activeChatUser && total > 0 && compactRailTab !== 'more';
+      const show = isCompactMode && !activeChatUser && total > 0 && compactRailTab !== 'more' && compactRailTab !== 'calendar';
       btn.style.display = show ? 'flex' : 'none';
       if (countEl) countEl.textContent = formatUnreadBadge(total);
     }
@@ -10225,6 +10280,12 @@
     function updateCompactOnlineCount() {
       const el = document.getElementById('compact-online-count');
       if (!el || compactRailTab === 'more') return;
+      if (compactRailTab === 'calendar') {
+        const d = selectedCalendarDateStr || formatDateStr(new Date());
+        const n = (typeof getSchedulesForDate === 'function' ? getSchedulesForDate(d) : []).length;
+        el.textContent = n > 0 ? `일정 ${n}건` : '일정 없음';
+        return;
+      }
       const staff = (allUsers || []).filter((u) => !isSharedPcUser(u) || isDirectorySelfUser(u));
       const online = staff.filter((u) => u.online).length;
       if (compactRailTab === 'friends') {
@@ -10708,6 +10769,10 @@
     async function renderCompactList() {
       if (compactRailTab === 'more') {
         updateCompactMoreProfile();
+        return;
+      }
+      if (compactRailTab === 'calendar') {
+        refreshCompactCalendarPane();
         return;
       }
       const container = document.getElementById(compactRailTab === 'friends' ? 'compact-friends-list-items' : 'compact-list-items');
@@ -21014,9 +21079,7 @@
       return card;
     }
 
-    function renderSidebarCalendarDay(dateStr) {
-      const bodyEl = document.getElementById('sidebar-cal-day-body');
-      const dutyEl = document.getElementById('sidebar-cal-day-duty');
+    function fillSidebarCalendarDayTargets(bodyEl, dutyEl, dateStr) {
       if (!bodyEl || !dateStr) return;
 
       const list = getSchedulesForDate(dateStr);
@@ -21078,6 +21141,25 @@
         otherWrap.className = 'sidebar-cal-other-list';
         renderSidebarOtherListContent(otherWrap, others);
         bodyEl.appendChild(otherWrap);
+      }
+    }
+
+    function renderSidebarCalendarDay(dateStr) {
+      if (!dateStr) return;
+      fillSidebarCalendarDayTargets(
+        document.getElementById('sidebar-cal-day-body'),
+        document.getElementById('sidebar-cal-day-duty'),
+        dateStr
+      );
+      fillSidebarCalendarDayTargets(
+        document.getElementById('compact-cal-day-body'),
+        document.getElementById('compact-cal-day-duty'),
+        dateStr
+      );
+      if (typeof updateCompactCalendarDayLabel === 'function') updateCompactCalendarDayLabel();
+      if (typeof compactRailTab !== 'undefined' && compactRailTab === 'calendar'
+          && typeof updateCompactOnlineCount === 'function') {
+        updateCompactOnlineCount();
       }
     }
 
@@ -22780,9 +22862,9 @@
       return `<span class="cal-marks">${parts.join('')}</span>`;
     }
 
-    function renderMiniCalendar() {
-      const grid = document.getElementById('mini-cal-grid');
-      const titleEl = document.getElementById('mini-cal-title');
+    function renderMiniCalendarInto(gridId, titleId) {
+      const grid = document.getElementById(gridId);
+      const titleEl = document.getElementById(titleId);
       if (!grid || !titleEl) return;
 
       const year = calendarViewDate.getFullYear();
@@ -22821,6 +22903,11 @@
         if (!cell.other) el.onclick = () => calendarSelectDate(cell.dateStr);
         grid.appendChild(el);
       });
+    }
+
+    function renderMiniCalendar() {
+      renderMiniCalendarInto('mini-cal-grid', 'mini-cal-title');
+      renderMiniCalendarInto('compact-mini-cal-grid', 'compact-mini-cal-title');
     }
 
     function renderSchedules() {

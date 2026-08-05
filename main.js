@@ -3766,14 +3766,14 @@ app.whenReady().then(async () => {
   }
   initSpellCheckerSession();
   registerMiraeFileProtocol();
-  createWindow();
-  createTray();
-  registerGlobalShortcuts();
-  // 작업표시줄 Jump List로 앱이 꺼진 상태에서 실행된 경우
+  // Jump List cold-start: createWindow 전에 큐잉 (did-finish-load 레이스 방지)
   const bootAction = parseMiraeLaunchAction(process.argv);
   if (bootAction) {
     pendingShellAction = bootAction;
   }
+  createWindow();
+  createTray();
+  registerGlobalShortcuts();
   startUdpDiscovery();
   startTcpServer();
   startMobileServer(db, MY_IP);
