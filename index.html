@@ -1894,6 +1894,25 @@
     #chat-search-bar { display: none; padding: 8px 24px; border-bottom: 1px solid var(--border-soft); gap: 8px; align-items: center; background: var(--surface-muted); flex-shrink: 0; }
     #chat-search-bar input { flex: 1; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 12px; outline: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     #chat-search-bar input:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
+    mark.search-kw-hit {
+      background: #fde047;
+      color: #713f12;
+      padding: 0 2px;
+      border-radius: 3px;
+      font-weight: 700;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+    .msg-row.is-me .msg-text mark.search-kw-hit,
+    .is-me .chat-bubble mark.search-kw-hit {
+      background: #fef08a;
+      color: #854d0e;
+    }
+    .log-card-body mark.search-kw-hit,
+    .log-card-sender mark.search-kw-hit {
+      background: #fde047;
+      color: #713f12;
+    }
 
     .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: 14px; display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; content-visibility: auto; }
     .chat-img-preview:hover { opacity: 0.94; transform: none; }
@@ -8502,6 +8521,8 @@
     let importantMsgKeys = new Set();
     let cachedNoticesList = [];
     let chatSearchDebounce = null;
+    /** 대화방 Ctrl+F 검색 중일 때 하이라이트용 키워드 */
+    let activeChatSearchKeyword = '';
     let scheduledForCurrentChat = [];
     let pendingScrollTimer = null;
     let pendingUnreadScrollCount = 0;
@@ -13657,6 +13678,50 @@
       return normalizeDisplayText(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    /** 평문(이미 escape된 문자열 포함)에서 검색어를 <mark>로 감쌈 */
+    function highlightSearchKeywordText(text, keyword) {
+      const raw = String(text == null ? '' : text);
+      const q = String(keyword || '').trim();
+      if (!q || !raw) return raw;
+      const lower = raw.toLowerCase();
+      const ql = q.toLowerCase();
+      let out = '';
+      let cursor = 0;
+      let hit = lower.indexOf(ql, cursor);
+      while (hit !== -1) {
+        // HTML 엔티티(&amp; 등) 한가운데는 건너뜀
+        const amp = raw.lastIndexOf('&', hit);
+        const semi = raw.indexOf(';', hit);
+        if (amp !== -1 && semi !== -1 && amp < hit && semi >= hit && (semi - amp) < 12 && raw.slice(amp + 1, semi).indexOf(' ') === -1) {
+          out += raw.slice(cursor, semi + 1);
+          cursor = semi + 1;
+          hit = lower.indexOf(ql, cursor);
+          continue;
+        }
+        out += raw.slice(cursor, hit);
+        out += `<mark class="search-kw-hit">${raw.slice(hit, hit + q.length)}</mark>`;
+        cursor = hit + q.length;
+        hit = lower.indexOf(ql, cursor);
+      }
+      out += raw.slice(cursor);
+      return out;
+    }
+
+    /** 평문을 escape한 뒤 검색어 하이라이트 */
+    function highlightSearchKeywordPlain(text, keyword) {
+      return highlightSearchKeywordText(escapeHtml(text), keyword);
+    }
+
+    /** 메시지 HTML: 태그 밖 텍스트에만 검색어 하이라이트 */
+    function highlightSearchKeywordInHtml(html, keyword) {
+      const q = String(keyword || '').trim();
+      if (!q || typeof html !== 'string' || !html) return html;
+      return html.replace(/(<[^>]+>)|([^<]+)/g, (m, tag, text) => {
+        if (tag) return tag;
+        return highlightSearchKeywordText(text, q);
+      });
+    }
+
     async function loadAllChatLogs(keyword) {
       const container = document.getElementById('all-logs-container');
       const countEl = document.getElementById('all-logs-count');
@@ -13728,6 +13793,9 @@
               <button type="button" class="log-unmark-btn" data-unmark-key="${escapeHtml(entryKey)}">중요 해제</button>
             </div>`
           : '';
+        const kw = String(keyword || '').trim();
+        const senderHtml = kw ? highlightSearchKeywordPlain(senderName, kw) : escapeHtml(senderName);
+        const bodyHtml = kw ? highlightSearchKeywordPlain(preview, kw) : escapeHtml(preview);
 
         card.innerHTML = `
           <div class="log-card-rail" aria-hidden="true"></div>
@@ -13735,11 +13803,11 @@
           <div class="log-card-main">
             <div class="log-card-top">
               <span class="log-card-direction ${dirClass}">${dirLabel}</span>
-              <span class="log-card-sender" title="${escapeHtml(senderName)}">${escapeHtml(senderName)}</span>
+              <span class="log-card-sender" title="${escapeHtml(senderName)}">${senderHtml}</span>
               <span class="log-card-type ${typeMeta.class}" title="${escapeHtml(contextLabel)}">${escapeHtml(contextLabel)}</span>
               <span class="log-card-time" title="${escapeHtml(item.created_time || '')}">${escapeHtml(timeParts.timeLabel)}</span>
             </div>
-            <div class="log-card-body">${escapeHtml(preview)}</div>
+            <div class="log-card-body">${bodyHtml}</div>
             ${importantActions}
           </div>
         `;
@@ -15810,6 +15878,7 @@
       const loadGen = ++chatHistoryLoadGen;
       const aroundDate = opts && opts.aroundDate ? String(opts.aroundDate).trim() : null;
       const scrollToDate = opts && opts.scrollToDate ? String(opts.scrollToDate).trim() : aroundDate;
+      activeChatSearchKeyword = (keyword && String(keyword).trim()) || '';
       chatHistoryLoadingOlder = false;
       chatHistoryLoadingNewer = false;
       chatHistoryHasNewer = false;
@@ -17105,7 +17174,13 @@
       const bar = document.getElementById('chat-search-bar');
       if (bar) bar.style.display = 'none';
       const input = document.getElementById('chat-search-input');
-      if (input && input.value) { input.value = ''; loadChatHistory(); }
+      if (input && input.value) {
+        input.value = '';
+        activeChatSearchKeyword = '';
+        loadChatHistory();
+      } else {
+        activeChatSearchKeyword = '';
+      }
       syncChatSearchToggleUi();
     }
     function onChatSearchInput(value) {
@@ -18837,9 +18912,15 @@
       const importantBadgeHtml = isImportantMsg ? `<div class="msg-important-badge">⭐ 중요</div>` : '';
       const unreadCountHtml = (isMe && isGroupChannel && msgUid)
         ? `<span class="msg-unread-count"></span>` : '';
-      const displayMsg = prepareChatMessageHtml(
-        isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg
-      );
+      const displayMsg = (() => {
+        let html = prepareChatMessageHtml(
+          isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg
+        );
+        if (activeChatSearchKeyword) {
+          html = highlightSearchKeywordInHtml(html, activeChatSearchKeyword);
+        }
+        return html;
+      })();
       const pendingNoticeHtml = offlinePendingNoticeHtml(isMe, outboundStatus, sentAtLabelForPending || time);
 
       const useBubbleLayout = compact && isGroupChannel;
