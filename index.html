@@ -4531,7 +4531,7 @@
 
       <div class="settings-panel" data-settings-panel="notify">
         <h3 class="settings-panel-title">알림</h3>
-        <p class="settings-panel-desc">새 메시지·읽음 확인 알림을 설정합니다.</p>
+        <p class="settings-panel-desc">새 메시지·읽음 확인·병원 일정 알람을 설정합니다.</p>
         <div class="settings-card settings-notify-section">
           <div class="settings-notify-list">
             <label class="settings-toggle-row" for="setting-notify-incoming">
@@ -4570,6 +4570,35 @@
               <span class="settings-toast-dur">
                 <input type="number" id="setting-toast-duration" min="2" max="60" step="1" value="7" aria-label="토스트 표시 시간(초)">
                 <span>초</span>
+              </span>
+            </label>
+            <div class="settings-divider"></div>
+            <div class="settings-section-title">병원 일정 알람</div>
+            <label class="settings-toggle-row" for="setting-schedule-alarm-enabled">
+              <input type="checkbox" id="setting-schedule-alarm-enabled">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">일정 알람 사용</span>
+                <span class="settings-toggle-desc">기본은 꺼짐 · 켜면 아래 시점에 맞춰 알립니다</span>
+              </span>
+            </label>
+            <label class="settings-field" style="margin-top:4px;">
+              알람이 나오는 시점
+              <select id="setting-schedule-alarm-lead" class="settings-select">
+                <option value="0">예정 시각에</option>
+                <option value="5">5분 전</option>
+                <option value="10">10분 전</option>
+                <option value="15">15분 전</option>
+                <option value="30">30분 전</option>
+                <option value="60">1시간 전</option>
+                <option value="1440">하루 전</option>
+              </select>
+            </label>
+            <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">같은 시점에 여러 일정이 있으면 내용을 모아 <b>한 번만</b> 알립니다.</p>
+            <label class="settings-toggle-row" for="setting-schedule-alarm-on-edit" style="margin-top:6px;">
+              <input type="checkbox" id="setting-schedule-alarm-on-edit">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">일정 수정 시 다시 알람</span>
+                <span class="settings-toggle-desc">끄면 이미 알린 일정은 시간이·내용이 바뀌어도 다시 울리지 않습니다</span>
               </span>
             </label>
           </div>
@@ -5776,7 +5805,111 @@
     let scheduleBoardSearchRenderTimer = null;
     /** null = 아직 칩 미생성. '' 와 구분해야 일정이 없어도 고정 주치의 칩이 렌더됨 */
     let scheduleBoardDoctorSelectKey = null;
-    let notifiedScheduleUids = new Set(JSON.parse(localStorage.getItem('notifiedScheduleUids') || '[]'));
+    let notifiedScheduleUids = loadScheduleAlarmNotifiedState();
+
+    function loadScheduleAlarmNotifiedState() {
+      try {
+        const raw = JSON.parse(localStorage.getItem('scheduleAlarmNotifiedState') || 'null');
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+      } catch (_) {}
+      // 예전 형식(uid 배열) → 지문 없는 상태로 이전
+      try {
+        const legacy = JSON.parse(localStorage.getItem('notifiedScheduleUids') || '[]');
+        if (Array.isArray(legacy)) {
+          const next = {};
+          legacy.forEach((k) => {
+            const key = String(k || '').replace(/_pre$/, '');
+            if (key) next[key] = { fp: '' };
+          });
+          return next;
+        }
+      } catch (_) {}
+      return {};
+    }
+
+    function persistScheduleAlarmNotifiedState() {
+      localStorage.setItem('scheduleAlarmNotifiedState', JSON.stringify(notifiedScheduleUids));
+    }
+
+    function isScheduleAlarmEnabled() {
+      return !!appSettings.scheduleAlarmEnabled;
+    }
+
+    function getScheduleAlarmLeadMinutes() {
+      const n = parseInt(appSettings.scheduleAlarmLeadMinutes, 10);
+      const allowed = [0, 5, 10, 15, 30, 60, 1440];
+      return allowed.includes(n) ? n : 0;
+    }
+
+    function isScheduleAlarmOnEdit() {
+      return !!appSettings.scheduleAlarmOnEdit;
+    }
+
+    function scheduleAlarmFingerprint(sch) {
+      if (!sch) return '';
+      return [
+        sch.uid || '',
+        sch.type || '',
+        sch.title || '',
+        sch.time_str || '',
+        sch.time_end_str || '',
+        sch.modified_at || '',
+        sch.remind_before ? '1' : '0'
+      ].join('|');
+    }
+
+    function scheduleAlarmTypeLabel(sch) {
+      const m = SCHEDULE_TYPE_ORDER.find((x) => x.key === (sch && sch.type));
+      let label = (m && m.label) || '일정';
+      if (isScheduleGuardianOnly(sch)) label += '·보호자만';
+      return label;
+    }
+
+    function scheduleAlarmTriggerAt(sch, leadMinutes) {
+      const t = new Date(sch && sch.time_str).getTime();
+      if (!Number.isFinite(t)) return NaN;
+      return t - (Math.max(0, leadMinutes || 0) * 60 * 1000);
+    }
+
+    function formatScheduleAlarmLine(sch) {
+      const type = scheduleAlarmTypeLabel(sch);
+      const title = (sch && sch.title) ? String(sch.title).trim() : '';
+      const when = sch && sch.time_end_str
+        ? formatScheduleTimeRange(sch)
+        : (sch && sch.time_str
+          ? (() => {
+              try {
+                const d = new Date(sch.time_str);
+                if (!Number.isFinite(d.getTime())) return String(sch.time_str);
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
+              } catch (_) {
+                return String(sch.time_str);
+              }
+            })()
+          : '');
+      const meta = formatScheduleExtraMeta(sch);
+      return [when, `[${type}]`, title, meta].filter(Boolean).join(' ');
+    }
+
+    function seedScheduleAlarmNotifiedForPastDue() {
+      const lead = getScheduleAlarmLeadMinutes();
+      const now = Date.now();
+      let changed = false;
+      (hospitalSchedules || []).forEach((sch) => {
+        if (!sch || !sch.uid) return;
+        const triggerAt = scheduleAlarmTriggerAt(sch, lead);
+        if (!Number.isFinite(triggerAt) || now < triggerAt) return;
+        const fp = scheduleAlarmFingerprint(sch);
+        const prev = notifiedScheduleUids[sch.uid];
+        if (!prev || prev.fp !== fp) {
+          notifiedScheduleUids[sch.uid] = { fp };
+          changed = true;
+        }
+      });
+      if (changed) persistScheduleAlarmNotifiedState();
+    }
     let allUsers = [];
     const CONTACT_SNAPSHOT_STORAGE_KEY = 'miraeContactSnapshots';
     let contactSnapshotsCache = null;
@@ -5989,6 +6122,9 @@
     if (appSettings.privacyLockOnHide === undefined) appSettings.privacyLockOnHide = true;
     if (appSettings.privacyLockIdleMinutes === undefined) appSettings.privacyLockIdleMinutes = 0;
     if (typeof appSettings.privacyLockPinHash !== 'string') appSettings.privacyLockPinHash = '';
+    if (appSettings.scheduleAlarmEnabled === undefined) appSettings.scheduleAlarmEnabled = false;
+    if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
+    if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -19548,64 +19684,95 @@
     }
 
     async function startScheduleAlarmChecker() {
-      setInterval(() => {
+      const ALARM_GRACE_MS = 3 * 60 * 1000; // 폴링 간격·지연을 감안한 허용 창
+      setInterval(async () => {
+        if (!isScheduleAlarmEnabled()) return;
+
+        const lead = getScheduleAlarmLeadMinutes();
+        const onEdit = isScheduleAlarmOnEdit();
+        const now = Date.now();
+        const liveUids = new Set();
+        const dueBatch = [];
         let updated = false;
-        const now = new Date();
-        const currentScheduleUids = new Set(); // 누수 방지용 추적 Set
 
-        (hospitalSchedules || []).forEach(sch => {
-          currentScheduleUids.add(sch.uid);
-          currentScheduleUids.add(`${sch.uid}_pre`);
+        (hospitalSchedules || []).forEach((sch) => {
+          if (!sch || !sch.uid) return;
+          liveUids.add(sch.uid);
+          const fp = scheduleAlarmFingerprint(sch);
+          const prev = notifiedScheduleUids[sch.uid];
+          const triggerAt = scheduleAlarmTriggerAt(sch, lead);
+          if (!Number.isFinite(triggerAt)) return;
 
-          let prefix = '[일정 알람]';
-          if (sch.type === 'ADMISSION') prefix = '[🟢 환자 입원 알람]';
-          if (sch.type === 'DISCHARGE') prefix = '[🔴 환자 퇴원 알람]';
-          if (sch.type === 'OUTPATIENT') prefix = '[🟠 외진 알람]';
-          if (sch.type === 'EXAM') prefix = '[🩺 검사 알람]';
-          if (sch.type === 'OUTING') prefix = '[🟡 외출 알람]';
-          if (sch.type === 'OVERNIGHT') prefix = '[🟣 외박 알람]';
-          if (sch.type === 'ROOM_CHANGE') prefix = '[🔷 환자 전실 알람]';
-          if (sch.type === 'TRANSFER') prefix = '[🔵 전원 알람]';
-          if (sch.type === 'LEAVE') prefix = '[🟣 연차 알람]';
-          const alarmBody = scheduleAlarmBody(sch);
-
-          const fire = async (title, body) => {
-            if (window.Notification && Notification.permission === 'granted') {
-              new Notification(title, { body, silent: false });
-            } else {
-              await appAlert(`${title}\n${body}`);
-            }
-          };
-
-          if (!notifiedScheduleUids.has(sch.uid)) {
-            const schTime = new Date(sch.time_str);
-            if (now >= schTime) {
-              notifiedScheduleUids.add(sch.uid);
+          if (prev) {
+            if (prev.fp === fp) return;
+            if (!onEdit) {
+              // 수정돼도 재알람 안 함 → 지문만 갱신
+              notifiedScheduleUids[sch.uid] = { fp };
               updated = true;
-              fire(`🚨 ${prefix}`, alarmBody);
+              return;
             }
+            // 수정 시 재알람: 이전 알림 기록을 지우고 아래 로직으로 다시 판단
+            delete notifiedScheduleUids[sch.uid];
+            updated = true;
           }
 
-          if (sch.remind_before && !notifiedScheduleUids.has(`${sch.uid}_pre`)) {
-            const preTime = new Date(new Date(sch.time_str).getTime() - 24 * 60 * 60 * 1000);
-            if (now >= preTime) {
-              notifiedScheduleUids.add(`${sch.uid}_pre`);
-              updated = true;
-              fire(`🔔 [내일 예정] ${prefix}`, alarmBody);
-            }
+          if (now < triggerAt) return;
+
+          // 이미 오래 지난 일정은 조용히 처리 (켠 직후 과거 일정 폭주 방지)
+          if (now - triggerAt > ALARM_GRACE_MS) {
+            notifiedScheduleUids[sch.uid] = { fp };
+            updated = true;
+            return;
           }
+
+          dueBatch.push(sch);
+          notifiedScheduleUids[sch.uid] = { fp };
+          updated = true;
         });
 
-        // 삭제되었거나 지나간 스케줄 UID를 정리하여 메모리 누수 방지
-        for (const uid of notifiedScheduleUids) {
-          if (!currentScheduleUids.has(uid)) {
-            notifiedScheduleUids.delete(uid);
+        for (const uid of Object.keys(notifiedScheduleUids)) {
+          if (!liveUids.has(uid)) {
+            delete notifiedScheduleUids[uid];
             updated = true;
           }
         }
 
-        if (updated) {
-          localStorage.setItem('notifiedScheduleUids', JSON.stringify([...notifiedScheduleUids]));
+        if (updated) persistScheduleAlarmNotifiedState();
+
+        if (!dueBatch.length) return;
+
+        dueBatch.sort((a, b) => {
+          const ta = new Date(a.time_str).getTime() || 0;
+          const tb = new Date(b.time_str).getTime() || 0;
+          return ta - tb;
+        });
+
+        const leadLabel = lead === 0
+          ? '예정 시각'
+          : lead === 1440
+            ? '하루 전'
+            : lead >= 60
+              ? `${Math.round(lead / 60)}시간 전`
+              : `${lead}분 전`;
+        const lines = dueBatch.map((sch, i) => `${i + 1}. ${formatScheduleAlarmLine(sch)}`);
+        const title = dueBatch.length === 1
+          ? `일정 알람 · ${scheduleAlarmTypeLabel(dueBatch[0])}`
+          : `일정 알람 ${dueBatch.length}건`;
+        const body = [`알림 시점: ${leadLabel}`, ...lines].join('\n');
+
+        try {
+          if (window.Notification && Notification.permission === 'granted') {
+            new Notification(title, { body, silent: false });
+          } else if (window.Notification && Notification.permission !== 'denied') {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') new Notification(title, { body, silent: false });
+            else await appAlert(`${title}\n\n${body}`);
+          } else {
+            await appAlert(`${title}\n\n${body}`);
+          }
+        } catch (e) {
+          console.error('일정 알람 표시 실패:', e);
+          try { await appAlert(`${title}\n\n${body}`); } catch (_) {}
         }
       }, 10000);
     }
@@ -20083,6 +20250,13 @@
         const spellEl = document.getElementById('setting-spellcheck');
         if (spellEl) spellEl.checked = appSettings.spellcheck === true;
 
+        const schAlarmEn = document.getElementById('setting-schedule-alarm-enabled');
+        if (schAlarmEn) schAlarmEn.checked = !!appSettings.scheduleAlarmEnabled;
+        const schAlarmLead = document.getElementById('setting-schedule-alarm-lead');
+        if (schAlarmLead) schAlarmLead.value = String(getScheduleAlarmLeadMinutes());
+        const schAlarmEdit = document.getElementById('setting-schedule-alarm-on-edit');
+        if (schAlarmEdit) schAlarmEdit.checked = !!appSettings.scheduleAlarmOnEdit;
+
         if (appSettings.fileMode === 'ask') document.getElementById('recv-ask').checked = true;
         else document.getElementById('recv-auto').checked = true;
 
@@ -20161,12 +20335,26 @@
   const privacyLockOnHide = appSettings.privacyLockOnHide !== false;
   const privacyLockIdleMinutes = appSettings.privacyLockIdleMinutes || 0;
 
+  const scheduleAlarmEnabled = !!(document.getElementById('setting-schedule-alarm-enabled')
+    && document.getElementById('setting-schedule-alarm-enabled').checked);
+  const leadRaw = parseInt(document.getElementById('setting-schedule-alarm-lead')?.value, 10);
+  const scheduleAlarmLeadMinutes = [0, 5, 10, 15, 30, 60, 1440].includes(leadRaw) ? leadRaw : 0;
+  const scheduleAlarmOnEdit = !!(document.getElementById('setting-schedule-alarm-on-edit')
+    && document.getElementById('setting-schedule-alarm-on-edit').checked);
+  const wasScheduleAlarmEnabled = !!appSettings.scheduleAlarmEnabled;
+  const prevScheduleAlarmLeadMinutes = getScheduleAlarmLeadMinutes();
+
   appSettings = {
     fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
     spellcheck, showUserListAvatars, showOfflineUsers, showSharedPcs, compactPersonClickMode,
-    privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes
+    privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
+    scheduleAlarmEnabled, scheduleAlarmLeadMinutes, scheduleAlarmOnEdit
   };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
+  // 방금 켰거나 알림 시점을 바꾼 경우: 이미 지난 트리거는 한꺼번에 울리지 않도록 맞춤
+  if (scheduleAlarmEnabled && (!wasScheduleAlarmEnabled || scheduleAlarmLeadMinutes !== prevScheduleAlarmLeadMinutes)) {
+    seedScheduleAlarmNotifiedForPastDue();
+  }
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
   // 저장 함수 파라미터에 floor, dept, rank, photo 추가
