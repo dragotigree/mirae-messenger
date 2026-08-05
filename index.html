@@ -7210,7 +7210,7 @@
       const onlineEl = document.getElementById('ipmsg-online-count');
       if (onlineEl) {
         const myIp = myProfile && myProfile.ip;
-        onlineEl.textContent = String((allUsers || []).filter((u) => u.online && u.ip !== myIp).length);
+        onlineEl.textContent = String(countStaffUsers(allUsers, (u) => u.online && u.ip !== myIp));
       }
       const checkAll = document.getElementById('ipmsg-check-all');
       if (checkAll && ipmsgVisibleUserIps.length) {
