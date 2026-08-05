@@ -1420,6 +1420,68 @@
     .ipmsg-send-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(14, 165, 233, 0.42); }
     .ipmsg-send-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
+    /* ⌨️ 채팅 빠른 전환 (Ctrl+1) */
+    #chat-quick-switcher-overlay {
+      display: none; position: fixed; inset: 0; z-index: 12050;
+      background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(4px);
+      align-items: flex-start; justify-content: center; padding: 12vh 16px 24px;
+    }
+    #chat-quick-switcher-overlay.is-open { display: flex; }
+    .chat-quick-switcher-panel {
+      width: min(480px, 96vw); max-height: min(70vh, 520px);
+      background: #fff; border-radius: 16px; box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .chat-quick-switcher-head {
+      padding: 12px 14px 8px; border-bottom: 1px solid #eef2f6; flex-shrink: 0;
+    }
+    .chat-quick-switcher-title { font-size: 13px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; }
+    .chat-quick-switcher-hint { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
+    .chat-quick-switcher-search {
+      margin-top: 8px; width: 100%; box-sizing: border-box; padding: 8px 11px;
+      border: 1px solid #e2e8f0; border-radius: 10px; font-size: 13px; outline: none;
+    }
+    .chat-quick-switcher-search:focus { border-color: #7dd3fc; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+    .chat-quick-switcher-list {
+      flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 10px;
+    }
+    .chat-quick-switcher-section {
+      font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;
+      letter-spacing: 0.04em; padding: 8px 8px 4px;
+    }
+    .chat-quick-switcher-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px;
+      cursor: pointer; border: 1px solid transparent; transition: background 0.1s, border-color 0.1s;
+    }
+    .chat-quick-switcher-item:hover { background: #f8fafc; }
+    .chat-quick-switcher-item.is-active {
+      background: #eff6ff; border-color: #bfdbfe;
+      box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.08);
+    }
+    .chat-quick-switcher-item.is-current { font-weight: 700; }
+    .chat-quick-switcher-icon {
+      width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; background: #f1f5f9; color: #334155; overflow: hidden;
+    }
+    .chat-quick-switcher-icon.avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .chat-quick-switcher-body { min-width: 0; flex: 1; }
+    .chat-quick-switcher-name {
+      font-size: 13px; font-weight: 600; color: #0f172a; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .chat-quick-switcher-sub {
+      font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+    }
+    .chat-quick-switcher-badge {
+      flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+      background: #e0f2fe; color: #0369a1;
+    }
+    .chat-quick-switcher-empty {
+      text-align: center; color: #94a3b8; font-size: 12px; padding: 24px 12px;
+    }
+
     .btn-schedule, .btn-quickphrase, .btn-capture, .btn-urgent {
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; height: 34px; padding: 0; background: transparent; border: none; border-radius: 10px;
@@ -4363,6 +4425,18 @@
         <input type="password" id="privacy-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyMasterUnlock();}">
         <button type="button" class="privacy-lock-unlock-btn" onclick="confirmPrivacyMasterUnlock()">마스터로 해제</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ⌨️ 채팅 빠른 전환 (Ctrl+1) -->
+  <div id="chat-quick-switcher-overlay" class="chat-quick-switcher-overlay" aria-hidden="true" onclick="if(event.target===this) closeChatQuickSwitcher()">
+    <div class="chat-quick-switcher-panel" role="dialog" aria-modal="true" aria-labelledby="chat-quick-switcher-title" onclick="event.stopPropagation()">
+      <div class="chat-quick-switcher-head">
+        <div class="chat-quick-switcher-title" id="chat-quick-switcher-title">채널 · 대화방 이동</div>
+        <div class="chat-quick-switcher-hint">↑↓ 이동 · Enter 열기 · Esc 닫기</div>
+        <input type="text" id="chat-quick-switcher-search" class="chat-quick-switcher-search" placeholder="이름·채널 검색..." autocomplete="off" spellcheck="false" oninput="onChatQuickSwitcherFilterInput(this.value)">
+      </div>
+      <div class="chat-quick-switcher-list" id="chat-quick-switcher-list" role="listbox" aria-label="채널 및 대화방"></div>
     </div>
   </div>
 
@@ -8122,6 +8196,7 @@
         { test: () => isFlexOverlay('group-chat-modal'), close: () => closeGroupChatModal(), confirm: false },
         { test: () => isFlexOverlay('share-message-modal'), close: () => closeShareMessageModal(), confirm: true, name: '메시지 전달' },
         { test: () => isFlexOverlay('schedule-msg-modal'), close: () => closeScheduleMessageModal(), confirm: true, name: '예약 메시지' },
+        { test: () => isChatQuickSwitcherOpen(), close: () => closeChatQuickSwitcher(), confirm: false },
         { test: () => isFlexOverlay('ipmsg-send-modal'), close: () => closeIpmsgSendModal(), confirm: true, name: '쪽지 보내기' },
         { test: () => isFlexOverlay('code-alert-modal'), close: () => closeCodeAlertModal(), confirm: true, name: '코드 발령' },
         { test: () => isFlexOverlay('transport-request-modal'), close: () => closeTransportRequestModal(), confirm: true, name: '이동기사 요청' },
@@ -9805,6 +9880,205 @@
         return;
       }
       Promise.resolve(selectUserChat({ ip: key, username: key, rank: '', dept: '', floor: '', extNo: '' })).then(afterOpen);
+    }
+
+    let chatQuickSwitcher = { open: false, items: [], filtered: [], index: 0, filter: '' };
+
+    function isChatQuickSwitcherOpen() {
+      const el = document.getElementById('chat-quick-switcher-overlay');
+      return !!(el && el.classList.contains('is-open'));
+    }
+
+    function getActiveChatChannelKey() {
+      if (!activeChatUser || !activeChatUser.ip) return '';
+      return String(activeChatUser.ip);
+    }
+
+    async function buildChatQuickSwitcherItems() {
+      const items = [];
+      const seen = new Set();
+      const push = (item) => {
+        if (!item || !item.key || seen.has(item.key)) return;
+        seen.add(item.key);
+        items.push(item);
+      };
+
+      getOrderedChannelEntries().forEach((entry) => {
+        if (entry.key === 'TRANSPORT' || entry.key === 'CODE_ALERT') return;
+        const label = getChannelDisplayName(entry.key, entry.defaultName);
+        const kind = entry.key === 'BROADCAST' ? 'channel' : (entry.key.startsWith('GROUP:') ? 'group' : 'channel');
+        push({
+          key: entry.key,
+          section: '채널 및 대화방',
+          title: label,
+          subtitle: entry.key.startsWith('GROUP:') ? '그룹 대화방' : '채널',
+          iconHtml: escapeHtml(getChannelSidebarIcon(entry)),
+          iconClass: '',
+          searchText: `${label} ${entry.defaultName || ''} 채널 그룹`,
+          activate: () => entry.onClick()
+        });
+      });
+
+      const recent = buildCompactConversationRows(await loadCompactRecentConversations(true));
+      recent.forEach((row) => {
+        if (!row || !row.key) return;
+        if (row.key === 'TRANSPORT' || row.key === 'CODE_ALERT') return;
+        const meta = resolveCompactConversationMeta(row.key);
+        if (!meta) return;
+        const section = meta.kind === 'dm' ? '최근 대화' : '채널 및 대화방';
+        push({
+          key: row.key,
+          section,
+          title: (meta.name || row.name || '').replace(/^\s*⭐\s*/, '⭐ ').trim() || row.key,
+          subtitle: row.preview || meta.searchText || '',
+          iconHtml: meta.avatarHtml || '',
+          iconClass: meta.avatarClass || '',
+          searchText: `${meta.searchText || ''} ${row.preview || ''} ${meta.name || ''}`,
+          activate: () => openChatFromToastChannelKey(row.key)
+        });
+      });
+
+      return items;
+    }
+
+    function applyChatQuickSwitcherFilter() {
+      const q = String(chatQuickSwitcher.filter || '').trim().toLowerCase();
+      chatQuickSwitcher.filtered = !q
+        ? chatQuickSwitcher.items.slice()
+        : chatQuickSwitcher.items.filter((it) => {
+          const hay = `${it.title} ${it.subtitle} ${it.searchText}`.toLowerCase();
+          return hay.includes(q);
+        });
+      const activeKey = getActiveChatChannelKey();
+      let idx = chatQuickSwitcher.filtered.findIndex((it) => it.key === activeKey);
+      if (idx < 0) idx = 0;
+      chatQuickSwitcher.index = Math.max(0, Math.min(idx, chatQuickSwitcher.filtered.length - 1));
+    }
+
+    function renderChatQuickSwitcherList() {
+      const host = document.getElementById('chat-quick-switcher-list');
+      if (!host) return;
+      const list = chatQuickSwitcher.filtered;
+      if (!list.length) {
+        host.innerHTML = '<div class="chat-quick-switcher-empty">일치하는 채널·대화가 없습니다.</div>';
+        return;
+      }
+      const activeKey = getActiveChatChannelKey();
+      let lastSection = '';
+      let html = '';
+      list.forEach((it, i) => {
+        if (it.section && it.section !== lastSection) {
+          lastSection = it.section;
+          html += `<div class="chat-quick-switcher-section">${escapeHtml(lastSection)}</div>`;
+        }
+        const isSel = i === chatQuickSwitcher.index;
+        const isCur = it.key === activeKey;
+        html += `<div class="chat-quick-switcher-item${isSel ? ' is-active' : ''}${isCur ? ' is-current' : ''}" role="option" aria-selected="${isSel}" data-switcher-index="${i}">
+          <div class="chat-quick-switcher-icon ${(it.iconClass || '').replace(/"/g, '')}">${it.iconHtml || '💬'}</div>
+          <div class="chat-quick-switcher-body">
+            <div class="chat-quick-switcher-name">${escapeHtml(it.title)}</div>
+            ${it.subtitle ? `<div class="chat-quick-switcher-sub">${escapeHtml(it.subtitle)}</div>` : ''}
+          </div>
+          ${isCur ? '<span class="chat-quick-switcher-badge">현재</span>' : ''}
+        </div>`;
+      });
+      host.innerHTML = html;
+      host.querySelectorAll('.chat-quick-switcher-item').forEach((el) => {
+        el.addEventListener('click', () => {
+          const i = Number(el.getAttribute('data-switcher-index'));
+          if (!Number.isNaN(i)) activateChatQuickSwitcherIndex(i);
+        });
+        el.addEventListener('mousemove', () => {
+          const i = Number(el.getAttribute('data-switcher-index'));
+          if (!Number.isNaN(i) && i !== chatQuickSwitcher.index) {
+            chatQuickSwitcher.index = i;
+            renderChatQuickSwitcherList();
+          }
+        });
+      });
+      const activeEl = host.querySelector('.chat-quick-switcher-item.is-active');
+      if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    function onChatQuickSwitcherFilterInput(value) {
+      chatQuickSwitcher.filter = value || '';
+      applyChatQuickSwitcherFilter();
+      renderChatQuickSwitcherList();
+    }
+
+    function activateChatQuickSwitcherIndex(index) {
+      const it = chatQuickSwitcher.filtered[index];
+      if (!it) return;
+      closeChatQuickSwitcher();
+        try {
+        const r = it.activate();
+        if (r && typeof r.then === 'function') r.catch(() => {});
+      } catch (e) {
+        console.error('채팅 전환 실패:', e);
+      }
+    }
+
+    function closeChatQuickSwitcher() {
+      const overlay = document.getElementById('chat-quick-switcher-overlay');
+      if (!overlay) return;
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      chatQuickSwitcher.open = false;
+      chatQuickSwitcher.filter = '';
+      const search = document.getElementById('chat-quick-switcher-search');
+      if (search) search.value = '';
+    }
+
+    async function openChatQuickSwitcher() {
+      if (isPrivacyScreenLocked) return;
+      if (isChatQuickSwitcherOpen()) {
+        closeChatQuickSwitcher();
+        return;
+      }
+      const overlay = document.getElementById('chat-quick-switcher-overlay');
+      if (!overlay) return;
+      chatQuickSwitcher.items = await buildChatQuickSwitcherItems();
+      chatQuickSwitcher.filter = '';
+      const search = document.getElementById('chat-quick-switcher-search');
+      if (search) search.value = '';
+      applyChatQuickSwitcherFilter();
+      overlay.classList.add('is-open');
+      overlay.setAttribute('aria-hidden', 'false');
+      chatQuickSwitcher.open = true;
+      renderChatQuickSwitcherList();
+      bindModalEditableFocus(overlay);
+      setTimeout(() => search?.focus(), 30);
+    }
+
+    function handleChatQuickSwitcherKeydown(e) {
+      if (!isChatQuickSwitcherOpen()) return false;
+      const key = e.key;
+      if (key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeChatQuickSwitcher();
+        return true;
+      }
+      if (key === 'ArrowDown') {
+        e.preventDefault();
+        const n = chatQuickSwitcher.filtered.length;
+        if (n) chatQuickSwitcher.index = (chatQuickSwitcher.index + 1) % n;
+        renderChatQuickSwitcherList();
+        return true;
+      }
+      if (key === 'ArrowUp') {
+        e.preventDefault();
+        const n = chatQuickSwitcher.filtered.length;
+        if (n) chatQuickSwitcher.index = (chatQuickSwitcher.index - 1 + n) % n;
+        renderChatQuickSwitcherList();
+        return true;
+      }
+      if (key === 'Enter') {
+        e.preventDefault();
+        activateChatQuickSwitcherIndex(chatQuickSwitcher.index);
+        return true;
+      }
+      return false;
     }
 
     if (window.api && typeof window.api.onOpenChatFromToast === 'function') {
@@ -20477,6 +20751,7 @@
     }
 
     window.addEventListener('keydown', async (e) => {
+      if (handleChatQuickSwitcherKeydown(e)) return;
       if (e.key === 'Escape') {
         if (document.querySelector('.msg-actions-open')) {
           e.preventDefault();
@@ -20493,6 +20768,11 @@
       if (e.ctrlKey && e.altKey && (e.key === 'e' || e.key === 'E' || e.keyCode === 69)) {
         e.preventDefault();
         openAllLogsModal();
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '1' || e.code === 'Digit1')) {
+        e.preventDefault();
+        openChatQuickSwitcher();
+        return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
       if (document.body.classList.contains('compact-mode')) {
