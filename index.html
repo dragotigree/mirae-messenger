@@ -10006,13 +10006,29 @@
       renderChatQuickSwitcherList();
     }
 
+    function focusChatComposeInputAfterNavigate() {
+      try {
+        if (window.api && typeof window.api.focusMainWindow === 'function') window.api.focusMainWindow();
+      } catch (_) {}
+      setTimeout(() => {
+        const ta = document.getElementById('chat-textarea');
+        if (!ta || !activeChatUser) return;
+        try { ta.focus(); } catch (_) {}
+      }, 50);
+    }
+
     function activateChatQuickSwitcherIndex(index) {
       const it = chatQuickSwitcher.filtered[index];
       if (!it) return;
       closeChatQuickSwitcher();
+      const afterOpen = () => focusChatComposeInputAfterNavigate();
       try {
         const r = it.activate();
-        if (r && typeof r.then === 'function') r.catch(() => {});
+        if (r && typeof r.then === 'function') {
+          r.then(afterOpen).catch(() => afterOpen());
+        } else {
+          afterOpen();
+        }
       } catch (e) {
         console.error('채팅 전환 실패:', e);
       }
