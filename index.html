@@ -1240,33 +1240,103 @@
     .schedule-list-cancel { align-self: center; padding: 6px 10px; border: none; border-radius: 99px; background: #fef2f2; color: #dc2626; font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
     .schedule-list-cancel:hover { background: #fee2e2; }
 
-    .schedule-msg-card { width: min(420px, 94vw) !important; padding: 0 !important; overflow: hidden; gap: 0 !important; }
-    .schedule-msg-hero { padding: 22px 24px 18px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 45%, #0369a1 100%); color: #fff; display: flex; align-items: flex-start; gap: 14px; }
-    .schedule-msg-hero-icon { width: 44px; height: 44px; border-radius: 14px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
-    .schedule-msg-hero h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; }
-    .schedule-msg-hero p { margin: 4px 0 0; font-size: 12px; opacity: 0.92; font-weight: 500; }
-    .schedule-msg-body { padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 16px; max-height: min(70vh, 560px); overflow-y: auto; }
-    .schedule-msg-target { font-size: 11px; font-weight: 600; color: #64748b; padding: 8px 12px; background: #f8fafc; border-radius: 12px; border: 1px dashed #e2e8f0; }
+    .schedule-msg-card {
+      width: min(560px, 96vw) !important;
+      max-height: min(92vh, 680px) !important;
+      padding: 0 !important; overflow: hidden; gap: 0 !important;
+      display: flex !important; flex-direction: column !important;
+    }
+    .schedule-msg-hero {
+      padding: 12px 16px; background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 45%, #0369a1 100%);
+      color: #fff; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .schedule-msg-hero-icon {
+      width: 34px; height: 34px; border-radius: 11px; background: rgba(255, 255, 255, 0.2);
+      display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
+    }
+    .schedule-msg-hero h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.03em; }
+    .schedule-msg-hero p { margin: 2px 0 0; font-size: 11px; opacity: 0.9; font-weight: 500; }
+    .schedule-msg-body {
+      padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 10px;
+      flex: 1; min-height: 0; overflow: hidden;
+    }
+    .schedule-msg-target {
+      font-size: 11px; font-weight: 600; color: #64748b; padding: 6px 10px;
+      background: #f8fafc; border-radius: 10px; border: 1px dashed #e2e8f0; flex-shrink: 0;
+    }
     .schedule-msg-target strong { color: #0f172a; font-weight: 700; }
-    .schedule-field-label { display: block; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
-    .schedule-textarea { width: 100%; min-height: 88px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 13px; font-family: inherit; line-height: 1.55; resize: vertical; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
+    .schedule-field-label {
+      display: block; font-size: 10.5px; font-weight: 800; color: #64748b;
+      letter-spacing: 0.02em; margin-bottom: 4px;
+    }
+    .schedule-textarea {
+      width: 100%; min-height: 52px; max-height: 72px; padding: 8px 10px;
+      border: 1px solid #e2e8f0; border-radius: 11px; font-size: 12.5px; font-family: inherit;
+      line-height: 1.45; resize: none; background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box;
+    }
     .schedule-textarea:focus { border-color: rgba(14, 165, 233, 0.5); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); outline: none; }
-    .schedule-preview-pill { padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg, #f0f9ff, #fff); border: 1px solid #bae6fd; font-size: 14px; font-weight: 600; color: #0c4a6e; letter-spacing: -0.02em; text-align: center; }
-    .schedule-quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .schedule-quick-chip { padding: 6px 11px; border-radius: 99px; border: 1px solid #e2e8f0; background: #fff; font-size: 11px; font-weight: 600; color: #475569; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; }
+    .schedule-preview-pill {
+      padding: 8px 10px; border-radius: 11px; background: linear-gradient(135deg, #f0f9ff, #fff);
+      border: 1px solid #bae6fd; font-size: 13px; font-weight: 700; color: #0c4a6e;
+      letter-spacing: -0.02em; text-align: center; flex-shrink: 0;
+    }
+    .schedule-quick-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .schedule-quick-chip {
+      padding: 4px 9px; border-radius: 99px; border: 1px solid #e2e8f0; background: #fff;
+      font-size: 10.5px; font-weight: 700; color: #475569; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
     .schedule-quick-chip:hover { border-color: #7dd3fc; background: #f0f9ff; color: #0369a1; }
-    .schedule-picker-wrap { margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; }
-    .schedule-picker-wrap .mini-calendar { border-color: #e2e8f0; box-shadow: none; }
-    .schedule-time-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
-    .schedule-time-row label { font-size: 11px; font-weight: 700; color: #64748b; }
-    .schedule-time-select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 14px; font-weight: 600; color: #0f172a; background: #fff; min-width: 72px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+    .schedule-datetime-grid {
+      display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      gap: 10px; align-items: stretch; min-height: 0; flex: 1;
+    }
+    .schedule-datetime-side {
+      display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0;
+    }
+    .schedule-picker-wrap {
+      margin-top: 0; padding: 8px; background: #f8fafc; border-radius: 12px;
+      border: 1px solid #e2e8f0; display: flex; flex-direction: column; min-height: 0; flex: 1;
+    }
+    .schedule-picker-wrap .mini-calendar {
+      border-color: #e2e8f0; box-shadow: none; padding: 4px 5px; flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+    }
+    .schedule-picker-wrap .mini-cal-header { font-size: 11px; margin-bottom: 2px; }
+    .schedule-picker-wrap .mini-cal-weekdays { font-size: 9px; margin-bottom: 1px; }
+    .schedule-picker-wrap .mini-cal-grid { gap: 0; flex: 1; }
+    .schedule-picker-wrap .mini-cal-day {
+      font-size: 11px; padding: 4px 0; border-radius: 8px;
+    }
+    .schedule-time-row {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin-top: 0; padding-top: 8px; border-top: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    .schedule-time-row label { font-size: 10.5px; font-weight: 700; color: #64748b; }
+    .schedule-time-select {
+      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px;
+      font-weight: 700; color: #0f172a; background: #fff; min-width: 60px; cursor: pointer;
+    }
     .schedule-time-select:focus { border-color: rgba(14, 165, 233, 0.5); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); outline: none; }
-    .schedule-time-colon { font-size: 18px; font-weight: 700; color: #94a3b8; }
-    .schedule-msg-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px 18px; border-top: 1px solid #f1f5f9; background: #fafbfc; }
-    .schedule-btn-ghost { padding: 10px 16px; border: none; border-radius: 12px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .schedule-time-colon { font-size: 16px; font-weight: 700; color: #94a3b8; }
+    .schedule-msg-footer {
+      display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px 12px;
+      border-top: 1px solid #f1f5f9; background: #fafbfc; flex-shrink: 0;
+    }
+    .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: 11px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
     .schedule-btn-ghost:hover { background: #e2e8f0; }
-    .schedule-btn-primary { padding: 10px 20px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35); transition: transform 0.15s, box-shadow 0.15s; }
-    .schedule-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(14, 165, 233, 0.4); }
+    .schedule-btn-primary {
+      padding: 8px 16px; border: none; border-radius: 11px;
+      background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+    }
+    .schedule-btn-primary:hover { filter: brightness(1.04); }
+    @media (max-width: 520px) {
+      .schedule-datetime-grid { grid-template-columns: 1fr; }
+      .schedule-msg-body { overflow-y: auto; }
+    }
 
     /* ✉️ IPmsg 스타일 쪽지 보내기 */
     .ipmsg-modal-card {
@@ -5851,19 +5921,30 @@
       </div>
       <div class="schedule-msg-body">
         <div class="schedule-msg-target" id="sch-msg-target-label">대화 상대: —</div>
-        <div>
+        <div style="flex-shrink:0;">
           <span class="schedule-field-label">메시지 내용</span>
-          <textarea id="sch-msg-content" class="schedule-textarea" placeholder="전송할 내용을 입력하세요"></textarea>
+          <textarea id="sch-msg-content" class="schedule-textarea" placeholder="전송할 내용을 입력하세요" rows="2"></textarea>
         </div>
-        <div>
-          <span class="schedule-field-label">전송 일시</span>
-          <div class="schedule-preview-pill" id="sch-msg-preview">—</div>
-          <div class="schedule-quick-chips">
-            <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('5m')">5분 후</button>
-            <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('30m')">30분 후</button>
-            <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('1h')">1시간 후</button>
-            <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('today18')">오늘 18:00</button>
-            <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('tomorrow9')">내일 09:00</button>
+        <div class="schedule-datetime-grid">
+          <div class="schedule-datetime-side">
+            <div>
+              <span class="schedule-field-label">전송 일시</span>
+              <div class="schedule-preview-pill" id="sch-msg-preview">—</div>
+              <div class="schedule-quick-chips">
+                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('5m')">5분 후</button>
+                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('30m')">30분 후</button>
+                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('1h')">1시간 후</button>
+                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('today18')">오늘 18:00</button>
+                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('tomorrow9')">내일 09:00</button>
+              </div>
+            </div>
+            <div class="schedule-time-row" style="border-top:none; padding-top:0; margin-top:auto; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:8px;">
+              <label for="sch-msg-hour">시</label>
+              <select id="sch-msg-hour" class="schedule-time-select" onchange="syncScheduleSendAtFromTimeSelects()"></select>
+              <span class="schedule-time-colon">:</span>
+              <select id="sch-msg-minute" class="schedule-time-select" onchange="syncScheduleSendAtFromTimeSelects()"></select>
+              <label for="sch-msg-minute">분</label>
+            </div>
           </div>
           <div class="schedule-picker-wrap">
             <div class="mini-calendar">
@@ -5874,13 +5955,6 @@
               </div>
               <div class="mini-cal-weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
               <div id="sch-cal-grid" class="mini-cal-grid"></div>
-            </div>
-            <div class="schedule-time-row">
-              <label for="sch-msg-hour">시</label>
-              <select id="sch-msg-hour" class="schedule-time-select" onchange="syncScheduleSendAtFromTimeSelects()"></select>
-              <span class="schedule-time-colon">:</span>
-              <select id="sch-msg-minute" class="schedule-time-select" onchange="syncScheduleSendAtFromTimeSelects()"></select>
-              <label for="sch-msg-minute">분</label>
             </div>
           </div>
         </div>
