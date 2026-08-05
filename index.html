@@ -385,6 +385,119 @@
     }
     .sidebar-ipmsg-btn:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
 
+    /* 🗓️ 서비스 일시중지 잠금 화면 */
+    .service-pause-overlay {
+      position: fixed; inset: 0; z-index: 100005;
+      display: none; align-items: center; justify-content: center;
+      padding: 24px; box-sizing: border-box;
+    }
+    .service-pause-bg {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(56, 189, 248, 0.28), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 90% 80%, rgba(14, 165, 233, 0.22), transparent 50%),
+        linear-gradient(160deg, #0b1f33 0%, #12324f 45%, #0c4a6e 100%);
+    }
+    .service-pause-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .service-pause-card {
+      position: relative;
+      width: min(440px, 94vw);
+      background: rgba(255,255,255,0.97);
+      border-radius: 22px;
+      padding: 28px 26px 24px;
+      box-shadow: 0 28px 80px rgba(2, 16, 36, 0.45), 0 0 0 1px rgba(255,255,255,0.35);
+      display: flex; flex-direction: column; gap: 12px;
+      animation: service-pause-in 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes service-pause-in {
+      from { opacity: 0; transform: translateY(18px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .service-pause-brand {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 4px;
+    }
+    .service-pause-logo {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.04em;
+      background: linear-gradient(145deg, #0284c7, #0369a1);
+      box-shadow: 0 8px 20px rgba(2, 132, 199, 0.35);
+    }
+    .service-pause-product {
+      font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em;
+    }
+    .service-pause-badge {
+      display: inline-block; margin-top: 3px;
+      font-size: 10.5px; font-weight: 700; color: #0369a1;
+      background: #e0f2fe; padding: 2px 8px; border-radius: 999px;
+    }
+    .service-pause-title {
+      margin: 6px 0 0; font-size: 22px; font-weight: 800;
+      color: #0f172a; letter-spacing: -0.03em; line-height: 1.25;
+    }
+    .service-pause-body {
+      margin: 0; font-size: 14px; line-height: 1.65; color: #475569; font-weight: 500;
+    }
+    .service-pause-body strong { color: #0369a1; font-weight: 800; }
+    .service-pause-date-pill {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px; border-radius: 14px;
+      background: linear-gradient(120deg, #f0f9ff, #e0f2fe);
+      border: 1px solid #bae6fd;
+    }
+    .service-pause-date-label {
+      font-size: 11px; font-weight: 700; color: #0284c7; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .service-pause-date-value {
+      font-size: 16px; font-weight: 800; color: #0c4a6e; letter-spacing: -0.02em;
+    }
+    .service-pause-contact {
+      margin: 0; font-size: 13px; line-height: 1.6; color: #64748b;
+      padding: 12px 14px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+    }
+    .service-pause-contact strong { color: #0f172a; font-weight: 800; }
+    .service-pause-divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 4px 0 0; font-size: 11px; font-weight: 700; color: #94a3b8;
+    }
+    .service-pause-divider::before,
+    .service-pause-divider::after {
+      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+    }
+    .service-pause-field {
+      display: flex; flex-direction: column; gap: 5px;
+      font-size: 12px; font-weight: 700; color: #475569;
+    }
+    .service-pause-field input {
+      padding: 11px 12px; border: 1px solid #cbd5e1; border-radius: 12px;
+      font-size: 13px; font-family: inherit; background: #fff;
+    }
+    .service-pause-field input:focus {
+      outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+    .service-pause-error {
+      font-size: 12px; color: #dc2626; min-height: 1.2em; font-weight: 600;
+    }
+    .service-pause-unlock-btn {
+      margin-top: 2px; padding: 13px 16px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #fff; font-size: 13.5px; font-weight: 800; cursor: pointer;
+      font-family: inherit; letter-spacing: -0.01em;
+      box-shadow: 0 10px 24px rgba(2, 132, 199, 0.3);
+      transition: filter 0.12s, transform 0.12s;
+    }
+    .service-pause-unlock-btn:hover { filter: brightness(1.06); }
+    .service-pause-unlock-btn:active { transform: translateY(1px); }
+
     #sidebar-left .channel-item { padding: 3px 8px; margin: 0 4px 0 4px; font-size: 12px; gap: 5px; }
 
     .channel-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; margin: 0 6px 1px 6px; border-radius: var(--radius-sm); color: var(--sidebar-text); font-weight: 500; font-size: 13px; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
@@ -4005,6 +4118,36 @@
         <input type="password" id="privacy-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyMasterUnlock();}">
         <button type="button" class="privacy-lock-unlock-btn" onclick="confirmPrivacyMasterUnlock()">마스터로 해제</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 🗓️ 서비스 일시중지 오버레이 (2026-08-18 이전) — 마스터 인증으로 우회 -->
+  <div id="service-pause-overlay" class="service-pause-overlay" style="display:none;" aria-hidden="true">
+    <div class="service-pause-bg" aria-hidden="true"></div>
+    <div class="service-pause-card" role="dialog" aria-modal="true" aria-labelledby="service-pause-title">
+      <div class="service-pause-brand">
+        <div class="service-pause-logo" aria-hidden="true">미래</div>
+        <div class="service-pause-brand-text">
+          <div class="service-pause-product">미래병원 메신저</div>
+          <div class="service-pause-badge">일시 중지</div>
+        </div>
+      </div>
+      <h1 id="service-pause-title" class="service-pause-title">메신저 일시 중지 안내</h1>
+      <p class="service-pause-body">현재 작동하고 있는 메신저는 <strong>8월 18일</strong> 이후에 사용 예정되어 있습니다.</p>
+      <div class="service-pause-date-pill">
+        <span class="service-pause-date-label">재개 예정</span>
+        <span class="service-pause-date-value">2026. 8. 18.</span>
+      </div>
+      <p class="service-pause-contact">문의 및 요청사항이 있는 경우<br><strong>내선번호 1030 (물리치료실장)</strong>으로 연락주시면 감사하겠습니다.</p>
+      <div class="service-pause-divider"><span>관리자 해제</span></div>
+      <label class="service-pause-field">마스터 아이디
+        <input type="text" id="service-pause-master-id" placeholder="마스터 아이디" autocomplete="username">
+      </label>
+      <label class="service-pause-field">마스터 비밀번호
+        <input type="password" id="service-pause-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmServicePauseUnlock();}">
+      </label>
+      <div id="service-pause-unlock-error" class="service-pause-error" aria-live="polite"></div>
+      <button type="button" class="service-pause-unlock-btn" onclick="confirmServicePauseUnlock()">관리자 로그인으로 사용하기</button>
     </div>
   </div>
 
@@ -12535,6 +12678,63 @@
     }
 
     let localUsageLocked = false;
+    let servicePauseLocked = false;
+
+    function showServicePauseOverlay(state) {
+      servicePauseLocked = true;
+      const el = document.getElementById('service-pause-overlay');
+      const err = document.getElementById('service-pause-unlock-error');
+      if (err) err.textContent = '';
+      if (el) {
+        el.style.display = 'flex';
+        el.setAttribute('aria-hidden', 'false');
+      }
+      setTimeout(() => document.getElementById('service-pause-master-id')?.focus(), 80);
+    }
+
+    function hideServicePauseOverlay() {
+      servicePauseLocked = false;
+      const el = document.getElementById('service-pause-overlay');
+      if (el) {
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      }
+      const idEl = document.getElementById('service-pause-master-id');
+      const pwdEl = document.getElementById('service-pause-master-pwd');
+      const err = document.getElementById('service-pause-unlock-error');
+      if (idEl) idEl.value = '';
+      if (pwdEl) pwdEl.value = '';
+      if (err) err.textContent = '';
+    }
+
+    function applyServicePauseState(state) {
+      if (state && state.locked) showServicePauseOverlay(state);
+      else hideServicePauseOverlay();
+    }
+
+    async function confirmServicePauseUnlock() {
+      const id = (document.getElementById('service-pause-master-id')?.value || '').trim();
+      const password = document.getElementById('service-pause-master-pwd')?.value || '';
+      const err = document.getElementById('service-pause-unlock-error');
+      if (!id || !password) {
+        if (err) err.textContent = '마스터 아이디와 비밀번호를 모두 입력해 주세요.';
+        return;
+      }
+      if (!window.api.unlockServicePause) {
+        if (err) err.textContent = '이 버전에서는 해제할 수 없습니다. 업데이트가 필요합니다.';
+        return;
+      }
+      const res = await window.api.unlockServicePause({ id, password });
+      if (!res || !res.success) {
+        if (err) err.textContent = (res && res.msg) || '인증에 실패했습니다.';
+        return;
+      }
+      isMasterAuthenticated = true;
+      try { updateMasterAuthUi(); } catch (_) {}
+      hideServicePauseOverlay();
+      await appAlert('관리자 인증이 완료되었습니다. 이 PC에서 메신저를 사용할 수 있습니다.');
+      try { window.api.focusMainWindow(); } catch (_) {}
+    }
 
     function showUsageLockOverlay(state) {
       localUsageLocked = true;
@@ -12825,6 +13025,9 @@
     if (window.api.onUsageLockState) {
       window.api.onUsageLockState((state) => applyUsageLockState(state));
     }
+    if (window.api.onServicePauseState) {
+      window.api.onServicePauseState((state) => applyServicePauseState(state));
+    }
     if (window.api.onUsageLockResult) {
       window.api.onUsageLockResult((data) => {
         const ok = data && data.success;
@@ -12848,6 +13051,9 @@
     }
     if (window.api.getUsageLockState) {
       window.api.getUsageLockState().then(applyUsageLockState).catch(() => {});
+    }
+    if (window.api.getServicePauseState) {
+      window.api.getServicePauseState().then(applyServicePauseState).catch(() => {});
     }
 
     function openMasterUserEditModal(ip) {
@@ -13760,6 +13966,7 @@
     function isBlockingOverlayOpenForSearchShortcut() {
       if (isPrivacyScreenLocked) return true;
       if (document.getElementById('app-dialog-overlay')?.style.display === 'flex') return true;
+      if (document.getElementById('service-pause-overlay')?.style.display === 'flex') return true;
       if (document.getElementById('usage-lock-overlay')?.style.display === 'flex') return true;
       return [...document.querySelectorAll('.modal-overlay')].some((el) => {
         if (!el || el.style.display !== 'flex') return false;

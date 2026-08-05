@@ -76,6 +76,10 @@ let masterSessionActive = false;
 /** 이 PC 메신저 사용 중지(잠금) — true면 접속·프레즌스 중단, 마스터 인증으로만 해제 */
 let localUsageDisabled = false;
 let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
+/** 전체 서비스 일시중지: 2026-08-18 00:00(로컬) 이전. 마스터 인증으로 PC별 우회 */
+const SERVICE_PAUSE_UNTIL = new Date(2026, 7, 18, 0, 0, 0, 0);
+const SERVICE_PAUSE_KEY = '2026-08-18';
+let servicePauseBypassed = false;
 /** 마스터가 사용 중지한 다른 PC (IP → meta) — 관리 화면 표시·원격 명령용 */
 const disabledClients = new Map();
 /** 작성자 세션이 당직·주치의 OFF(일정등록) 권한을 갖는지 */
@@ -666,6 +670,69 @@ async function stagePendingUpdateBuffer(relPath, buffer) {
   const safe = pendingRelSafe(relPath);
   const dest = path.join(pendingUpdateDir(), safe);
   await writeBufferWithRetry(dest, buffer);
+}
+
+function isServicePausePeriod() {
+  return Date.now() < SERVICE_PAUSE_UNTIL.getTime();
+}
+
+function isServicePauseLocked() {
+  return isServicePausePeriod() && !servicePauseBypassed;
+}
+
+/** 사용 중지 또는 서비스 일시중지 — 메시지 전송·프레즌스 차단 */
+function isMessengerUsageBlocked() {
+  return localUsageDisabled || isServicePauseLocked();
+}
+
+function getServicePauseState() {
+  return {
+    active: isServicePausePeriod(),
+    locked: isServicePauseLocked(),
+    bypassed: !!servicePauseBypassed,
+    until: SERVICE_PAUSE_KEY,
+    untilLabel: '2026년 8월 18일',
+    title: '메신저 일시 중지 안내',
+    body: '현재 작동하고 있는 메신저는 8월 18일 이후에 사용 예정되어 있습니다.',
+    contact: '문의 및 요청사항이 있는 경우 내선번호 1030(물리치료실장)으로 연락주시면 감사하겠습니다.',
+    myIp: MY_IP
+  };
+}
+
+function persistServicePauseBypass(unlocked) {
+  servicePauseBypassed = !!unlocked;
+  const key = unlocked ? SERVICE_PAUSE_KEY : '';
+  const at = unlocked ? new Date().toISOString() : '';
+  db.run(
+    `INSERT INTO service_pause_bypass (id, pause_key, unlocked_at) VALUES (1, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET pause_key = excluded.pause_key, unlocked_at = excluded.unlocked_at`,
+    [key, at],
+    logDbErr
+  );
+}
+
+function notifyServicePauseState() {
+  safeWebContentsSend('service-pause-state', getServicePauseState());
+}
+
+function applyServicePausePresenceSideEffects() {
+  if (isMessengerUsageBlocked()) {
+    try { broadcastGoodbye(); } catch (_) {}
+    onlineUsers.delete(MY_IP);
+    registerSelf();
+  } else {
+    registerSelf();
+    if (globalUdpSocket) broadcastPresence(globalUdpSocket);
+  }
+  notifyUserList();
+}
+
+function messengerBlockedResponse() {
+  if (isServicePauseLocked()) {
+    const msg = '메신저가 일시 중지 상태입니다. 마스터 아이디·비밀번호로 해제하거나 2026년 8월 18일 이후에 이용해 주세요.';
+    return { success: false, status: 'ERROR', msg, error: msg };
+  }
+  return usageLockBlockedResponse();
 }
 
 function previewBody(rawMessage) {
@@ -2068,6 +2135,14 @@ db.serialize(() => {
   )`, logDbErr);
   db.run(`INSERT OR IGNORE INTO usage_lock (id, disabled) VALUES (1, 0)`, () => {});
 
+  // 서비스 일시중지(일정) 마스터 우회 — pause_key가 현재 일시중지 키와 같으면 우회
+  db.run(`CREATE TABLE IF NOT EXISTS service_pause_bypass (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    pause_key TEXT DEFAULT '',
+    unlocked_at TEXT DEFAULT ''
+  )`, logDbErr);
+  db.run(`INSERT OR IGNORE INTO service_pause_bypass (id, pause_key) VALUES (1, '')`, () => {});
+
   // 마스터가 다른 PC 사용을 중지한 목록 (관리 화면용)
   db.run(`CREATE TABLE IF NOT EXISTS disabled_clients (
     ip TEXT PRIMARY KEY,
@@ -2076,20 +2151,26 @@ db.serialize(() => {
     disabled_by_ip TEXT DEFAULT ''
   )`, logDbErr);
 
-  db.get(`SELECT disabled, disabled_at, disabled_by_ip, reason FROM usage_lock WHERE id = 1`, (err, row) => {
-    if (!err && row) {
-      localUsageDisabled = !!row.disabled;
-      localUsageLockMeta = {
-        disabledAt: row.disabled_at || '',
-        disabledByIp: row.disabled_by_ip || '',
-        reason: row.reason || ''
-      };
+  db.get(`SELECT pause_key FROM service_pause_bypass WHERE id = 1`, (errBypass, bypassRow) => {
+    if (!errBypass && bypassRow && String(bypassRow.pause_key || '') === SERVICE_PAUSE_KEY) {
+      servicePauseBypassed = true;
     }
-    if (localUsageDisabled) {
-      try { broadcastGoodbye(); } catch (_) {}
-      onlineUsers.delete(MY_IP);
-    }
-    try { notifyUsageLockState(); } catch (_) {}
+    db.get(`SELECT disabled, disabled_at, disabled_by_ip, reason FROM usage_lock WHERE id = 1`, (err, row) => {
+      if (!err && row) {
+        localUsageDisabled = !!row.disabled;
+        localUsageLockMeta = {
+          disabledAt: row.disabled_at || '',
+          disabledByIp: row.disabled_by_ip || '',
+          reason: row.reason || ''
+        };
+      }
+      if (isMessengerUsageBlocked()) {
+        try { broadcastGoodbye(); } catch (_) {}
+        onlineUsers.delete(MY_IP);
+      }
+      try { notifyUsageLockState(); } catch (_) {}
+      try { notifyServicePauseState(); } catch (_) {}
+    });
   });
   db.all(`SELECT ip, username, disabled_at, disabled_by_ip FROM disabled_clients`, [], (err, rows) => {
     if (err || !rows) return;
@@ -3300,7 +3381,7 @@ function registerSelf() {
   // 등록하지 않는다 — 이걸 빠뜨리면 내 사이드바 카드에 "실장 정용범"이 잠깐 보였다가 몇 초 뒤
   // "물리치료실장 정용범"으로 바뀌는 현상이 생긴다.
   if (!profileLoaded) return;
-  if (localUsageDisabled) {
+  if (isMessengerUsageBlocked()) {
     // 사용 중지 상태에서는 온라인으로 등록하지 않는다.
     onlineUsers.delete(MY_IP);
     const prev = allKnownUsers.get(MY_IP);
@@ -3338,7 +3419,7 @@ function registerSelf() {
 function broadcastPresence(socket) {
   if (!socket) return;
   if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
-  if (localUsageDisabled) return; // 사용 중지 시 접속 신호를 보내지 않음
+  if (isMessengerUsageBlocked()) return; // 사용 중지·서비스 일시중지 시 접속 신호를 보내지 않음
   const packet = Buffer.from(JSON.stringify({
     type: 'PING',
     username: myProfile.username,
@@ -5801,7 +5882,7 @@ function syncGroupsWithPeer(peerIP) {
 }
 
 ipcMain.handle('send-file-transfer', async (event, opts) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   try {
     const o = opts || {};
     const fileName = String(o.fileName || 'file').trim() || 'file';
@@ -5911,7 +5992,7 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
 });
 
 ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   return new Promise((resolve) => {
     const client = new net.Socket();
     let isConnected = false;
@@ -6019,7 +6100,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
 });
 
 ipcMain.handle('send-broadcast-message', async (event, messageOrOpts) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   const opts = (messageOrOpts && typeof messageOrOpts === 'object' && !Array.isArray(messageOrOpts))
     ? messageOrOpts
     : { message: messageOrOpts };
@@ -6061,7 +6142,7 @@ ipcMain.handle('send-broadcast-message', async (event, messageOrOpts) => {
 });
 
 ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const deptPayload = { type: 'DEPT_MESSAGE', dept, sender: myProfile.username, message, msgUid };
@@ -6118,7 +6199,7 @@ ipcMain.handle('send-dept-message', async (event, { dept, message }) => {
 });
 
 ipcMain.handle('send-floor-message', async (event, { floor, message }) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const floorPayload = { type: 'FLOOR_MESSAGE', floor, sender: myProfile.username, message, msgUid };
@@ -7903,7 +7984,7 @@ ipcMain.handle('leave-group-chat', async (event, { uid }) => {
 });
 
 ipcMain.handle('send-group-message', async (event, { uid, groupName, message }) => {
-  if (localUsageDisabled) return usageLockBlockedResponse();
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   return new Promise((resolve) => {
     const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const msgUid = generateMsgUid();
@@ -8699,6 +8780,27 @@ ipcMain.handle('get-usage-lock-state', async () => ({
   reason: localUsageLockMeta.reason || '',
   myIp: MY_IP
 }));
+
+ipcMain.handle('get-service-pause-state', async () => getServicePauseState());
+
+ipcMain.handle('unlock-service-pause', async (event, payload) => {
+  const p = payload || {};
+  if (!isServicePausePeriod()) {
+    servicePauseBypassed = false;
+    notifyServicePauseState();
+    return { success: true, locked: false, msg: '일시 중지 기간이 종료되었습니다.' };
+  }
+  const ok = await verifyLocalMasterAuth(p.id, p.password);
+  if (!ok) {
+    return { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
+  }
+  masterSessionActive = true;
+  persistServicePauseBypass(true);
+  applyServicePausePresenceSideEffects();
+  notifyServicePauseState();
+  writeToLogFile('info', '[서비스일시중지] 마스터 인증으로 이 PC 일시 중지를 해제했습니다.');
+  return { success: true, locked: false };
+});
 
 ipcMain.handle('get-disabled-clients', async () => {
   if (!masterSessionActive) return [];
