@@ -12,7 +12,7 @@
   #compact-list-view { display: none; }
   #compact-back-btn { display: none; }
 
-  /* ── 창 크롬 (Discord Overlay) ── */
+  /* ── 창 크롬 (Discord Overlay) — 기본 불투명 ── */
   body.compact-mode {
     --mm-font: 12.5px;
     --mm-font-sm: 11.5px;
@@ -21,9 +21,9 @@
     --mm-radius: 14px;
     --mm-radius-sm: 10px;
     --mm-radius-lg: 16px;
-    --mm-bg: rgba(30, 31, 34, 0.96);
-    --mm-surface: rgba(43, 45, 49, 0.92);
-    --mm-raised: rgba(49, 51, 56, 0.95);
+    --mm-bg: #1e1f22;
+    --mm-surface: #2b2d31;
+    --mm-raised: #313338;
     --mm-hover: rgba(255, 255, 255, 0.06);
     --mm-active: rgba(255, 255, 255, 0.10);
     --mm-border: rgba(255, 255, 255, 0.08);
@@ -34,7 +34,7 @@
     --mm-accent: #ff6229;
     --mm-kakao: #fee500;
     --mm-chat-bg: #b2c7d9;
-    background: transparent;
+    background: var(--mm-bg);
     font-size: var(--mm-font);
   }
 
@@ -42,8 +42,6 @@
     height: 32px;
     background: var(--mm-bg);
     border-bottom: 1px solid var(--mm-border);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
   }
 
   body.compact-mode #titlebar-sidebar-accent {
@@ -86,23 +84,21 @@
     flex-direction: row;
     height: 100%;
     min-width: 360px;
-    background: transparent;
+    background: var(--mm-bg);
     --compact-accent: var(--mm-accent);
-    --compact-rail: transparent;
+    --compact-rail: var(--mm-bg);
   }
 
   body.compact-mode .compact-rail {
     width: 48px;
     flex-shrink: 0;
-    background: rgba(24, 25, 28, 0.88);
+    background: #18191c;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 8px 0;
     gap: 4px;
     border-right: 1px solid var(--mm-border);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
   }
 
   body.compact-mode .compact-rail-spacer { flex: 1; min-height: 8px; }
@@ -154,8 +150,6 @@
     display: flex;
     flex-direction: column;
     background: var(--mm-surface);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
   }
 
   body.compact-mode .compact-header {
@@ -630,8 +624,6 @@
     background: var(--mm-surface);
     border-bottom: 1px solid var(--mm-border);
     box-shadow: none;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
   }
 
   body.compact-mode #chat-header .header-user-name,

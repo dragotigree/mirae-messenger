@@ -7822,10 +7822,7 @@
     }
 
     function readSavedCompactOpacity() {
-      try {
-        const n = Number(localStorage.getItem('compactWindowOpacity'));
-        if (Number.isFinite(n)) return Math.max(0.55, Math.min(1, n));
-      } catch (_) {}
+      // 기본값은 항상 불투명(1). 저장된 값이 있어도 미니모드 진입 시엔 쓰지 않음.
       return 1;
     }
 
@@ -7843,7 +7840,8 @@
       const opacity = Math.max(0.55, Math.min(1, Number(value) / 100));
       const label = document.getElementById('compact-opacity-label');
       if (label) label.textContent = `${Math.round(opacity * 100)}%`;
-      try { localStorage.setItem('compactWindowOpacity', String(opacity)); } catch (_) {}
+      // 세션 중 조절만 반영. 기본(재진입)은 항상 100%이므로 저장하지 않음.
+      try { localStorage.removeItem('compactWindowOpacity'); } catch (_) {}
       await applyMainWindowOpacity(opacity);
     }
 
@@ -7852,11 +7850,16 @@
       const label = document.getElementById('compact-opacity-label');
       if (!slider) return;
       try {
-        const opacity = readSavedCompactOpacity();
-        const pct = Math.round(opacity * 100);
+        // 더보기 진입 시에도 기본은 불투명. 현재 창 투명도를 슬라이더에만 반영.
+        let pct = 100;
+        try {
+          if (window.api && window.api.getMainWindowOpacity) {
+            const cur = await window.api.getMainWindowOpacity();
+            if (Number.isFinite(Number(cur))) pct = Math.round(Math.max(0.55, Math.min(1, Number(cur))) * 100);
+          }
+        } catch (_) {}
         slider.value = String(pct);
         if (label) label.textContent = `${pct}%`;
-        await applyMainWindowOpacity(opacity);
       } catch (_) {
         slider.value = '100';
         if (label) label.textContent = '100%';
@@ -10042,12 +10045,13 @@
       }
       updateCompactModeButtonUi();
       syncCompactConvenienceUi();
-      // 투명도는 미니모드 전용 — 일반화면 복귀 시 반드시 불투명으로
-      if (isCompactMode) {
-        applyMainWindowOpacity(readSavedCompactOpacity()).catch(() => {});
-      } else {
-        applyMainWindowOpacity(1).catch(() => {});
-      }
+      // 미니모드 기본은 불투명. 이전 세션 투명도 저장값은 쓰지 않음.
+      try { localStorage.removeItem('compactWindowOpacity'); } catch (_) {}
+      applyMainWindowOpacity(1).catch(() => {});
+      const slider = document.getElementById('compact-opacity-slider');
+      const label = document.getElementById('compact-opacity-label');
+      if (slider) slider.value = '100';
+      if (label) label.textContent = '100%';
       const ta = document.getElementById('chat-textarea');
       if (ta) ta.placeholder = isCompactMode
         ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
