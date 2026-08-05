@@ -2632,10 +2632,17 @@
       position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 999px;
       background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
     }
-    .board-detail-images { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .board-detail-images { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
     .board-detail-images img {
-      max-width: 100%; max-height: 360px; width: auto; height: auto; object-fit: contain;
-      border-radius: 14px; border: 1px solid #e2e8f0; cursor: zoom-in; background: #f8fafc;
+      max-width: 100%; width: 100%; height: auto; max-height: min(72vh, 720px);
+      object-fit: contain; border-radius: 14px; border: 1px solid #e2e8f0;
+      cursor: zoom-in; background: #f8fafc;
+    }
+    .modal-card.board-modal-card {
+      width: min(920px, 96vw);
+      height: min(860px, 92vh);
+      max-height: 92vh;
+      box-sizing: border-box;
     }
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.2s var(--ease-out); }
@@ -3528,7 +3535,7 @@
 
   <!-- 📢 사내 공지사항 게시판 모달 -->
   <div id="board-modal" class="modal-overlay">
-    <div class="modal-card" style="width:720px; height:600px;">
+    <div class="modal-card board-modal-card">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--accent); padding-bottom:14px;">
         <div>
           <div style="font-size:18px; font-weight:700; color:#0369a1;" id="board-modal-title">📋 미래병원 사내 공지사항 게시판</div>
