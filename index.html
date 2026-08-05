@@ -4577,9 +4577,8 @@
         <div class="settings-card">
           <label class="settings-field">근무 상태
             <select id="setting-my-status" class="settings-select">
-              <option value="ONLINE">온라인 (상담 가능)</option>
-              <option value="BUSY">진료 중 / 치료 중</option>
-              <option value="TREATMENT">자리 비움</option>
+              <option value="ONLINE">온라인</option>
+              <option value="TREATMENT">자리비움</option>
             </select>
           </label>
         </div>
@@ -9035,10 +9034,7 @@
 
     function compactUserTimeLabel(u) {
       if (u.online) {
-        const st = u.statusState || 'ONLINE';
-        if (st === 'BUSY') return '진료중';
-        if (st === 'TREATMENT') return '자리비움';
-        return '접속 중';
+        return onlineStatusLabel(u.statusState);
       }
       const rel = formatLastSeenRelative(u);
       return rel === '-' ? '오프라인' : rel;
@@ -9697,14 +9693,12 @@
 
     function groupMemberStatusInfo(m) {
       const live = allUsers.find((u) => u.ip === m.ip);
-      const statusMap = { ONLINE: '온라인', BUSY: '진료 중', TREATMENT: '자리 비움', OFFLINE: '오프라인' };
       if (!live || !live.online) {
         const sub = [live ? live.floor : m.floor, live ? live.dept : m.dept].filter(Boolean).join(' · ');
         return { label: '오프라인', online: false, sub };
       }
-      const state = live.statusState || 'ONLINE';
       const parts = [live.floor, live.dept].filter(Boolean).join(' · ');
-      return { label: statusMap[state] || '온라인', online: true, sub: parts };
+      return { label: onlineStatusLabel(live.statusState), online: true, sub: parts };
     }
 
     function sortGroupMembers(members) {
@@ -11917,7 +11911,7 @@
       const card = document.createElement('div');
       card.className = `user-card-item ${isActive ? 'active' : ''} ${!u.online ? 'is-offline' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}`;
       card.dataset.userIp = u.ip;
-      const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
+      const userStatus = u.online ? normalizeSelectableStatusState(u.statusState) : 'OFFLINE';
 
       const photoOk = isUsableProfilePhoto(u.photo);
       const displayName = formatDmListDisplayName(u);
@@ -11975,7 +11969,7 @@
         card.classList.toggle('active', isSidebarDmCardActive(u.ip));
         card.classList.toggle('is-offline', !u.online);
         card.classList.toggle('is-multi-selected', isSidebarIpSelected(u.ip));
-        const userStatus = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
+        const userStatus = u.online ? normalizeSelectableStatusState(u.statusState) : 'OFFLINE';
         const badge = card.querySelector('.avatar-status-badge');
         if (badge) badge.className = `avatar-status-badge status-${userStatus}`;
         const nameEl = card.querySelector('.user-name-text');
@@ -13066,7 +13060,7 @@
       }
     }
 
-    const masterStatusLabel = { ONLINE: '🟢 온라인', BUSY: '🔴 진료/치료', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };
+    const masterStatusLabel = { ONLINE: '🟢 온라인', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };
 
     async function renderMasterOnlineClients() {
       const box = document.getElementById('master-online-clients-box');
@@ -13111,7 +13105,7 @@
         const isMe = !!u.isMe;
         const ver = u.appVersion || '-';
         const verOutdated = ver !== '-' && ver !== refVersion;
-        const statusKey = u.online ? (u.statusState || 'ONLINE') : 'OFFLINE';
+        const statusKey = u.online ? normalizeSelectableStatusState(u.statusState || 'ONLINE') : 'OFFLINE';
         const deptFloor = [u.dept, u.floor].filter(Boolean).join(' · ') || '-';
         const lastSeenText = formatLastSeenRelative(u);
         const lastTitle = formatLastSeenTitle(u);
@@ -14068,7 +14062,20 @@
 
     function updateMyStatusBadge(status) {
       const el = document.getElementById('my-status-indicator');
-      if (el) el.className = `avatar-status-badge status-${status}`;
+      const key = normalizeSelectableStatusState(status);
+      if (el) el.className = `avatar-status-badge status-${key}`;
+    }
+
+    /** 설정·표시용 근무 상태 (온라인 / 자리비움만) */
+    function normalizeSelectableStatusState(st) {
+      const s = String(st || 'ONLINE').toUpperCase();
+      if (s === 'TREATMENT') return 'TREATMENT';
+      if (s === 'BUSY') return 'ONLINE';
+      return 'ONLINE';
+    }
+
+    function onlineStatusLabel(st) {
+      return normalizeSelectableStatusState(st) === 'TREATMENT' ? '자리비움' : '온라인';
     }
 
     function getChatHeaderAvatarText(user) {
@@ -14126,9 +14133,9 @@
         renderGroupDetailPanel(user);
       } else {
         document.getElementById('chat-header-title').textContent = buildChatHeaderTitleText(user);
-        const statusMap = { 'ONLINE': '🟢 온라인', 'BUSY': '🔴 진료 중', 'TREATMENT': '🟡 자리 비움', 'OFFLINE': '🔘 오프라인' };
-        const userStatus = user.online ? (user.statusState || 'ONLINE') : 'OFFLINE';
-        document.getElementById('chat-header-status-text').textContent = `${user.floor || ''} · ${user.dept || ''} | ${statusMap[userStatus]}`;
+        const userStatus = user.online ? normalizeSelectableStatusState(user.statusState) : 'OFFLINE';
+        const statusText = user.online ? onlineStatusLabel(user.statusState) : '오프라인';
+        document.getElementById('chat-header-status-text').textContent = `${user.floor || ''} · ${user.dept || ''} | ${statusText}`;
         statusBadgeEl.style.display = '';
         statusBadgeEl.className = `avatar-status-badge status-${userStatus}`;
         setupAvatarElement(document.getElementById('chat-header-avatar'), user.username, user.photo, user.ip);
@@ -20683,7 +20690,7 @@
         if (privacyPin1) privacyPin1.value = '';
         if (privacyPin2) privacyPin2.value = '';
         onPrivacyLockEnabledToggle();
-        document.getElementById('setting-my-status').value = p.statusState || 'ONLINE';
+        document.getElementById('setting-my-status').value = normalizeSelectableStatusState(p.statusState);
         document.getElementById('setting-notification-preview').checked = await window.api.getNotificationPreviewSetting();
         const msgNotify = await window.api.getMessageNotificationSettings();
         const incomingEl = document.getElementById('setting-notify-incoming');
@@ -20789,7 +20796,7 @@
 
   const extNo = document.getElementById('setting-ext').value.trim();
   const phone = document.getElementById('setting-phone').value.trim();
-  const statusState = document.getElementById('setting-my-status').value;
+  const statusState = normalizeSelectableStatusState(document.getElementById('setting-my-status').value);
 
   const privacyLockEnabled = !!appSettings.privacyLockEnabled;
   const privacyLockPinHash = appSettings.privacyLockPinHash || '';
