@@ -197,116 +197,6 @@
     #sidebar-right-resize-handle:hover,
     #sidebar-right-resize-handle.is-dragging { background: rgba(14, 165, 233, 0.35); }
 
-    /* 좌·우 사이드바 접기/펼치기 */
-    body.sidebar-left-collapsed #sidebar-left {
-      width: 0 !important;
-      min-width: 0 !important;
-      overflow: hidden;
-      border: none;
-      padding: 0;
-      box-shadow: none;
-      pointer-events: none;
-    }
-    body.sidebar-left-collapsed #sidebar-resize-handle { display: none; }
-    body.sidebar-left-collapsed #titlebar-sidebar-accent {
-      width: 0 !important;
-      min-width: 0;
-      overflow: hidden;
-      padding: 0;
-      box-shadow: none;
-      border: none;
-    }
-    body.sidebar-left-collapsed #titlebar-app-label { display: none; }
-    body.sidebar-right-collapsed #sidebar-right {
-      width: 0 !important;
-      min-width: 0 !important;
-      overflow: hidden;
-      border: none;
-      padding: 0;
-      pointer-events: none;
-    }
-    body.sidebar-right-collapsed #sidebar-right-resize-handle { display: none; }
-    .sidebar-edge-toggle {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      width: 22px;
-      align-self: stretch;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1;
-      z-index: 12;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    #sidebar-left-edge-toggle {
-      background: linear-gradient(180deg, var(--sidebar-bg) 0%, #081c32 100%);
-      color: rgba(255, 255, 255, 0.75);
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    #sidebar-left-edge-toggle:hover { background: #0c2740; color: #fff; }
-    #sidebar-right-edge-toggle {
-      background: var(--surface);
-      color: #64748b;
-      border-left: 1px solid var(--border-soft);
-    }
-    #sidebar-right-edge-toggle:hover { background: #f0f9ff; color: #0369a1; }
-    body.sidebar-left-collapsed:not(.compact-mode) #sidebar-left-edge-toggle { display: flex; }
-    body.sidebar-right-collapsed:not(.compact-mode) #sidebar-right-edge-toggle { display: flex; }
-    body.compact-mode .sidebar-edge-toggle { display: none !important; }
-    .sidebar-panel-collapse-btn {
-      width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-      border: none; border-radius: 8px; cursor: pointer; flex-shrink: 0;
-      background: transparent; color: inherit; font-size: 14px; font-weight: 700;
-      transition: background 0.12s ease, color 0.12s ease;
-    }
-    #sidebar-left-collapse-btn {
-      color: rgba(255, 255, 255, 0.7);
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-    }
-    #sidebar-left-collapse-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
-    #sidebar-right-collapse-btn {
-      color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0;
-      width: 30px; height: 30px; border-radius: 9px; font-size: 0;
-    }
-    #sidebar-right-collapse-btn:hover { background: #e2e8f0; color: #334155; }
-    #sidebar-right-collapse-btn .icon-glyph { width: 14px; height: 14px; }
-    .sidebar-edge-toggle .icon-glyph { width: 14px; height: 14px; }
-    .chat-header-tool-btn--sidebar {
-      background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;
-      min-width: 36px; padding: 0 10px;
-    }
-    .chat-header-tool-btn--sidebar:hover { background: #f1f5f9; border-color: #cbd5e1; }
-    .chat-header-tool-btn--sidebar.is-collapsed {
-      background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe;
-    }
-    #titlebar-panel-toggles {
-      display: flex; align-items: center; gap: 2px; flex-shrink: 0;
-      margin: 5px 0 5px 4px; padding: 3px;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      -webkit-app-region: no-drag;
-      height: 26px;
-    }
-    body.compact-mode #titlebar-panel-toggles { display: none; }
-    body.compact-mode .chat-header-tool-btn--sidebar { display: none; }
-    .titlebar-panel-btn {
-      width: 28px; height: 22px; border: none; border-radius: 7px;
-      background: transparent; color: rgba(255, 255, 255, 0.78);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-size: 0; font-weight: 700;
-      transition: background var(--transition-fast), color var(--transition-fast);
-    }
-    .titlebar-panel-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
-    .titlebar-panel-btn.is-collapsed { color: #7dd3fc; background: rgba(14, 165, 233, 0.18); }
-    .titlebar-panel-btn .icon-glyph { width: 13px; height: 13px; }
-
     .app-brand { padding: 16px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .brand-logo-img { height: 30px; width: auto; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
     .sidebar-logo-only { padding: 14px 16px 10px; display: flex; justify-content: flex-start; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -3822,10 +3712,6 @@
       <div id="titlebar-drag-region">
         <span class="titlebar-app-label-compact">MIRAE MESSENGER</span>
       </div>
-      <div id="titlebar-panel-toggles" aria-label="패널 표시">
-        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-left" onclick="toggleSidebarLeft()" title="좌측 목록 패널 열기/닫기" data-ui-icon="panelCollapseLeft"></button>
-        <button type="button" class="titlebar-panel-btn" id="titlebar-toggle-right" onclick="toggleSidebarRight()" title="우측 달력 패널 열기/닫기" data-ui-icon="panelCollapseRight"></button>
-      </div>
       <div id="titlebar-controls">
         <button class="titlebar-btn" id="titlebar-min-btn" onclick="window.api.windowMinimize()" title="최소화">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="4.5" width="8" height="1" fill="currentColor" rx="0.5"/></svg>
@@ -3841,9 +3727,8 @@
   </div>
 
   <div id="app-body-row">
-  <button type="button" id="sidebar-left-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarLeft()" title="좌측 목록 열기" data-ui-icon="chevronRight"></button>
   <div id="sidebar-left">
-    <div id="sidebar-resize-handle" title="너비 조절 · 더블클릭으로 접기"></div>
+    <div id="sidebar-resize-handle" title="너비 조절"></div>
 
     <div class="notice-widget-area" onclick="openBoardModal()">
       <div class="notice-widget-header">
@@ -3925,7 +3810,6 @@
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
         <button class="icon-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
         <button class="icon-btn" id="toolbar-settings-btn" onclick="openSettingsModal()" title="환경 설정"></button>
-        <button type="button" class="icon-btn" id="sidebar-left-collapse-btn" onclick="toggleSidebarLeft()" title="좌측 패널 접기"></button>
       </div>
     </div>
   </div>
@@ -4056,12 +3940,6 @@
           </div>
         </div>
         <div class="chat-header-actions">
-          <button type="button" class="chat-header-tool-btn chat-header-tool-btn--sidebar" id="chat-toggle-left-btn" onclick="toggleSidebarLeft()" title="좌측 목록 패널">
-            <span class="chat-header-tool-icon" data-ui-icon="panelCollapseLeft" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="chat-header-tool-btn chat-header-tool-btn--sidebar" id="chat-toggle-right-btn" onclick="toggleSidebarRight()" title="우측 달력 패널">
-            <span class="chat-header-tool-icon" data-ui-icon="panelCollapseRight" aria-hidden="true"></span>
-          </button>
           <button type="button" class="chat-header-tool-btn chat-header-tool-btn--archive" id="chat-shared-archive-btn" onclick="toggleChatSharedDrawer()" title="사진·파일·링크 모아보기">
             <span class="chat-header-tool-icon" aria-hidden="true"></span>
             <span class="chat-header-tool-label">보관함</span>
@@ -4178,14 +4056,13 @@
 
   <!-- 3단: 병원 달력 (상세정보는 「정보보기」모달) -->
   <div id="sidebar-right">
-    <div id="sidebar-right-resize-handle" title="너비 조절 · 더블클릭으로 접기"></div>
+    <div id="sidebar-right-resize-handle" title="너비 조절"></div>
     <div class="sidebar-cal-header">
       <div class="sidebar-section-title">
         <div class="sidebar-cal-title">
           <span class="sidebar-cal-title-icon" data-ui-icon="calendar" aria-hidden="true"></span>
           <span class="sidebar-cal-title-text">병원 달력</span>
         </div>
-        <button type="button" id="sidebar-right-collapse-btn" class="sidebar-panel-collapse-btn" onclick="toggleSidebarRight()" title="우측 패널 접기" data-ui-icon="panelCollapseRight"></button>
       </div>
       <div class="sidebar-cal-actions">
         <button type="button" id="sidebar-cal-refresh-btn" onclick="refreshSidebarHospitalCalendar()" title="일정 새로고침">🔄</button>
@@ -4210,7 +4087,6 @@
       </div>
     </div>
   </div>
-  <button type="button" id="sidebar-right-edge-toggle" class="sidebar-edge-toggle" onclick="toggleSidebarRight()" title="우측 달력 열기" data-ui-icon="chevronLeft"></button>
 
   <!-- 👤 상세 정보 (좌측 우클릭 → 정보보기) -->
   <div id="user-info-modal" class="modal-overlay" onclick="if(event.target===this) closeUserInfoModal()">
@@ -7172,7 +7048,7 @@
     let autoAwayTriggered = false;
     const IDLE_MS = 5 * 60 * 1000;
 
-    // ↔️ 좌·우 사이드바 크기 조절 · 접기/펼치기
+    // ↔️ 좌·우 사이드바 크기 조절
     (function initSidebarResize() {
       // 목록 글씨는 nowrap+ellipsis. 고정 UI(쪽지·코드·필터칩)가 깨지지 않는 폭까지만 축소.
       const SIDEBAR_MIN_FLOOR = 240;
@@ -7183,13 +7059,6 @@
       const MAIN_CHAT_MIN_WIDTH = 420;
       let cachedLeftContentMin = SIDEBAR_MIN_FLOOR;
       let cachedRightContentMin = SIDEBAR_RIGHT_MIN_FLOOR;
-
-      function isLeftCollapsed() {
-        return document.body.classList.contains('sidebar-left-collapsed');
-      }
-      function isRightCollapsed() {
-        return document.body.classList.contains('sidebar-right-collapsed');
-      }
 
       /** 좌측 패널 고정 UI(공지·쪽지/코드·필터칩)가 한 줄로 유지되는 최소 폭 */
       function measureLeftSidebarContentMinWidth() {
@@ -7376,14 +7245,14 @@
 
       function currentRightSidebarWidth() {
         const el = document.getElementById('sidebar-right');
-        if (!el || document.body.classList.contains('compact-mode') || isRightCollapsed()) return 0;
+        if (!el || document.body.classList.contains('compact-mode')) return 0;
         const w = el.getBoundingClientRect().width;
         return w > 0 ? w : 230;
       }
 
       function currentLeftSidebarWidth() {
         const el = document.getElementById('sidebar-left');
-        if (!el || document.body.classList.contains('compact-mode') || isLeftCollapsed()) return 0;
+        if (!el || document.body.classList.contains('compact-mode')) return 0;
         const w = el.getBoundingClientRect().width;
         return w > 0 ? w : 300;
       }
@@ -7420,83 +7289,11 @@
         return clamped;
       }
 
-      function updateSidebarToggleUi() {
-        const leftCollapsed = isLeftCollapsed();
-        const rightCollapsed = isRightCollapsed();
-        const pairs = [
-          ['titlebar-toggle-left', leftCollapsed],
-          ['chat-toggle-left-btn', leftCollapsed],
-          ['titlebar-toggle-right', rightCollapsed],
-          ['chat-toggle-right-btn', rightCollapsed]
-        ];
-        pairs.forEach(([id, collapsed]) => {
-          const el = document.getElementById(id);
-          if (!el) return;
-          el.classList.toggle('is-collapsed', collapsed);
-          if (id === 'titlebar-toggle-left' || id === 'chat-toggle-left-btn') {
-            el.title = collapsed ? '좌측 목록 패널 열기' : '좌측 목록 패널 닫기';
-          } else {
-            el.title = collapsed ? '우측 달력 패널 열기' : '우측 달력 패널 닫기';
-          }
-        });
-        const leftEdge = document.getElementById('sidebar-left-edge-toggle');
-        if (leftEdge) leftEdge.title = '좌측 목록 열기';
-        const rightEdge = document.getElementById('sidebar-right-edge-toggle');
-        if (rightEdge) rightEdge.title = '우측 달력 열기';
-      }
-
-      function setSidebarLeftCollapsed(collapsed) {
-        if (document.body.classList.contains('compact-mode')) return;
-        document.body.classList.toggle('sidebar-left-collapsed', !!collapsed);
-        localStorage.setItem('sidebarLeftCollapsed', collapsed ? '1' : '0');
-        updateSidebarToggleUi();
-        if (!collapsed) {
-          requestAnimationFrame(() => {
-            refreshLeftSidebarMinWidth();
-            const left = document.getElementById('sidebar-left');
-            if (!left) return;
-            const w = left.getBoundingClientRect().width || 300;
-            applySidebarWidth(w);
-          });
-        }
-      }
-
-      function setSidebarRightCollapsed(collapsed) {
-        if (document.body.classList.contains('compact-mode')) return;
-        document.body.classList.toggle('sidebar-right-collapsed', !!collapsed);
-        localStorage.setItem('sidebarRightCollapsed', collapsed ? '1' : '0');
-        updateSidebarToggleUi();
-        if (!collapsed) {
-          // 펼친 뒤 실제 글씨 폭 기준으로 한 번 더 보정
-          requestAnimationFrame(() => {
-            refreshRightSidebarMinWidth();
-            const right = document.getElementById('sidebar-right');
-            if (!right) return;
-            const w = right.getBoundingClientRect().width || 280;
-            applyRightSidebarWidth(w);
-          });
-        }
-      }
-
-      window.toggleSidebarLeft = function toggleSidebarLeft() {
-        if (document.body.classList.contains('compact-mode')) return;
-        setSidebarLeftCollapsed(!isLeftCollapsed());
-      };
-      window.toggleSidebarRight = function toggleSidebarRight() {
-        if (document.body.classList.contains('compact-mode')) return;
-        setSidebarRightCollapsed(!isRightCollapsed());
-      };
-      window.applySidebarCollapseState = function applySidebarCollapseState() {
-        if (document.body.classList.contains('compact-mode')) {
-          updateSidebarToggleUi();
-          return;
-        }
-        const left = localStorage.getItem('sidebarLeftCollapsed') === '1';
-        const right = localStorage.getItem('sidebarRightCollapsed') === '1';
-        document.body.classList.toggle('sidebar-left-collapsed', left);
-        document.body.classList.toggle('sidebar-right-collapsed', right);
-        updateSidebarToggleUi();
-      };
+      document.body.classList.remove('sidebar-left-collapsed', 'sidebar-right-collapsed');
+      try {
+        localStorage.removeItem('sidebarLeftCollapsed');
+        localStorage.removeItem('sidebarRightCollapsed');
+      } catch (e) { /* ignore */ }
 
       refreshLeftSidebarMinWidth();
       const savedWidth = parseInt(localStorage.getItem('sidebarWidth'), 10);
@@ -7507,8 +7304,6 @@
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
       applyRightSidebarWidth(savedRightWidth || 280);
 
-      window.applySidebarCollapseState();
-
       const handle = document.getElementById('sidebar-resize-handle');
       const rightHandle = document.getElementById('sidebar-right-resize-handle');
       let dragging = false;
@@ -7518,7 +7313,7 @@
 
       if (handle) {
         handle.addEventListener('mousedown', (e) => {
-          if (document.body.classList.contains('compact-mode') || isLeftCollapsed()) return;
+          if (document.body.classList.contains('compact-mode')) return;
           // 드래그 시작 시 최소 폭을 다시 측정 (쪽지·코드·필터 문구 반영)
           refreshLeftSidebarMinWidth();
           dragging = true;
@@ -7528,15 +7323,10 @@
           document.body.style.cursor = 'col-resize';
           e.preventDefault();
         });
-        handle.addEventListener('dblclick', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.toggleSidebarLeft();
-        });
       }
       if (rightHandle) {
         rightHandle.addEventListener('mousedown', (e) => {
-          if (document.body.classList.contains('compact-mode') || isRightCollapsed()) return;
+          if (document.body.classList.contains('compact-mode')) return;
           // 드래그 시작 시 최소 폭을 다시 측정 (폰트·버튼 문구 반영)
           refreshRightSidebarMinWidth();
           draggingRight = true;
@@ -7545,11 +7335,6 @@
           rightHandle.classList.add('is-dragging');
           document.body.style.cursor = 'col-resize';
           e.preventDefault();
-        });
-        rightHandle.addEventListener('dblclick', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.toggleSidebarRight();
         });
       }
 
@@ -7575,7 +7360,7 @@
           dragging = false;
           handle?.classList.remove('is-dragging');
           document.body.style.cursor = '';
-          if (dragMoved && !isLeftCollapsed()) {
+          if (dragMoved) {
             const leftEl = document.getElementById('sidebar-left');
             if (!leftEl) return;
             const currentWidth = leftEl.getBoundingClientRect().width;
@@ -7588,7 +7373,7 @@
           draggingRight = false;
           rightHandle?.classList.remove('is-dragging');
           document.body.style.cursor = '';
-          if (dragRightMoved && !isRightCollapsed()) {
+          if (dragRightMoved) {
             const minW = getRightSidebarMinWidth();
             const currentWidth = document.getElementById('sidebar-right')?.getBoundingClientRect().width || minW;
             if (currentWidth > 0) {
@@ -7603,7 +7388,7 @@
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
           if (document.body.classList.contains('compact-mode')) return;
-          if (!isLeftCollapsed()) {
+          if (!document.body.classList.contains('compact-mode')) {
             const sidebar = document.getElementById('sidebar-left');
             if (sidebar) {
               refreshLeftSidebarMinWidth();
@@ -7618,7 +7403,7 @@
               }
             }
           }
-          if (!isRightCollapsed()) {
+          if (!document.body.classList.contains('compact-mode')) {
             const right = document.getElementById('sidebar-right');
             if (right) {
               refreshRightSidebarMinWidth();
@@ -7637,7 +7422,7 @@
 
       // 첫 페인트·폰트 로드 후 실제 글씨 폭으로 보정 (저장된 좁은 폭 복구)
       function reconcileLeftSidebarWidth() {
-        if (document.body.classList.contains('compact-mode') || isLeftCollapsed()) return;
+        if (document.body.classList.contains('compact-mode')) return;
         const left = document.getElementById('sidebar-left');
         if (!left) return;
         refreshLeftSidebarMinWidth();
@@ -7645,7 +7430,7 @@
         localStorage.setItem('sidebarWidth', String(fixed));
       }
       function reconcileRightSidebarWidth() {
-        if (document.body.classList.contains('compact-mode') || isRightCollapsed()) return;
+        if (document.body.classList.contains('compact-mode')) return;
         const right = document.getElementById('sidebar-right');
         if (!right) return;
         refreshRightSidebarMinWidth();
@@ -7848,7 +7633,6 @@
         ['toolbar-refresh-btn', 'refresh'],
         ['toolbar-settings-btn', 'settings'],
         ['toolbar-settings-btn-compact', 'settings'],
-        ['sidebar-left-collapse-btn', 'panelCollapseLeft'],
         ['compact-expand-btn', 'panelWide'],
         ['compact-back-btn', 'back'],
         ['chat-clear-view-btn', 'clearChat'],
@@ -8825,9 +8609,6 @@
         ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
         : '메시지를 입력하세요 (Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 사진)';
       updateMainPanelVisibility();
-      if (!isCompactMode && typeof window.applySidebarCollapseState === 'function') {
-        window.applySidebarCollapseState();
-      }
       if (activeChatUser) loadChatHistory();
       resizeChatTextarea();
     }
