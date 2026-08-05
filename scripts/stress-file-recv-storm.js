@@ -105,20 +105,29 @@ async function runPhotoStorm() {
   };
 }
 
-/** FILE_XFER 동시 조립 메모리 모델 (실제 pendingFileXfers) */
+/** FILE_XFER 동시 조립 메모리 모델 (실제 pendingFileXfers + 바이트 상한) */
 function modelFileXferMemory() {
   const size = Math.round(FILE_MB * 1024 * 1024);
+  const BYTE_CAP = Math.max(16, parseInt(arg('byte-cap-mb', '256'), 10) || 256) * 1024 * 1024;
   const uncappedBytes = FILE_COUNT * size;
-  const cappedActive = Math.min(FILE_COUNT, CAP);
-  const rejected = Math.max(0, FILE_COUNT - CAP);
-  const cappedBytes = cappedActive * size;
+
+  let accepted = 0;
+  let used = 0;
+  let rejected = 0;
+  for (let i = 0; i < FILE_COUNT; i++) {
+    if (accepted < CAP && used + size <= BYTE_CAP) {
+      accepted += 1;
+      used += size;
+    } else {
+      rejected += 1;
+    }
+  }
+
   const freeMb = os.freemem() / 1024 / 1024;
   const totalMb = os.totalmem() / 1024 / 1024;
-
-  // JSON+base64 수신 버퍼 오버헤드 대략 ×1.4 (라인 버퍼·Map)
   const overhead = 1.4;
   const uncappedPeakMb = (uncappedBytes * overhead) / 1024 / 1024;
-  const cappedPeakMb = (cappedBytes * overhead) / 1024 / 1024;
+  const cappedPeakMb = (used * overhead) / 1024 / 1024;
 
   const risks = [];
   if (uncappedPeakMb > freeMb * 0.5) risks.push('uncapped-ram-pressure');
@@ -133,11 +142,12 @@ function modelFileXferMemory() {
     sizeBytesEach: size,
     withoutCap: {
       peakRamMbApprox: +uncappedPeakMb.toFixed(1),
-      note: 'pendingFileXfers에 청크 전부 상주'
+      note: '상한 없을 때 pendingFileXfers에 청크 전부 상주'
     },
     withCap: {
       cap: CAP,
-      accepted: cappedActive,
+      byteCapMb: Math.round(BYTE_CAP / 1024 / 1024),
+      accepted,
       rejectedOrQueued: rejected,
       peakRamMbApprox: +cappedPeakMb.toFixed(1)
     },
@@ -178,15 +188,26 @@ async function runDiskWriteCompare() {
 }
 
 function judge(photo, mem, disk) {
-  const risks = [...(mem.risks || [])];
+  const risks = [];
   if (photo.errors > 0) risks.push('photo-write-errors');
   if (photo.eventLoopLagMs.p95 > 100) risks.push('photo-event-loop');
   if (photo.writeMs.p95 > 500) risks.push('photo-slow-write');
 
+  const cappedMb = mem.withCap && mem.withCap.peakRamMbApprox;
+  const uncappedMb = mem.withoutCap && mem.withoutCap.peakRamMbApprox;
+  const freeMb = mem.host && mem.host.freeMb;
+
+  // 상한 없을 때의 위험은 참고만 — 제품에는 MAX_PENDING_FILE_XFERS/BYTES 가 있음
+  if (uncappedMb > 1024) risks.push('uncapped-would-oom');
+  if (cappedMb > 512 && freeMb && cappedMb > freeMb * 0.4) risks.push('capped-still-tight');
+  if (cappedMb > 1500) risks.push('capped-over-1-5gb');
+
   let level = 'LOW';
-  if (risks.includes('uncapped-over-2gb') || risks.includes('uncapped-over-1gb') || photo.errors > 0) {
+  // HIGH: 실제 상한 적용 후에도 위험하거나 사진 저장 오류
+  if (photo.errors > 0 || risks.includes('capped-over-1-5gb') || risks.includes('capped-still-tight')) {
     level = 'HIGH';
-  } else if (risks.length) {
+  } else if (risks.includes('photo-event-loop') || risks.includes('photo-slow-write') || risks.includes('uncapped-would-oom')) {
+    // 상한이 막아 주는 시나리오는 WARN(MEDIUM)
     level = 'MEDIUM';
   }
 
@@ -194,10 +215,11 @@ function judge(photo, mem, disk) {
     level,
     risks,
     answerKo: level === 'HIGH'
-      ? '오류·메모리 부족 가능성이 큼 — 동시 수신 상한 필요'
+      ? '상한 적용 후에도 위험 — 추가 제한 필요'
       : level === 'MEDIUM'
-        ? '작은 사진 다수는 버팀. 큰 파일 다수 동시 수신은 위험 — 상한 권장'
-        : '이 환경·설정에서는 큰 오류 없이 처리 가능'
+        ? '상한으로 OOM은 막힘. 사진 폭주 시 잠깐 버벅이거나 일부 파일은 거절·재시도'
+        : '이 환경·설정에서는 큰 오류 없이 처리 가능',
+    protectedByCap: !!(mem.withCap && mem.withCap.rejectedOrQueued > 0)
   };
 }
 
@@ -231,7 +253,8 @@ async function main() {
     photoWallMs: photo.wallMs,
     photoErrors: photo.errors,
     uncappedRamMb: mem.withoutCap.peakRamMbApprox,
-    cappedRamMb: mem.withCap.peakRamMbApprox
+    cappedRamMb: mem.withCap.peakRamMbApprox,
+    protectedByCap: !!verdict.protectedByCap
   })}`);
 
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
