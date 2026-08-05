@@ -4977,6 +4977,51 @@
     </div>
   </div>
 
+  <!-- 침묵모드 시간 지정 -->
+  <div id="silent-mode-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeSilentModeModal()">
+    <div class="modal-card" style="width:380px; max-width:94vw; padding:0; overflow:hidden;" onclick="event.stopPropagation()">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #e2e8f0;">
+        <div>
+          <div style="font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">침묵모드 시간 지정</div>
+          <div style="font-size:11.5px; color:#64748b; margin-top:3px; line-height:1.45;">메시지는 주고받지만 토스트·데스크톱 알림만 끕니다.</div>
+        </div>
+        <button type="button" onclick="closeSilentModeModal()" style="width:30px;height:30px;border:none;background:transparent;border-radius:8px;font-size:16px;color:#94a3b8;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+        <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; font-weight:700; color:#334155;">
+          지속 시간 (분)
+          <input type="number" id="silent-mode-minutes-input" min="1" max="2880" step="1" value="60" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px; font-weight:600;">
+        </label>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          <button type="button" class="silent-mode-quick" onclick="setSilentModeMinutesInput(15)">15분</button>
+          <button type="button" class="silent-mode-quick" onclick="setSilentModeMinutesInput(30)">30분</button>
+          <button type="button" class="silent-mode-quick" onclick="setSilentModeMinutesInput(60)">1시간</button>
+          <button type="button" class="silent-mode-quick" onclick="setSilentModeMinutesInput(120)">2시간</button>
+          <button type="button" class="silent-mode-quick" onclick="setSilentModeMinutesInput(240)">4시간</button>
+        </div>
+        <div style="height:1px; background:#f1f5f9;"></div>
+        <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; font-weight:700; color:#334155;">
+          또는 종료 시각
+          <input type="datetime-local" id="silent-mode-until-input" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px; font-weight:600;">
+        </label>
+        <p id="silent-mode-modal-hint" style="margin:0; font-size:11.5px; color:#64748b; line-height:1.5;">코드블루·코드레드 발령 알림은 안전을 위해 유지됩니다.</p>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
+          <button type="button" onclick="closeSilentModeModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;">취소</button>
+          <button type="button" onclick="clearSilentModeFromModal()" id="silent-mode-clear-btn" style="padding:8px 14px; background:#fff; border:1px solid #fecaca; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer; color:#dc2626;">해제</button>
+          <button type="button" onclick="confirmSilentModeModal()" style="padding:8px 16px; background:#0f172a; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">침묵모드 시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <style>
+    .silent-mode-quick {
+      padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 99px;
+      background: #f8fafc; color: #334155; font-size: 11.5px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .silent-mode-quick:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+  </style>
+
   <!-- 강제 업데이트 수신/진행 오버레이 -->
   <div id="force-update-overlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(15,23,42,0.88); align-items:center; justify-content:center;">
     <div style="text-align:center; color:#fff; max-width:420px; padding:24px;">
@@ -5356,6 +5401,15 @@
                 <span>초</span>
               </span>
             </label>
+            <div class="settings-divider"></div>
+            <div class="settings-section-title">침묵모드</div>
+            <div class="settings-toggle-row" style="align-items:flex-start;">
+              <span class="settings-toggle-text" style="flex:1;">
+                <span class="settings-toggle-title">트레이에서 시간을 정해 알림만 끄기</span>
+                <span class="settings-toggle-desc" id="setting-silent-mode-status">상태: 꺼짐 — 메시지 송수신은 유지됩니다</span>
+              </span>
+              <button type="button" onclick="openSilentModeModal()" style="padding:7px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; font-size:11.5px; font-weight:700; cursor:pointer; color:#0f172a; flex-shrink:0;">시간 지정</button>
+            </div>
             <div class="settings-divider"></div>
             <div class="settings-section-title">병원 일정 알람</div>
             <label class="settings-toggle-row" for="setting-schedule-alarm-enabled">
@@ -9230,7 +9284,7 @@
         rememberPendingInbound(data.senderIP, data);
         markRecentDmUiFingerprint(fp);
       }
-      if (data.urgent) playUrgentSound();
+      if (data.urgent && !isSilentModeActiveUi()) playUrgentSound();
     });
 
     window.api.onReceiveBroadcast((data) => {
@@ -9239,7 +9293,7 @@
         : detectCodeAlertType(data && data.message);
       const urgent = !!(data && data.urgent) || !!codeType;
       if (codeType) playCodeAlertSound();
-      else if (urgent) playUrgentSound();
+      else if (urgent && !isSilentModeActiveUi()) playUrgentSound();
       if (activeChatUser && activeChatUser.isBroadcast) {
         void appendLiveMessageSafely(() => {
           appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), urgent, data.msgUid, data.messageId, data.senderIP);
@@ -23045,6 +23099,8 @@
           const body = [`알림 시점: ${leadLabel}`, ...lines].join('\n');
 
           try {
+            // 침묵모드: 일정 알람(토스트/대화상자)도 잠시 숨김 — 메시지는 영향 없음
+            if (isSilentModeActiveUi()) return;
             // 여러 건은 OS 알림이 잘리므로 앱 대화상자로 전체 내용을 보여 줌
             const preferDialog = dueBatch.length > 1 || body.length > 160;
             if (!preferDialog && window.Notification && Notification.permission === 'granted') {
@@ -23475,6 +23531,120 @@
     if (window.api.onTriggerPrivacyLock) {
       window.api.onTriggerPrivacyLock(() => { lockPrivacyScreen(); });
     }
+
+    let silentModeState = { active: false, untilMs: 0, remainingMs: 0, label: '꺼짐' };
+
+    function isSilentModeActiveUi() {
+      return !!(silentModeState && silentModeState.active && Number(silentModeState.untilMs) > Date.now());
+    }
+
+    function applySilentModeState(state) {
+      if (state && typeof state === 'object') {
+        silentModeState = {
+          active: !!state.active,
+          untilMs: Number(state.untilMs) || 0,
+          remainingMs: Number(state.remainingMs) || 0,
+          label: state.label || (state.active ? '켜짐' : '꺼짐')
+        };
+      }
+      syncSilentModeUi();
+    }
+
+    async function refreshSilentModeState() {
+      if (!window.api || !window.api.getSilentModeState) return;
+      try {
+        applySilentModeState(await window.api.getSilentModeState());
+      } catch (_) {}
+    }
+
+    function syncSilentModeUi() {
+      const clearBtn = document.getElementById('silent-mode-clear-btn');
+      if (clearBtn) clearBtn.style.display = isSilentModeActiveUi() ? '' : 'none';
+      const hint = document.getElementById('silent-mode-modal-hint');
+      if (hint && isSilentModeActiveUi()) {
+        hint.textContent = `현재 침묵모드 켜짐 · ${silentModeState.label}. 코드블루·코드레드는 안전을 위해 알림이 유지됩니다.`;
+      } else if (hint) {
+        hint.textContent = '코드블루·코드레드 발령 알림은 안전을 위해 유지됩니다.';
+      }
+      const statusEl = document.getElementById('setting-silent-mode-status');
+      if (statusEl) {
+        statusEl.textContent = isSilentModeActiveUi()
+          ? `상태: 켜짐 · ${silentModeState.label}`
+          : '상태: 꺼짐 — 메시지 송수신은 유지됩니다';
+      }
+    }
+
+    function toDatetimeLocalValue(ms) {
+      const d = new Date(ms);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function setSilentModeMinutesInput(mins) {
+      const el = document.getElementById('silent-mode-minutes-input');
+      if (el) el.value = String(mins);
+      const untilEl = document.getElementById('silent-mode-until-input');
+      if (untilEl) untilEl.value = toDatetimeLocalValue(Date.now() + mins * 60 * 1000);
+    }
+
+    function openSilentModeModal() {
+      const modal = document.getElementById('silent-mode-modal');
+      if (!modal) return;
+      const minsEl = document.getElementById('silent-mode-minutes-input');
+      const untilEl = document.getElementById('silent-mode-until-input');
+      if (isSilentModeActiveUi()) {
+        const remMins = Math.max(1, Math.ceil((silentModeState.untilMs - Date.now()) / 60000));
+        if (minsEl) minsEl.value = String(remMins);
+        if (untilEl) untilEl.value = toDatetimeLocalValue(silentModeState.untilMs);
+      } else {
+        setSilentModeMinutesInput(60);
+      }
+      syncSilentModeUi();
+      modal.style.display = 'flex';
+      setModalOpenState(true);
+      setTimeout(() => minsEl && minsEl.focus(), 40);
+    }
+
+    function closeSilentModeModal() {
+      const modal = document.getElementById('silent-mode-modal');
+      if (modal) modal.style.display = 'none';
+      setModalOpenState(false);
+    }
+
+    async function confirmSilentModeModal() {
+      const untilEl = document.getElementById('silent-mode-until-input');
+      const minsEl = document.getElementById('silent-mode-minutes-input');
+      const untilRaw = untilEl && untilEl.value ? untilEl.value : '';
+      if (untilRaw) {
+        const untilMs = new Date(untilRaw).getTime();
+        if (!Number.isFinite(untilMs) || untilMs <= Date.now()) {
+          await appAlert('종료 시각은 현재보다 이후여야 합니다.');
+          return;
+        }
+        applySilentModeState(await window.api.setSilentModeUntil(untilMs));
+      } else {
+        const mins = parseInt(minsEl && minsEl.value, 10);
+        if (!Number.isFinite(mins) || mins < 1) {
+          await appAlert('지속 시간을 1분 이상으로 입력해 주세요.');
+          return;
+        }
+        applySilentModeState(await window.api.setSilentModeMinutes(mins));
+      }
+      closeSilentModeModal();
+    }
+
+    async function clearSilentModeFromModal() {
+      applySilentModeState(await window.api.clearSilentMode());
+      closeSilentModeModal();
+    }
+
+    if (window.api.onSilentModeChanged) {
+      window.api.onSilentModeChanged((state) => applySilentModeState(state));
+    }
+    if (window.api.onTriggerSilentModeCustom) {
+      window.api.onTriggerSilentModeCustom(() => { openSilentModeModal(); });
+    }
+    refreshSilentModeState();
 
     // main 프로세스 쪽 로그(DB 오류, 프로필 저장/로딩 등)를 개발자 도구 콘솔에도 그대로 남긴다.
     // (main 프로세스의 console.log는 npm start로 켰을 때만 터미널에 보이고, 패키징된 프로그램에서는

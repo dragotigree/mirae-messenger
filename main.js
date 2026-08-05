@@ -367,6 +367,9 @@ let notifyReadReceipts = true;
 let incomingNotifyMode = 'toast';
 /** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
 let toastDurationSeconds = 7;
+/** 침묵모드 종료 시각(ms). 0이면 꺼짐 — 메시지 송수신은 유지, 알림만 억제 */
+let silentModeUntilMs = 0;
+let silentModeEndTimer = null;
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -877,6 +880,130 @@ function detectCodeAlertType(message) {
   return null;
 }
 
+function isSilentModeActive() {
+  return Number(silentModeUntilMs) > Date.now();
+}
+
+function getSilentModeState() {
+  const active = isSilentModeActive();
+  const untilMs = active ? Number(silentModeUntilMs) : 0;
+  const remainingMs = active ? Math.max(0, untilMs - Date.now()) : 0;
+  return {
+    active,
+    untilMs,
+    remainingMs,
+    label: formatSilentModeRemainingLabel()
+  };
+}
+
+function formatSilentModeRemainingLabel() {
+  if (!isSilentModeActive()) return '꺼짐';
+  const rem = Math.max(0, silentModeUntilMs - Date.now());
+  const mins = Math.max(1, Math.ceil(rem / 60000));
+  const end = new Date(silentModeUntilMs);
+  const endStr = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+  if (mins < 60) return `${mins}분 남음 (∼${endStr})`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h}시간 ${m}분 남음 (∼${endStr})` : `${h}시간 남음 (∼${endStr})`;
+}
+
+function persistSilentModeUntil() {
+  try {
+    db.run(
+      `UPDATE app_settings SET silent_mode_until_ms = ? WHERE id = 1`,
+      [isSilentModeActive() ? silentModeUntilMs : 0],
+      logDbErr
+    );
+  } catch (e) {
+    console.error('침묵모드 저장 오류:', e.message);
+  }
+}
+
+function updateTraySilentUi() {
+  if (tray && !tray.isDestroyed()) {
+    const state = getSilentModeState();
+    tray.setToolTip(
+      state.active
+        ? `미래병원 사내 메신저 · 침묵모드 (${state.label})`
+        : '미래병원 사내 메신저'
+    );
+  }
+  refreshShellMenus();
+}
+
+function scheduleSilentModeEnd() {
+  if (silentModeEndTimer) {
+    clearTimeout(silentModeEndTimer);
+    silentModeEndTimer = null;
+  }
+  if (!isSilentModeActive()) return;
+  const delay = Math.min(Math.max(200, silentModeUntilMs - Date.now() + 80), 2147483647);
+  silentModeEndTimer = setTimeout(() => {
+    silentModeEndTimer = null;
+    if (isSilentModeActive()) {
+      scheduleSilentModeEnd();
+      return;
+    }
+    silentModeUntilMs = 0;
+    persistSilentModeUntil();
+    updateTraySilentUi();
+    safeWebContentsSend('silent-mode-changed', getSilentModeState());
+  }, delay);
+}
+
+function setSilentModeUntil(untilMs) {
+  const until = Number(untilMs) || 0;
+  if (!Number.isFinite(until) || until <= Date.now()) {
+    return clearSilentMode();
+  }
+  // 최대 48시간
+  const maxUntil = Date.now() + 48 * 60 * 60 * 1000;
+  silentModeUntilMs = Math.min(until, maxUntil);
+  persistSilentModeUntil();
+  scheduleSilentModeEnd();
+  updateTraySilentUi();
+  safeWebContentsSend('silent-mode-changed', getSilentModeState());
+  return getSilentModeState();
+}
+
+function setSilentModeForMinutes(minutes) {
+  const mins = Math.max(1, Math.min(48 * 60, Math.round(Number(minutes) || 0)));
+  return setSilentModeUntil(Date.now() + mins * 60 * 1000);
+}
+
+function setSilentModeUntilMidnight() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(0, 0, 0, 0);
+  return setSilentModeUntil(d.getTime());
+}
+
+function clearSilentMode() {
+  silentModeUntilMs = 0;
+  if (silentModeEndTimer) {
+    clearTimeout(silentModeEndTimer);
+    silentModeEndTimer = null;
+  }
+  persistSilentModeUntil();
+  updateTraySilentUi();
+  safeWebContentsSend('silent-mode-changed', getSilentModeState());
+  return getSilentModeState();
+}
+
+function openSilentModeCustomPrompt() {
+  openMainWindowWithViewMode(trayLaunchViewMode);
+  setTimeout(() => safeWebContentsSend('trigger-silent-mode-custom'), 160);
+}
+
+/** 일반 메시지 알림 표시 가능 여부 (코드 발령 force는 예외) */
+function canShowIncomingNotify(force) {
+  if (force) return true;
+  if (!notifyIncomingMessages) return false;
+  if (isSilentModeActive()) return false;
+  return true;
+}
+
 function shouldSuppressMessageToast(channelKey) {
   const key = String(channelKey || '').trim();
   if (!key || !toastUiState.focused) return false;
@@ -912,6 +1039,7 @@ function truncateToastText(text, maxLen) {
 }
 
 function showMessageToast({ title, body, urgent, channelKey, codeType, force }) {
+  if (!force && !canShowIncomingNotify(false)) return;
   if (!force && !notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
   const work = display.workArea || display.bounds;
@@ -969,7 +1097,8 @@ function showMessageToast({ title, body, urgent, channelKey, codeType, force }) 
   toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
 }
 
-function showDesktopNotification({ title, body, urgent, channelKey }) {
+function showDesktopNotification({ title, body, urgent, channelKey, force }) {
+  if (!force && isSilentModeActive()) return;
   if (!Notification.isSupported()) return;
   try {
     const notification = new Notification({
@@ -993,7 +1122,7 @@ function showDesktopNotification({ title, body, urgent, channelKey }) {
 function notifyIncomingMessageNotification(opts) {
   const o = opts || {};
   const force = !!o.force;
-  if (!force && !notifyIncomingMessages) return;
+  if (!canShowIncomingNotify(force)) return;
   // 코드 발령은 해당 채널을 보고 있어도 토스트·알림을 숨기지 않음
   if (!force && shouldSuppressMessageToast(o.channelKey)) return;
   const key = String(o.channelKey || '').trim() || '__unknown__';
@@ -1014,7 +1143,8 @@ function notifyIncomingMessageNotification(opts) {
       title: o.title || '새 메시지',
       body: o.body || '메시지가 도착했습니다.',
       urgent: !!o.urgent || !!code,
-      channelKey: o.channelKey
+      channelKey: o.channelKey,
+      force
     });
   } else {
     showMessageToast(o);
@@ -2686,6 +2816,7 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'auto'`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_interval_hours INTEGER DEFAULT 24`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_retention_days INTEGER DEFAULT 14`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN silent_mode_until_ms INTEGER DEFAULT 0`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
@@ -2717,6 +2848,14 @@ db.serialize(() => {
       transportWebappUrl = row.transport_webapp_url || DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = row.download_folder_path || app.getPath('downloads');
       trayLaunchViewMode = row.tray_launch_view_mode === 'compact' ? 'compact' : 'normal';
+      const silentUntil = Number(row.silent_mode_until_ms) || 0;
+      if (silentUntil > Date.now()) {
+        silentModeUntilMs = silentUntil;
+        scheduleSilentModeEnd();
+        try { updateTraySilentUi(); } catch (_) { /* tray 아직 없을 수 있음 */ }
+      } else {
+        silentModeUntilMs = 0;
+      }
       if (!row.update_source_path || rawPath !== updateSourcePath || !row.transport_webapp_url || !row.download_folder_path) {
         db.run(`UPDATE app_settings SET update_source_path = ?, transport_webapp_url = ?, download_folder_path = ? WHERE id = 1`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
       }
@@ -3089,6 +3228,36 @@ function buildTrayContextMenu() {
       ]
     },
     { type: 'separator' },
+    {
+      label: isSilentModeActive()
+        ? `침묵모드 · ${formatSilentModeRemainingLabel()}`
+        : '침묵모드 (알림만 끄기)',
+      submenu: [
+        {
+          label: isSilentModeActive()
+            ? `상태: 켜짐 · ${formatSilentModeRemainingLabel()}`
+            : '상태: 꺼짐 — 메시지 송수신은 그대로, 알림만 숨김',
+          enabled: false
+        },
+        { type: 'separator' },
+        { label: '15분', click: () => setSilentModeForMinutes(15) },
+        { label: '30분', click: () => setSilentModeForMinutes(30) },
+        { label: '1시간', click: () => setSilentModeForMinutes(60) },
+        { label: '2시간', click: () => setSilentModeForMinutes(120) },
+        { label: '4시간', click: () => setSilentModeForMinutes(240) },
+        { label: '8시간', click: () => setSilentModeForMinutes(480) },
+        { label: '오늘 자정까지', click: () => setSilentModeUntilMidnight() },
+        { type: 'separator' },
+        { label: '시간 직접 지정…', click: () => openSilentModeCustomPrompt() },
+        { type: 'separator' },
+        {
+          label: '침묵모드 해제',
+          enabled: isSilentModeActive(),
+          click: () => clearSilentMode()
+        }
+      ]
+    },
+    { type: 'separator' },
     { label: '트레이·단축키로 열 때', enabled: false },
     {
       label: '기본 화면',
@@ -3116,7 +3285,11 @@ function createTray() {
   const icon = getTrayIcon();
   tray = new Tray(icon);
 
-  tray.setToolTip('미래병원 사내 메신저');
+  tray.setToolTip(
+    isSilentModeActive()
+      ? `미래병원 사내 메신저 · 침묵모드 (${formatSilentModeRemainingLabel()})`
+      : '미래병원 사내 메신저'
+  );
   tray.setContextMenu(buildTrayContextMenu());
   tray.on('double-click', () => openMainWindowWithViewMode(trayLaunchViewMode));
   tray.on('click', () => {
@@ -9490,8 +9663,17 @@ ipcMain.handle('get-message-notification-settings', async () => ({
   notifyIncomingMessages,
   notifyReadReceipts,
   toastDurationSeconds,
-  incomingNotifyMode
+  incomingNotifyMode,
+  silentMode: getSilentModeState()
 }));
+
+ipcMain.handle('get-silent-mode-state', async () => getSilentModeState());
+
+ipcMain.handle('set-silent-mode-minutes', async (event, minutes) => setSilentModeForMinutes(minutes));
+
+ipcMain.handle('set-silent-mode-until', async (event, untilMs) => setSilentModeUntil(untilMs));
+
+ipcMain.handle('clear-silent-mode', async () => clearSilentMode());
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
   if (settings && typeof settings.notifyIncomingMessages === 'boolean') {
