@@ -76,10 +76,24 @@ let masterSessionActive = false;
 /** 이 PC 메신저 사용 중지(잠금) — true면 접속·프레즌스 중단, 마스터 인증으로만 해제 */
 let localUsageDisabled = false;
 let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
-/** 전체 서비스 일시중지: 2026-08-18 00:00(로컬) 이전. 마스터 인증으로 PC별 우회 */
-const SERVICE_PAUSE_UNTIL = new Date(2026, 7, 18, 0, 0, 0, 0);
-const SERVICE_PAUSE_KEY = '2026-08-18';
-let servicePauseBypassed = false;
+/** 전체 서비스 일시중지 — 마스터가 켜고 끔(기본 OFF). 메시지·재개일은 관리자 창에서 편집 */
+const SERVICE_PAUSE_DEFAULTS = {
+  title: '메신저 일시 중지 안내',
+  body: '현재 작동하고 있는 메신저는 8월 18일 이후에 사용 예정되어 있습니다.',
+  contact: '문의 및 요청사항이 있는 경우 내선번호 1030(물리치료실장)으로 연락주시면 감사하겠습니다.',
+  untilLabel: '2026년 8월 18일'
+};
+let servicePause = {
+  enabled: false,
+  title: SERVICE_PAUSE_DEFAULTS.title,
+  body: SERVICE_PAUSE_DEFAULTS.body,
+  contact: SERVICE_PAUSE_DEFAULTS.contact,
+  untilLabel: SERVICE_PAUSE_DEFAULTS.untilLabel,
+  updatedAt: '',
+  revision: 0
+};
+/** 이 PC에서 마스터로 해제한 revision — 현재 revision과 같으면 잠금 해제 */
+let servicePauseBypassRevision = 0;
 /** 마스터가 사용 중지한 다른 PC (IP → meta) — 관리 화면 표시·원격 명령용 */
 const disabledClients = new Map();
 /** 작성자 세션이 당직·주치의 OFF(일정등록) 권한을 갖는지 */
@@ -672,12 +686,8 @@ async function stagePendingUpdateBuffer(relPath, buffer) {
   await writeBufferWithRetry(dest, buffer);
 }
 
-function isServicePausePeriod() {
-  return Date.now() < SERVICE_PAUSE_UNTIL.getTime();
-}
-
 function isServicePauseLocked() {
-  return isServicePausePeriod() && !servicePauseBypassed;
+  return !!servicePause.enabled && servicePauseBypassRevision !== Number(servicePause.revision || 0);
 }
 
 /** 사용 중지 또는 서비스 일시중지 — 메시지 전송·프레즌스 차단 */
@@ -687,28 +697,59 @@ function isMessengerUsageBlocked() {
 
 function getServicePauseState() {
   return {
-    active: isServicePausePeriod(),
+    enabled: !!servicePause.enabled,
+    active: !!servicePause.enabled,
     locked: isServicePauseLocked(),
-    bypassed: !!servicePauseBypassed,
-    until: SERVICE_PAUSE_KEY,
-    untilLabel: '2026년 8월 18일',
-    title: '메신저 일시 중지 안내',
-    body: '현재 작동하고 있는 메신저는 8월 18일 이후에 사용 예정되어 있습니다.',
-    contact: '문의 및 요청사항이 있는 경우 내선번호 1030(물리치료실장)으로 연락주시면 감사하겠습니다.',
+    bypassed: !!servicePause.enabled && servicePauseBypassRevision === Number(servicePause.revision || 0),
+    revision: Number(servicePause.revision || 0),
+    updatedAt: servicePause.updatedAt || '',
+    untilLabel: servicePause.untilLabel || SERVICE_PAUSE_DEFAULTS.untilLabel,
+    title: servicePause.title || SERVICE_PAUSE_DEFAULTS.title,
+    body: servicePause.body || SERVICE_PAUSE_DEFAULTS.body,
+    contact: servicePause.contact || SERVICE_PAUSE_DEFAULTS.contact,
     myIp: MY_IP
   };
 }
 
-function persistServicePauseBypass(unlocked) {
-  servicePauseBypassed = !!unlocked;
-  const key = unlocked ? SERVICE_PAUSE_KEY : '';
-  const at = unlocked ? new Date().toISOString() : '';
+function buildServicePauseSyncPayload() {
+  return {
+    type: 'SERVICE_PAUSE_SYNC',
+    enabled: !!servicePause.enabled,
+    title: servicePause.title || SERVICE_PAUSE_DEFAULTS.title,
+    body: servicePause.body || SERVICE_PAUSE_DEFAULTS.body,
+    contact: servicePause.contact || SERVICE_PAUSE_DEFAULTS.contact,
+    untilLabel: servicePause.untilLabel || SERVICE_PAUSE_DEFAULTS.untilLabel,
+    updatedAt: servicePause.updatedAt || '',
+    revision: Number(servicePause.revision || 0),
+    fromIp: MY_IP
+  };
+}
+
+function persistServicePauseState() {
   db.run(
-    `INSERT INTO service_pause_bypass (id, pause_key, unlocked_at) VALUES (1, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET pause_key = excluded.pause_key, unlocked_at = excluded.unlocked_at`,
-    [key, at],
+    `INSERT INTO service_pause (id, enabled, title, body, contact, until_label, updated_at, revision, bypass_revision)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       enabled = excluded.enabled, title = excluded.title, body = excluded.body,
+       contact = excluded.contact, until_label = excluded.until_label,
+       updated_at = excluded.updated_at, revision = excluded.revision,
+       bypass_revision = excluded.bypass_revision`,
+    [
+      servicePause.enabled ? 1 : 0,
+      servicePause.title || '',
+      servicePause.body || '',
+      servicePause.contact || '',
+      servicePause.untilLabel || '',
+      servicePause.updatedAt || '',
+      Number(servicePause.revision || 0),
+      Number(servicePauseBypassRevision || 0)
+    ],
     logDbErr
   );
+}
+
+function persistServicePauseBypass() {
+  persistServicePauseState();
 }
 
 function notifyServicePauseState() {
@@ -727,9 +768,71 @@ function applyServicePausePresenceSideEffects() {
   notifyUserList();
 }
 
+function applyServicePauseConfig(next, opts) {
+  const o = opts || {};
+  const wasLocked = isServicePauseLocked();
+  servicePause = {
+    enabled: !!next.enabled,
+    title: String(next.title || SERVICE_PAUSE_DEFAULTS.title).trim() || SERVICE_PAUSE_DEFAULTS.title,
+    body: String(next.body || SERVICE_PAUSE_DEFAULTS.body).trim() || SERVICE_PAUSE_DEFAULTS.body,
+    contact: String(next.contact || SERVICE_PAUSE_DEFAULTS.contact).trim() || SERVICE_PAUSE_DEFAULTS.contact,
+    untilLabel: String(next.untilLabel || SERVICE_PAUSE_DEFAULTS.untilLabel).trim() || SERVICE_PAUSE_DEFAULTS.untilLabel,
+    updatedAt: next.updatedAt || new Date().toISOString(),
+    revision: Number(next.revision || 0)
+  };
+  if (o.clearBypass) servicePauseBypassRevision = -1;
+  if (o.setBypass) servicePauseBypassRevision = Number(servicePause.revision || 0);
+  if (!servicePause.enabled) servicePauseBypassRevision = 0;
+  persistServicePauseState();
+  const nowLocked = isServicePauseLocked();
+  if (wasLocked !== nowLocked || o.forcePresence) applyServicePausePresenceSideEffects();
+  notifyServicePauseState();
+}
+
+function handleServicePauseSync(payload, senderIP) {
+  if (!payload) return;
+  const remoteRev = Number(payload.revision || 0);
+  const localRev = Number(servicePause.revision || 0);
+  if (remoteRev < localRev) {
+    if (senderIP) sendToIpDirect(senderIP, buildServicePauseSyncPayload());
+    return;
+  }
+  if (remoteRev === localRev) {
+    const remoteAt = String(payload.updatedAt || '');
+    const localAt = String(servicePause.updatedAt || '');
+    if (remoteAt && localAt && remoteAt < localAt) {
+      if (senderIP) sendToIpDirect(senderIP, buildServicePauseSyncPayload());
+      return;
+    }
+    if (
+      !!payload.enabled === !!servicePause.enabled &&
+      String(payload.body || '') === String(servicePause.body || '') &&
+      String(payload.contact || '') === String(servicePause.contact || '') &&
+      String(payload.untilLabel || '') === String(servicePause.untilLabel || '')
+    ) {
+      return;
+    }
+  }
+  applyServicePauseConfig({
+    enabled: !!payload.enabled,
+    title: payload.title,
+    body: payload.body,
+    contact: payload.contact,
+    untilLabel: payload.untilLabel,
+    updatedAt: payload.updatedAt || new Date().toISOString(),
+    revision: remoteRev
+  }, { forcePresence: true });
+}
+
+function maybeSyncServicePauseToPeer(ip) {
+  if (!ip || ip === MY_IP) return;
+  if (!servicePause.enabled && !servicePause.revision) return;
+  sendToIps([ip], buildServicePauseSyncPayload());
+}
+
 function messengerBlockedResponse() {
   if (isServicePauseLocked()) {
-    const msg = '메신저가 일시 중지 상태입니다. 마스터 아이디·비밀번호로 해제하거나 2026년 8월 18일 이후에 이용해 주세요.';
+    const msg = '메신저가 일시 중지 상태입니다. 마스터 아이디·비밀번호로 해제하거나 관리자가 일시 중지를 끌 때까지 기다려 주세요.';
     return { success: false, status: 'ERROR', msg, error: msg };
   }
   return usageLockBlockedResponse();
@@ -2135,13 +2238,29 @@ db.serialize(() => {
   )`, logDbErr);
   db.run(`INSERT OR IGNORE INTO usage_lock (id, disabled) VALUES (1, 0)`, () => {});
 
-  // 서비스 일시중지(일정) 마스터 우회 — pause_key가 현재 일시중지 키와 같으면 우회
-  db.run(`CREATE TABLE IF NOT EXISTS service_pause_bypass (
+  // 서비스 일시중지(전체) — 마스터가 켜고 끔. 기본 OFF
+  db.run(`CREATE TABLE IF NOT EXISTS service_pause (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    pause_key TEXT DEFAULT '',
-    unlocked_at TEXT DEFAULT ''
+    enabled INTEGER DEFAULT 0,
+    title TEXT DEFAULT '',
+    body TEXT DEFAULT '',
+    contact TEXT DEFAULT '',
+    until_label TEXT DEFAULT '',
+    updated_at TEXT DEFAULT '',
+    revision INTEGER DEFAULT 0,
+    bypass_revision INTEGER DEFAULT 0
   )`, logDbErr);
-  db.run(`INSERT OR IGNORE INTO service_pause_bypass (id, pause_key) VALUES (1, '')`, () => {});
+  db.run(
+    `INSERT OR IGNORE INTO service_pause (id, enabled, title, body, contact, until_label, revision, bypass_revision)
+     VALUES (1, 0, ?, ?, ?, ?, 0, 0)`,
+    [
+      SERVICE_PAUSE_DEFAULTS.title,
+      SERVICE_PAUSE_DEFAULTS.body,
+      SERVICE_PAUSE_DEFAULTS.contact,
+      SERVICE_PAUSE_DEFAULTS.untilLabel
+    ],
+    () => {}
+  );
 
   // 마스터가 다른 PC 사용을 중지한 목록 (관리 화면용)
   db.run(`CREATE TABLE IF NOT EXISTS disabled_clients (
@@ -2151,41 +2270,39 @@ db.serialize(() => {
     disabled_by_ip TEXT DEFAULT ''
   )`, logDbErr);
 
-  db.get(`SELECT pause_key FROM service_pause_bypass WHERE id = 1`, (errBypass, bypassRow) => {
-    if (!errBypass && bypassRow && String(bypassRow.pause_key || '') === SERVICE_PAUSE_KEY) {
-      servicePauseBypassed = true;
-    }
-    db.get(`SELECT disabled, disabled_at, disabled_by_ip, reason FROM usage_lock WHERE id = 1`, (err, row) => {
-      if (!err && row) {
-        localUsageDisabled = !!row.disabled;
-        localUsageLockMeta = {
-          disabledAt: row.disabled_at || '',
-          disabledByIp: row.disabled_by_ip || '',
-          reason: row.reason || ''
+  db.get(
+    `SELECT enabled, title, body, contact, until_label, updated_at, revision, bypass_revision FROM service_pause WHERE id = 1`,
+    (errPause, pauseRow) => {
+      if (!errPause && pauseRow) {
+        servicePause = {
+          enabled: !!pauseRow.enabled,
+          title: pauseRow.title || SERVICE_PAUSE_DEFAULTS.title,
+          body: pauseRow.body || SERVICE_PAUSE_DEFAULTS.body,
+          contact: pauseRow.contact || SERVICE_PAUSE_DEFAULTS.contact,
+          untilLabel: pauseRow.until_label || SERVICE_PAUSE_DEFAULTS.untilLabel,
+          updatedAt: pauseRow.updated_at || '',
+          revision: Number(pauseRow.revision || 0)
         };
+        servicePauseBypassRevision = Number(pauseRow.bypass_revision || 0);
       }
-      if (isMessengerUsageBlocked()) {
-        try { broadcastGoodbye(); } catch (_) {}
-        onlineUsers.delete(MY_IP);
-      }
-      try { notifyUsageLockState(); } catch (_) {}
-      try { notifyServicePauseState(); } catch (_) {}
-      try {
-        if (isServicePausePeriod()) {
-          const ms = SERVICE_PAUSE_UNTIL.getTime() - Date.now() + 1000;
-          if (ms > 0 && ms < 2147483647) {
-            setTimeout(() => {
-              notifyServicePauseState();
-              if (!localUsageDisabled) {
-                registerSelf();
-                if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-              }
-            }, ms);
-          }
+      db.get(`SELECT disabled, disabled_at, disabled_by_ip, reason FROM usage_lock WHERE id = 1`, (err, row) => {
+        if (!err && row) {
+          localUsageDisabled = !!row.disabled;
+          localUsageLockMeta = {
+            disabledAt: row.disabled_at || '',
+            disabledByIp: row.disabled_by_ip || '',
+            reason: row.reason || ''
+          };
         }
-      } catch (_) {}
-    });
-  });
+        if (isMessengerUsageBlocked()) {
+          try { broadcastGoodbye(); } catch (_) {}
+          onlineUsers.delete(MY_IP);
+        }
+        try { notifyUsageLockState(); } catch (_) {}
+        try { notifyServicePauseState(); } catch (_) {}
+      });
+    }
+  );
   db.all(`SELECT ip, username, disabled_at, disabled_by_ip FROM disabled_clients`, [], (err, rows) => {
     if (err || !rows) return;
     rows.forEach((r) => {
@@ -3359,6 +3476,7 @@ function startUdpDiscovery() {
           requestNoticeSync(rinfo.address);
           syncGroupsWithPeer(rinfo.address);
           tryDeliverPendingWipe(rinfo.address);
+          maybeSyncServicePauseToPeer(rinfo.address);
           if (myProfile.photo) {
             sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
           } else {
@@ -4296,6 +4414,9 @@ function routeIncomingPayload(payload, senderIP) {
       break;
     case 'USAGE_LOCK_SYNC':
       handleUsageLockSync(payload, senderIP);
+      break;
+    case 'SERVICE_PAUSE_SYNC':
+      handleServicePauseSync(payload, senderIP);
       break;
     case 'WIPE_CHAT_HISTORY':
       handleWipeChatHistoryCommand(payload, senderIP).catch((e) => {
@@ -8797,19 +8918,48 @@ ipcMain.handle('get-usage-lock-state', async () => ({
 
 ipcMain.handle('get-service-pause-state', async () => getServicePauseState());
 
+ipcMain.handle('set-service-pause', async (event, payload) => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  }
+  const p = payload || {};
+  const enabled = !!p.enabled;
+  const nextRev = Number(servicePause.revision || 0) + 1;
+  applyServicePauseConfig({
+    enabled,
+    title: p.title != null ? p.title : servicePause.title,
+    body: p.body != null ? p.body : servicePause.body,
+    contact: p.contact != null ? p.contact : servicePause.contact,
+    untilLabel: p.untilLabel != null ? p.untilLabel : servicePause.untilLabel,
+    updatedAt: new Date().toISOString(),
+    revision: nextRev
+  }, {
+    // 켠 관리자 PC는 계속 조작할 수 있도록 자동 우회
+    setBypass: true,
+    forcePresence: true
+  });
+  broadcastToOnlinePeers(buildServicePauseSyncPayload());
+  writeToLogFile('info', enabled
+    ? `[서비스일시중지] 마스터가 전체 일시 중지를 켰습니다. (rev ${nextRev})`
+    : `[서비스일시중지] 마스터가 전체 일시 중지를 껐습니다. (rev ${nextRev})`);
+  return { success: true, state: getServicePauseState() };
+});
+
 ipcMain.handle('unlock-service-pause', async (event, payload) => {
   const p = payload || {};
-  if (!isServicePausePeriod()) {
-    servicePauseBypassed = false;
+  if (!servicePause.enabled) {
+    servicePauseBypassRevision = 0;
+    persistServicePauseState();
     notifyServicePauseState();
-    return { success: true, locked: false, msg: '일시 중지 기간이 종료되었습니다.' };
+    return { success: true, locked: false, msg: '일시 중지가 꺼져 있습니다.' };
   }
   const ok = await verifyLocalMasterAuth(p.id, p.password);
   if (!ok) {
     return { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
   }
   masterSessionActive = true;
-  persistServicePauseBypass(true);
+  servicePauseBypassRevision = Number(servicePause.revision || 0);
+  persistServicePauseBypass();
   applyServicePausePresenceSideEffects();
   notifyServicePauseState();
   writeToLogFile('info', '[서비스일시중지] 마스터 인증으로 이 PC 일시 중지를 해제했습니다.');

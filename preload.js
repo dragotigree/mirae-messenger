@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld('api', {
   masterForceUpdate: (payload) => ipcRenderer.invoke('master-force-update', payload),
   getUsageLockState: () => ipcRenderer.invoke('get-usage-lock-state'),
   getServicePauseState: () => ipcRenderer.invoke('get-service-pause-state'),
+  setServicePause: (payload) => ipcRenderer.invoke('set-service-pause', payload),
   unlockServicePause: (payload) => ipcRenderer.invoke('unlock-service-pause', payload),
   getDisabledClients: () => ipcRenderer.invoke('get-disabled-clients'),
   unlockUsageWithMaster: (payload) => ipcRenderer.invoke('unlock-usage-with-master', payload),

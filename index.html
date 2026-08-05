@@ -4010,6 +4010,33 @@
         <button onclick="addMasterNoticeOperator()" style="padding:11px; background:#2563eb; color:#fff; border:none; border-radius: 15px; font-size:13px; font-weight:700; cursor:pointer; margin-top:4px;">💾 계정 발급 및 저장</button>
       </div>
 
+      <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius: 21px; padding:16px; display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#9a3412;">🗓️ 전체 메신저 일시 중지</div>
+            <div style="font-size:11.5px; color:#9a3412; margin-top:3px; opacity:0.85;">켜면 전 PC에 안내 화면이 뜹니다. 기본은 꺼짐(사용 가능)입니다.</div>
+          </div>
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:800; color:#9a3412; cursor:pointer; user-select:none;">
+            <input type="checkbox" id="master-service-pause-enabled" style="width:16px; height:16px;">
+            일시 중지 켜기
+          </label>
+        </div>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">안내 제목
+          <input type="text" id="master-service-pause-title" placeholder="메신저 일시 중지 안내" style="padding:9px 12px; border:1px solid #fdba74; border-radius:12px; font-size:13px;">
+        </label>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">안내 메시지
+          <textarea id="master-service-pause-body" rows="3" placeholder="현재 작동하고 있는 메신저는 8월 18일 이후에 사용 예정되어 있습니다." style="padding:9px 12px; border:1px solid #fdba74; border-radius:12px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
+        </label>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">문의 안내
+          <textarea id="master-service-pause-contact" rows="2" placeholder="문의 및 요청사항이 있는 경우 내선번호 1030(물리치료실장)으로 연락주시면 감사하겠습니다." style="padding:9px 12px; border:1px solid #fdba74; border-radius:12px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
+        </label>
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">재개 예정 표시
+          <input type="text" id="master-service-pause-until" placeholder="2026년 8월 18일" style="padding:9px 12px; border:1px solid #fdba74; border-radius:12px; font-size:13px;">
+        </label>
+        <div id="master-service-pause-status" style="font-size:11.5px; color:#9a3412; min-height:1.2em;"></div>
+        <button type="button" onclick="saveMasterServicePause()" style="padding:11px; background:#ea580c; color:#fff; border:none; border-radius:15px; font-size:13px; font-weight:700; cursor:pointer;">💾 일시 중지 설정 저장 · 전체 적용</button>
+      </div>
+
       <div>
         <div style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:8px;">📋 등록된 작성 권한자 목록</div>
         <div style="font-size:11.5px; color:#64748b; margin:-2px 0 8px;">아래 계정으로 로그인하면 공지·일정·당직의·OFF를 작성할 수 있습니다.</div>
@@ -4133,12 +4160,12 @@
         </div>
       </div>
       <h1 id="service-pause-title" class="service-pause-title">메신저 일시 중지 안내</h1>
-      <p class="service-pause-body">현재 작동하고 있는 메신저는 <strong>8월 18일</strong> 이후에 사용 예정되어 있습니다.</p>
+      <p id="service-pause-body" class="service-pause-body">현재 작동하고 있는 메신저는 <strong>8월 18일</strong> 이후에 사용 예정되어 있습니다.</p>
       <div class="service-pause-date-pill">
         <span class="service-pause-date-label">재개 예정</span>
-        <span class="service-pause-date-value">2026. 8. 18.</span>
+        <span id="service-pause-until" class="service-pause-date-value">2026. 8. 18.</span>
       </div>
-      <p class="service-pause-contact">문의 및 요청사항이 있는 경우<br><strong>내선번호 1030 (물리치료실장)</strong>으로 연락주시면 감사하겠습니다.</p>
+      <p id="service-pause-contact" class="service-pause-contact">문의 및 요청사항이 있는 경우<br><strong>내선번호 1030 (물리치료실장)</strong>으로 연락주시면 감사하겠습니다.</p>
       <div class="service-pause-divider"><span>관리자 해제</span></div>
       <label class="service-pause-field">마스터 아이디
         <input type="text" id="service-pause-master-id" placeholder="마스터 아이디" autocomplete="username">
@@ -12439,6 +12466,12 @@
       loadMasterOperatorList();
       try { await refreshPendingRemoteWipesUi(); } catch (_) {}
       renderMasterOnlineClients();
+      try {
+        if (window.api.getServicePauseState) {
+          const st = await window.api.getServicePauseState();
+          fillMasterServicePauseForm(st);
+        }
+      } catch (_) {}
       setModalOpenState(true);
       document.getElementById('master-admin-modal').style.display = 'flex';
     }
@@ -12685,11 +12718,38 @@
       const el = document.getElementById('service-pause-overlay');
       const err = document.getElementById('service-pause-unlock-error');
       if (err) err.textContent = '';
+      fillServicePauseOverlayCopy(state);
       if (el) {
         el.style.display = 'flex';
         el.setAttribute('aria-hidden', 'false');
       }
       setTimeout(() => document.getElementById('service-pause-master-id')?.focus(), 80);
+    }
+
+    function fillServicePauseOverlayCopy(state) {
+      const s = state || {};
+      const titleEl = document.getElementById('service-pause-title');
+      const bodyEl = document.getElementById('service-pause-body');
+      const contactEl = document.getElementById('service-pause-contact');
+      const untilEl = document.getElementById('service-pause-until');
+      if (titleEl) titleEl.textContent = s.title || '메신저 일시 중지 안내';
+      if (bodyEl) {
+        const body = String(s.body || '');
+        bodyEl.textContent = '';
+        body.split('\n').forEach((line, i) => {
+          if (i) bodyEl.appendChild(document.createElement('br'));
+          bodyEl.appendChild(document.createTextNode(line));
+        });
+      }
+      if (contactEl) {
+        const contact = String(s.contact || '');
+        contactEl.textContent = '';
+        contact.split('\n').forEach((line, i) => {
+          if (i) contactEl.appendChild(document.createElement('br'));
+          contactEl.appendChild(document.createTextNode(line));
+        });
+      }
+      if (untilEl) untilEl.textContent = s.untilLabel || '—';
     }
 
     function hideServicePauseOverlay() {
@@ -12709,7 +12769,70 @@
 
     function applyServicePauseState(state) {
       if (state && state.locked) showServicePauseOverlay(state);
-      else hideServicePauseOverlay();
+      else {
+        hideServicePauseOverlay();
+        if (state) fillServicePauseOverlayCopy(state);
+      }
+      fillMasterServicePauseForm(state);
+    }
+
+    function fillMasterServicePauseForm(state) {
+      if (!state) return;
+      const en = document.getElementById('master-service-pause-enabled');
+      const title = document.getElementById('master-service-pause-title');
+      const body = document.getElementById('master-service-pause-body');
+      const contact = document.getElementById('master-service-pause-contact');
+      const until = document.getElementById('master-service-pause-until');
+      const status = document.getElementById('master-service-pause-status');
+      if (en) en.checked = !!state.enabled;
+      if (title && document.activeElement !== title) title.value = state.title || '';
+      if (body && document.activeElement !== body) body.value = state.body || '';
+      if (contact && document.activeElement !== contact) contact.value = state.contact || '';
+      if (until && document.activeElement !== until) until.value = state.untilLabel || '';
+      if (status) {
+        status.textContent = state.enabled
+          ? (state.bypassed
+            ? `현재 ON · 이 PC는 관리자 우회 중 (rev ${state.revision || 0})`
+            : `현재 ON · 잠금 적용 중 (rev ${state.revision || 0})`)
+          : '현재 OFF · 전 직원이 메신저를 사용할 수 있습니다';
+      }
+    }
+
+    async function saveMasterServicePause() {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      if (!window.api.setServicePause) {
+        await appAlert('이 버전에서는 일시 중지 설정을 저장할 수 없습니다.');
+        return;
+      }
+      const enabled = !!document.getElementById('master-service-pause-enabled')?.checked;
+      const title = (document.getElementById('master-service-pause-title')?.value || '').trim();
+      const body = (document.getElementById('master-service-pause-body')?.value || '').trim();
+      const contact = (document.getElementById('master-service-pause-contact')?.value || '').trim();
+      const untilLabel = (document.getElementById('master-service-pause-until')?.value || '').trim();
+      if (!body) {
+        await appAlert('안내 메시지를 입력해 주세요.');
+        return;
+      }
+      const label = enabled ? '일시 중지를 켜고 전 PC에 적용' : '일시 중지를 끄고 전 PC에 적용';
+      if (!await appConfirm(`${label}할까요?`, {
+        title: '전체 메신저 일시 중지',
+        confirmText: '저장 · 적용',
+        cancelText: '취소',
+        variant: enabled ? 'danger' : 'default',
+        icon: '🗓️'
+      })) return;
+      const res = await window.api.setServicePause({ enabled, title, body, contact, untilLabel });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '저장에 실패했습니다.');
+        return;
+      }
+      applyServicePauseState(res.state || await window.api.getServicePauseState());
+      await appAlert(enabled
+        ? '일시 중지를 켰습니다. 다른 PC에 곧 반영됩니다. (이 PC는 관리자로 계속 사용 가능)'
+        : '일시 중지를 껐습니다. 전 PC에서 다시 사용할 수 있습니다.');
     }
 
     async function confirmServicePauseUnlock() {
