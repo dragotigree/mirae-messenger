@@ -4180,11 +4180,12 @@
 
   <!-- 🔒 메신저 사용 중지(잠금) 오버레이 — 마스터 아이디·비밀번호로만 해제 -->
   <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.92); align-items:center; justify-content:center;">
-    <div style="width:min(420px,92vw); background:#fff; border-radius:20px; padding:28px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:14px;">
+    <div style="width:min(440px,92vw); background:#fff; border-radius:20px; padding:28px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:14px;">
       <div style="text-align:center;">
         <div style="font-size:32px; margin-bottom:8px;">🔒</div>
         <div style="font-size:18px; font-weight:800; color:#b91c1c;">메신저 사용이 중지되었습니다</div>
-        <div id="usage-lock-overlay-desc" style="font-size:12.5px; color:#64748b; line-height:1.55; margin-top:8px;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
+        <div id="usage-lock-overlay-reason" style="margin-top:12px; padding:12px 14px; border-radius:14px; background:#fef2f2; border:1px solid #fecaca; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
+        <div id="usage-lock-overlay-desc" style="font-size:12.5px; color:#64748b; line-height:1.55; margin-top:10px;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
       </div>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 아이디
         <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
@@ -4204,6 +4205,12 @@
       <div id="master-usage-lock-desc" style="font-size:12.5px; color:#475569; line-height:1.55;"></div>
       <input type="hidden" id="master-usage-lock-target">
       <input type="hidden" id="master-usage-lock-disabled" value="1">
+      <div id="master-usage-lock-reason-wrap" style="display:none;">
+        <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">정지 안내 문구 (대상 PC에 표시)
+          <textarea id="master-usage-lock-reason" rows="4" placeholder="예: 퇴직 처리로 메신저 사용이 중지되었습니다.&#10;문의는 내선 1030으로 연락 바랍니다." style="padding:9px 12px; border:1px solid #fecaca; border-radius:12px; font-size:13px; resize:vertical; font-family:inherit; line-height:1.5;"></textarea>
+        </label>
+        <p style="font-size:11px; color:#94a3b8; margin:6px 0 0; line-height:1.45;">비워 두면 기본 안내 문구가 표시됩니다.</p>
+      </div>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 비밀번호 재확인
         <input type="password" id="master-usage-lock-pwd" placeholder="마스터 비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') confirmMasterUsageLock()">
       </label>
@@ -12533,8 +12540,9 @@
         const nameText = `${u.rank || ''} ${u.username || '-'}`.trim();
         const usageDisabled = !!u.usageDisabled;
         const wipePending = pendingRemoteWipeIps.has(u.ip);
+        const lockReason = String(u.usageLockReason || '').trim();
         const statusCell = usageDisabled
-          ? '<span style="color:#b91c1c; font-weight:700;">🔒 사용중지</span>'
+          ? `<span style="color:#b91c1c; font-weight:700;"${lockReason ? ` title="${escAttr(lockReason)}"` : ''}>🔒 사용중지${lockReason ? `<div style="font-size:10px; font-weight:600; color:#9f1239; margin-top:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(lockReason)}</div>` : ''}</span>`
           : (masterStatusLabel[statusKey] || statusKey);
         const wipePendingBadge = wipePending
           ? ' <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:999px; background:#ffedd5; color:#c2410c; font-size:10px; font-weight:800;">삭제예약</span>'
@@ -12580,11 +12588,14 @@
         }));
       });
       box.querySelectorAll('.master-usage-enable-btn').forEach(btn => {
+        const ip = btn.getAttribute('data-ip');
+        const u = (allUsers || []).find((x) => x.ip === ip);
         btn.addEventListener('click', () => openMasterUsageLockModal({
-          targetIp: btn.getAttribute('data-ip'),
+          targetIp: ip,
           name: btn.getAttribute('data-name') || '',
           isMe: btn.getAttribute('data-isme') === '1',
-          disabled: false
+          disabled: false,
+          reason: (u && u.usageLockReason) || ''
         }));
       });
       box.querySelectorAll('.master-wipe-cancel-btn').forEach(btn => {
@@ -12863,11 +12874,24 @@
       localUsageLocked = true;
       const el = document.getElementById('usage-lock-overlay');
       const desc = document.getElementById('usage-lock-overlay-desc');
+      const reasonEl = document.getElementById('usage-lock-overlay-reason');
       const err = document.getElementById('usage-lock-unlock-error');
       if (err) err.textContent = '';
-      if (desc && state) {
-        const by = state.disabledByIp ? ` (요청: ${state.disabledByIp})` : '';
-        desc.textContent = `마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다${by}. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.`;
+      const customReason = String((state && state.reason) || '').trim();
+      if (reasonEl) {
+        if (customReason) {
+          reasonEl.style.display = 'block';
+          reasonEl.textContent = customReason;
+        } else {
+          reasonEl.style.display = 'none';
+          reasonEl.textContent = '';
+        }
+      }
+      if (desc) {
+        const by = state && state.disabledByIp ? ` (요청: ${state.disabledByIp})` : '';
+        desc.textContent = customReason
+          ? `위 사유로 메신저 사용이 중지되어 있습니다${by}. 마스터 아이디·비밀번호로 해제하거나, 관리자 화면에서 사용을 허용해야 합니다.`
+          : `마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다${by}. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.`;
       }
       if (el) el.style.display = 'flex';
       setTimeout(() => document.getElementById('usage-lock-master-id')?.focus(), 80);
@@ -12924,6 +12948,8 @@
       const title = document.getElementById('master-usage-lock-title');
       const desc = document.getElementById('master-usage-lock-desc');
       const btn = document.getElementById('master-usage-lock-confirm-btn');
+      const reasonWrap = document.getElementById('master-usage-lock-reason-wrap');
+      const reasonEl = document.getElementById('master-usage-lock-reason');
       if (disabled) {
         if (title) { title.textContent = '🔒 사용 중지'; title.style.color = '#b91c1c'; }
         if (desc) {
@@ -12932,6 +12958,11 @@
             : `${o.name || '대상'} (${o.targetIp}) PC의 메신저 사용을 중지합니다. 해당 PC는 접속할 수 없게 됩니다.`;
         }
         if (btn) { btn.textContent = '사용 중지'; btn.style.background = '#dc2626'; }
+        if (reasonWrap) reasonWrap.style.display = 'block';
+        if (reasonEl) {
+          reasonEl.value = o.reason || '';
+          setTimeout(() => reasonEl.focus(), 60);
+        }
       } else {
         if (title) { title.textContent = '🔓 사용 허용'; title.style.color = '#15803d'; }
         if (desc) {
@@ -12940,10 +12971,12 @@
             : `${o.name || '대상'} (${o.targetIp}) PC의 사용 중지를 해제합니다.`;
         }
         if (btn) { btn.textContent = '사용 허용'; btn.style.background = '#16a34a'; }
+        if (reasonWrap) reasonWrap.style.display = 'none';
+        if (reasonEl) reasonEl.value = '';
+        setTimeout(() => document.getElementById('master-usage-lock-pwd')?.focus(), 50);
       }
       document.getElementById('master-usage-lock-pwd').value = '';
       document.getElementById('master-usage-lock-modal').style.display = 'flex';
-      setTimeout(() => document.getElementById('master-usage-lock-pwd')?.focus(), 50);
     }
 
     function closeMasterUsageLockModal() {
@@ -12958,19 +12991,28 @@
       const targetIp = document.getElementById('master-usage-lock-target').value.trim();
       const disabled = document.getElementById('master-usage-lock-disabled').value === '1';
       const password = document.getElementById('master-usage-lock-pwd').value;
+      const reason = (document.getElementById('master-usage-lock-reason')?.value || '').trim();
       if (!password) {
         await appAlert('마스터 비밀번호를 입력해 주세요.');
         return;
       }
       const actionLabel = disabled ? '사용 중지' : '사용 허용';
-      if (!await appConfirm(`정말 ${actionLabel}를 실행할까요?`, {
+      const confirmDetail = disabled && reason
+        ? `안내 문구:\n${reason}`
+        : '';
+      if (!await appConfirm(`정말 ${actionLabel}를 실행할까요?${confirmDetail ? `\n\n${confirmDetail}` : ''}`, {
         title: actionLabel,
         confirmText: '실행',
         cancelText: '취소',
         variant: disabled ? 'danger' : 'default'
       })) return;
 
-      const res = await window.api.masterSetClientUsage({ targetIp, disabled, password });
+      const res = await window.api.masterSetClientUsage({
+        targetIp,
+        disabled,
+        password,
+        reason: disabled ? reason : ''
+      });
       closeMasterUsageLockModal();
       if (!res || !res.success) {
         await appAlert((res && res.msg) || `${actionLabel} 요청에 실패했습니다.`);

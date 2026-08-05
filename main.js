@@ -2267,8 +2267,10 @@ db.serialize(() => {
     ip TEXT PRIMARY KEY,
     username TEXT DEFAULT '',
     disabled_at TEXT DEFAULT '',
-    disabled_by_ip TEXT DEFAULT ''
+    disabled_by_ip TEXT DEFAULT '',
+    reason TEXT DEFAULT ''
   )`, logDbErr);
+  db.run(`ALTER TABLE disabled_clients ADD COLUMN reason TEXT DEFAULT ''`, () => {});
 
   db.get(
     `SELECT enabled, title, body, contact, until_label, updated_at, revision, bypass_revision FROM service_pause WHERE id = 1`,
@@ -2303,7 +2305,7 @@ db.serialize(() => {
       });
     }
   );
-  db.all(`SELECT ip, username, disabled_at, disabled_by_ip FROM disabled_clients`, [], (err, rows) => {
+  db.all(`SELECT ip, username, disabled_at, disabled_by_ip, reason FROM disabled_clients`, [], (err, rows) => {
     if (err || !rows) return;
     rows.forEach((r) => {
       if (!r || !r.ip) return;
@@ -2311,7 +2313,8 @@ db.serialize(() => {
         ip: r.ip,
         username: r.username || '',
         disabledAt: r.disabled_at || '',
-        disabledByIp: r.disabled_by_ip || ''
+        disabledByIp: r.disabled_by_ip || '',
+        reason: r.reason || ''
       });
     });
   });
@@ -4138,11 +4141,21 @@ function profilePhotoForIp(ip) {
 function userListEntryForRenderer(u) {
   const photo = profilePhotoForIp(u.ip);
   const { photo: _omit, ...rest } = u;
+  const usageDisabled = disabledClients.has(u.ip) || (u.ip === MY_IP && localUsageDisabled);
+  let usageLockReason = '';
+  if (usageDisabled) {
+    if (u.ip === MY_IP && localUsageDisabled) usageLockReason = localUsageLockMeta.reason || '';
+    else {
+      const dc = disabledClients.get(u.ip);
+      usageLockReason = (dc && dc.reason) || '';
+    }
+  }
   return {
     ...rest,
     online: onlineUsers.has(u.ip),
     hasPhoto: !!photo,
-    usageDisabled: disabledClients.has(u.ip) || (u.ip === MY_IP && localUsageDisabled)
+    usageDisabled,
+    usageLockReason
   };
 }
 
@@ -8686,14 +8699,15 @@ function persistDisabledClient(ip, meta) {
     ip: key,
     username: m.username || '',
     disabledAt: m.disabledAt || new Date().toISOString(),
-    disabledByIp: m.disabledByIp || MY_IP
+    disabledByIp: m.disabledByIp || MY_IP,
+    reason: String(m.reason || '').trim()
   };
   disabledClients.set(key, entry);
   db.run(
-    `INSERT INTO disabled_clients (ip, username, disabled_at, disabled_by_ip) VALUES (?, ?, ?, ?)
+    `INSERT INTO disabled_clients (ip, username, disabled_at, disabled_by_ip, reason) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(ip) DO UPDATE SET username = excluded.username, disabled_at = excluded.disabled_at,
-       disabled_by_ip = excluded.disabled_by_ip`,
-    [entry.ip, entry.username, entry.disabledAt, entry.disabledByIp],
+       disabled_by_ip = excluded.disabled_by_ip, reason = excluded.reason`,
+    [entry.ip, entry.username, entry.disabledAt, entry.disabledByIp, entry.reason],
     logDbErr
   );
 }
@@ -8740,7 +8754,8 @@ function handleUsageLockSync(payload, senderIP) {
     persistDisabledClient(ip, {
       username: (payload && payload.username) || '',
       disabledAt: (payload && payload.disabledAt) || new Date().toISOString(),
-      disabledByIp: (payload && payload.fromIp) || senderIP || ''
+      disabledByIp: (payload && payload.fromIp) || senderIP || '',
+      reason: (payload && payload.reason) || ''
     });
   } else {
     removeDisabledClient(ip);
@@ -8769,7 +8784,7 @@ async function handleUsageDisableCommand(payload, senderIP) {
   applyLocalUsageDisabled(true, {
     disabledAt: new Date().toISOString(),
     disabledByIp: (payload && payload.fromIp) || senderIP || '',
-    reason: (payload && payload.reason) || '마스터 관리자에 의해 사용 중지'
+    reason: String((payload && payload.reason) || '').trim() || '마스터 관리자에 의해 사용 중지'
   });
   replyUsageLockResult(senderIP, true, true, '사용이 중지되었습니다');
 }
@@ -9003,11 +9018,14 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
 
   const known = allKnownUsers.get(targetIp);
   const username = (known && known.username) || String(p.username || '').trim() || '';
+  const reason = disabled
+    ? (String(p.reason || '').trim() || '마스터 관리자에 의해 사용 중지')
+    : '';
   const lockPayload = {
     type: disabled ? 'USAGE_DISABLE' : 'USAGE_ENABLE',
     masterPassword: password,
     fromIp: MY_IP,
-    reason: disabled ? '마스터 관리자에 의해 사용 중지' : '',
+    reason,
     username
   };
 
@@ -9015,7 +9033,7 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
     applyLocalUsageDisabled(disabled, {
       disabledAt: new Date().toISOString(),
       disabledByIp: MY_IP,
-      reason: lockPayload.reason
+      reason
     });
     if (disabled) {
       // 자기 자신은 disabled_clients에 넣지 않음 (로컬 usage_lock으로 관리)
@@ -9028,6 +9046,7 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
       disabled,
       username: myProfile.username || username,
       disabledAt: localUsageLockMeta.disabledAt,
+      reason,
       fromIp: MY_IP
     });
     return { success: true, local: true, disabled };
@@ -9037,7 +9056,8 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
     persistDisabledClient(targetIp, {
       username,
       disabledAt: new Date().toISOString(),
-      disabledByIp: MY_IP
+      disabledByIp: MY_IP,
+      reason
     });
   } else {
     removeDisabledClient(targetIp);
@@ -9049,6 +9069,7 @@ ipcMain.handle('master-set-client-usage', async (event, payload) => {
     disabled,
     username,
     disabledAt: disabled ? new Date().toISOString() : '',
+    reason,
     fromIp: MY_IP
   });
 
