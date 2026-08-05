@@ -11886,7 +11886,11 @@
 
     async function restartNowForAutoUpdate() {
       clearInterval(autoUpdateCountdownTimer);
-      showAppUpdateProgress('재시작 중', '새 버전으로 프로그램을 다시 여는 중입니다.');
+      showAppUpdateProgress('재시작 중', [
+        '새 버전으로 프로그램을 다시 여는 중입니다.',
+        '',
+        '프로그램을 닫지 말아주세요.'
+      ].join('\n'));
       try {
         await window.api.restartNowForUpdate();
       } catch (_) {
@@ -12109,7 +12113,18 @@
     }
 
     function showForceUpdateOverlay(text) {
-      showAppUpdateProgress('강제 업데이트 중', text || '최신 파일을 적용한 뒤 자동으로 재시작합니다. 창을 닫지 마세요.');
+      const fallback = [
+        '최신 파일을 받아 적용하고 있습니다.',
+        '',
+        '곧 자동으로 재시작 됩니다.',
+        '',
+        '프로그램을 닫지 말아주세요.'
+      ].join('\n');
+      let desc = text || fallback;
+      if (text && !/\n/.test(text) && /재시작/.test(text)) {
+        desc = [text.replace(/\s*창을 닫지 마세요\.?\s*$/, '').trim(), '', '프로그램을 닫지 말아주세요.'].join('\n');
+      }
+      showAppUpdateProgress('강제 업데이트 중', desc);
       const legacy = document.getElementById('force-update-overlay');
       if (legacy) legacy.style.display = 'none';
     }
