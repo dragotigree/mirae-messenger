@@ -1084,6 +1084,12 @@
     }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
+    #chat-messages-area .msg-row,
+    #chat-messages-area .msg-row-bubble,
+    #chat-messages-area .chat-date-sep {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 72px;
+    }
     .chat-history-load-older {
       display: none; align-self: center; margin: 4px 0 10px; padding: 6px 12px;
       font-size: 11.5px; font-weight: 600; color: #64748b; background: #f1f5f9;
@@ -1889,7 +1895,7 @@
     #chat-search-bar input { flex: 1; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 12px; outline: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     #chat-search-bar input:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
 
-    .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: 14px; display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; }
+    .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: 14px; display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; content-visibility: auto; }
     .chat-img-preview:hover { opacity: 0.94; transform: none; }
     .chat-file-box {
       display: flex; align-items: center; gap: 10px;
@@ -15776,6 +15782,8 @@
       const aroundDate = opts && opts.aroundDate ? String(opts.aroundDate).trim() : null;
       const scrollToDate = opts && opts.scrollToDate ? String(opts.scrollToDate).trim() : aroundDate;
       chatHistoryLoadingOlder = false;
+      chatHistoryLoadingNewer = false;
+      chatHistoryHasNewer = false;
       try {
         msgsEl.innerHTML = '<div id="chat-history-load-older" class="chat-history-load-older" hidden>이전 대화 불러오는 중…</div>';
         const result = await window.api.getChatHistory({
@@ -15786,11 +15794,22 @@
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         const jumpedDate = (!Array.isArray(result) && result && result.jumpedDate) ? result.jumpedDate : null;
         if (!Array.isArray(result) && result) {
-          chatHistoryHasMore = !!result.hasMore;
           chatHistoryOldestId = result.oldestId || (history[0] && history[0].id) || 0;
+          chatHistoryNewestId = result.newestId || (history.length && history[history.length - 1].id) || 0;
+          if (aroundDate) {
+            // 날짜 점프: hasMore = 해당 시점 이후(더 최근)가 더 있음
+            chatHistoryHasNewer = !!result.hasMore;
+            chatHistoryHasMore = true; // 이전은 스크롤로 확인 (없으면 로드 시 false)
+          } else {
+            // 일반 진입: hasMore = 더 오래된 메시지 있음
+            chatHistoryHasMore = !!result.hasMore;
+            chatHistoryHasNewer = false;
+          }
         } else {
           chatHistoryHasMore = false;
+          chatHistoryHasNewer = false;
           chatHistoryOldestId = (history[0] && history[0].id) || 0;
+          chatHistoryNewestId = (history.length && history[history.length - 1].id) || 0;
         }
 
         if (!history.length) {
@@ -15804,6 +15823,7 @@
             setChatDateJumpBanner(null);
           }
           chatHistoryHasMore = false;
+          chatHistoryHasNewer = false;
           return;
         }
 
@@ -15838,6 +15858,7 @@
           const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
           appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey, skipDomPrune: true });
         });
+        syncChatHistoryIdsFromDom(msgsEl);
         pendingUnreadScrollCount = 0;
 
         const targetDate = jumpedDate || scrollToDate;
@@ -15874,9 +15895,91 @@
       }
     }
 
-    let chatHistoryHasMore = false;
+    let chatHistoryHasMore = false; // 더 오래된 메시지 있음
+    let chatHistoryHasNewer = false; // 화면에서 잘린 더 최근 메시지 있음
     let chatHistoryOldestId = 0;
+    let chatHistoryNewestId = 0;
     let chatHistoryLoadingOlder = false;
+    let chatHistoryLoadingNewer = false;
+    const CHAT_DOM_MAX_MESSAGES = 220;
+    const CHAT_HISTORY_PAGE_SIZE = 80;
+
+    function countChatMessageNodes(container) {
+      if (!container) return 0;
+      return container.querySelectorAll('.msg-row, .msg-row-bubble').length;
+    }
+
+    function syncChatHistoryIdsFromDom(container) {
+      const nodes = container
+        ? container.querySelectorAll('.msg-row[data-msg-id], .msg-row-bubble[data-msg-id]')
+        : [];
+      if (!nodes.length) {
+        chatHistoryOldestId = 0;
+        chatHistoryNewestId = 0;
+        return;
+      }
+      const firstId = parseInt(nodes[0].getAttribute('data-msg-id'), 10);
+      const lastId = parseInt(nodes[nodes.length - 1].getAttribute('data-msg-id'), 10);
+      if (Number.isFinite(firstId) && firstId > 0) chatHistoryOldestId = firstId;
+      if (Number.isFinite(lastId) && lastId > 0) chatHistoryNewestId = lastId;
+    }
+
+    function pruneChatDomFromTop(container, removeCount) {
+      if (!container || removeCount <= 0) return 0;
+      let removed = 0;
+      while (removed < removeCount && container.firstChild) {
+        const first = container.firstChild;
+        if (first && first.id === 'chat-history-load-older') {
+          // 로딩 뱃지 다음부터
+          if (!first.nextSibling) break;
+          const n = first.nextSibling;
+          if (n.classList && (n.classList.contains('msg-row') || n.classList.contains('msg-row-bubble'))) removed += 1;
+          container.removeChild(n);
+          continue;
+        }
+        if (first.classList && (first.classList.contains('msg-row') || first.classList.contains('msg-row-bubble'))) removed += 1;
+        container.removeChild(first);
+      }
+      // 맨 위 날짜선만 남지 않게
+      while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
+        const next = container.children[1];
+        if (next && next.classList && next.classList.contains('chat-date-sep')) {
+          container.removeChild(container.firstChild);
+          continue;
+        }
+        break;
+      }
+      chatHistoryHasMore = true;
+      syncChatHistoryIdsFromDom(container);
+      return removed;
+    }
+
+    function pruneChatDomFromBottom(container, removeCount) {
+      if (!container || removeCount <= 0) return 0;
+      let removed = 0;
+      while (removed < removeCount && container.lastChild) {
+        const last = container.lastChild;
+        if (last && last.id === 'chat-history-load-older') break;
+        if (last.classList && (last.classList.contains('msg-row') || last.classList.contains('msg-row-bubble'))) removed += 1;
+        container.removeChild(last);
+      }
+      while (container.lastChild && container.lastChild.classList && container.lastChild.classList.contains('chat-date-sep')) {
+        container.removeChild(container.lastChild);
+      }
+      chatHistoryHasNewer = true;
+      syncChatHistoryIdsFromDom(container);
+      return removed;
+    }
+
+    function enforceChatDomWindow(preferKeepBottom) {
+      const container = document.getElementById('chat-messages-area');
+      if (!container) return;
+      let count = countChatMessageNodes(container);
+      if (count <= CHAT_DOM_MAX_MESSAGES) return;
+      const overflow = count - CHAT_DOM_MAX_MESSAGES;
+      if (preferKeepBottom) pruneChatDomFromTop(container, overflow);
+      else pruneChatDomFromBottom(container, overflow);
+    }
 
     function setChatHistoryLoadOlderVisible(visible) {
       let el = document.getElementById('chat-history-load-older');
@@ -15898,8 +16001,33 @@
       }
     }
 
+    function renderChatHistoryRows(history, opts) {
+      const o = opts || {};
+      const msgsEl = document.getElementById('chat-messages-area');
+      if (!msgsEl || !history) return;
+      history.forEach((row) => {
+        const codeType = detectCodeAlertType(row.message);
+        const urgent = codeType
+          ? true
+          : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
+        const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
+        const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
+        appendMessageRow(
+          row.message, row.created_time, row.sender_name, !!row.isMe, urgent,
+          row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full,
+          {
+            skipStatusUpdate: true,
+            skipEnterAnim: true,
+            dateKey,
+            skipDomPrune: true,
+            insertBefore: o.insertBefore || null
+          }
+        );
+      });
+    }
+
     async function loadOlderChatHistory() {
-      if (!activeChatUser || chatHistoryLoadingOlder || !chatHistoryHasMore || !chatHistoryOldestId) return;
+      if (!activeChatUser || chatHistoryLoadingOlder || chatHistoryLoadingNewer || !chatHistoryHasMore || !chatHistoryOldestId) return;
       if (chatDateJumpActive) return;
       const searchInput = document.getElementById('chat-search-input');
       if (searchInput && searchInput.value && searchInput.value.trim()) return;
@@ -15914,7 +16042,7 @@
         const result = await window.api.getChatHistory({
           targetIP: activeChatUser.ip,
           beforeId: chatHistoryOldestId,
-          limit: 400
+          limit: CHAT_HISTORY_PAGE_SIZE
         });
         const history = Array.isArray(result) ? result : ((result && result.rows) || []);
         if (!Array.isArray(result) && result) {
@@ -15927,33 +16055,22 @@
           chatHistoryHasMore = false;
           return;
         }
-        // 현재 맨 위 노드 앞에 끼워 넣음 (로딩 표시 다음)
         let anchor = msgsEl.firstChild;
         const loadEl = document.getElementById('chat-history-load-older');
         if (loadEl) anchor = loadEl.nextSibling;
 
         history.forEach((row, idx) => {
-          const codeType = detectCodeAlertType(row.message);
-          const urgent = codeType
-            ? true
-            : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
-          const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
           const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
-          // 같은 날짜 구분선이 이미 있으면 제거하고 배치 앞에서 다시 그리도록
           if (idx === 0 && anchor && anchor.classList && anchor.classList.contains('chat-date-sep')
             && dateKey && anchor.getAttribute('data-chat-date-key') === dateKey) {
             const next = anchor.nextSibling;
             anchor.remove();
             anchor = next;
           }
-          appendMessageRow(
-            row.message, row.created_time, row.sender_name, !!row.isMe, urgent,
-            row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full,
-            { skipStatusUpdate: true, skipEnterAnim: true, dateKey, skipDomPrune: true, insertBefore: anchor }
-          );
         });
+        renderChatHistoryRows(history, { insertBefore: anchor });
+        enforceChatDomWindow(false); // 위쪽 유지, 아래(최근) 잘라냄
 
-        // 이어붙인 뒤 스크롤 위치 유지
         const newHeight = msgsEl.scrollHeight;
         msgsEl.scrollTop = prevTop + (newHeight - prevHeight);
         await refreshAllVisibleReactions();
@@ -15963,6 +16080,43 @@
       } finally {
         chatHistoryLoadingOlder = false;
         setChatHistoryLoadOlderVisible(false);
+      }
+    }
+
+    async function loadNewerChatHistory() {
+      if (!activeChatUser || chatHistoryLoadingNewer || chatHistoryLoadingOlder || !chatHistoryHasNewer || !chatHistoryNewestId) return;
+      if (chatDateJumpActive) return;
+      const msgsEl = document.getElementById('chat-messages-area');
+      if (!msgsEl) return;
+
+      chatHistoryLoadingNewer = true;
+      try {
+        const result = await window.api.getChatHistory({
+          targetIP: activeChatUser.ip,
+          afterId: chatHistoryNewestId,
+          limit: CHAT_HISTORY_PAGE_SIZE
+        });
+        const history = Array.isArray(result) ? result : ((result && result.rows) || []);
+        if (!Array.isArray(result) && result) {
+          chatHistoryHasNewer = !!result.hasMore;
+          if (result.newestId) chatHistoryNewestId = result.newestId;
+        } else {
+          chatHistoryHasNewer = false;
+        }
+        if (!history.length) {
+          chatHistoryHasNewer = false;
+          return;
+        }
+        const nearBottom = isNearChatBottom(160);
+        renderChatHistoryRows(history, {});
+        enforceChatDomWindow(true); // 아래 유지, 위(오래됨) 잘라냄
+        if (nearBottom) scrollChatToBottom(false);
+        await refreshAllVisibleReactions();
+        await refreshImportantMessageKeys();
+      } catch (e) {
+        console.error('이후 대화 불러오기 실패:', e);
+      } finally {
+        chatHistoryLoadingNewer = false;
       }
     }
 
@@ -18056,8 +18210,12 @@
     if (chatMessagesAreaEl) {
       chatMessagesAreaEl.addEventListener('scroll', () => {
         closeOpenMsgActions();
-        if (chatMessagesAreaEl.scrollTop <= 80) {
+        const top = chatMessagesAreaEl.scrollTop;
+        const distBottom = chatMessagesAreaEl.scrollHeight - top - chatMessagesAreaEl.clientHeight;
+        if (top <= 80) {
           loadOlderChatHistory();
+        } else if (distBottom <= 120) {
+          loadNewerChatHistory();
         }
       }, { passive: true });
     }
@@ -18425,6 +18583,18 @@
       return html.replace(/(<div[^>]*class="[^"]*chat-file-box[^"]*"[^>]*>[\s\S]*?<a\b[^>]*>)\s*다운로드\s*(<\/a>)/gi, '$1받기$2');
     }
 
+    /** 채팅 이미지에 lazy loading 부여 (대량 대화 시 렌더 부담 감소) */
+    function prepareChatMessageHtml(html) {
+      let out = normalizeChatFileBoxHtml(html);
+      if (typeof out !== 'string' || out.indexOf('<img') === -1) return out;
+      return out.replace(/<img\b([^>]*?)>/gi, (full, attrs) => {
+        let a = attrs;
+        if (!/\bloading\s*=/i.test(a)) a += ' loading="lazy"';
+        if (!/\bdecoding\s*=/i.test(a)) a += ' decoding="async"';
+        return `<img${a}>`;
+      });
+    }
+
     function resolveChatDateKey(sentAtFull, opts) {
       if (opts && opts.dateKey) {
         const k = String(opts.dateKey).trim();
@@ -18499,20 +18669,12 @@
       const wasNearBottom = isMe || isNearChatBottom();
       const dateKey = resolveChatDateKey(sentAtLabelForPending, options);
 
-      // 메모리 보호: 매우 많을 때만 맨 위(오래된 쪽)부터 정리. 이전 대화는 스크롤로 다시 불러옴.
-      if (!skipDomPrune && container.children.length > 4000) {
-        let removed = 0;
-        while (container.firstChild && removed < 50) {
-          const first = container.firstChild;
-          if (first && first.id === 'chat-history-load-older') break;
-          container.removeChild(first);
-          removed += 1;
-        }
-        chatHistoryHasMore = true;
-        const firstMsg = container.querySelector('.msg-row[data-msg-id], .msg-row-bubble[data-msg-id]');
-        if (firstMsg) {
-          const oid = parseInt(firstMsg.getAttribute('data-msg-id'), 10);
-          if (Number.isFinite(oid) && oid > 0) chatHistoryOldestId = oid;
+      // 화면 DOM은 최근 구간만 유지 (많으면 느려짐). 이전/이후는 스크롤로 이어 불러옴.
+      if (!skipDomPrune) {
+        enforceChatDomWindow(true);
+        if (messageId) {
+          const mid = parseInt(messageId, 10);
+          if (Number.isFinite(mid) && mid > chatHistoryNewestId) chatHistoryNewestId = mid;
         }
       }
 
@@ -18588,7 +18750,7 @@
       const importantBadgeHtml = isImportantMsg ? `<div class="msg-important-badge">⭐ 중요</div>` : '';
       const unreadCountHtml = (isMe && isGroupChannel && msgUid)
         ? `<span class="msg-unread-count"></span>` : '';
-      const displayMsg = normalizeChatFileBoxHtml(
+      const displayMsg = prepareChatMessageHtml(
         isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg
       );
       const pendingNoticeHtml = offlinePendingNoticeHtml(isMe, outboundStatus, sentAtLabelForPending || time);

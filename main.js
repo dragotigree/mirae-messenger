@@ -7303,11 +7303,13 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     : null;
   const beforeIdRaw = args && typeof args === 'object' ? parseInt(args.beforeId, 10) : 0;
   const beforeId = Number.isFinite(beforeIdRaw) && beforeIdRaw > 0 ? beforeIdRaw : 0;
+  const afterIdRaw = args && typeof args === 'object' ? parseInt(args.afterId, 10) : 0;
+  const afterId = Number.isFinite(afterIdRaw) && afterIdRaw > 0 ? afterIdRaw : 0;
   const limitRaw = args && typeof args === 'object' ? parseInt(args.limit, 10) : 0;
-  // 기본: 최근 2000건. 이전 페이지: 400건. 날짜 점프: 1000건.
-  const CHAT_HISTORY_INITIAL = 2000;
-  const CHAT_HISTORY_PAGE = 400;
-  const CHAT_HISTORY_DATE = 1000;
+  // 성능을 위해 화면에는 적게 올리고, 스크롤로 이어 불러온다.
+  const CHAT_HISTORY_INITIAL = 120;
+  const CHAT_HISTORY_PAGE = 80;
+  const CHAT_HISTORY_DATE = 160;
   const hideUpToId = await getChatViewHideUpToId(targetIP);
   const scope = chatHistoryScopeSql(targetIP);
 
@@ -7330,10 +7332,34 @@ ipcMain.handle('get-chat-history', async (event, args) => {
 
   const selectCols = `DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
 
+  // 아래로 스크롤: afterId 이후(더 최근) 메시지
+  if (afterId && !keyword && !dateStr && !beforeId) {
+    const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
+      ? Math.min(300, limitRaw)
+      : CHAT_HISTORY_PAGE;
+    return new Promise((resolve) => {
+      let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id > ?`;
+      const params = [...scope.params, afterId];
+      if (hideUpToId > 0) {
+        sql += ` AND id > ?`;
+        params.push(hideUpToId);
+      }
+      sql += ` ORDER BY id ASC LIMIT ${pageLimit}`;
+      db.all(sql, params, (err, rows) => {
+        if (err) {
+          logDbErr(err);
+          resolve({ rows: [], hasMore: false, oldestId: 0, newestId: 0 });
+          return;
+        }
+        resolve(pack(rows || [], pageLimit));
+      });
+    });
+  }
+
   // 위로 스크롤: beforeId 이전(더 오래된) 메시지
   if (beforeId && !keyword && !dateStr) {
     const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(1000, limitRaw)
+      ? Math.min(300, limitRaw)
       : CHAT_HISTORY_PAGE;
     return new Promise((resolve) => {
       let sql = `SELECT ${selectCols} FROM messages WHERE ${scope.where} AND id < ?`;
@@ -7357,7 +7383,7 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터
   if (dateStr && !keyword) {
     const pageLimit = (Number.isFinite(limitRaw) && limitRaw > 0)
-      ? Math.min(3000, limitRaw)
+      ? Math.min(400, limitRaw)
       : CHAT_HISTORY_DATE;
     return new Promise((resolve) => {
       let findSql = `SELECT MIN(id) AS minId FROM messages WHERE ${scope.where} AND strftime('%Y-%m-%d', created_at, 'localtime') = ?`;
