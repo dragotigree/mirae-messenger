@@ -548,8 +548,29 @@
 
     /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 작은 세그먼트 */
     .sidebar-list-prefs {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+      display: flex; flex-wrap: nowrap; align-items: center; gap: 5px;
       padding: 0 10px 7px 10px; flex-shrink: 0;
+      overflow: hidden;
+    }
+    .sidebar-block-head {
+      white-space: nowrap;
+      gap: 8px;
+      min-width: 0;
+    }
+    .sidebar-block-head > span:first-child {
+      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    }
+    #dm-section-label > span:last-child {
+      flex: 0 0 auto;
+    }
+    #users-section-label > span:last-child,
+    #channels-section-label > span:last-child {
+      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-ipmsg-btn,
+    .sidebar-code-alert-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
     }
     .sidebar-pref-seg {
       display: inline-flex; align-items: stretch;
@@ -6591,13 +6612,14 @@
 
     // ↔️ 좌·우 사이드바 크기 조절 · 접기/펼치기
     (function initSidebarResize() {
-      // 목록 글씨는 nowrap+ellipsis 이므로 좁혀도 이중 줄바꿈되지 않음. 채팅 헤더 공간을 위해 최소를 낮춤.
-      const SIDEBAR_MIN = 200;
+      // 목록 글씨는 nowrap+ellipsis. 고정 UI(쪽지·코드·필터칩)가 깨지지 않는 폭까지만 축소.
+      const SIDEBAR_MIN_FLOOR = 260;
       const SIDEBAR_MAX = 480;
       // 우측: 버튼·제목 글씨가 잘리지 않는 실제 최소 너비를 동적으로 측정 (아래 floor는 하한)
       const SIDEBAR_RIGHT_MIN_FLOOR = 220;
       const SIDEBAR_RIGHT_MAX = 440;
       const MAIN_CHAT_MIN_WIDTH = 420;
+      let cachedLeftContentMin = SIDEBAR_MIN_FLOOR;
       let cachedRightContentMin = SIDEBAR_RIGHT_MIN_FLOOR;
 
       function isLeftCollapsed() {
@@ -6605,6 +6627,91 @@
       }
       function isRightCollapsed() {
         return document.body.classList.contains('sidebar-right-collapsed');
+      }
+
+      /** 좌측 패널 고정 UI(공지·쪽지/코드·필터칩)가 한 줄로 유지되는 최소 폭 */
+      function measureLeftSidebarContentMinWidth() {
+        const left = document.getElementById('sidebar-left');
+        if (!left) return SIDEBAR_MIN_FLOOR;
+
+        const host = document.createElement('div');
+        host.setAttribute('aria-hidden', 'true');
+        host.style.cssText = [
+          'position:fixed',
+          'left:-10000px',
+          'top:0',
+          'visibility:hidden',
+          'pointer-events:none',
+          'z-index:-1',
+          'box-sizing:border-box',
+          'width:max-content',
+          'max-width:none',
+          'min-width:0',
+          'display:flex',
+          'flex-direction:column',
+          'gap:6px',
+          'padding:0'
+        ].join(';');
+
+        const notice = left.querySelector('.notice-widget-header');
+        if (notice) {
+          const clone = notice.cloneNode(true);
+          clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          clone.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;width:max-content;white-space:nowrap;padding:0 12px;box-sizing:border-box;';
+          host.appendChild(clone);
+        }
+
+        const dmHead = left.querySelector('#dm-section-label');
+        if (dmHead) {
+          const clone = dmHead.cloneNode(true);
+          clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          clone.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;width:max-content;white-space:nowrap;padding:5px 16px 3px 12px;box-sizing:border-box;';
+          clone.querySelectorAll('button').forEach((btn) => {
+            btn.style.flex = '0 0 auto';
+            btn.style.whiteSpace = 'nowrap';
+          });
+          host.appendChild(clone);
+        }
+
+        const prefs = left.querySelector('#sidebar-list-prefs');
+        if (prefs) {
+          const clone = prefs.cloneNode(true);
+          clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          clone.style.cssText = 'display:flex;flex-wrap:nowrap;align-items:center;gap:5px;width:max-content;padding:0 10px;box-sizing:border-box;';
+          clone.querySelectorAll('.sidebar-pref-seg').forEach((seg) => {
+            seg.style.flex = '0 0 auto';
+          });
+          host.appendChild(clone);
+        }
+
+        const multi = left.querySelector('#user-multi-select-bar');
+        if (multi && multi.offsetParent !== null) {
+          const clone = multi.cloneNode(true);
+          clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          clone.style.cssText = 'display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:max-content;padding:6px 10px;box-sizing:border-box;white-space:nowrap;';
+          host.appendChild(clone);
+        }
+
+        document.body.appendChild(host);
+        const measured = Math.ceil(host.getBoundingClientRect().width);
+        host.remove();
+
+        const needed = measured + 6;
+        cachedLeftContentMin = Math.max(SIDEBAR_MIN_FLOOR, needed);
+        return cachedLeftContentMin;
+      }
+
+      function getLeftSidebarMinWidth() {
+        return cachedLeftContentMin || SIDEBAR_MIN_FLOOR;
+      }
+
+      function refreshLeftSidebarMinWidth() {
+        try {
+          return measureLeftSidebarContentMinWidth();
+        } catch (e) {
+          cachedLeftContentMin = cachedLeftContentMin || SIDEBAR_MIN_FLOOR;
+          return cachedLeftContentMin;
+        }
       }
 
       /** 우측 패널 고정 UI(제목·액션 버튼)가 잘리지 않는 최소 폭 */
@@ -6716,8 +6823,9 @@
 
       function maxLeftSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
+        const minW = getLeftSidebarMinWidth();
         const cap = w - currentRightSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
-        return Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, cap));
+        return Math.max(minW, Math.min(SIDEBAR_MAX, cap));
       }
 
       function maxRightSidebarWidthForWindow() {
@@ -6728,8 +6836,9 @@
       }
 
       function applySidebarWidth(px) {
+        const minW = getLeftSidebarMinWidth();
         const maxW = maxLeftSidebarWidthForWindow();
-        const clamped = Math.max(SIDEBAR_MIN, Math.min(maxW, Math.round(px)));
+        const clamped = Math.max(minW, Math.min(maxW, Math.round(px)));
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
         return clamped;
       }
@@ -6773,6 +6882,15 @@
         document.body.classList.toggle('sidebar-left-collapsed', !!collapsed);
         localStorage.setItem('sidebarLeftCollapsed', collapsed ? '1' : '0');
         updateSidebarToggleUi();
+        if (!collapsed) {
+          requestAnimationFrame(() => {
+            refreshLeftSidebarMinWidth();
+            const left = document.getElementById('sidebar-left');
+            if (!left) return;
+            const w = left.getBoundingClientRect().width || 300;
+            applySidebarWidth(w);
+          });
+        }
       }
 
       function setSidebarRightCollapsed(collapsed) {
@@ -6812,10 +6930,10 @@
         updateSidebarToggleUi();
       };
 
+      refreshLeftSidebarMinWidth();
       const savedWidth = parseInt(localStorage.getItem('sidebarWidth'), 10);
-      if (savedWidth && savedWidth >= SIDEBAR_MIN) {
-        applySidebarWidth(savedWidth);
-      }
+      // 저장된 값이 예전 최소(200)보다 좁아 버튼·필터가 깨졌다면 측정 최소로 끌어올림
+      applySidebarWidth(savedWidth || 300);
       refreshRightSidebarMinWidth();
       const savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
@@ -6833,6 +6951,8 @@
       if (handle) {
         handle.addEventListener('mousedown', (e) => {
           if (document.body.classList.contains('compact-mode') || isLeftCollapsed()) return;
+          // 드래그 시작 시 최소 폭을 다시 측정 (쪽지·코드·필터 문구 반영)
+          refreshLeftSidebarMinWidth();
           dragging = true;
           draggingRight = false;
           dragMoved = false;
@@ -6886,8 +7006,9 @@
           handle?.classList.remove('is-dragging');
           document.body.style.cursor = '';
           if (dragMoved && !isLeftCollapsed()) {
+            const minW = getLeftSidebarMinWidth();
             const currentWidth = document.getElementById('sidebar-left').getBoundingClientRect().width;
-            if (currentWidth >= SIDEBAR_MIN) {
+            if (currentWidth >= minW) {
               localStorage.setItem('sidebarWidth', String(Math.round(currentWidth)));
             }
           }
@@ -6914,10 +7035,15 @@
           if (!isLeftCollapsed()) {
             const sidebar = document.getElementById('sidebar-left');
             if (sidebar) {
+              refreshLeftSidebarMinWidth();
+              const minW = getLeftSidebarMinWidth();
               const w = sidebar.getBoundingClientRect().width;
-              if (w >= SIDEBAR_MIN) {
+              if (w >= minW - 1) {
                 const fixed = applySidebarWidth(w);
                 if (fixed !== Math.round(w)) localStorage.setItem('sidebarWidth', String(fixed));
+              } else {
+                applySidebarWidth(minW);
+                localStorage.setItem('sidebarWidth', String(minW));
               }
             }
           }
@@ -6939,6 +7065,14 @@
       });
 
       // 첫 페인트·폰트 로드 후 실제 글씨 폭으로 보정 (저장된 좁은 폭 복구)
+      function reconcileLeftSidebarWidth() {
+        if (document.body.classList.contains('compact-mode') || isLeftCollapsed()) return;
+        const left = document.getElementById('sidebar-left');
+        if (!left) return;
+        refreshLeftSidebarMinWidth();
+        const fixed = applySidebarWidth(left.getBoundingClientRect().width || 300);
+        localStorage.setItem('sidebarWidth', String(fixed));
+      }
       function reconcileRightSidebarWidth() {
         if (document.body.classList.contains('compact-mode') || isRightCollapsed()) return;
         const right = document.getElementById('sidebar-right');
@@ -6947,9 +7081,15 @@
         const fixed = applyRightSidebarWidth(right.getBoundingClientRect().width || 280);
         localStorage.setItem('sidebarRightWidth', String(fixed));
       }
-      requestAnimationFrame(reconcileRightSidebarWidth);
+      requestAnimationFrame(() => {
+        reconcileLeftSidebarWidth();
+        reconcileRightSidebarWidth();
+      });
       if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => requestAnimationFrame(reconcileRightSidebarWidth)).catch(() => {});
+        document.fonts.ready.then(() => requestAnimationFrame(() => {
+          reconcileLeftSidebarWidth();
+          reconcileRightSidebarWidth();
+        })).catch(() => {});
       }
     })();
 
