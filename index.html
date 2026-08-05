@@ -3712,14 +3712,40 @@
       padding: 16px;
       box-sizing: border-box;
     }
-    body.schedule-board-standalone { margin: 0; overflow: hidden; background: #eef2f7; }
-    body.schedule-board-standalone #custom-titlebar,
+    body.schedule-board-standalone {
+      margin: 0; overflow: hidden; background: #eef2f7;
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    body.schedule-board-standalone #custom-titlebar {
+      display: flex !important;
+      flex-shrink: 0;
+    }
     body.schedule-board-standalone #app-body-row,
     body.schedule-board-standalone #splash-screen { display: none !important; }
+    body.schedule-board-standalone #titlebar-sidebar-accent {
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      padding: 0 16px;
+      box-shadow: none;
+    }
+    body.schedule-board-standalone #titlebar-app-label {
+      text-transform: none;
+      letter-spacing: -0.02em;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    body.schedule-board-standalone #titlebar-drag-region .titlebar-app-label-compact {
+      display: none !important;
+    }
     body.schedule-board-standalone #schedule-board-modal {
       display: flex !important;
-      position: fixed;
-      inset: 0;
+      position: relative;
+      inset: auto;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
       z-index: 1;
       background: #eef2f7;
       padding: 0;
@@ -3737,6 +3763,9 @@
     }
     body.schedule-board-standalone #app-dialog-overlay {
       z-index: 6000;
+    }
+    @media print {
+      body.schedule-board-printing #custom-titlebar { display: none !important; }
     }
 
     /* 설정 모달 — 좌측 메뉴 + 패널 */
@@ -8062,7 +8091,13 @@
       if (splash) splash.classList.add('is-hidden');
       const titlebar = document.getElementById('custom-titlebar');
       const appRow = document.getElementById('app-body-row');
-      if (titlebar) titlebar.style.display = 'none';
+      if (titlebar) {
+        titlebar.style.display = '';
+        const label = document.getElementById('titlebar-app-label');
+        if (label) label.textContent = '병동 일정 현황판';
+        const closeBtn = document.getElementById('titlebar-close-btn');
+        if (closeBtn) closeBtn.title = '닫기';
+      }
       if (appRow) appRow.style.display = 'none';
       const modal = document.getElementById('schedule-board-modal');
       if (modal && modal.parentElement !== document.body) {

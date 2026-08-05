@@ -2861,7 +2861,7 @@ async function openScheduleBoardWindow(payload) {
     minHeight: 700,
     title: '병동 일정 현황판 — Mirae Messenger',
     icon: getAppNativeIcon(),
-    frame: true,
+    frame: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: getMainPreloadPath(),
@@ -2877,19 +2877,43 @@ async function openScheduleBoardWindow(payload) {
   scheduleBoardWindow.webContents.once('did-finish-load', () => {
     setTimeout(() => sendOpenPayload(scheduleBoardWindow), 150);
   });
+  const sendScheduleBoardMaximizedState = () => {
+    if (!scheduleBoardWindow || scheduleBoardWindow.isDestroyed()) return;
+    try {
+      scheduleBoardWindow.webContents.send('window-maximized-state', scheduleBoardWindow.isMaximized());
+    } catch (_) { /* ignore */ }
+  };
+  scheduleBoardWindow.on('maximize', sendScheduleBoardMaximizedState);
+  scheduleBoardWindow.on('unmaximize', sendScheduleBoardMaximizedState);
   scheduleBoardWindow.on('closed', () => {
     scheduleBoardWindow = null;
   });
 }
 
+function browserWindowFromEvent(event) {
+  try {
+    return BrowserWindow.fromWebContents(event.sender);
+  } catch (_) {
+    return null;
+  }
+}
+
 // 🪟 프레임 없는 창(frame:false)이라 -/□/X 버튼을 직접 그려야 하므로, 그 버튼들이 호출하는 IPC.
-ipcMain.handle('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
-ipcMain.handle('window-maximize-toggle', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMaximized()) mainWindow.unmaximize();
-  else mainWindow.maximize();
+// 메인·현황판 등 호출한 창을 대상으로 동작한다.
+ipcMain.handle('window-minimize', (event) => {
+  const win = browserWindowFromEvent(event);
+  if (win && !win.isDestroyed()) win.minimize();
 });
-ipcMain.handle('window-close', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.handle('window-maximize-toggle', (event) => {
+  const win = browserWindowFromEvent(event);
+  if (!win || win.isDestroyed()) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+ipcMain.handle('window-close', (event) => {
+  const win = browserWindowFromEvent(event);
+  if (win && !win.isDestroyed()) win.close();
+});
 ipcMain.handle('focus-main-window', () => { showAndFocusWindow(); });
 
 ipcMain.handle('open-schedule-board-window', async (event, payload = {}) => {
