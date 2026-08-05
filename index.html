@@ -22211,6 +22211,7 @@
         if (!isPrivacyScreenLocked) openAllLogsModal();
       }
       if (handleScheduleBoardShortcuts(e)) return;
+      if (handleScheduleBoardRefreshKey(e)) return;
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '1' || e.code === 'Digit1')) {
         e.preventDefault();
         openChatQuickSwitcher();
