@@ -10789,7 +10789,7 @@
       localStorage.setItem('compactListFilter', filter);
       syncCompactFilterChipUi();
       syncCompactInboxBar();
-      renderCompactList();
+      renderCompactListNow(false).catch(() => {});
     }
 
     function updateCompactOnlineCount() {
