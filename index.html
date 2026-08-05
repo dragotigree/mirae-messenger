@@ -6883,22 +6883,22 @@
 
       function maxLeftSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
-        const minW = getLeftSidebarMinWidth();
         const cap = w - currentRightSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
-        return Math.max(minW, Math.min(SIDEBAR_MAX, cap));
+        return Math.max(0, Math.min(SIDEBAR_MAX, cap));
       }
 
       function maxRightSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
-        const minW = getRightSidebarMinWidth();
         const cap = w - currentLeftSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
-        return Math.max(minW, Math.min(SIDEBAR_RIGHT_MAX, cap));
+        return Math.max(0, Math.min(SIDEBAR_RIGHT_MAX, cap));
       }
 
       function applySidebarWidth(px) {
         const minW = getLeftSidebarMinWidth();
         const maxW = maxLeftSidebarWidthForWindow();
-        const clamped = Math.max(minW, Math.min(maxW, Math.round(px)));
+        // 창이 너무 좁으면 콘텐츠 최소보다 창 여유(max)를 우선해 채팅 영역을 보호
+        const effectiveMin = maxW > 0 ? Math.min(minW, maxW) : 0;
+        const clamped = Math.max(effectiveMin, Math.min(maxW, Math.round(px)));
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
         return clamped;
       }
@@ -6906,8 +6906,9 @@
       function applyRightSidebarWidth(px) {
         const minW = getRightSidebarMinWidth();
         const maxW = maxRightSidebarWidthForWindow();
-        const clamped = Math.max(minW, Math.min(maxW, Math.round(px)));
-        document.documentElement.style.setProperty('--sidebar-right-min-width', minW + 'px');
+        const effectiveMin = maxW > 0 ? Math.min(minW, maxW) : 0;
+        const clamped = Math.max(effectiveMin, Math.min(maxW, Math.round(px)));
+        document.documentElement.style.setProperty('--sidebar-right-min-width', effectiveMin + 'px');
         document.documentElement.style.setProperty('--sidebar-right-width', clamped + 'px');
         return clamped;
       }
@@ -7048,7 +7049,9 @@
       window.addEventListener('mousemove', (e) => {
         if (dragging) {
           dragMoved = true;
-          const sidebarLeft = document.getElementById('sidebar-left').getBoundingClientRect().left;
+          const leftEl = document.getElementById('sidebar-left');
+          if (!leftEl) return;
+          const sidebarLeft = leftEl.getBoundingClientRect().left;
           applySidebarWidth(e.clientX - sidebarLeft);
           return;
         }
@@ -7066,9 +7069,10 @@
           handle?.classList.remove('is-dragging');
           document.body.style.cursor = '';
           if (dragMoved && !isLeftCollapsed()) {
-            const minW = getLeftSidebarMinWidth();
-            const currentWidth = document.getElementById('sidebar-left').getBoundingClientRect().width;
-            if (currentWidth >= minW) {
+            const leftEl = document.getElementById('sidebar-left');
+            if (!leftEl) return;
+            const currentWidth = leftEl.getBoundingClientRect().width;
+            if (currentWidth > 0) {
               localStorage.setItem('sidebarWidth', String(Math.round(currentWidth)));
             }
           }
@@ -7080,7 +7084,7 @@
           if (dragRightMoved && !isRightCollapsed()) {
             const minW = getRightSidebarMinWidth();
             const currentWidth = document.getElementById('sidebar-right')?.getBoundingClientRect().width || minW;
-            if (currentWidth >= minW) {
+            if (currentWidth > 0) {
               localStorage.setItem('sidebarRightWidth', String(Math.round(currentWidth)));
             }
           }
