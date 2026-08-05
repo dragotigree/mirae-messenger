@@ -370,6 +370,16 @@ let toastDurationSeconds = 7;
 /** 침묵모드 종료 시각(ms). 0이면 꺼짐 — 메시지 송수신은 유지, 알림만 억제 */
 let silentModeUntilMs = 0;
 let silentModeEndTimer = null;
+/** 자주 쓰는 문구 — null이면 아직 DB 미설정(렌더러가 localStorage에서 이관) */
+let quickPhrasesCache = null;
+let appSettingsRowLoaded = false;
+const appSettingsRowWaiters = [];
+const DEFAULT_QUICK_PHRASES = [
+  '환자 이동 도움 요청드립니다.',
+  '치료실 변경 안내드립니다.',
+  '확인했습니다.',
+  '잠시 후 연락드리겠습니다.'
+];
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -2817,6 +2827,7 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_interval_hours INTEGER DEFAULT 24`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_retention_days INTEGER DEFAULT 14`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN silent_mode_until_ms INTEGER DEFAULT 0`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN quick_phrases_json TEXT`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
@@ -2856,10 +2867,18 @@ db.serialize(() => {
       } else {
         silentModeUntilMs = 0;
       }
+      // 렌더러가 먼저 이관한 경우(배열)를 DB 미설정 NULL로 덮어쓰지 않음
+      const parsedPhrases = parseQuickPhrasesJson(row.quick_phrases_json);
+      if (parsedPhrases) {
+        quickPhrasesCache = parsedPhrases;
+      } else if (!Array.isArray(quickPhrasesCache)) {
+        quickPhrasesCache = null;
+      }
       if (!row.update_source_path || rawPath !== updateSourcePath || !row.transport_webapp_url || !row.download_folder_path) {
         db.run(`UPDATE app_settings SET update_source_path = ?, transport_webapp_url = ?, download_folder_path = ? WHERE id = 1`, [updateSourcePath, transportWebappUrl, downloadFolderPath], logDbErr);
       }
     }
+    markAppSettingsRowLoaded();
   });
 
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
@@ -9674,6 +9693,71 @@ ipcMain.handle('set-silent-mode-minutes', async (event, minutes) => setSilentMod
 ipcMain.handle('set-silent-mode-until', async (event, untilMs) => setSilentModeUntil(untilMs));
 
 ipcMain.handle('clear-silent-mode', async () => clearSilentMode());
+
+function normalizeQuickPhrasesList(list) {
+  if (!Array.isArray(list)) return null;
+  const out = [];
+  const seen = new Set();
+  for (const raw of list) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s.slice(0, 500));
+    if (out.length >= 100) break;
+  }
+  return out;
+}
+
+/** null = DB에 저장 이력 없음. 배열(빈 배열 포함) = 사용자 상태 */
+function parseQuickPhrasesJson(raw) {
+  if (raw == null || raw === '') return null;
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (Array.isArray(parsed)) return normalizeQuickPhrasesList(parsed) || [];
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.items)) {
+      return normalizeQuickPhrasesList(parsed.items) || [];
+    }
+  } catch (e) {
+    console.error('자주 쓰는 문구 파싱 오류:', e.message);
+  }
+  return null;
+}
+
+function markAppSettingsRowLoaded() {
+  if (appSettingsRowLoaded) return;
+  appSettingsRowLoaded = true;
+  const waiters = appSettingsRowWaiters.splice(0, appSettingsRowWaiters.length);
+  waiters.forEach((fn) => {
+    try { fn(); } catch (_) { /* ignore */ }
+  });
+}
+
+function whenAppSettingsRowLoaded() {
+  if (appSettingsRowLoaded) return Promise.resolve();
+  return new Promise((resolve) => appSettingsRowWaiters.push(resolve));
+}
+
+function persistQuickPhrasesList(list) {
+  const items = normalizeQuickPhrasesList(list) || [];
+  quickPhrasesCache = items;
+  const payload = JSON.stringify({ v: 1, items });
+  db.run(`UPDATE app_settings SET quick_phrases_json = ? WHERE id = 1`, [payload], logDbErr);
+  return items;
+}
+
+ipcMain.handle('get-quick-phrases', async () => {
+  await whenAppSettingsRowLoaded();
+  if (Array.isArray(quickPhrasesCache)) {
+    return { phrases: quickPhrasesCache.slice(), source: 'db' };
+  }
+  return { phrases: null, source: 'unset' };
+});
+
+ipcMain.handle('set-quick-phrases', async (event, phrases) => {
+  await whenAppSettingsRowLoaded();
+  const saved = persistQuickPhrasesList(phrases);
+  return { phrases: saved };
+});
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
   if (settings && typeof settings.notifyIncomingMessages === 'boolean') {

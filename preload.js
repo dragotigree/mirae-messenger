@@ -152,6 +152,8 @@ contextBridge.exposeInMainWorld('api', {
   setMessageNotificationSettings: (settings) => ipcRenderer.invoke('set-message-notification-settings', settings),
   getSpellcheckEnabled: () => ipcRenderer.invoke('get-spellcheck-enabled'),
   setSpellcheckEnabled: (enabled) => ipcRenderer.invoke('set-spellcheck-enabled', enabled),
+  getQuickPhrases: () => ipcRenderer.invoke('get-quick-phrases'),
+  setQuickPhrases: (phrases) => ipcRenderer.invoke('set-quick-phrases', phrases),
 
   // 📶 네트워크 상태 진단
   getNetworkStatus: () => ipcRenderer.invoke('get-network-status'),
