@@ -307,6 +307,15 @@ function buildKnownSubnetHostIps() {
   return ips;
 }
 const KNOWN_SUBNET_HOST_IPS = buildKnownSubnetHostIps();
+/** 전체 서브넷 유니캐스트 프로브 주기(PING 횟수). 평소엔 아는 상대만 유니캐스트 */
+const PRESENCE_FULL_SUBNET_PROBE_EVERY = 8;
+let presenceBroadcastTick = 0;
+
+/** 상대가 처음 온라인일 때 TCP 동기화 동시 연결 상한 (500대 동시 기동 대비) */
+const PEER_ONLINE_WORK_CONCURRENCY = 8;
+const peerOnlineWorkQueue = [];
+const peerOnlineWorkQueued = new Set();
+let peerOnlineWorkActive = 0;
 
 const allKnownUsers = new Map();
 const persistedPhotos = {}; // ip -> photo (재시작 후에도 사진이 바로 보이도록 DB에서 미리 불러옴)
@@ -3532,16 +3541,7 @@ function startUdpDiscovery() {
         if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
-          resendPendingMessages(rinfo.address);
-          requestNoticeSync(rinfo.address);
-          syncGroupsWithPeer(rinfo.address);
-          tryDeliverPendingWipe(rinfo.address);
-          maybeSyncServicePauseToPeer(rinfo.address);
-          if (myProfile.photo) {
-            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
-          } else {
-            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_REQUEST' });
-          }
+          enqueuePeerOnlineWork(rinfo.address);
         }
       }
     } catch (e) {}
@@ -3623,12 +3623,78 @@ function broadcastPresence(socket) {
     statusState: myProfile.statusState,
     appVersion: APP_VERSION
   }));
-  // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
+  // 같은 대역은 브로드캐스트로 빠르게 전달
   socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
-  // 다른 층 대역은 라우터의 브로드캐스트 차단 여부와 상관없이 전달되도록 호스트별 유니캐스트로 전송
-  KNOWN_SUBNET_HOST_IPS.forEach(ip => {
+
+  presenceBroadcastTick = (presenceBroadcastTick + 1) % 1e9;
+  const fullProbe = (presenceBroadcastTick % PRESENCE_FULL_SUBNET_PROBE_EVERY) === 1;
+  const myPrefix = String(MY_IP || '').split('.').slice(0, 3).join('.');
+  const targets = new Set();
+
+  if (fullProbe) {
+    // 신규 상대 발견용: 가끔만 전체 호스트 유니캐스트 (500대×매회 508발 폭주 방지)
+    KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
+      if (ip !== MY_IP) targets.add(ip);
+    });
+  } else {
+    // 평소: 다른 대역의 "이미 아는" 상대에게만 유니캐스트 (같은 대역은 브로드캐스트로 충분)
+    allKnownUsers.forEach((_, ip) => {
+      if (!ip || ip === MY_IP || !looksLikeIpv4(ip)) return;
+      if (isSyntheticReceiverKey(ip)) return;
+      const prefix = String(ip).split('.').slice(0, 3).join('.');
+      if (prefix && prefix !== myPrefix) targets.add(ip);
+    });
+    onlineUsers.forEach((_, ip) => {
+      if (!ip || ip === MY_IP || !looksLikeIpv4(ip)) return;
+      const prefix = String(ip).split('.').slice(0, 3).join('.');
+      if (prefix && prefix !== myPrefix) targets.add(ip);
+    });
+  }
+
+  targets.forEach((ip) => {
     try { socket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
+}
+
+function enqueuePeerOnlineWork(peerIp) {
+  const ip = String(peerIp || '').trim();
+  if (!ip || ip === MY_IP) return;
+  if (peerOnlineWorkQueued.has(ip)) return;
+  peerOnlineWorkQueued.add(ip);
+  peerOnlineWorkQueue.push(ip);
+  drainPeerOnlineWork();
+}
+
+function drainPeerOnlineWork() {
+  while (peerOnlineWorkActive < PEER_ONLINE_WORK_CONCURRENCY && peerOnlineWorkQueue.length) {
+    const ip = peerOnlineWorkQueue.shift();
+    peerOnlineWorkActive += 1;
+    try {
+      runPeerOnlineWork(ip);
+    } catch (e) {
+      console.error('peer online work:', e && e.message ? e.message : e);
+    } finally {
+      // TCP는 비동기 fire-and-forget — 슬롯은 짧게 잡은 뒤 양보해 폭주를 완화
+      setTimeout(() => {
+        peerOnlineWorkQueued.delete(ip);
+        peerOnlineWorkActive = Math.max(0, peerOnlineWorkActive - 1);
+        drainPeerOnlineWork();
+      }, 40);
+    }
+  }
+}
+
+function runPeerOnlineWork(ip) {
+  resendPendingMessages(ip);
+  requestNoticeSync(ip);
+  syncGroupsWithPeer(ip);
+  tryDeliverPendingWipe(ip);
+  maybeSyncServicePauseToPeer(ip);
+  if (myProfile.photo) {
+    sendToIps([ip], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
+  } else {
+    sendToIps([ip], { type: 'PROFILE_PHOTO_REQUEST' });
+  }
 }
 
 function broadcastGoodbye() {
@@ -3914,6 +3980,24 @@ function persistKnownUserSnapshot(u) {
     } else if (existing && existing.lastSeen) {
       lastSeen = Math.max(lastSeen, existing.lastSeen);
     }
+
+    const photoToStore = isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '';
+    const statusToStore = mergedForStore.statusState || 'OFFLINE';
+    // PING마다 동일 프로필을 UPSERT하면 500대 규모에서 디스크·이벤트루프를 불필요하게 소모함
+    if (row) {
+      const sameProfile =
+        (row.username || '') === (mergedForStore.username || '') &&
+        (row.rank || '') === (mergedForStore.rank || '') &&
+        (row.dept || '') === (mergedForStore.dept || '') &&
+        (row.floor || '') === (mergedForStore.floor || '') &&
+        (row.ext_no || '') === (mergedForStore.extNo || '') &&
+        (row.phone_no || '') === (mergedForStore.phone || '') &&
+        (row.status_state || '') === statusToStore &&
+        (row.photo || '') === photoToStore &&
+        (Number(row.last_seen_at) || 0) === (Number(lastSeen) || 0);
+      if (sameProfile) return;
+    }
+
     db.run(
     `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -3935,8 +4019,8 @@ function persistKnownUserSnapshot(u) {
       mergedForStore.floor || '',
       mergedForStore.extNo || '',
       mergedForStore.phone || '',
-      mergedForStore.statusState || 'OFFLINE',
-      isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '',
+      statusToStore,
+      photoToStore,
       lastSeen
     ],
     logDbErr
