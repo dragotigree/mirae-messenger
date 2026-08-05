@@ -98,24 +98,26 @@ if ($procs.Count -gt 0) {
 
 $wc = New-Object System.Net.WebClient
 $wc.Headers['User-Agent'] = 'MiraeMessenger-ManualUpdate'
+$wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
+$bust = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $copied = 0
 foreach ($rel in $files) {
-  $url = ($RepoRawBase.TrimEnd('/') + '/' + ($rel -replace '\\','/'))
+  $url = ($RepoRawBase.TrimEnd('/') + '/' + ($rel -replace '\\','/') + '?t=' + $bust)
   $dst = Join-Path $TargetAppDir ($rel -replace '/','\')
   $dstDir = Split-Path -Parent $dst
   if (-not (Test-Path -LiteralPath $dstDir)) {
     New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
   }
   try {
-    Write-Host "  받는 중: $rel"
+    Write-Host "  downloading: $rel"
     $wc.DownloadFile($url, $dst)
     $copied++
   } catch {
     if ($rel -match 'splash\.png$|compact-overlay\.css$|phosphor-paths\.json$|excalidraw-app\.(js|css)$') {
-      Write-Host "  건너뜀(선택): $rel" -ForegroundColor DarkGray
+      Write-Host "  skip(optional): $rel" -ForegroundColor DarkGray
       continue
     }
-    Write-Host "  실패: $rel — $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  FAIL: $rel — $($_.Exception.Message)" -ForegroundColor Red
     exit 1
   }
 }
