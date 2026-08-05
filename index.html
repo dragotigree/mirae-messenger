@@ -4045,6 +4045,12 @@
                 <option value="online">온라인만</option>
               </select>
             </label>
+            <label class="settings-field">공용 컴퓨터
+              <select id="setting-show-shared-pcs" class="settings-select">
+                <option value="show">목록에 표시</option>
+                <option value="hide">숨기기</option>
+              </select>
+            </label>
             <label class="settings-toggle-row span-2" for="setting-show-user-list-avatars">
               <input type="checkbox" id="setting-show-user-list-avatars" checked>
               <span class="settings-toggle-text">
@@ -4052,6 +4058,7 @@
                 <span class="settings-toggle-desc">끄면 사이드바·미니 모드에서 아바타를 숨깁니다</span>
               </span>
             </label>
+            <p class="settings-field-hint span-2" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">공용 컴퓨터는 직급이 비어 있는 계정입니다. 숨기면 좌측 직원 목록에서 제외됩니다.</p>
           </div>
         </div>
       </div>
@@ -5450,7 +5457,7 @@
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -5458,6 +5465,7 @@
     if (appSettings.spellcheck === undefined) appSettings.spellcheck = false;
     if (appSettings.showUserListAvatars === undefined) appSettings.showUserListAvatars = true;
     if (appSettings.showOfflineUsers === undefined) appSettings.showOfflineUsers = true;
+    if (appSettings.showSharedPcs === undefined) appSettings.showSharedPcs = true;
     if (appSettings.compactPersonClickMode !== 'chat' && appSettings.compactPersonClickMode !== 'ipmsg') {
       appSettings.compactPersonClickMode = 'ipmsg';
     }
@@ -5555,10 +5563,27 @@
       return appSettings.showOfflineUsers !== false;
     }
 
+    /** 직급이 없으면 공용 컴퓨터로 본다 */
+    function isSharedPcUser(u) {
+      return !normalizeRankText(u && u.rank);
+    }
+
+    function showSharedPcsInDirectory() {
+      return appSettings.showSharedPcs !== false;
+    }
+
+    function isDirectorySelfUser(u) {
+      if (!u) return false;
+      if (u.isMe) return true;
+      return !!(myProfile && u.ip && myProfile.ip && u.ip === myProfile.ip);
+    }
+
     /** 직원 목록(사이드바·미니 직원 탭)에 표시할지 */
     function isUserVisibleInDirectory(u) {
       if (!u || !u.ip) return false;
+      if (isDirectorySelfUser(u)) return true;
       if (!showOfflineUsersInDirectory() && !u.online) return false;
+      if (!showSharedPcsInDirectory() && isSharedPcUser(u)) return false;
       return true;
     }
 
@@ -8190,6 +8215,7 @@
         emptyHintEl.textContent = compactListFilter === 'online' ? '현재 온라인인 직원이 없습니다.' :
           compactListFilter === 'favorite' ? '즐겨찾기한 직원이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.' :
           !showOfflineUsersInDirectory() ? '현재 온라인인 직원이 없습니다.' :
+          !showSharedPcsInDirectory() && !userFilterKeyword ? '표시할 직원이 없습니다.\n(공용 컴퓨터가 숨겨져 있을 수 있습니다)' :
           userFilterKeyword ? '검색 결과가 없습니다.' : '표시할 직원이 없습니다.';
       }
 
@@ -10511,7 +10537,14 @@
         const ips = (groups[g] || []).map((u) => u.ip).join(',');
         return `${g}|${collapsedGroups.has(collapseKey) ? 1 : 0}|${ips}`;
       });
-      return [String(userFilterKeyword || ''), groupingKey, showOfflineUsersInDirectory() ? 'all' : 'online', favIps, parts.join(';')].join('::');
+      return [
+        String(userFilterKeyword || ''),
+        groupingKey,
+        showOfflineUsersInDirectory() ? 'all' : 'online',
+        showSharedPcsInDirectory() ? 'shared' : 'noShared',
+        favIps,
+        parts.join(';')
+      ].join('::');
     }
 
     function patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey) {
@@ -10643,7 +10676,14 @@
       }
 
       if (sortedGroupKeys.length === 0 && favorites.length === 0) {
-        treeEl.innerHTML = `<div style="text-align:center; color:var(--sidebar-text-dim); font-size:12px; padding:20px 0;">표시할 사용자가 없습니다.</div>`;
+        const emptyMsg = userFilterKeyword
+          ? '검색 결과가 없습니다.'
+          : !showOfflineUsersInDirectory()
+            ? '현재 온라인인 직원이 없습니다.'
+            : !showSharedPcsInDirectory()
+              ? '표시할 사용자가 없습니다.<br>(공용 컴퓨터가 숨겨져 있을 수 있습니다)'
+              : '표시할 사용자가 없습니다.';
+        treeEl.innerHTML = `<div style="text-align:center; color:var(--sidebar-text-dim); font-size:12px; padding:20px 0;">${emptyMsg}</div>`;
         lastUserListStructureKey = structureKey + '|empty';
         return;
       }
@@ -18615,6 +18655,8 @@
         if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
         const showOfflineEl = document.getElementById('setting-show-offline-users');
         if (showOfflineEl) showOfflineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
+        const showSharedPcsEl = document.getElementById('setting-show-shared-pcs');
+        if (showSharedPcsEl) showSharedPcsEl.value = showSharedPcsInDirectory() ? 'show' : 'hide';
         document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
         const privacyEnabledEl = document.getElementById('setting-privacy-lock-enabled');
         if (privacyEnabledEl) privacyEnabledEl.checked = !!appSettings.privacyLockEnabled && !!appSettings.privacyLockPinHash;
@@ -18698,6 +18740,9 @@
   const showOfflineUsers = document.getElementById('setting-show-offline-users')
     ? document.getElementById('setting-show-offline-users').value !== 'online'
     : true;
+  const showSharedPcs = document.getElementById('setting-show-shared-pcs')
+    ? document.getElementById('setting-show-shared-pcs').value !== 'hide'
+    : true;
 
   const username = document.getElementById('setting-name').value.trim();
   if (!username) {
@@ -18724,7 +18769,7 @@
 
   appSettings = {
     fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
-    spellcheck, showUserListAvatars, showOfflineUsers, compactPersonClickMode,
+    spellcheck, showUserListAvatars, showOfflineUsers, showSharedPcs, compactPersonClickMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes
   };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
