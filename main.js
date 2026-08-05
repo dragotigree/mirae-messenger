@@ -384,6 +384,12 @@ let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
 /** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
 let updateMode = 'auto';
+/** 자동 DB 백업 주기(시간). 0=끔. 기본 24(매일) */
+let autoBackupIntervalHours = 24;
+/** 자동 백업 파일 보관 일수 */
+let autoBackupRetentionDays = 14;
+let autoBackupTimer = null;
+let autoBackupLogCleanupTimer = null;
 
 // 🚑 이동요청시스템(mirae-transport) 연동: 이동기사에게 이동 요청을 전달하는 앱스크립트 웹앱 주소.
 let transportWebappUrl = '';
@@ -2528,13 +2534,17 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'auto'`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_interval_hours INTEGER DEFAULT 24`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN auto_backup_retention_days INTEGER DEFAULT 14`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
       transportWebappUrl = DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = app.getPath('downloads');
       updateMode = 'auto';
-      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode) VALUES (1, 1, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode], logDbErr);
+      autoBackupIntervalHours = 24;
+      autoBackupRetentionDays = 14;
+      db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode, auto_backup_interval_hours, auto_backup_retention_days) VALUES (1, 1, ?, ?, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode, autoBackupIntervalHours, autoBackupRetentionDays], logDbErr);
     } else {
       showNotificationPreview = !!row.show_notification_preview;
       if (row.notify_incoming_messages != null) notifyIncomingMessages = !!row.notify_incoming_messages;
@@ -2549,6 +2559,8 @@ db.serialize(() => {
         incomingNotifyMode = 'toast';
       }
       updateMode = row.update_mode === 'manual' ? 'manual' : 'auto';
+      autoBackupIntervalHours = normalizeAutoBackupIntervalHours(row.auto_backup_interval_hours);
+      autoBackupRetentionDays = normalizeAutoBackupRetentionDays(row.auto_backup_retention_days);
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
@@ -10185,7 +10197,44 @@ ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
   return { success: true };
 });
 
-const AUTO_BACKUP_RETENTION_DAYS = 14;
+const AUTO_BACKUP_INTERVAL_OPTIONS = [0, 1, 6, 12, 24, 168];
+const AUTO_BACKUP_RETENTION_OPTIONS = [7, 14, 30, 60];
+
+function normalizeAutoBackupIntervalHours(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (AUTO_BACKUP_INTERVAL_OPTIONS.includes(n)) return n;
+  // 예전 고정 주기(6시간 검사·일 1회) 호환 → 매일
+  if (n === 6) return 24;
+  // 가장 가까운 허용 값
+  let best = 24;
+  let bestDiff = Infinity;
+  for (const opt of AUTO_BACKUP_INTERVAL_OPTIONS) {
+    if (opt === 0) continue;
+    const d = Math.abs(opt - n);
+    if (d < bestDiff) { bestDiff = d; best = opt; }
+  }
+  return best;
+}
+
+function normalizeAutoBackupRetentionDays(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 14;
+  if (AUTO_BACKUP_RETENTION_OPTIONS.includes(n)) return n;
+  let best = 14;
+  let bestDiff = Infinity;
+  for (const opt of AUTO_BACKUP_RETENTION_OPTIONS) {
+    const d = Math.abs(opt - n);
+    if (d < bestDiff) { bestDiff = d; best = opt; }
+  }
+  return best;
+}
+
+function autoBackupStamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
 
 async function getAutoBackupDir() {
   const dir = path.join(app.getPath('userData'), 'backups');
@@ -10197,36 +10246,137 @@ async function getAutoBackupDir() {
   return dir;
 }
 
-async function performAutoBackupIfNeeded() {
+async function listAutoBackupFiles(dir) {
+  const names = await fs.promises.readdir(dir).catch(() => []);
+  const files = [];
+  for (const name of names) {
+    if (!name.startsWith('auto_backup_') || !name.endsWith('.db')) continue;
+    const filePath = path.join(dir, name);
+    try {
+      const stat = await fs.promises.stat(filePath);
+      files.push({ name, filePath, mtimeMs: stat.mtimeMs });
+    } catch (_) { /* skip */ }
+  }
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return files;
+}
+
+async function getLastAutoBackupInfo() {
   try {
     const dir = await getAutoBackupDir();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayFile = path.join(dir, `auto_backup_${todayStr}.db`);
-    let alreadyExists = true;
-    try { await fs.promises.access(todayFile); } catch (e) { alreadyExists = false; }
-    if (!alreadyExists) {
-      await checkpointWal();
-      await fs.promises.copyFile(dbPath, todayFile);
-    }
-    const cutoff = Date.now() - AUTO_BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const names = await fs.promises.readdir(dir);
-    for (const name of names) {
-      if (!name.startsWith('auto_backup_')) continue;
-      const filePath = path.join(dir, name);
-      const stat = await fs.promises.stat(filePath);
-      if (stat.mtimeMs < cutoff) await fs.promises.unlink(filePath);
-    }
-  } catch (e) {
-    console.error('자동 백업 오류:', e.message);
+    const files = await listAutoBackupFiles(dir);
+    if (!files.length) return null;
+    const f = files[0];
+    const d = new Date(f.mtimeMs);
+    const pad = (n) => String(n).padStart(2, '0');
+    const label = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return { name: f.name, path: f.filePath, mtimeMs: f.mtimeMs, label, count: files.length };
+  } catch (_) {
+    return null;
   }
 }
 
-function startAutoBackup() {
-  performAutoBackupIfNeeded();
-  cleanupOldLogFiles();
-  setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
-  setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
+async function performAutoBackupIfNeeded(opts) {
+  const force = !!(opts && opts.force);
+  try {
+    if (!force && autoBackupIntervalHours <= 0) return { created: false, reason: 'disabled' };
+    const dir = await getAutoBackupDir();
+    const files = await listAutoBackupFiles(dir);
+    const intervalMs = Math.max(1, autoBackupIntervalHours) * 60 * 60 * 1000;
+    const newest = files[0] || null;
+    const due = force || !newest || (Date.now() - newest.mtimeMs) >= intervalMs;
+    let created = false;
+    let createdPath = '';
+    if (due) {
+      await checkpointWal();
+      createdPath = path.join(dir, `auto_backup_${autoBackupStamp()}.db`);
+      await fs.promises.copyFile(dbPath, createdPath);
+      created = true;
+    }
+    const retentionDays = Math.max(1, autoBackupRetentionDays || 14);
+    const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+    const after = await listAutoBackupFiles(dir);
+    for (const f of after) {
+      if (f.mtimeMs < cutoff) {
+        try { await fs.promises.unlink(f.filePath); } catch (_) { /* ignore */ }
+      }
+    }
+    return { created, path: createdPath, reason: due ? (created ? 'created' : 'error') : 'not-due' };
+  } catch (e) {
+    console.error('자동 백업 오류:', e.message);
+    return { created: false, reason: 'error', msg: e.message };
+  }
 }
+
+function stopAutoBackupTimers() {
+  if (autoBackupTimer) { clearInterval(autoBackupTimer); autoBackupTimer = null; }
+  if (autoBackupLogCleanupTimer) { clearInterval(autoBackupLogCleanupTimer); autoBackupLogCleanupTimer = null; }
+}
+
+function startAutoBackup() {
+  stopAutoBackupTimers();
+  // 로그 정리는 백업과 무관하게 6시간마다
+  cleanupOldLogFiles();
+  autoBackupLogCleanupTimer = setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
+
+  if (autoBackupIntervalHours <= 0) {
+    console.log('[자동백업] 꺼짐');
+    return;
+  }
+  performAutoBackupIfNeeded();
+  // 검사 주기: 설정 주기의 1/4 (최소 30분, 최대 6시간)
+  const checkMs = Math.min(
+    6 * 60 * 60 * 1000,
+    Math.max(30 * 60 * 1000, Math.floor(autoBackupIntervalHours * 60 * 60 * 1000 / 4))
+  );
+  autoBackupTimer = setInterval(() => { performAutoBackupIfNeeded(); }, checkMs);
+  console.log(`[자동백업] ${autoBackupIntervalHours}시간마다 · 보관 ${autoBackupRetentionDays}일 · 검사 ${Math.round(checkMs / 60000)}분`);
+}
+
+function persistAutoBackupSettings() {
+  db.run(
+    `UPDATE app_settings SET auto_backup_interval_hours = ?, auto_backup_retention_days = ? WHERE id = 1`,
+    [autoBackupIntervalHours, autoBackupRetentionDays],
+    logDbErr
+  );
+}
+
+ipcMain.handle('get-auto-backup-settings', async () => {
+  const last = await getLastAutoBackupInfo();
+  return {
+    intervalHours: autoBackupIntervalHours,
+    retentionDays: autoBackupRetentionDays,
+    lastBackup: last
+  };
+});
+
+ipcMain.handle('set-auto-backup-settings', async (event, payload) => {
+  const p = payload || {};
+  autoBackupIntervalHours = normalizeAutoBackupIntervalHours(
+    p.intervalHours != null ? p.intervalHours : autoBackupIntervalHours
+  );
+  autoBackupRetentionDays = normalizeAutoBackupRetentionDays(
+    p.retentionDays != null ? p.retentionDays : autoBackupRetentionDays
+  );
+  persistAutoBackupSettings();
+  startAutoBackup();
+  const last = await getLastAutoBackupInfo();
+  return {
+    success: true,
+    intervalHours: autoBackupIntervalHours,
+    retentionDays: autoBackupRetentionDays,
+    lastBackup: last
+  };
+});
+
+ipcMain.handle('run-auto-backup-now', async () => {
+  const res = await performAutoBackupIfNeeded({ force: true });
+  const last = await getLastAutoBackupInfo();
+  if (!res || !res.created) {
+    return { success: false, msg: (res && res.msg) || '자동 백업에 실패했습니다.', lastBackup: last };
+  }
+  return { success: true, path: res.path, lastBackup: last };
+});
 
 ipcMain.handle('get-network-status', async () => ({
   myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()

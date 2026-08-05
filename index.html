@@ -5582,8 +5582,38 @@
 
       <div class="settings-panel" data-settings-panel="data">
         <h3 class="settings-panel-title">데이터</h3>
-        <p class="settings-panel-desc">대화 백업과 삭제를 관리합니다.</p>
+        <p class="settings-panel-desc">자동 백업 주기와 대화 백업·삭제를 관리합니다.</p>
         <div class="settings-card">
+          <div class="settings-section-title">자동 DB 백업</div>
+          <p class="settings-hint">손상 대비로 이 PC에 DB 사본을 주기적으로 남깁니다. (폴더: 데이터 → backups)</p>
+          <div class="settings-form-grid" style="margin-top:10px;">
+            <label class="settings-field">백업 주기
+              <select id="setting-auto-backup-interval" class="settings-select">
+                <option value="0">사용 안 함</option>
+                <option value="1">1시간마다</option>
+                <option value="6">6시간마다</option>
+                <option value="12">12시간마다</option>
+                <option value="24" selected>매일 (24시간)</option>
+                <option value="168">매주 (7일)</option>
+              </select>
+            </label>
+            <label class="settings-field">보관 기간
+              <select id="setting-auto-backup-retention" class="settings-select">
+                <option value="7">7일</option>
+                <option value="14" selected>14일</option>
+                <option value="30">30일</option>
+                <option value="60">60일</option>
+              </select>
+            </label>
+          </div>
+          <p id="setting-auto-backup-last" class="settings-hint" style="margin-top:10px;">최근 자동 백업: -</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            <button type="button" class="settings-btn-secondary" onclick="runAutoBackupNowFromSettings()">지금 자동 백업</button>
+            <button type="button" class="settings-btn-secondary" onclick="window.api.openUserDataFolder()">백업 폴더 열기</button>
+          </div>
+        </div>
+        <div class="settings-card">
+          <div class="settings-section-title">대화 내보내기</div>
           <p class="settings-hint">모든 대화를 JSON·텍스트·CSV와 일별 로그로 내보냅니다.</p>
           <div style="display:flex; flex-wrap:wrap; gap:8px;">
             <button type="button" class="settings-btn-primary" onclick="backupChatHistory()">대화 백업 실행</button>
@@ -22799,6 +22829,50 @@
       }
     }
 
+    function updateAutoBackupLastLabel(last) {
+      const el = document.getElementById('setting-auto-backup-last');
+      if (!el) return;
+      if (!last || !last.label) {
+        el.textContent = '최근 자동 백업: 없음';
+        return;
+      }
+      const count = last.count != null ? ` · 보관 ${last.count}개` : '';
+      el.textContent = `최근 자동 백업: ${last.label}${count}`;
+    }
+
+    async function loadAutoBackupSettingsPanel() {
+      if (!window.api || typeof window.api.getAutoBackupSettings !== 'function') return;
+      try {
+        const s = await window.api.getAutoBackupSettings();
+        const intervalEl = document.getElementById('setting-auto-backup-interval');
+        const retentionEl = document.getElementById('setting-auto-backup-retention');
+        if (intervalEl && s) intervalEl.value = String(s.intervalHours != null ? s.intervalHours : 24);
+        if (retentionEl && s) retentionEl.value = String(s.retentionDays != null ? s.retentionDays : 14);
+        updateAutoBackupLastLabel(s && s.lastBackup);
+      } catch (e) {
+        console.warn('자동 백업 설정 로드 실패:', e);
+      }
+    }
+
+    async function runAutoBackupNowFromSettings() {
+      if (!window.api || typeof window.api.runAutoBackupNow !== 'function') {
+        await appAlert('자동 백업을 실행할 수 없습니다.');
+        return;
+      }
+      try {
+        const res = await window.api.runAutoBackupNow();
+        updateAutoBackupLastLabel(res && res.lastBackup);
+        if (res && res.success) {
+          await appAlert(`자동 백업을 저장했습니다.\n\n${res.path || ''}`);
+        } else {
+          await appAlert((res && res.msg) || '자동 백업에 실패했습니다.');
+        }
+      } catch (e) {
+        console.error(e);
+        await appAlert('자동 백업 중 오류가 발생했습니다.');
+      }
+    }
+
     async function clearAllChatHistoryFromSettings() {
       const el = document.getElementById('chat-clear-all-result');
       const firstOk = await appConfirm(
@@ -22946,6 +23020,7 @@
 
         await loadNetworkStatus();
         await loadUpdatePanel();
+        await loadAutoBackupSettingsPanel();
         window.api.focusMainWindow();
       } catch (e) {
         console.error('설정 화면을 불러오는 중 오류가 발생했습니다:', e);
@@ -22983,6 +23058,16 @@
   const updateMode = (updateModeEl && updateModeEl.value === 'manual') ? 'manual' : 'auto';
   if (window.api.setUpdateMode) {
     try { await window.api.setUpdateMode(updateMode); } catch (e) { /* ignore */ }
+  }
+  if (window.api.setAutoBackupSettings) {
+    try {
+      const intervalEl = document.getElementById('setting-auto-backup-interval');
+      const retentionEl = document.getElementById('setting-auto-backup-retention');
+      const intervalHours = intervalEl ? parseInt(intervalEl.value, 10) : 24;
+      const retentionDays = retentionEl ? parseInt(retentionEl.value, 10) : 14;
+      const backupRes = await window.api.setAutoBackupSettings({ intervalHours, retentionDays });
+      updateAutoBackupLastLabel(backupRes && backupRes.lastBackup);
+    } catch (e) { /* ignore */ }
   }
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const uiAnimEl = document.querySelector('input[name="setting-ui-animations"]:checked');
