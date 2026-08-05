@@ -3882,7 +3882,7 @@
       <div class="brand-icons footer-toolbar">
         <button class="icon-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
         <button class="icon-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (사생활 보호)" data-ui-icon="lock"></button>
-        <button class="icon-btn" id="toolbar-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+Alt+E)"></button>
+        <button class="icon-btn" id="toolbar-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)"></button>
         <button class="icon-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
         <button class="icon-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
@@ -20783,11 +20783,16 @@
       }
       if (e.ctrlKey && e.altKey && (e.key === 'e' || e.key === 'E' || e.keyCode === 69)) {
         e.preventDefault();
-        openAllLogsModal();
+        if (!isPrivacyScreenLocked) openAllLogsModal();
       }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '1' || e.code === 'Digit1')) {
         e.preventDefault();
         openChatQuickSwitcher();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '2' || e.code === 'Digit2')) {
+        e.preventDefault();
+        if (!isPrivacyScreenLocked) openAllLogsModal();
         return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
