@@ -18124,6 +18124,11 @@
   }
   const notifyModeEl = document.querySelector('input[name="incoming-notify-mode"]:checked');
   const incomingNotifyMode = (notifyModeEl && notifyModeEl.value === 'desktop') ? 'desktop' : 'toast';
+  const updateModeEl = document.querySelector('input[name="update-mode"]:checked');
+  const updateMode = (updateModeEl && updateModeEl.value === 'manual') ? 'manual' : 'auto';
+  if (window.api.setUpdateMode) {
+    try { await window.api.setUpdateMode(updateMode); } catch (e) { /* ignore */ }
+  }
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const showUserListAvatars = document.getElementById('setting-show-user-list-avatars')
     ? document.getElementById('setting-show-user-list-avatars').checked
