@@ -10010,7 +10010,7 @@
       const it = chatQuickSwitcher.filtered[index];
       if (!it) return;
       closeChatQuickSwitcher();
-        try {
+      try {
         const r = it.activate();
         if (r && typeof r.then === 'function') r.catch(() => {});
       } catch (e) {
