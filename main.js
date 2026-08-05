@@ -3960,72 +3960,98 @@ function userObjFromKnownUsersRow(row) {
   return obj;
 }
 
+let persistKnownInFlight = 0;
+const persistKnownWaitQueue = [];
+const PERSIST_KNOWN_MAX_INFLIGHT = 24;
+
 function persistKnownUserSnapshot(u) {
   if (!u || !u.ip) return;
   if (isSyntheticReceiverKey(u.ip)) return;
-  db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
-    if (err) logDbErr(err);
-    const existing = row ? userObjFromKnownUsersRow(row) : null;
-    const merged = mergeUserProfile(existing, u, !!u.online);
-    const mergedForStore = applyStoredProfileOverride(merged);
-    let lastSeen = mergedForStore.lastSeen || merged.lastSeen || 0;
-    if (u.online) {
-      // 접속 중에는 DB의 last_seen_at(마지막 종료 시각)을 유지한다.
-      // (예전처럼 Date.now()로 덮으면 '프로그램 시작 시각'처럼 보일 수 있음)
-      if (existing && existing.lastSeen) {
+  const job = () => {
+    persistKnownInFlight += 1;
+    const finish = () => {
+      persistKnownInFlight = Math.max(0, persistKnownInFlight - 1);
+      if (persistKnownWaitQueue.length) {
+        const next = persistKnownWaitQueue.shift();
+        try { next(); } catch (e) { /* ignore */ }
+      }
+    };
+    db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
+      if (err) {
+        logDbErr(err);
+        finish();
+        return;
+      }
+      const existing = row ? userObjFromKnownUsersRow(row) : null;
+      const merged = mergeUserProfile(existing, u, !!u.online);
+      const mergedForStore = applyStoredProfileOverride(merged);
+      let lastSeen = mergedForStore.lastSeen || merged.lastSeen || 0;
+      if (u.online) {
+        // 접속 중에는 DB의 last_seen_at(마지막 종료 시각)을 유지한다.
+        // (예전처럼 Date.now()로 덮으면 '프로그램 시작 시각'처럼 보일 수 있음)
+        if (existing && existing.lastSeen) {
+          lastSeen = Math.max(lastSeen, existing.lastSeen);
+        }
+      } else if (!lastSeen && existing && existing.lastSeen) {
+        lastSeen = existing.lastSeen;
+      } else if (existing && existing.lastSeen) {
         lastSeen = Math.max(lastSeen, existing.lastSeen);
       }
-    } else if (!lastSeen && existing && existing.lastSeen) {
-      lastSeen = existing.lastSeen;
-    } else if (existing && existing.lastSeen) {
-      lastSeen = Math.max(lastSeen, existing.lastSeen);
-    }
 
-    const photoToStore = isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '';
-    const statusToStore = mergedForStore.statusState || 'OFFLINE';
-    // PING마다 동일 프로필을 UPSERT하면 500대 규모에서 디스크·이벤트루프를 불필요하게 소모함
-    if (row) {
-      const sameProfile =
-        (row.username || '') === (mergedForStore.username || '') &&
-        (row.rank || '') === (mergedForStore.rank || '') &&
-        (row.dept || '') === (mergedForStore.dept || '') &&
-        (row.floor || '') === (mergedForStore.floor || '') &&
-        (row.ext_no || '') === (mergedForStore.extNo || '') &&
-        (row.phone_no || '') === (mergedForStore.phone || '') &&
-        (row.status_state || '') === statusToStore &&
-        (row.photo || '') === photoToStore &&
-        (Number(row.last_seen_at) || 0) === (Number(lastSeen) || 0);
-      if (sameProfile) return;
-    }
+      const photoToStore = isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '';
+      const statusToStore = mergedForStore.statusState || 'OFFLINE';
+      // PING마다 동일 프로필을 UPSERT하면 500대 규모에서 디스크·이벤트루프를 불필요하게 소모함
+      if (row) {
+        const sameProfile =
+          (row.username || '') === (mergedForStore.username || '') &&
+          (row.rank || '') === (mergedForStore.rank || '') &&
+          (row.dept || '') === (mergedForStore.dept || '') &&
+          (row.floor || '') === (mergedForStore.floor || '') &&
+          (row.ext_no || '') === (mergedForStore.extNo || '') &&
+          (row.phone_no || '') === (mergedForStore.phone || '') &&
+          (row.status_state || '') === statusToStore &&
+          (row.photo || '') === photoToStore &&
+          (Number(row.last_seen_at) || 0) === (Number(lastSeen) || 0);
+        if (sameProfile) {
+          finish();
+          return;
+        }
+      }
 
-    db.run(
-    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(ip) DO UPDATE SET
-       username = excluded.username,
-       rank = excluded.rank,
-       dept = CASE WHEN excluded.dept != '' THEN excluded.dept ELSE known_users.dept END,
-       floor = CASE WHEN excluded.floor != '' THEN excluded.floor ELSE known_users.floor END,
-       ext_no = CASE WHEN excluded.ext_no != '' THEN excluded.ext_no ELSE known_users.ext_no END,
-       phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
-       status_state = excluded.status_state,
-       photo = CASE WHEN excluded.photo != '' THEN excluded.photo ELSE known_users.photo END,
-       last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0))`,
-    [
-      mergedForStore.ip,
-      mergedForStore.username || '',
-      mergedForStore.rank || '',
-      mergedForStore.dept || '',
-      mergedForStore.floor || '',
-      mergedForStore.extNo || '',
-      mergedForStore.phone || '',
-      statusToStore,
-      photoToStore,
-      lastSeen
-    ],
-    logDbErr
-    );
-  });
+      db.run(
+      `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(ip) DO UPDATE SET
+         username = excluded.username,
+         rank = excluded.rank,
+         dept = CASE WHEN excluded.dept != '' THEN excluded.dept ELSE known_users.dept END,
+         floor = CASE WHEN excluded.floor != '' THEN excluded.floor ELSE known_users.floor END,
+         ext_no = CASE WHEN excluded.ext_no != '' THEN excluded.ext_no ELSE known_users.ext_no END,
+         phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
+         status_state = excluded.status_state,
+         photo = CASE WHEN excluded.photo != '' THEN excluded.photo ELSE known_users.photo END,
+         last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0))`,
+      [
+        mergedForStore.ip,
+        mergedForStore.username || '',
+        mergedForStore.rank || '',
+        mergedForStore.dept || '',
+        mergedForStore.floor || '',
+        mergedForStore.extNo || '',
+        mergedForStore.phone || '',
+        statusToStore,
+        photoToStore,
+        lastSeen
+      ],
+      (runErr) => {
+        logDbErr(runErr);
+        finish();
+      }
+      );
+    });
+  };
+  if (persistKnownInFlight >= PERSIST_KNOWN_MAX_INFLIGHT) persistKnownWaitQueue.push(job);
+  else job();
 }
 
 function loadPersistedKnownUsers(callback) {
