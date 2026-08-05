@@ -2829,6 +2829,11 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN silent_mode_until_ms INTEGER DEFAULT 0`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN quick_phrases_json TEXT`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
+    if (err) {
+      logDbErr(err);
+      markAppSettingsRowLoaded();
+      return;
+    }
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
       transportWebappUrl = DEFAULT_TRANSPORT_WEBAPP_URL;
