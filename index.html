@@ -23599,6 +23599,22 @@
       } else {
         setSilentModeMinutesInput(60);
       }
+      if (minsEl && minsEl.dataset.bound !== '1') {
+        minsEl.dataset.bound = '1';
+        minsEl.addEventListener('input', () => {
+          const mins = parseInt(minsEl.value, 10);
+          if (!Number.isFinite(mins) || mins < 1 || !untilEl) return;
+          untilEl.value = toDatetimeLocalValue(Date.now() + mins * 60 * 1000);
+        });
+      }
+      if (untilEl && untilEl.dataset.bound !== '1') {
+        untilEl.dataset.bound = '1';
+        untilEl.addEventListener('input', () => {
+          const untilMs = new Date(untilEl.value).getTime();
+          if (!Number.isFinite(untilMs) || untilMs <= Date.now() || !minsEl) return;
+          minsEl.value = String(Math.max(1, Math.ceil((untilMs - Date.now()) / 60000)));
+        });
+      }
       syncSilentModeUi();
       modal.style.display = 'flex';
       setModalOpenState(true);
