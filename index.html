@@ -4194,6 +4194,39 @@
       flex-direction: column;
       gap: 12px;
     }
+    .settings-inquiry-card {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 14px;
+      background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 55%, #fff 100%);
+      border-color: #bae6fd;
+    }
+    .settings-inquiry-icon {
+      width: 44px; height: 44px; flex-shrink: 0;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      background: #fff;
+      border: 1px solid #e0f2fe;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.1);
+    }
+    .settings-inquiry-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .settings-inquiry-title {
+      font-size: 14px; font-weight: 800; color: #0c4a6e; letter-spacing: -0.02em;
+    }
+    .settings-inquiry-text {
+      margin: 0; font-size: 13px; line-height: 1.65; color: #334155;
+    }
+    .settings-inquiry-text strong { color: #0369a1; font-weight: 800; }
+    .settings-inquiry-pill {
+      display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      margin-top: 2px; padding: 8px 12px; border-radius: 999px;
+      background: #fff; border: 1px solid #bae6fd;
+      font-size: 12.5px; font-weight: 700; color: #0f172a;
+    }
+    .settings-inquiry-pill-label { color: #64748b; font-weight: 700; }
+    .settings-inquiry-pill-sep { color: #cbd5e1; }
+    .settings-inquiry-pill strong { color: #0284c7; font-size: 14px; letter-spacing: 0.02em; }
     .settings-card.danger {
       background: #fff7f7;
       border-color: #fecaca;
@@ -5225,6 +5258,7 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="inquiry" onclick="setSettingsTab('inquiry')">문의</button>
         </nav>
         <div class="settings-panels">
 
@@ -5586,6 +5620,25 @@
             <button type="button" class="settings-btn-secondary" onclick="window.api.openUserDataFolder()">토큰 폴더 열기</button>
           </div>
           <div id="update-check-result" class="settings-hint"></div>
+        </div>
+      </div>
+
+      <div class="settings-panel" data-settings-panel="inquiry">
+        <h3 class="settings-panel-title">문의</h3>
+        <p class="settings-panel-desc">오류 신고와 기능 문의 연락처입니다.</p>
+        <div class="settings-card settings-inquiry-card">
+          <div class="settings-inquiry-icon" aria-hidden="true">📞</div>
+          <div class="settings-inquiry-body">
+            <div class="settings-inquiry-title">메신저 문의</div>
+            <p class="settings-inquiry-text">오류가 있거나 문의사항이 있을 경우<br><strong>물리치료실장 (내선번호 1010)</strong>으로 연락주세요.</p>
+            <div class="settings-inquiry-pill">
+              <span class="settings-inquiry-pill-label">담당</span>
+              <span>물리치료실장</span>
+              <span class="settings-inquiry-pill-sep" aria-hidden="true">·</span>
+              <span class="settings-inquiry-pill-label">내선</span>
+              <strong>1010</strong>
+            </div>
+          </div>
         </div>
       </div>
 
