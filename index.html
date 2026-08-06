@@ -16276,13 +16276,21 @@
         return;
       }
 
-      // 작성자 계정이 아니면 마스터 아이디로 재시도 (공지 작성 로그인 등)
+      // 작성자 계정이 아니면 마스터 아이디로 재시도 (공지·일정 작성 로그인 등)
+      // → 마스터 관리 센터는 열지 않음 (방패 아이콘으로만 진입)
       if (!wantDuty) {
         const masterRes = await window.api.verifyMasterAuth({ id: username, password });
         if (masterRes && masterRes.success) {
           pendingOpenDutyRosterAfterLogin = false;
+          const boardOpen = document.getElementById('board-modal')?.style.display === 'flex';
+          const scheduleBoardOpen = document.getElementById('schedule-board-modal')?.style.display === 'flex'
+            || document.body.classList.contains('schedule-board-standalone');
           closeOperatorLoginModal();
-          await applyMasterAuthSuccess({ openDutyRoster: false, openAdmin: true });
+          await applyMasterAuthSuccess({ openDutyRoster: false, openAdmin: false });
+          if (boardOpen) openBoardWriteView(null);
+          else if (scheduleBoardOpen) {
+            try { refreshScheduleBoardEntryUi(); } catch (_) {}
+          }
           return;
         }
         await appAlert((res && res.msg) || (masterRes && masterRes.msg) || '로그인에 실패했습니다.');
