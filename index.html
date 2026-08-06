@@ -5016,6 +5016,20 @@
             </div>
             <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
+
+            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; background:#f8fafc; border-color:#e2e8f0;">
+              <div style="font-size:13px; font-weight:800; color:#0f172a;">🧪 부하 모의 (접속 폭주)</div>
+              <p style="font-size:12px; color:#64748b; margin:0; line-height:1.55;">가상 직원이 한꺼번에 온라인으로 붙는 상황을 이 PC에서 재현합니다. 목록 렌더·DB·프레즌스 부하를 볼 때 사용하세요. (테스트망 IP · 실제 LAN 동료가 아닙니다)</p>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">인원
+                  <input type="number" id="master-loadsim-users" min="1" max="500" value="200" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;">
+                </label>
+                <button type="button" onclick="runMasterLoadSimInject()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">접속 모의 실행</button>
+                <button type="button" onclick="runMasterLoadSimClear()" style="padding:7px 12px; background:#fff; border:1px solid #fecaca; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; color:#b91c1c;">모의 접속 지우기</button>
+              </div>
+              <div id="master-loadsim-status" style="font-size:11.5px; color:#475569; min-height:1.2em;">모의 접속: 확인 중…</div>
+              <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">CLI: <code>node scripts/load-sim.js presence --users=200</code> · UDP 폭주: <code>node scripts/load-sim.js udp --target=&lt;IP&gt;</code></p>
+            </div>
           </div>
 
           <div class="settings-panel" data-master-panel="pause">
@@ -14690,6 +14704,7 @@
       }
       if (key === 'traffic') {
         try { renderMasterPeerTraffic(); } catch (_) {}
+        try { refreshMasterLoadSimStatus(); } catch (_) {}
       }
     }
 
@@ -14783,6 +14798,66 @@
         }
       } catch (_) {}
       renderMasterPeerTraffic();
+    }
+
+    async function refreshMasterLoadSimStatus() {
+      const el = document.getElementById('master-loadsim-status');
+      if (!el) return;
+      if (!window.api.getLoadSimStatus) {
+        el.textContent = '이 버전에서는 부하 모의를 지원하지 않습니다.';
+        return;
+      }
+      try {
+        const res = await window.api.getLoadSimStatus();
+        if (!res || res.success === false) {
+          el.textContent = (res && res.msg) || '상태 확인 실패';
+          return;
+        }
+        el.textContent = `모의 접속 중: ${Number(res.onlineLoadTest) || 0}명 (약 45초간 PING 없으면 오프라인으로 내려갑니다)`;
+      } catch (_) {
+        el.textContent = '상태 확인 실패';
+      }
+    }
+
+    async function runMasterLoadSimInject() {
+      if (!window.api.runLoadSim) {
+        await appAlert('이 버전에서는 부하 모의를 지원하지 않습니다.');
+        return;
+      }
+      const input = document.getElementById('master-loadsim-users');
+      const n = Math.max(1, Math.min(500, parseInt(input && input.value ? input.value : '200', 10) || 200));
+      if (input) input.value = String(n);
+      const ok = await appConfirm(`가상 직원 ${n}명을 한꺼번에 온라인으로 올릴까요?\n(테스트용 · 실제 LAN 접속이 아닙니다)`);
+      if (!ok) return;
+      const statusEl = document.getElementById('master-loadsim-status');
+      if (statusEl) statusEl.textContent = `${n}명 주입 중…`;
+      try {
+        const res = await window.api.runLoadSim({ action: 'inject', usersCount: n, persist: true });
+        if (!res || res.success === false) {
+          await appAlert((res && res.msg) || '부하 모의 실패');
+        } else {
+          await appAlert(`모의 접속 ${res.injected || n}명 완료.\n직원 목록을 확인해 보세요.`);
+        }
+      } catch (e) {
+        await appAlert('부하 모의 중 오류가 발생했습니다.');
+      }
+      refreshMasterLoadSimStatus();
+      try { renderMasterOnlineClients(); } catch (_) {}
+      try { renderMasterPeerTraffic(); } catch (_) {}
+    }
+
+    async function runMasterLoadSimClear() {
+      if (!window.api.runLoadSim) return;
+      const ok = await appConfirm('모의 접속(가상 직원)을 모두 지울까요?');
+      if (!ok) return;
+      try {
+        const res = await window.api.runLoadSim({ action: 'clear' });
+        if (res && res.success === false) {
+          await appAlert(res.msg || '삭제 실패');
+        }
+      } catch (_) {}
+      refreshMasterLoadSimStatus();
+      try { renderMasterOnlineClients(); } catch (_) {}
     }
 
     const masterStatusLabel = { ONLINE: '🟢 온라인', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };

@@ -1889,6 +1889,148 @@ function isSyntheticReceiverKey(ip) {
   );
 }
 
+/** RFC 5737 테스트망 — load-sim 가상 피어 */
+function isLoadTestPeerIp(ip) {
+  const s = String(ip || '').trim();
+  if (!s) return false;
+  const known = onlineUsers.get(s) || allKnownUsers.get(s);
+  if (known && known.isLoadTest) return true;
+  return /^(192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)/.test(s);
+}
+
+function isLoopbackIp(ip) {
+  const s = String(ip || '').replace('::ffff:', '').trim();
+  return s === '127.0.0.1' || s === '::1' || s === 'localhost';
+}
+
+function buildLoadTestIpForIndex(i) {
+  const nets = ['192.0.2', '198.51.100', '203.0.113'];
+  const idx = Math.max(0, (Number(i) || 1) - 1);
+  const netPart = nets[Math.floor(idx / 254) % nets.length];
+  const host = (idx % 254) + 1;
+  return `${netPart}.${host}`;
+}
+
+function countLoadTestPeers() {
+  let n = 0;
+  allKnownUsers.forEach((u, ip) => {
+    if ((u && u.isLoadTest) || isLoadTestPeerIp(ip)) n += 1;
+  });
+  return n;
+}
+
+/**
+ * 부하 모의: 가상 온라인 피어 주입/하트비트/정리
+ * @returns {{ success: boolean, msg?: string, injected?: number, touched?: number, cleared?: number, onlineLoadTest?: number }}
+ */
+function runLoadTestCommand(payload) {
+  const action = String((payload && payload.action) || '').trim();
+  if (!action) return { success: false, msg: 'action 필요' };
+
+  if (action === 'clear') {
+    const removeIps = [];
+    allKnownUsers.forEach((u, ip) => {
+      if ((u && u.isLoadTest) || isLoadTestPeerIp(ip)) removeIps.push(ip);
+    });
+    removeIps.forEach((ip) => {
+      onlineUsers.delete(ip);
+      allKnownUsers.delete(ip);
+      try {
+        if (db) db.run(`DELETE FROM known_users WHERE ip = ?`, [ip], () => {});
+      } catch (_) {}
+    });
+    notifyUserList(true);
+    writeToLogFile('info', `[loadtest] cleared ${removeIps.length} synthetic peers`);
+    return { success: true, cleared: removeIps.length, onlineLoadTest: 0 };
+  }
+
+  if (action === 'touch') {
+    const ips = Array.isArray(payload.ips) ? payload.ips : [];
+    const now = Date.now();
+    let touched = 0;
+    ips.forEach((ip) => {
+      const key = String(ip || '').trim();
+      if (!key || !isLoadTestPeerIp(key)) return;
+      const u = onlineUsers.get(key) || allKnownUsers.get(key);
+      if (!u) return;
+      u.lastPingAt = now;
+      u.online = true;
+      u.isLoadTest = true;
+      onlineUsers.set(key, u);
+      allKnownUsers.set(key, u);
+      touched += 1;
+    });
+    return { success: true, touched, onlineLoadTest: countLoadTestPeers() };
+  }
+
+  if (action === 'inject' || action === 'burst') {
+    let users = Array.isArray(payload.users) ? payload.users : [];
+    const count = Math.max(0, Math.min(500, parseInt(payload.usersCount || payload.count || users.length || 0, 10) || 0));
+    if (!users.length && count > 0) {
+      users = [];
+      for (let i = 1; i <= count; i++) {
+        users.push({
+          ip: buildLoadTestIpForIndex(i),
+          username: `모의직원${String(i).padStart(3, '0')}`,
+          rank: i % 7 === 0 ? '실장' : '',
+          dept: `부서${(i % 12) + 1}`,
+          floor: `${(i % 8) + 1}층`,
+          extNo: String(2000 + i),
+          phone: '',
+          statusState: 'ONLINE',
+          appVersion: 'load-sim'
+        });
+      }
+    }
+    users = users.slice(0, 500);
+    const persist = payload.persist !== false && payload.persist !== 0 && payload.persist !== '0';
+    const now = Date.now();
+    let injected = 0;
+
+    users.forEach((raw, idx) => {
+      const ip = String((raw && raw.ip) || buildLoadTestIpForIndex(idx + 1)).trim();
+      if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+      const previouslyKnown = allKnownUsers.get(ip);
+      const overlay = {
+        ip,
+        username: (raw && raw.username) || `모의직원${idx + 1}`,
+        rank: (raw && raw.rank) || '',
+        dept: (raw && raw.dept) || '부하테스트',
+        floor: (raw && raw.floor) || '',
+        extNo: (raw && raw.extNo) || '',
+        phone: (raw && raw.phone) || '',
+        statusState: (raw && raw.statusState) || 'ONLINE',
+        appVersion: (raw && raw.appVersion) || 'load-sim',
+        photo: (previouslyKnown && previouslyKnown.photo) || '',
+        lastPingAt: now,
+        online: true,
+        isMe: false,
+        isLoadTest: true
+      };
+      const userObj = mergeUserProfile(previouslyKnown, overlay, true);
+      userObj.lastPingAt = now;
+      userObj.online = true;
+      userObj.isLoadTest = true;
+      onlineUsers.set(ip, userObj);
+      allKnownUsers.set(ip, userObj);
+      if (persist) {
+        try { persistKnownUserSnapshot(userObj); } catch (_) {}
+      }
+      injected += 1;
+    });
+
+    notifyUserList(true);
+    writeToLogFile('info', `[loadtest] injected ${injected} synthetic peers (persist=${persist})`);
+    return { success: true, injected, onlineLoadTest: countLoadTestPeers() };
+  }
+
+  if (action === 'status') {
+    return { success: true, onlineLoadTest: countLoadTestPeers() };
+  }
+
+  return { success: false, msg: `unknown action: ${action}` };
+}
+
 function encodeDeptPeerKey(ip, dept) {
   return `DEPTPEER:${ip}|${String(dept || '')}`;
 }
@@ -4040,7 +4182,7 @@ function allowUdpReceive(fromIp) {
 function collectPresenceHeartbeatIps() {
   const out = [];
   onlineUsers.forEach((_u, ip) => {
-    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.push(ip);
+    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip) && !isLoadTestPeerIp(ip)) out.push(ip);
   });
   return out;
 }
@@ -4904,6 +5046,17 @@ function parseAndRoute(line, socket) {
     const payload = JSON.parse(line);
     const senderIP = (socket.remoteAddress || '').replace('::ffff:', '');
     if (!senderIP) return;
+    if (payload && payload.type === 'LOADTEST_CMD') {
+      if (!isLoopbackIp(senderIP)) {
+        try {
+          socket.write(JSON.stringify({ success: false, msg: 'LOADTEST는 로컬(127.0.0.1)만 허용' }) + '\n');
+        } catch (_) {}
+        return;
+      }
+      const result = runLoadTestCommand(payload);
+      try { socket.write(JSON.stringify(result) + '\n'); } catch (_) {}
+      return;
+    }
     recordPeerTraffic(senderIP, {
       msgs: 1,
       type: payload && payload.type ? payload.type : 'CHAT'
@@ -10772,6 +10925,24 @@ ipcMain.handle('reset-peer-traffic-stats', async () => {
   if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
   peerTrafficByIp.clear();
   return { success: true };
+});
+
+ipcMain.handle('run-load-sim', async (_event, payload) => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  }
+  try {
+    return runLoadTestCommand(payload || {});
+  } catch (e) {
+    return { success: false, msg: (e && e.message) || String(e) };
+  }
+});
+
+ipcMain.handle('get-load-sim-status', async () => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.', onlineLoadTest: 0 };
+  }
+  return { success: true, onlineLoadTest: countLoadTestPeers() };
 });
 
 ipcMain.handle('refresh-users', async () => {

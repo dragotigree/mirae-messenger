@@ -96,6 +96,8 @@ contextBridge.exposeInMainWorld('api', {
   cancelPendingRemoteWipe: (targetIp) => ipcRenderer.invoke('cancel-pending-remote-wipe', targetIp),
   getPeerTrafficStats: () => ipcRenderer.invoke('get-peer-traffic-stats'),
   resetPeerTrafficStats: () => ipcRenderer.invoke('reset-peer-traffic-stats'),
+  runLoadSim: (payload) => ipcRenderer.invoke('run-load-sim', payload),
+  getLoadSimStatus: () => ipcRenderer.invoke('get-load-sim-status'),
   onUsageLockState: (callback) => ipcRenderer.on('usage-lock-state', (e, data) => callback(data)),
   onServicePauseState: (callback) => ipcRenderer.on('service-pause-state', (e, data) => callback(data)),
   onUsageLockResult: (callback) => ipcRenderer.on('usage-lock-result', (e, data) => callback(data)),
