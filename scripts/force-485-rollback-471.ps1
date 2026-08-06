@@ -1,7 +1,7 @@
 # Force rollback to yesterday-evening stable (1.0.471 code) as 1.0.485.
 # Target: packaged exe resources\app only. No prompts.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = 'dc6111e070496876cd8d210eefd8362f83be5ffe'
 $Expected = '1.0.485'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
