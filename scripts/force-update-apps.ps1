@@ -15,7 +15,7 @@ try { chcp 65001 | Out-Null } catch {}
 $PackagedApp = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $SourceApp = 'C:\Apps\Mirae Messenger'
 $ExePath = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\MiraeMessenger.exe'
-$FallbackRef = 'c61c87fa60eec01bdd7f82ab67a9c6d2737dc267'
+$FallbackRef = '6586d9c19f6f887712f56fad7cf95bb429408182'
 
 $files = @(
   'main.js',
