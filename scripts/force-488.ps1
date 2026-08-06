@@ -1,6 +1,6 @@
 # Force 1.0.488 — TCP storm shield + SAFE_UI. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = 'acbbb6990fedae29d5169aac82cc52f071f37fd7'
 $Expected = '1.0.488'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
