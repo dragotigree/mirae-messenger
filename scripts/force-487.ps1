@@ -1,6 +1,6 @@
 # Force 1.0.487 — local userdata + no Z auto-update hang. No exit (irm|iex safe).
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = '9e2088908e9296bef4963332cff7f8324f45ccff'
 $Expected = '1.0.487'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
