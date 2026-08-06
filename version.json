@@ -1,4 +1,4 @@
 {
-  "version": "1.0.482",
-  "notes": "핫픽스: known_users.phone_no 컬럼 마이그레이션·DB오류 로그 스로틀·mobile_server 안전로드 — 콘솔 SQLITE_ERROR 폭주/버벅임 수정"
+  "version": "1.0.484",
+  "notes": "핫픽스: Win occlusion 계산 OFF·backdrop blur 전면 제거·애니메이션 기본 Off·하트비트 완화 — Excel 등과 동시 실행 시 유휴 CPU/버벅임"
 }

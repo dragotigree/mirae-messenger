@@ -35,6 +35,12 @@ if (!gotSingleInstanceLock) {
   process.exit(0);
 }
 
+// Windows: 네이티브 창 가림(occlusion) 계산이 WinEvents 락 경합을 일으켜
+// Excel/Oracle 등과 동시 실행 시 Electron 유휴 CPU·포커스 버벅임을 키울 수 있음.
+try {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+} catch (e) { /* ignore */ }
+
 // GPU 가속은 기본 ON 유지.
 // 1.0.479에서 disableHardwareAcceleration()을 켰더니 소프트웨어 렌더가
 // 유휴 상태에서도 CPU ~12%를 상시 점유하는 경우가 있어 되돌림.
@@ -352,7 +358,7 @@ const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 1200;
 /** 평소 하트비트: 온라인 동료만 */
-const PRESENCE_HEARTBEAT_MS = 10000;
+const PRESENCE_HEARTBEAT_MS = 15000;
 /** 전체 서브넷 508 탐색 — OFF (CPU 12%+ 주원인). 브로드캐스트+온라인 유니캐스트만 */
 const PRESENCE_FULL_SCAN_ENABLED = false;
 const PRESENCE_FULL_SCAN_MS = 600000;
@@ -361,11 +367,11 @@ const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
 /** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
 const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
 /** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
-const UDP_RX_MAX_PER_SEC = 60;
-const UDP_RX_MAX_PER_IP_PER_SEC = 4;
+const UDP_RX_MAX_PER_SEC = 30;
+const UDP_RX_MAX_PER_IP_PER_SEC = 3;
 /** 수신이 이 값을 넘으면 잠시 송신 유니캐스트 중단(브로드캐스트만) */
-const UDP_STORM_THRESHOLD_PER_SEC = 40;
-const UDP_STORM_COOLDOWN_MS = 8000;
+const UDP_STORM_THRESHOLD_PER_SEC = 20;
+const UDP_STORM_COOLDOWN_MS = 12000;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -2894,7 +2900,16 @@ function initSpellCheckerSession() {
   const ses = session.defaultSession;
   if (!ses) return;
   try {
-    ses.setSpellCheckerLanguages(['ko-KR', 'en-US']);
+    // Electron/Chromium에 ko-KR 사전 코드가 없어 "Invalid language code" 스팸이 난다.
+    // 사용 가능한 언어만 고른다 (대개 en-US).
+    const available = (typeof ses.availableSpellCheckerLanguages === 'function'
+      ? ses.availableSpellCheckerLanguages()
+      : (ses.availableSpellCheckerLanguages || [])) || [];
+    const pick = ['en-US', 'en', 'ko'].filter((code) => available.includes(code));
+    if (pick.length) ses.setSpellCheckerLanguages(pick);
+    else {
+      try { ses.setSpellCheckerLanguages(['en-US']); } catch (_) { /* ignore */ }
+    }
     ses.setSpellCheckerEnabled(spellCheckerEnabled);
   } catch (e) {
     console.error('맞춤법 검사 초기화 오류:', e.message);
@@ -2936,6 +2951,7 @@ function createWindow() {
     title: "Mirae Messenger",
     icon: getAppNativeIcon(),
     frame: false,
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: getMainPreloadPath(),
       contextIsolation: true,
@@ -3536,6 +3552,18 @@ app.whenReady().then(async () => {
   startPresenceSweeper();
   startAutoBackup();
   startUpdateChecker();
+  // 부팅 25초 후 메인 프로세스 CPU 샘플 — 유휴 버벅임 진단용
+  setTimeout(() => {
+    try {
+      const u = process.cpuUsage();
+      const mem = process.memoryUsage();
+      console.log(
+        `[perf] main cpuUser=${Math.round(u.user / 1000)}ms cpuSystem=${Math.round(u.system / 1000)}ms ` +
+        `rss=${Math.round(mem.rss / 1024 / 1024)}MB heap=${Math.round(mem.heapUsed / 1024 / 1024)}MB ` +
+        `onlinePeers=${onlineUsers.size} udpStorm=${Date.now() < udpStormUntil ? 'yes' : 'no'}`
+      );
+    } catch (e) { /* ignore */ }
+  }, 25000);
   startPendingWipeRetryLoop();
   // 1.0.471: 부팅 시 Z: 미러 비활성 — Z드라이브 hang이 Electron '응답 없음'의 주원인.
   // 수동 「Z드라이브에 공유」및 업데이트 직후 미러(타임아웃)만 유지.
@@ -4631,7 +4659,7 @@ function startPresenceSweeper() {
     });
 
     if (changed) notifyUserList();
-  }, 3000);
+  }, 5000);
 }
 
 function startTcpServer() {
