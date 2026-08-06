@@ -1,4 +1,4 @@
 {
-  "version": "1.0.483",
-  "notes": "핫픽스: 채팅 헤더 상시 backdrop-filter 제거(유휴 CPU)~UDP 수신 상한 강화·맞춤법 ko-KR 무효코드 제거 — 설치는 정상, 버벅임 추가 완화"
+  "version": "1.0.484",
+  "notes": "핫픽스: Win occlusion 계산 OFF·backdrop blur 전면 제거·애니메이션 기본 Off·하트비트 완화 — Excel 등과 동시 실행 시 유휴 CPU/버벅임"
 }

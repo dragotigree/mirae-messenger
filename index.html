@@ -442,7 +442,7 @@
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
-    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; backdrop-filter: blur(12px); animation: menu-pop 0.18s var(--ease-spring); }
+    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
     @keyframes menu-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .ctx-menu-item { padding: 9px 12px; font-size: 12.5px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary); font-weight: 600; transition: background var(--transition-fast); }
     .ctx-menu-item:hover { background: var(--surface-muted); }
@@ -701,7 +701,7 @@
       display: none; position: fixed; inset: 0; z-index: 100010;
       align-items: center; justify-content: center;
       background: rgba(15, 23, 42, 0.42);
-      backdrop-filter: blur(6px);
+      /* backdrop-filter removed (Win CPU) */
       -webkit-app-region: no-drag;
     }
     .app-update-progress.is-visible { display: flex; }
@@ -1669,8 +1669,7 @@
     #chat-quick-switcher-overlay {
       display: none; position: fixed; inset: 0; z-index: 12050;
       background: rgba(15, 23, 42, 0.38);
-      backdrop-filter: blur(10px) saturate(1.1);
-      -webkit-backdrop-filter: blur(10px) saturate(1.1);
+      /* backdrop-filter removed (Win CPU) */
       align-items: flex-start; justify-content: center;
       padding: max(10vh, 48px) 16px 32px;
       animation: cqs-overlay-in 0.18s var(--ease-out);
@@ -1988,8 +1987,8 @@
     .read-receipt-note { text-align: right; font-size: 11px; color: #0369a1; font-weight: 600; padding: 4px 18px 6px 0; flex-shrink: 0; background: linear-gradient(180deg, rgba(240,249,255,0.9), transparent); }
 
     /* 💬 빠른 문구 팝오버 */
-    #quick-phrase-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 260px; max-height: 240px; overflow-y: auto; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 8px; z-index: 50; backdrop-filter: blur(12px); animation: menu-pop 0.18s var(--ease-spring); }
-    #screen-capture-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 220px; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; z-index: 50; backdrop-filter: blur(12px); }
+    #quick-phrase-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 260px; max-height: 240px; overflow-y: auto; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 8px; z-index: 50; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
+    #screen-capture-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 220px; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; z-index: 50; /* backdrop-filter removed (Win CPU) */ }
     .screen-capture-menu-item { display: block; width: 100%; text-align: left; padding: 9px 12px; border: none; background: transparent; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; color: var(--text-primary); cursor: pointer; }
     .screen-capture-menu-item:hover { background: var(--surface-muted); }
     .screen-capture-menu-item small { display: block; font-size: 10.5px; font-weight: 500; color: var(--text-secondary); margin-top: 2px; }
@@ -2013,7 +2012,7 @@
       display: none; position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 6px;
       max-height: 220px; overflow-y: auto; background: rgba(255,255,255,0.98); border: 1px solid var(--border);
       border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; z-index: 55;
-      backdrop-filter: blur(12px);
+      /* backdrop-filter removed (Win CPU) */
     }
     .chat-slash-item {
       display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%;
@@ -3634,7 +3633,7 @@
       box-sizing: border-box;
     }
 
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); /* backdrop-filter removed (Win CPU) */ z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
 
@@ -7214,7 +7213,7 @@
     if (appSettings.scheduleAlarmEnabled === undefined) appSettings.scheduleAlarmEnabled = false;
     if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
-    if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = true;
+    if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = false; // 1.0.484: Win 유휴 CPU 완화 기본값
     if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = false;
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
@@ -7446,6 +7445,15 @@
     }
 
     async function ensureStabilityModeOnBoot() {
+      // 1.0.484: 기존 사용자도 한 번 애니메이션 Off로 맞춰 유휴 CPU 완화 (설정에서 다시 On 가능)
+      try {
+        if (!localStorage.getItem('mirae_cpu484_anim_off')) {
+          appSettings.uiAnimationsEnabled = false;
+          localStorage.setItem('mirae_cpu484_anim_off', '1');
+          localStorage.setItem('appSettings', JSON.stringify(appSettings));
+        }
+      } catch (_) { /* ignore */ }
+      applyUiAnimationsSetting();
       if (!isStabilityModeEnabled()) return;
       applyStabilityModePresetToSettingsObject();
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
