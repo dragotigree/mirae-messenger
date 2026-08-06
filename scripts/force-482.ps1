@@ -1,6 +1,6 @@
 ﻿# Force install Mirae 1.0.482. Includes mobile_server.js. No prompts.
 $ErrorActionPreference = 'Stop'
-$Ref = 'REPLACE_REF'
+$Ref = '5892953429de35e3467e2f7caa1526a22d8f9743'
 $Expected = '1.0.482'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
