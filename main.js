@@ -338,6 +338,10 @@ const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
+/** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
+const PRESENCE_HEARTBEAT_MS = 10000;
+/** 전체 서브넷 508 스캔 OFF (1.0.486). 브로드캐스트 + 온라인 동료만 */
+const PRESENCE_FULL_SCAN_ENABLED = false;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -375,6 +379,7 @@ let udpBindRetryTimer = null;
 let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
+let lastSelfRegisterSig = '';
 
 const MY_IP = getMyIP();
 
@@ -2850,7 +2855,7 @@ function initSpellCheckerSession() {
   const ses = session.defaultSession;
   if (!ses) return;
   try {
-    ses.setSpellCheckerLanguages(['ko-KR', 'en-US']);
+    ses.setSpellCheckerLanguages(['en-US']);
     ses.setSpellCheckerEnabled(spellCheckerEnabled);
   } catch (e) {
     console.error('맞춤법 검사 초기화 오류:', e.message);
@@ -3578,7 +3583,7 @@ function startUdpDiscovery() {
       setInterval(() => {
         registerSelf();
         if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-      }, 4000);
+      }, PRESENCE_HEARTBEAT_MS);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
       setInterval(() => flushAllPendingOutboundMessages(), 15000);
     }
@@ -3600,6 +3605,40 @@ function startUdpDiscovery() {
       if (data.type === 'PING') {
         const previouslyKnown = allKnownUsers.get(rinfo.address);
         const now = Date.now();
+        const wasOffline = !onlineUsers.has(rinfo.address);
+
+        // Fast path: 이미 온라인 + 프로필 동일 → lastPingAt만 (DB/IPC 없음)
+        if (!wasOffline && previouslyKnown) {
+          const rank = data.rank || '';
+          const dept = data.dept || '';
+          const floor = data.floor || '';
+          const extNo = data.extNo || '';
+          const phone = data.phone || '';
+          const statusState = data.statusState || 'ONLINE';
+          const appVersion = data.appVersion || previouslyKnown.appVersion || '';
+          const same =
+            previouslyKnown.username === data.username &&
+            previouslyKnown.rank === rank &&
+            previouslyKnown.dept === dept &&
+            previouslyKnown.floor === floor &&
+            previouslyKnown.extNo === extNo &&
+            previouslyKnown.phone === phone &&
+            previouslyKnown.statusState === statusState &&
+            previouslyKnown.appVersion === appVersion;
+          if (same) {
+            previouslyKnown.lastPingAt = now;
+            previouslyKnown.online = true;
+            const live = onlineUsers.get(rinfo.address);
+            if (live) {
+              live.lastPingAt = now;
+              live.online = true;
+            } else {
+              onlineUsers.set(rinfo.address, previouslyKnown);
+            }
+            return;
+          }
+        }
+
         const overlay = {
           ip: rinfo.address,
           username: data.username,
@@ -3622,7 +3661,6 @@ function startUdpDiscovery() {
           userObj.lastSeen = Number(previouslyKnown.lastSeen);
         }
 
-        const wasOffline = !onlineUsers.has(rinfo.address);
         const profileChanged = !previouslyKnown
           || previouslyKnown.username !== userObj.username
           || previouslyKnown.rank !== userObj.rank
@@ -3636,7 +3674,9 @@ function startUdpDiscovery() {
 
         onlineUsers.set(rinfo.address, userObj);
         allKnownUsers.set(rinfo.address, userObj);
-        persistKnownUserSnapshot(userObj);
+        if (wasOffline || profileChanged) {
+          persistKnownUserSnapshot(userObj);
+        }
 
         if (wasOffline || profileChanged) notifyUserList();
 
@@ -3689,6 +3729,7 @@ function registerSelf() {
     if (prev) {
       allKnownUsers.set(MY_IP, { ...prev, online: false, isMe: true });
     }
+    lastSelfRegisterSig = 'blocked';
     notifyUserList();
     return;
   }
@@ -3711,10 +3752,25 @@ function registerSelf() {
     online: true,
     isMe: true
   };
+  const sig = [
+    me.username, me.rank, me.dept, me.floor, me.extNo, me.phone, me.statusState, me.appVersion,
+    me.photo ? '1' : '0'
+  ].join('|');
+  const unchanged = onlineUsers.has(MY_IP) && sig === lastSelfRegisterSig;
   onlineUsers.set(MY_IP, me);
   allKnownUsers.set(MY_IP, me);
+  if (unchanged) return; // 하트비트마다 DB/UI 갱신하지 않음 — 클릭 지연 방지
+  lastSelfRegisterSig = sig;
   persistKnownUserSnapshot(me);
   notifyUserList();
+}
+
+function collectPresenceHeartbeatIps() {
+  const out = [];
+  onlineUsers.forEach((_u, ip) => {
+    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.push(ip);
+  });
+  return out;
 }
 
 function broadcastPresence(socket) {
@@ -3733,12 +3789,15 @@ function broadcastPresence(socket) {
     appVersion: APP_VERSION
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
-  socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
-  // 다른 층 대역 유니캐스트(최대 508개) — 한 틱에 몰아보내면 메인 루프가 잠깐 멈출 수 있어 배치
-  const ips = KNOWN_SUBNET_HOST_IPS;
+  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
+
+  // 1.0.486: 기본은 온라인 동료만. 전체 508 유니캐스트는 클릭/커서 프리징의 주원인.
+  const ips = PRESENCE_FULL_SCAN_ENABLED ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
+  if (!ips.length) return;
   let i = 0;
-  const BATCH = 64;
+  const BATCH = 24;
   const sendBatch = () => {
+    if (!globalUdpSocket || globalUdpSocket !== socket) return;
     const end = Math.min(i + BATCH, ips.length);
     for (; i < end; i++) {
       try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
@@ -3758,7 +3817,9 @@ function broadcastGoodbye() {
   try {
     globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
   } catch (e) { /* ignore */ }
-  KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
+  // 전체 508 유니캐스트는 종료 순간 클릭 프리징만 키움 — 온라인 동료에게만
+  onlineUsers.forEach((_u, ip) => {
+    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
     try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
 }
