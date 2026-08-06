@@ -1,4 +1,4 @@
 {
-  "version": "1.0.518",
-  "notes": "업데이트: Z/CDN 구버전 오인 수정 — GitHub API·raw 중 더 새 version 사용"
+  "version": "1.0.519",
+  "notes": "업데이트 오인 수정 — Z/CDN 구버전 무시하고 GitHub 최신 반영"
 }

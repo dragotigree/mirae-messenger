@@ -894,13 +894,12 @@ async function fetchGithubUpdateFile(meta, relPath) {
   const filePath = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
   const token = loadGithubUpdateToken();
   const isLargeHint = /excalidraw-app\.(js|css)$/i.test(filePath) || /^vendor\//i.test(filePath);
-  // version.json은 CDN(max-age=300)에 막히면 새 버전을 못 봄 → raw+캐시버스트 우선·짧은 타임아웃
+  // version.json: raw CDN이 수 분~수 시간 stale 할 수 있음 → API 우선, 둘 다 받으면 더 새 버전 선택
   const isVersionMeta = /^(version|package)\.json$/i.test(filePath);
   const timeoutMs = isLargeHint ? 180000 : (isVersionMeta ? 15000 : 45000);
   const ua = { 'User-Agent': 'MiraeMessenger-Updater' };
   const noCache = { 'Cache-Control': 'no-cache', Pragma: 'no-cache' };
 
-  // 대용량·버전메타는 Contents API보다 raw URL을 먼저 시도
   const bust = Date.now();
   const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}?t=${bust}`;
   const rawHeaders = { ...ua, ...noCache };
@@ -914,7 +913,39 @@ async function fetchGithubUpdateFile(meta, relPath) {
   };
   if (token) apiHeaders.Authorization = `Bearer ${token}`;
 
-  const tryOrder = (isLargeHint || isVersionMeta)
+  const looksLikeGithubMetaOnly = (buf) => {
+    if (!buf || buf.length >= 4000) return false;
+    const head = buf.toString('utf8', 0, Math.min(buf.length, 80)).trim();
+    return head.startsWith('{') && /"encoding"\s*:\s*"none"/.test(buf.toString('utf8'));
+  };
+
+  // version/package.json 은 API·raw 둘 다 시도 후 더 높은 version 채택 (CDN stale 방지)
+  if (isVersionMeta) {
+    let apiBuf = null;
+    let rawBuf = null;
+    let lastErr = null;
+    try {
+      apiBuf = await httpsGetBuffer(apiUrl, apiHeaders, { timeoutMs });
+      if (looksLikeGithubMetaOnly(apiBuf)) apiBuf = null;
+    } catch (e) { lastErr = e; }
+    try {
+      rawBuf = await httpsGetBuffer(rawUrl, rawHeaders, { timeoutMs });
+    } catch (e) { lastErr = e; }
+    if (apiBuf && rawBuf) {
+      try {
+        const av = String((parseUpdateJsonText(apiBuf.toString('utf8')) || {}).version || '');
+        const rv = String((parseUpdateJsonText(rawBuf.toString('utf8')) || {}).version || '');
+        if (av && rv && compareVersions(av, rv) > 0) return apiBuf;
+        if (av && rv && compareVersions(rv, av) > 0) return rawBuf;
+      } catch (_) { /* fall through */ }
+      return apiBuf; // 같으면 API(원본) 우선
+    }
+    if (apiBuf) return apiBuf;
+    if (rawBuf) return rawBuf;
+    throw lastErr || new Error('GitHub version.json 다운로드 실패');
+  }
+
+  const tryOrder = isLargeHint
     ? [
         () => httpsGetBuffer(rawUrl, rawHeaders, { timeoutMs }),
         () => httpsGetBuffer(apiUrl, apiHeaders, { timeoutMs })
@@ -928,12 +959,8 @@ async function fetchGithubUpdateFile(meta, relPath) {
   for (const run of tryOrder) {
     try {
       const buf = await run();
-      // Contents API가 JSON 메타만 주는 경우(대용량 encoding:none) 감지
-      if (buf && buf.length < 4000) {
-        const head = buf.toString('utf8', 0, Math.min(buf.length, 80)).trim();
-        if (head.startsWith('{') && /"encoding"\s*:\s*"none"/.test(buf.toString('utf8'))) {
-          throw new Error('GitHub Contents API가 대용량 파일 본문을 주지 않았습니다.');
-        }
+      if (looksLikeGithubMetaOnly(buf)) {
+        throw new Error('GitHub Contents API가 대용량 파일 본문을 주지 않았습니다.');
       }
       return buf;
     } catch (e) {
