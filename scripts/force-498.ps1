@@ -1,6 +1,6 @@
 # Force 1.0.498 — unread-only inbox view. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = 'f7da22d17ded4407be6d8c08119b0eb4f62122a4'
 $Expected = '1.0.498'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
