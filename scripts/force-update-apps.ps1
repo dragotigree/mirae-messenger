@@ -1,20 +1,14 @@
-# Mirae Messenger — C:\Apps 패키지(exe가 읽는 코드) 강제 업데이트
-# 앱이 버벅여도 이 스크립트만으로 종료·덮어쓰기 가능.
-# 예:
+﻿# Mirae Messenger - Force update packaged app under C:\Apps
+# Safe for Windows PowerShell 5.1 (ASCII-only strings to avoid encoding parse errors)
+# Example:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\force-update-apps.ps1
 
 param(
   [string]$RepoRawBase = 'https://raw.githubusercontent.com/dragotigree/mirae-messenger/main'
 )
 
-try {
-  chcp 65001 | Out-Null
-  [Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
-  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-  $OutputEncoding = [Console]::OutputEncoding
-} catch {}
-
 $ErrorActionPreference = 'Stop'
+try { chcp 65001 | Out-Null } catch {}
 
 $PackagedApp = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $SourceApp = 'C:\Apps\Mirae Messenger'
@@ -51,7 +45,7 @@ function Read-Version([string]$dir) {
 }
 
 function Stop-MessengerHard {
-  Write-Host '[1/4] MiraeMessenger / electron 강제 종료...' -ForegroundColor Yellow
+  Write-Host '[1/4] Force-stopping MiraeMessenger / electron...' -ForegroundColor Yellow
   $names = @('MiraeMessenger', 'electron')
   for ($i = 0; $i -lt 3; $i++) {
     $procs = @()
@@ -62,18 +56,17 @@ function Stop-MessengerHard {
     $procs | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
   }
-  # 잠긴 파일 방지용 짧은
   Start-Sleep -Seconds 1
 }
 
 function Update-AppDir([string]$appDir, $wc, [long]$bust) {
   if (-not (Test-AppDir $appDir)) {
-    Write-Host "  skip (없음): $appDir" -ForegroundColor DarkGray
+    Write-Host ("  skip (missing): " + $appDir) -ForegroundColor DarkGray
     return $null
   }
   $before = Read-Version $appDir
-  Write-Host "  대상: $appDir" -ForegroundColor Cyan
-  Write-Host "  이전 버전: $before"
+  Write-Host ("  target: " + $appDir) -ForegroundColor Cyan
+  Write-Host ("  before: " + $before)
 
   $ok = 0
   foreach ($rel in $files) {
@@ -92,68 +85,68 @@ function Update-AppDir([string]$appDir, $wc, [long]$bust) {
         Write-Host ("    skip optional: " + $rel) -ForegroundColor DarkGray
         continue
       }
-      throw ("다운로드 실패: $rel — " + $_.Exception.Message)
+      throw ("download failed: " + $rel + " - " + $_.Exception.Message)
     }
   }
   $after = Read-Version $appDir
-  Write-Host "  완료 $ok 개 → 버전 $after" -ForegroundColor Green
+  Write-Host ("  done " + $ok + " files -> version " + $after) -ForegroundColor Green
   return $after
 }
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
-Write-Host ' Mirae Messenger 강제 업데이트 (Apps)' -ForegroundColor Cyan
+Write-Host ' Mirae Messenger FORCE UPDATE (Apps)' -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ''
-Write-Host 'exe가 읽는 경로:'
-Write-Host "  $PackagedApp"
+Write-Host 'Packaged app path (exe reads this):'
+Write-Host ("  " + $PackagedApp)
 Write-Host ''
 
 if (-not (Test-AppDir $PackagedApp)) {
-  Write-Host '패키지 경로를 찾을 수 없습니다.' -ForegroundColor Red
-  Write-Host "  확인: $PackagedApp\index.html"
-  Write-Host '  C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64 가 있는지 보세요.'
+  Write-Host 'ERROR: packaged app folder not found.' -ForegroundColor Red
+  Write-Host ("  expected: " + $PackagedApp + '\index.html')
+  Write-Host '  Check: C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64'
   exit 1
 }
 
 Stop-MessengerHard
 
-Write-Host '[2/4] GitHub main 에서 파일 다운로드...' -ForegroundColor Yellow
+Write-Host '[2/4] Downloading from GitHub main...' -ForegroundColor Yellow
 $wc = New-Object System.Net.WebClient
 $wc.Headers['User-Agent'] = 'MiraeMessenger-ForceUpdate'
 $wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
 $bust = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
-Write-Host '[3/4] 패키지 resources\app 덮어쓰기 (필수)...' -ForegroundColor Yellow
+Write-Host '[3/4] Overwriting packaged resources\app (required)...' -ForegroundColor Yellow
 $ver = Update-AppDir -appDir $PackagedApp -wc $wc -bust $bust
 if (-not $ver) { exit 1 }
 
-Write-Host '[3b] 소스 폴더도 있으면 같이 맞춤...' -ForegroundColor DarkGray
+Write-Host '[3b] Also sync source folder if present...' -ForegroundColor DarkGray
 if ((Test-AppDir $SourceApp) -and ($SourceApp -ne $PackagedApp)) {
   try { Update-AppDir -appDir $SourceApp -wc $wc -bust $bust | Out-Null } catch {
-    Write-Host ("  소스 폴더 업데이트 경고: " + $_.Exception.Message) -ForegroundColor DarkYellow
+    Write-Host ("  source folder warning: " + $_.Exception.Message) -ForegroundColor DarkYellow
   }
 }
 
 Write-Host ''
-Write-Host '[4/4] 검증' -ForegroundColor Yellow
+Write-Host '[4/4] Verify' -ForegroundColor Yellow
 $pkgJson = Get-Content -LiteralPath (Join-Path $PackagedApp 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $verJson = Read-Version $PackagedApp
 Write-Host ("  package.json = " + $pkgJson.version)
 Write-Host ("  version.json = " + $verJson)
 
 if ($pkgJson.version -ne $verJson) {
-  Write-Host '경고: package.json 과 version.json 버전이 다릅니다.' -ForegroundColor Yellow
+  Write-Host 'WARN: package.json and version.json differ.' -ForegroundColor Yellow
 }
 
 Write-Host ''
-Write-Host "강제 업데이트 완료: $verJson" -ForegroundColor Green
-Write-Host "실행: $ExePath" -ForegroundColor Green
+Write-Host ("FORCE UPDATE OK: " + $verJson) -ForegroundColor Green
+Write-Host ("Run: " + $ExePath) -ForegroundColor Green
 Write-Host ''
 
 if (Test-Path -LiteralPath $ExePath) {
-  $ans = Read-Host '지금 MiraeMessenger.exe 를 실행할까요? (Y/N)'
-  if ($ans -match '^(Y|y|예|ㅇ)') {
+  $ans = Read-Host 'Start MiraeMessenger.exe now? (Y/N)'
+  if ($ans -match '^[Yy]') {
     Start-Process -FilePath $ExePath
   }
 }
