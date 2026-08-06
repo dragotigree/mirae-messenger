@@ -1,6 +1,6 @@
 # Force 1.0.490 — restore phone_no migration + 489 TCP quiet. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'd35d8da425d4d71fc3d52c8acdb0751089c631b9'
+$Ref = '2386330e4ab2add46026b88fd8b02bf0370a0e9f'
 $Expected = '1.0.490'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
