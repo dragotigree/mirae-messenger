@@ -5426,7 +5426,7 @@
         <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
           <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-          <button onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
+          <button type="button" id="board-write-submit-btn" onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
         </div>
       </div>
 
@@ -14564,6 +14564,12 @@
       }
 
       isSubmittingNotice = true;
+      const submitBtn = document.getElementById('board-write-submit-btn');
+      const prevSubmitLabel = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '등록 중…';
+      }
       try {
         if (uid) {
           const existing = (cachedNoticesList || []).find((x) => x.uid === uid);
@@ -14607,6 +14613,10 @@
         await appAlert('공지사항 저장 중 오류: ' + ((e && e.message) || e));
       } finally {
         isSubmittingNotice = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevSubmitLabel || '✔ 등록';
+        }
       }
     }
 
