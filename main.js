@@ -3561,12 +3561,18 @@ app.whenReady().then(async () => {
       return;
     }
     networkQuietUntil = Date.now() + NETWORK_QUIET_MS;
-    console.log(`[network] quiet ${NETWORK_QUIET_MS / 1000}s — heavy TCP sync deferred`);
+    console.log(`[network] quiet ${NETWORK_QUIET_MS / 1000}s — UDP only first; TCP deferred (prevents buffer flood)`);
     try { startUdpDiscovery(); } catch (e) { console.error('UDP start', e); }
-    try { startTcpServer(); } catch (e) { console.error('TCP start', e); }
     try {
       if (typeof startMobileServer === 'function') startMobileServer(db, MY_IP);
     } catch (e) { console.warn('[mobile]', e && e.message ? e.message : e); }
+    // TCP는 quiet 끝난 뒤에만 — 부팅 중 대용량 sync가 버퍼 초과·클릭 불가를 만듦
+    setTimeout(() => {
+      try {
+        startTcpServer();
+        console.log('[network] TCP listening after quiet period');
+      } catch (e) { console.error('TCP start', e); }
+    }, NETWORK_QUIET_MS);
   }, 1200);
 
   setTimeout(() => {
@@ -4670,16 +4676,24 @@ function startTcpServer() {
     };
 
     socket.on('data', (chunk) => {
-      // 대용량 문자열 += 는 메인스레드를 크게 잡아먹음
+      const from = String((socket.remoteAddress || '').replace('::ffff:', '') || '?');
       if (chunk.length > MAX_TCP_LINE_BUFFER) {
-        console.error('TCP 수신 청크 과다 — 연결을 끊습니다.');
+        console.error(`[TCP] 청크 과다 from=${from} bytes=${chunk.length} — 연결 종료`);
         buffer = '';
         try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
       }
+      // quiet 중(이론상 TCP 미기동)이거나 비정상적으로 큰 미완성 라인은 조기 차단
+      const softCap = isNetworkQuietPeriod() ? 64 * 1024 : MAX_TCP_LINE_BUFFER;
       buffer += chunk.toString('utf8');
+      if (buffer.length > softCap && buffer.indexOf('\n') === -1) {
+        console.error(`[TCP] 버퍼 초과(개행 없음) from=${from} bytes=${buffer.length} head=${JSON.stringify(buffer.slice(0, 80))} — 연결 종료`);
+        buffer = '';
+        try { socket.destroy(); } catch (e) { /* ignore */ }
+        return;
+      }
       if (buffer.length > MAX_TCP_LINE_BUFFER) {
-        console.error('TCP 수신 버퍼 초과 — 연결을 끊습니다.');
+        console.error(`[TCP] 버퍼 초과 from=${from} bytes=${buffer.length} — 연결 종료`);
         buffer = '';
         try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
