@@ -1,4 +1,4 @@
 {
   "version": "1.0.472",
-  "notes": "핫픽스: 프레즌스 전체스캔 완화·레거시 이미지 compact·채팅 DOM/공유사진 상한·캡처 해상도 제한 — CPU·RAM 스파이크 완화"
+  "notes": "핫픽스: CPU·RAM 스파이크 완화 + C:\\Apps\\Mirae Messenger 수동 업데이트 지원"
 }

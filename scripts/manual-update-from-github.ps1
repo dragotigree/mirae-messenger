@@ -38,6 +38,9 @@ $files = @(
 
 function Find-DefaultTarget {
   $candidates = @(
+    'C:\Apps\Mirae Messenger',
+    'C:\Apps\Mirae Messenger\resources\app',
+    'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app',
     (Join-Path $env:USERPROFILE 'OneDrive\6. Desktop_1\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'),
     (Join-Path $env:USERPROFILE 'OneDrive\6. Desktop_1\Mirae Messenger'),
     (Join-Path $env:LOCALAPPDATA 'MiraeMessenger\resources\app'),
