@@ -316,8 +316,8 @@ const NORMAL_MIN_HEIGHT = 600;
 
 const UDP_PORT = 41234;
 const TCP_PORT = 41235;
-/** UDP PING 간격(4초) 기준 — 연속 2회 이상 없으면 오프라인. 강제 종료·전원 OFF 시 GOODBYE가 없어도 빠르게 반영 */
-const PRESENCE_STALE_MS = 10000;
+/** UDP PING — 너무 짧으면 CPU, 너무 길면 타 클라이언트가 오프라인으로 봄 */
+const PRESENCE_STALE_MS = 22000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
@@ -337,16 +337,17 @@ const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
-const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
-/** 프레즌스 빠른 하트비트(온라인·최근 동료) */
-const PRESENCE_HEARTBEAT_MS = 4000;
-/** 전체 서브넷(508대) 탐색 주기 — 매 틱 508유니캐스트는 CPU·메모리 스파이크 유발 */
-const PRESENCE_FULL_SCAN_MS = 20000;
+const USER_LIST_NOTIFY_DEBOUNCE_MS = 1800;
+/** 프레즌스 하트비트(온라인·최근 동료만) */
+const PRESENCE_HEARTBEAT_MS = 6000;
+/** 전체 서브넷(508대) 탐색 — 리소스 폭주 주원인, 드물게만 */
+const PRESENCE_FULL_SCAN_MS = 120000;
 /** 빠른 하트비트 대상: 최근 이 시간 안에 본 동료 */
 const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
-/** 예전 data: URL 메시지를 mirae-file 로 서서히 줄이는 백그라운드 compact */
-const LEGACY_MSG_COMPACT_INTERVAL_MS = 12000;
-const LEGACY_MSG_COMPACT_BATCH = 6;
+/** 1.0.475: 레거시 compact 기본 OFF (포커스 중 디스크 I/O가 조작 불능 유발) */
+const LEGACY_MSG_COMPACT_ENABLED = false;
+const LEGACY_MSG_COMPACT_INTERVAL_MS = 30000;
+const LEGACY_MSG_COMPACT_BATCH = 1;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -1718,6 +1719,10 @@ function isMainWindowActivelyUsed() {
 
 /** DB에 남은 data: base64 메시지를 유휴 시에만 서서히 mirae-file 로 줄인다 (포커스 중엔 건너뛰어 UI 버벅임 방지) */
 function startLegacyMessageCompaction() {
+  if (!LEGACY_MSG_COMPACT_ENABLED) {
+    console.log('[compact] 레거시 compact 비활성 (LEGACY_MSG_COMPACT_ENABLED=false)');
+    return;
+  }
   let busy = false;
   setInterval(() => {
     if (busy || legacyMessageCompactDone || !db) return;
@@ -3844,7 +3849,7 @@ function collectPresenceHeartbeatIps() {
 function sendPresenceUnicastBatches(socket, packet, ips) {
   if (!socket || !packet || !ips || !ips.length) return;
   let i = 0;
-  const BATCH = 48;
+  const BATCH = 24;
   const sendBatch = () => {
     if (!globalUdpSocket || globalUdpSocket !== socket) return;
     const end = Math.min(i + BATCH, ips.length);
