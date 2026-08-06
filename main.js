@@ -338,12 +338,14 @@ const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 1200;
-/** 평소 하트비트: 온라인·최근 동료만 (CPU ~12% 주원인 완화) */
-const PRESENCE_HEARTBEAT_MS = 6000;
-/** 전체 서브넷 508대 탐색 — 드물게만 (예전엔 4초마다라 메인 루프를 먹음) */
-const PRESENCE_FULL_SCAN_MS = 120000;
-/** 하트비트 대상: 최근 이 시간 안에 본 동료 */
+/** 평소 하트비트: 온라인 동료만 */
+const PRESENCE_HEARTBEAT_MS = 8000;
+/** 전체 서브넷 탐색 — 부팅 후 드물게 (다른 PC의 구버전 스캔 폭주와 별개) */
+const PRESENCE_FULL_SCAN_MS = 600000;
+/** 하트비트 대상(레거시): 최근 동료 보조 포함 시간 — 현재는 온라인만 사용 */
 const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
+/** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
+const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -382,6 +384,9 @@ let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
 let presenceFullScanDueAt = 0;
+let lastSelfRegisterSig = '';
+/** @type {Map<string, number>} ip -> last DB persist at */
+const knownUserPersistAt = new Map();
 
 const MY_IP = getMyIP();
 
@@ -3608,6 +3613,41 @@ function startUdpDiscovery() {
       if (data.type === 'PING') {
         const previouslyKnown = allKnownUsers.get(rinfo.address);
         const now = Date.now();
+        const wasOffline = !onlineUsers.has(rinfo.address);
+
+        // Fast path: 이미 온라인 + 프로필 동일 → 메모리 lastPingAt만 (DB/IPC 없음)
+        // 구버전 동료가 4초마다 508스캔하면 여기로 수천 패킷/분이 들어온다.
+        if (!wasOffline && previouslyKnown) {
+          const rank = data.rank || '';
+          const dept = data.dept || '';
+          const floor = data.floor || '';
+          const extNo = data.extNo || '';
+          const phone = data.phone || '';
+          const statusState = data.statusState || 'ONLINE';
+          const appVersion = data.appVersion || previouslyKnown.appVersion || '';
+          const same =
+            previouslyKnown.username === data.username &&
+            previouslyKnown.rank === rank &&
+            previouslyKnown.dept === dept &&
+            previouslyKnown.floor === floor &&
+            previouslyKnown.extNo === extNo &&
+            previouslyKnown.phone === phone &&
+            previouslyKnown.statusState === statusState &&
+            previouslyKnown.appVersion === appVersion;
+          if (same) {
+            previouslyKnown.lastPingAt = now;
+            previouslyKnown.online = true;
+            const live = onlineUsers.get(rinfo.address);
+            if (live) {
+              live.lastPingAt = now;
+              live.online = true;
+            } else {
+              onlineUsers.set(rinfo.address, previouslyKnown);
+            }
+            return;
+          }
+        }
+
         const overlay = {
           ip: rinfo.address,
           username: data.username,
@@ -3624,13 +3664,11 @@ function startUdpDiscovery() {
           isMe: false
         };
         const userObj = mergeUserProfile(previouslyKnown, overlay, true);
-        // lastSeen = 마지막 '종료/오프라인' 시각. 접속 중에는 갱신하지 않는다.
         userObj.lastPingAt = now;
         if (previouslyKnown && Number(previouslyKnown.lastSeen) > 0) {
           userObj.lastSeen = Number(previouslyKnown.lastSeen);
         }
 
-        const wasOffline = !onlineUsers.has(rinfo.address);
         const profileChanged = !previouslyKnown
           || previouslyKnown.username !== userObj.username
           || previouslyKnown.rank !== userObj.rank
@@ -3644,9 +3682,10 @@ function startUdpDiscovery() {
 
         onlineUsers.set(rinfo.address, userObj);
         allKnownUsers.set(rinfo.address, userObj);
-        persistKnownUserSnapshot(userObj);
-
-        if (wasOffline || profileChanged) notifyUserList();
+        if (wasOffline || profileChanged) {
+          persistKnownUserSnapshot(userObj, { force: true });
+          notifyUserList();
+        }
 
         if (wasOffline) {
           resendPendingMessages(rinfo.address);
@@ -3697,6 +3736,7 @@ function registerSelf() {
     if (prev) {
       allKnownUsers.set(MY_IP, { ...prev, online: false, isMe: true });
     }
+    lastSelfRegisterSig = 'blocked';
     notifyUserList();
     return;
   }
@@ -3719,24 +3759,26 @@ function registerSelf() {
     online: true,
     isMe: true
   };
+  const sig = [
+    me.username, me.rank, me.dept, me.floor, me.extNo, me.phone, me.statusState, me.appVersion,
+    me.photo ? '1' : '0'
+  ].join('|');
+  const unchanged = onlineUsers.has(MY_IP) && sig === lastSelfRegisterSig;
   onlineUsers.set(MY_IP, me);
   allKnownUsers.set(MY_IP, me);
-  persistKnownUserSnapshot(me);
+  if (unchanged) return; // 하트비트마다 DB/UI 갱신하지 않음
+  lastSelfRegisterSig = sig;
+  persistKnownUserSnapshot(me, { force: true });
   notifyUserList();
 }
 
 function collectPresenceHeartbeatIps() {
-  const out = new Set();
-  const now = Date.now();
+  // 온라인인 동료만 — allKnownUsers 전체 순회/유니캐스트는 CPU를 다시 올림
+  const out = [];
   onlineUsers.forEach((_u, ip) => {
-    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.add(ip);
+    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.push(ip);
   });
-  allKnownUsers.forEach((u, ip) => {
-    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
-    const beat = Number((u && u.lastPingAt) || 0) || Number((u && u.lastSeen) || 0) || 0;
-    if (beat && now - beat <= PRESENCE_RECENT_PEER_MS) out.add(ip);
-  });
-  return Array.from(out);
+  return out;
 }
 
 function sendPresenceUnicastBatches(socket, packet, ips) {
@@ -4044,9 +4086,14 @@ function userObjFromKnownUsersRow(row) {
   return obj;
 }
 
-function persistKnownUserSnapshot(u) {
+function persistKnownUserSnapshot(u, opts) {
   if (!u || !u.ip) return;
   if (isSyntheticReceiverKey(u.ip)) return;
+  const force = !!(opts && opts.force);
+  const now = Date.now();
+  const prevAt = knownUserPersistAt.get(u.ip) || 0;
+  if (!force && prevAt && now - prevAt < PRESENCE_DB_PERSIST_MIN_MS) return;
+  knownUserPersistAt.set(u.ip, now);
   db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
     if (err) logDbErr(err);
     const existing = row ? userObjFromKnownUsersRow(row) : null;
