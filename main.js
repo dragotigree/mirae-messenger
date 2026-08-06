@@ -3144,8 +3144,12 @@ db.serialize(() => {
   ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT', 'category TEXT'].forEach(colDef => {
     db.run(`ALTER TABLE notices ADD COLUMN ${colDef}`, () => {});
   });
-  // 카테고리 없는 기존 공지는 전체로
-  db.run(`UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(category) = ''`, () => {});
+  // 카테고리 컬럼 보장 후 빈 값 보정 (기존 PC에서 INSERT 실패 방지)
+  setTimeout(() => {
+    ensureNoticesCategoryColumn(() => {
+      db.run(`UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(COALESCE(category, '')) = ''`, () => {});
+    });
+  }, 300);
   setTimeout(() => {
     db.all(`SELECT rowid FROM notices WHERE uid IS NULL OR uid = ''`, [], (err, rows) => {
       if (err || !rows) return;
@@ -6161,6 +6165,96 @@ function normalizeNoticeCategory(raw) {
   return s.slice(0, 40);
 }
 
+let noticesCategoryColumnReady = false;
+
+function ensureNoticesCategoryColumn(done) {
+  const finish = typeof done === 'function' ? done : () => {};
+  if (!db) {
+    finish(false);
+    return;
+  }
+  if (noticesCategoryColumnReady) {
+    finish(true);
+    return;
+  }
+  db.all(`PRAGMA table_info(notices)`, [], (err, rows) => {
+    if (err) {
+      console.error('notices schema 확인 실패:', err.message);
+      finish(false);
+      return;
+    }
+    const cols = (rows || []).map((r) => String(r.name || '').toLowerCase());
+    if (cols.includes('category')) {
+      noticesCategoryColumnReady = true;
+      finish(true);
+      return;
+    }
+    db.run(`ALTER TABLE notices ADD COLUMN category TEXT DEFAULT '전체'`, (alterErr) => {
+      if (alterErr && !/duplicate column/i.test(String(alterErr.message || ''))) {
+        console.error('notices.category 추가 실패:', alterErr.message);
+        finish(false);
+        return;
+      }
+      noticesCategoryColumnReady = true;
+      db.run(`UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(COALESCE(category, '')) = ''`, () => finish(true));
+    });
+  });
+}
+
+function insertNoticeRecord(record, callback) {
+  const cb = typeof callback === 'function' ? callback : () => {};
+  const row = record || {};
+  const category = normalizeNoticeCategory(row.category);
+  const images = normalizeNoticeImagesField(row.images);
+  const saved = { ...row, images, category };
+  const paramsWithCat = [
+    row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at, images, category
+  ];
+  const paramsNoCat = [
+    row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at, images
+  ];
+  const insertWithoutCategory = (done) => {
+    db.run(
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      paramsNoCat,
+      (err2) => {
+        if (!err2) {
+          // 컬럼이 생기면 카테고리 보정
+          noticesCategoryColumnReady = false;
+          ensureNoticesCategoryColumn(() => {
+            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, row.uid], () => {});
+          });
+        }
+        done(err2);
+      }
+    );
+  };
+  ensureNoticesCategoryColumn((ok) => {
+    if (!ok) {
+      insertWithoutCategory((err2) => cb(err2, err2 ? null : saved));
+      return;
+    }
+    db.run(
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      paramsWithCat,
+      (err) => {
+        if (!err) {
+          cb(null, saved);
+          return;
+        }
+        // 구버전 DB / 마이그레이션 지연 시 category 없이 재시도
+        const msg = String(err.message || '');
+        if (/no such column|no column.*category|has no column named category/i.test(msg)) {
+          noticesCategoryColumnReady = false;
+          insertWithoutCategory((err2) => cb(err2, err2 ? null : saved));
+          return;
+        }
+        cb(err);
+      }
+    );
+  });
+}
+
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
   isNoticeTombstoned(n.uid, (tombstoned) => {
@@ -6170,13 +6264,13 @@ function handleNoticeAdd(n) {
     }
     db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
       if (row) return;
-      const images = normalizeNoticeImagesField(n.images);
-      const category = normalizeNoticeCategory(n.category);
-      db.run(
-        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category],
-        () => { if (mainWindow) safeWebContentsSend('notices-update'); }
-      );
+      insertNoticeRecord(n, (insErr) => {
+        if (insErr) {
+          console.error('NOTICE_ADD 저장 실패:', insErr.message);
+          return;
+        }
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
     });
   });
 }
@@ -6859,13 +6953,9 @@ function upsertNoticeFromSync(n) {
       db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
       return;
     }
-    const images = normalizeNoticeImagesField(n.images);
-    const category = normalizeNoticeCategory(n.category);
-    db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category],
-      logDbErr
-    );
+    insertNoticeRecord(n, (insErr) => {
+      if (insErr) console.error('notice sync upsert 실패:', insErr.message);
+    });
   });
 }
 
@@ -8839,15 +8929,25 @@ function generateMsgUid() {
 
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
-    db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (err, rows) => resolve(rows || []));
+    ensureNoticesCategoryColumn(() => {
+      db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (err, rows) => {
+        if (err) {
+          console.error('get-notices 실패:', err.message);
+          resolve([]);
+          return;
+        }
+        resolve((rows || []).map((r) => ({
+          ...r,
+          category: normalizeNoticeCategory(r && r.category)
+        })));
+      });
+    });
   });
 });
 
 ipcMain.handle('add-notice', async (event, { title, content, authorName, images, category }) => {
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
-    const imagesJson = normalizeNoticeImagesField(images);
-    const categoryNorm = normalizeNoticeCategory(category);
     const record = {
       uid: generateNoticeUid(),
       title,
@@ -8855,22 +8955,18 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images,
       author_name: (authorName && String(authorName).trim()) || fallbackAuthor,
       author_ip: MY_IP,
       created_at: new Date().toISOString(),
-      images: imagesJson,
-      category: categoryNorm
+      images,
+      category
     };
-    db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.title, record.content, record.author_name, record.author_ip, record.created_at, record.images, record.category],
-      (err) => {
-        if (err) {
-          console.error('공지사항 저장 실패:', err.message);
-          resolve({ success: false, error: err.message });
-          return;
-        }
-        broadcastNoticeWire('NOTICE_ADD', record);
-        resolve({ success: true, notice: record });
+    insertNoticeRecord(record, (err, saved) => {
+      if (err) {
+        console.error('공지사항 저장 실패:', err.message);
+        resolve({ success: false, error: err.message, msg: err.message });
+        return;
       }
-    );
+      broadcastNoticeWire('NOTICE_ADD', saved);
+      resolve({ success: true, notice: saved });
+    });
   });
 });
 
@@ -8882,14 +8978,27 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
   return new Promise((resolve) => {
     const imagesJson = normalizeNoticeImagesField(images);
     const categoryNorm = normalizeNoticeCategory(category);
-    db.run(
-      `UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`,
-      [title, content, imagesJson, categoryNorm, uid],
-      (err) => {
-        if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
-        resolve({ success: !err });
-      }
-    );
+    ensureNoticesCategoryColumn(() => {
+      db.run(
+        `UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`,
+        [title, content, imagesJson, categoryNorm, uid],
+        (err) => {
+          if (err && /no column.*category|category/i.test(String(err.message || ''))) {
+            db.run(
+              `UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`,
+              [title, content, imagesJson, uid],
+              (err2) => {
+                if (!err2) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
+                resolve({ success: !err2, msg: err2 ? err2.message : undefined });
+              }
+            );
+            return;
+          }
+          if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
+          resolve({ success: !err, msg: err ? err.message : undefined });
+        }
+      );
+    });
   });
 });
 

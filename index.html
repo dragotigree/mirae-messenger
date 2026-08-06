@@ -14412,13 +14412,30 @@
     }
 
     async function loadNoticesList() {
-      const notices = await window.api.getNotices();
+      let notices = [];
+      try {
+        notices = await window.api.getNotices();
+      } catch (e) {
+        console.error('getNotices 실패:', e);
+        notices = [];
+      }
+      if (notices && !Array.isArray(notices) && Array.isArray(notices.notices)) {
+        notices = notices.notices;
+      }
       const seenUids = new Set();
-      cachedNoticesList = (notices || []).filter((n) => {
+      cachedNoticesList = (Array.isArray(notices) ? notices : []).filter((n) => {
         if (!n || !n.uid || seenUids.has(n.uid)) return false;
         seenUids.add(n.uid);
         return true;
       }).map((n) => ({ ...n, category: normalizeBoardCategory(n.category) }));
+      // 저장 공지가 있는데 필터만 안 맞으면 「모두」로
+      if (cachedNoticesList.length && boardCategoryFilter !== '__all__') {
+        const filtered = getFilteredNoticesList();
+        if (!filtered.length) {
+          boardCategoryFilter = '__all__';
+          localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
+        }
+      }
       renderBoardCategoryFilters(cachedNoticesList);
       renderFilteredNoticesList();
     }
@@ -14542,23 +14559,35 @@
           }
           const res = await window.api.updateNotice({ uid, title, content, images, category });
           if (!res || !res.success) {
-            await appAlert((res && res.msg) || '공지사항 수정에 실패했습니다. 다시 시도해 주세요.');
+            await appAlert((res && (res.msg || res.error)) || '공지사항 수정에 실패했습니다. 다시 시도해 주세요.');
             return;
           }
           boardWriteImages = [];
-          boardCategoryFilter = category;
+          boardCategoryFilter = '__all__';
           localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
           await loadNoticesList();
           showBoardDetailView(uid);
         } else {
           const res = await window.api.addNotice({ title, content, images, category, authorName: getNoticeAuthorDisplayName() });
-          if (!res || !res.success) { await appAlert('공지사항 등록에 실패했습니다. 다시 시도해 주세요.'); return; }
+          if (!res || !res.success) {
+            await appAlert((res && (res.msg || res.error)) || '공지사항 등록에 실패했습니다. 다시 시도해 주세요.');
+            return;
+          }
           boardWriteImages = [];
-          boardCategoryFilter = category;
+          // 등록 직후엔 「모두」로 보여 방금 쓴 글이 바로 보이게
+          boardCategoryFilter = '__all__';
           localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
+          if (res.notice && res.notice.uid) {
+            const n = { ...res.notice, category: normalizeBoardCategory(res.notice.category || category) };
+            const idx = (cachedNoticesList || []).findIndex((x) => x.uid === n.uid);
+            if (idx >= 0) cachedNoticesList[idx] = n;
+            else cachedNoticesList = [n].concat(cachedNoticesList || []);
+          }
           await loadNoticesList();
           showBoardListView();
         }
+      } catch (e) {
+        await appAlert('공지사항 저장 중 오류: ' + ((e && e.message) || e));
       } finally {
         isSubmittingNotice = false;
       }
