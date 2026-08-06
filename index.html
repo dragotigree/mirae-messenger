@@ -9611,6 +9611,24 @@
       renderUserListTree();
     }
 
+    async function snapCompactWindowEdge(edge) {
+      if (!isCompactMode) return;
+      try {
+        if (window.api && window.api.snapCompactWindow) {
+          await window.api.snapCompactWindow(edge);
+        }
+      } catch (_) {}
+    }
+
+    async function applyCompactSizePreset(preset) {
+      if (!isCompactMode) return;
+      try {
+        if (window.api && window.api.setCompactSizePreset) {
+          await window.api.setCompactSizePreset(preset);
+        }
+      } catch (_) {}
+    }
+
     async function applyViewMode(compact) {
       if (isCompactMode && !compact) {
         try {
