@@ -1919,113 +1919,456 @@ function countLoadTestPeers() {
   return n;
 }
 
+function listLoadTestIps() {
+  const ips = [];
+  allKnownUsers.forEach((u, ip) => {
+    if ((u && u.isLoadTest) || isLoadTestPeerIp(ip)) ips.push(ip);
+  });
+  return ips;
+}
+
+let loadTestSustainTimer = null;
+let loadTestLastReport = null;
+
+function summarizeMs(arr) {
+  const s = (arr || []).slice().sort((a, b) => a - b);
+  if (!s.length) return { count: 0, avg: 0, p50: 0, p95: 0, max: 0 };
+  const sum = s.reduce((a, b) => a + b, 0);
+  const pct = (p) => s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))];
+  return {
+    count: s.length,
+    avg: +(sum / s.length).toFixed(2),
+    p50: +pct(50).toFixed(2),
+    p95: +pct(95).toFixed(2),
+    max: +s[s.length - 1].toFixed(2)
+  };
+}
+
+function probeEventLoopLag(durationMs = 1500) {
+  return new Promise((resolve) => {
+    const samples = [];
+    let last = process.hrtime.bigint();
+    const handle = setInterval(() => {
+      const now = process.hrtime.bigint();
+      const gapMs = Number(now - last) / 1e6;
+      samples.push(Math.max(0, gapMs - 50));
+      last = now;
+    }, 50);
+    setTimeout(() => {
+      clearInterval(handle);
+      resolve(summarizeMs(samples));
+    }, Math.max(300, durationMs));
+  });
+}
+
+function buildSyntheticLoadUsers(count) {
+  const users = [];
+  const n = Math.max(0, Math.min(500, count));
+  for (let i = 1; i <= n; i++) {
+    users.push({
+      ip: buildLoadTestIpForIndex(i),
+      username: `모의직원${String(i).padStart(3, '0')}`,
+      rank: i % 7 === 0 ? '실장' : (i % 5 === 0 ? '팀장' : ''),
+      dept: `부서${(i % 12) + 1}`,
+      floor: `${(i % 8) + 1}층`,
+      extNo: String(2000 + i),
+      phone: '',
+      statusState: 'ONLINE',
+      appVersion: 'load-sim'
+    });
+  }
+  return users;
+}
+
+function injectLoadTestUsers(users, persist) {
+  const now = Date.now();
+  let injected = 0;
+  (users || []).slice(0, 500).forEach((raw, idx) => {
+    const ip = String((raw && raw.ip) || buildLoadTestIpForIndex(idx + 1)).trim();
+    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+    const previouslyKnown = allKnownUsers.get(ip);
+    const overlay = {
+      ip,
+      username: (raw && raw.username) || `모의직원${idx + 1}`,
+      rank: (raw && raw.rank) || '',
+      dept: (raw && raw.dept) || '부하테스트',
+      floor: (raw && raw.floor) || '',
+      extNo: (raw && raw.extNo) || '',
+      phone: (raw && raw.phone) || '',
+      statusState: (raw && raw.statusState) || 'ONLINE',
+      appVersion: (raw && raw.appVersion) || 'load-sim',
+      photo: (previouslyKnown && previouslyKnown.photo) || '',
+      lastPingAt: now,
+      online: true,
+      isMe: false,
+      isLoadTest: true
+    };
+    const userObj = mergeUserProfile(previouslyKnown, overlay, true);
+    userObj.lastPingAt = now;
+    userObj.online = true;
+    userObj.isLoadTest = true;
+    onlineUsers.set(ip, userObj);
+    allKnownUsers.set(ip, userObj);
+    if (persist) {
+      try { persistKnownUserSnapshot(userObj); } catch (_) {}
+    }
+    injected += 1;
+  });
+  notifyUserList(true);
+  return injected;
+}
+
+function clearLoadTestUsers() {
+  const removeIps = listLoadTestIps();
+  removeIps.forEach((ip) => {
+    onlineUsers.delete(ip);
+    allKnownUsers.delete(ip);
+    try {
+      if (db) db.run(`DELETE FROM known_users WHERE ip = ?`, [ip], () => {});
+    } catch (_) {}
+  });
+  notifyUserList(true);
+  return removeIps.length;
+}
+
+function touchLoadTestUsers(ips) {
+  const now = Date.now();
+  let touched = 0;
+  const list = Array.isArray(ips) && ips.length ? ips : listLoadTestIps();
+  list.forEach((ip) => {
+    const key = String(ip || '').trim();
+    if (!key || !isLoadTestPeerIp(key)) return;
+    const u = onlineUsers.get(key) || allKnownUsers.get(key);
+    if (!u) return;
+    u.lastPingAt = now;
+    u.online = true;
+    u.isLoadTest = true;
+    onlineUsers.set(key, u);
+    allKnownUsers.set(key, u);
+    touched += 1;
+  });
+  return touched;
+}
+
+function stopLoadTestSustain() {
+  if (loadTestSustainTimer) {
+    clearInterval(loadTestSustainTimer);
+    loadTestSustainTimer = null;
+  }
+}
+
+function startLoadTestSustain(intervalMs) {
+  stopLoadTestSustain();
+  const ms = Math.max(2000, Math.min(30000, parseInt(intervalMs, 10) || 10000));
+  loadTestSustainTimer = setInterval(() => {
+    touchLoadTestUsers();
+  }, ms);
+  if (typeof loadTestSustainTimer.unref === 'function') loadTestSustainTimer.unref();
+  return ms;
+}
+
 /**
- * 부하 모의: 가상 온라인 피어 주입/하트비트/정리
- * @returns {{ success: boolean, msg?: string, injected?: number, touched?: number, cleared?: number, onlineLoadTest?: number }}
+ * 부하 모의/검사 스위트
+ * @returns {Promise<object>|object}
  */
 function runLoadTestCommand(payload) {
   const action = String((payload && payload.action) || '').trim();
   if (!action) return { success: false, msg: 'action 필요' };
 
   if (action === 'clear') {
-    const removeIps = [];
-    allKnownUsers.forEach((u, ip) => {
-      if ((u && u.isLoadTest) || isLoadTestPeerIp(ip)) removeIps.push(ip);
-    });
-    removeIps.forEach((ip) => {
-      onlineUsers.delete(ip);
-      allKnownUsers.delete(ip);
-      try {
-        if (db) db.run(`DELETE FROM known_users WHERE ip = ?`, [ip], () => {});
-      } catch (_) {}
-    });
-    notifyUserList(true);
-    writeToLogFile('info', `[loadtest] cleared ${removeIps.length} synthetic peers`);
-    return { success: true, cleared: removeIps.length, onlineLoadTest: 0 };
+    stopLoadTestSustain();
+    const cleared = clearLoadTestUsers();
+    writeToLogFile('info', `[loadtest] cleared ${cleared} synthetic peers`);
+    const res = { success: true, cleared, onlineLoadTest: 0, sustain: false };
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
   }
 
   if (action === 'touch') {
-    const ips = Array.isArray(payload.ips) ? payload.ips : [];
-    const now = Date.now();
-    let touched = 0;
-    ips.forEach((ip) => {
-      const key = String(ip || '').trim();
-      if (!key || !isLoadTestPeerIp(key)) return;
-      const u = onlineUsers.get(key) || allKnownUsers.get(key);
-      if (!u) return;
-      u.lastPingAt = now;
-      u.online = true;
-      u.isLoadTest = true;
-      onlineUsers.set(key, u);
-      allKnownUsers.set(key, u);
-      touched += 1;
-    });
-    return { success: true, touched, onlineLoadTest: countLoadTestPeers() };
+    const touched = touchLoadTestUsers(payload.ips);
+    return { success: true, touched, onlineLoadTest: countLoadTestPeers(), sustain: !!loadTestSustainTimer };
   }
 
   if (action === 'inject' || action === 'burst') {
     let users = Array.isArray(payload.users) ? payload.users : [];
     const count = Math.max(0, Math.min(500, parseInt(payload.usersCount || payload.count || users.length || 0, 10) || 0));
-    if (!users.length && count > 0) {
-      users = [];
-      for (let i = 1; i <= count; i++) {
-        users.push({
-          ip: buildLoadTestIpForIndex(i),
-          username: `모의직원${String(i).padStart(3, '0')}`,
-          rank: i % 7 === 0 ? '실장' : '',
-          dept: `부서${(i % 12) + 1}`,
-          floor: `${(i % 8) + 1}층`,
-          extNo: String(2000 + i),
-          phone: '',
-          statusState: 'ONLINE',
-          appVersion: 'load-sim'
-        });
-      }
-    }
-    users = users.slice(0, 500);
+    if (!users.length && count > 0) users = buildSyntheticLoadUsers(count);
     const persist = payload.persist !== false && payload.persist !== 0 && payload.persist !== '0';
-    const now = Date.now();
-    let injected = 0;
+    const t0 = Date.now();
+    const injected = injectLoadTestUsers(users, persist);
+    const wallMs = Date.now() - t0;
+    writeToLogFile('info', `[loadtest] injected ${injected} synthetic peers (persist=${persist}, ${wallMs}ms)`);
+    const res = {
+      success: true,
+      action: 'inject',
+      injected,
+      wallMs,
+      persist,
+      onlineLoadTest: countLoadTestPeers(),
+      sustain: !!loadTestSustainTimer
+    };
+    loadTestLastReport = { action: 'inject', at: Date.now(), ...res };
+    return res;
+  }
 
-    users.forEach((raw, idx) => {
-      const ip = String((raw && raw.ip) || buildLoadTestIpForIndex(idx + 1)).trim();
-      if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
-      const previouslyKnown = allKnownUsers.get(ip);
-      const overlay = {
-        ip,
-        username: (raw && raw.username) || `모의직원${idx + 1}`,
-        rank: (raw && raw.rank) || '',
-        dept: (raw && raw.dept) || '부하테스트',
-        floor: (raw && raw.floor) || '',
-        extNo: (raw && raw.extNo) || '',
-        phone: (raw && raw.phone) || '',
-        statusState: (raw && raw.statusState) || 'ONLINE',
-        appVersion: (raw && raw.appVersion) || 'load-sim',
-        photo: (previouslyKnown && previouslyKnown.photo) || '',
-        lastPingAt: now,
-        online: true,
-        isMe: false,
-        isLoadTest: true
-      };
-      const userObj = mergeUserProfile(previouslyKnown, overlay, true);
-      userObj.lastPingAt = now;
-      userObj.online = true;
-      userObj.isLoadTest = true;
-      onlineUsers.set(ip, userObj);
-      allKnownUsers.set(ip, userObj);
-      if (persist) {
-        try { persistKnownUserSnapshot(userObj); } catch (_) {}
-      }
-      injected += 1;
-    });
+  if (action === 'sustain_start') {
+    if (countLoadTestPeers() === 0) {
+      const n = Math.max(1, Math.min(500, parseInt(payload.usersCount || payload.count || 200, 10) || 200));
+      injectLoadTestUsers(buildSyntheticLoadUsers(n), payload.persist !== false);
+    }
+    const intervalMs = startLoadTestSustain(payload.intervalMs || payload.interval || 10000);
+    touchLoadTestUsers();
+    const res = {
+      success: true,
+      action: 'sustain_start',
+      intervalMs,
+      onlineLoadTest: countLoadTestPeers(),
+      sustain: true
+    };
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
+  }
 
-    notifyUserList(true);
-    writeToLogFile('info', `[loadtest] injected ${injected} synthetic peers (persist=${persist})`);
-    return { success: true, injected, onlineLoadTest: countLoadTestPeers() };
+  if (action === 'sustain_stop') {
+    stopLoadTestSustain();
+    return { success: true, action: 'sustain_stop', sustain: false, onlineLoadTest: countLoadTestPeers() };
   }
 
   if (action === 'status') {
-    return { success: true, onlineLoadTest: countLoadTestPeers() };
+    return {
+      success: true,
+      onlineLoadTest: countLoadTestPeers(),
+      sustain: !!loadTestSustainTimer,
+      lastReport: loadTestLastReport
+    };
+  }
+
+  if (action === 'list_rerender') {
+    const rounds = Math.max(1, Math.min(200, parseInt(payload.rounds || payload.count || 50, 10) || 50));
+    const samples = [];
+    for (let i = 0; i < rounds; i++) {
+      const t0 = process.hrtime.bigint();
+      notifyUserListNow();
+      samples.push(Number(process.hrtime.bigint() - t0) / 1e6);
+    }
+    const res = {
+      success: true,
+      action: 'list_rerender',
+      rounds,
+      notifyMs: summarizeMs(samples),
+      onlineLoadTest: countLoadTestPeers()
+    };
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
+  }
+
+  if (action === 'profile_churn') {
+    const rounds = Math.max(1, Math.min(30, parseInt(payload.rounds || 5, 10) || 5));
+    let ips = listLoadTestIps();
+    if (!ips.length) {
+      const n = Math.max(1, Math.min(500, parseInt(payload.usersCount || 100, 10) || 100));
+      injectLoadTestUsers(buildSyntheticLoadUsers(n), true);
+      ips = listLoadTestIps();
+    }
+    const samples = [];
+    const tAll = Date.now();
+    for (let r = 0; r < rounds; r++) {
+      const t0 = process.hrtime.bigint();
+      ips.forEach((ip, idx) => {
+        const u = onlineUsers.get(ip) || allKnownUsers.get(ip);
+        if (!u) return;
+        u.dept = `부서${((idx + r) % 12) + 1}`;
+        u.floor = `${((idx + r) % 8) + 1}층`;
+        u.lastPingAt = Date.now();
+        u.isLoadTest = true;
+        onlineUsers.set(ip, u);
+        allKnownUsers.set(ip, u);
+        try { persistKnownUserSnapshot(u); } catch (_) {}
+      });
+      notifyUserList(true);
+      samples.push(Number(process.hrtime.bigint() - t0) / 1e6);
+    }
+    const res = {
+      success: true,
+      action: 'profile_churn',
+      peers: ips.length,
+      rounds,
+      wallMs: Date.now() - tAll,
+      roundMs: summarizeMs(samples),
+      onlineLoadTest: countLoadTestPeers()
+    };
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
+  }
+
+  if (action === 'db_persist_bench') {
+    const count = Math.max(1, Math.min(500, parseInt(payload.usersCount || payload.count || 200, 10) || 200));
+    const users = buildSyntheticLoadUsers(count);
+    const samples = [];
+    const tAll = Date.now();
+    users.forEach((raw) => {
+      const t0 = process.hrtime.bigint();
+      const u = {
+        ip: raw.ip,
+        username: raw.username,
+        rank: raw.rank,
+        dept: raw.dept,
+        floor: raw.floor,
+        extNo: raw.extNo,
+        phone: '',
+        statusState: 'ONLINE',
+        photo: '',
+        lastSeen: Date.now(),
+        lastPingAt: Date.now(),
+        online: true,
+        isLoadTest: true
+      };
+      try { persistKnownUserSnapshot(u); } catch (_) {}
+      samples.push(Number(process.hrtime.bigint() - t0) / 1e6);
+    });
+    const res = {
+      success: true,
+      action: 'db_persist_bench',
+      users: count,
+      wallMs: Date.now() - tAll,
+      queryMs: summarizeMs(samples),
+      note: 'known_users UPSERT만 측정 (목록 주입 없음). 끝나면 clear로 테스트망 row를 지울 수 있습니다.'
+    };
+    // 벤치로 쓴 row도 isLoadTest로 안 올라갈 수 있어 IP로 정리 가능하게 올려둠
+    users.forEach((raw) => {
+      const prev = allKnownUsers.get(raw.ip) || {};
+      allKnownUsers.set(raw.ip, { ...prev, ...raw, isLoadTest: true, online: false });
+    });
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
+  }
+
+  if (action === 'event_loop_probe') {
+    const durationMs = Math.max(500, Math.min(10000, parseInt(payload.durationMs || 1500, 10) || 1500));
+    return probeEventLoopLag(durationMs).then((lag) => {
+      const res = {
+        success: true,
+        action: 'event_loop_probe',
+        durationMs,
+        eventLoopLagMs: lag,
+        verdict: lag.p95 > 80 ? 'HIGH' : (lag.p95 > 25 ? 'MEDIUM' : 'LOW')
+      };
+      loadTestLastReport = { action, at: Date.now(), ...res };
+      return res;
+    });
+  }
+
+  if (action === 'udp_limiter_bench') {
+    const packets = Math.max(10, Math.min(5000, parseInt(payload.count || 300, 10) || 300));
+    const uniqueIps = Math.max(1, Math.min(200, parseInt(payload.ips || 50, 10) || 50));
+    let accepted = 0;
+    let rejected = 0;
+    const t0 = Date.now();
+    for (let i = 0; i < packets; i++) {
+      const ip = buildLoadTestIpForIndex((i % uniqueIps) + 1);
+      if (allowUdpReceive(ip)) accepted += 1;
+      else rejected += 1;
+    }
+    const res = {
+      success: true,
+      action: 'udp_limiter_bench',
+      packets,
+      uniqueIps,
+      accepted,
+      rejected,
+      wallMs: Date.now() - t0,
+      limits: {
+        perSec: UDP_RX_MAX_PER_SEC,
+        perIpPerSec: UDP_RX_MAX_PER_IP_PER_SEC,
+        stormThreshold: UDP_STORM_THRESHOLD_PER_SEC
+      },
+      stormActive: Date.now() < udpStormUntil,
+      note: '실제 UDP 소켓 없이 allowUdpReceive 제한만 측정합니다.'
+    };
+    loadTestLastReport = { action, at: Date.now(), ...res };
+    return res;
+  }
+
+  if (action === 'tcp_connect_burst') {
+    const attempts = Math.max(1, Math.min(40, parseInt(payload.count || 20, 10) || 20));
+    const host = '127.0.0.1';
+    const t0 = Date.now();
+    const results = [];
+    const workers = [];
+    for (let i = 0; i < attempts; i++) {
+      workers.push(new Promise((resolve) => {
+        const started = Date.now();
+        const sock = net.connect({ host, port: TCP_PORT }, () => {
+          results.push({ ok: true, ms: Date.now() - started });
+          try { sock.end(); } catch (_) {}
+          try { sock.destroy(); } catch (_) {}
+          resolve();
+        });
+        sock.setTimeout(2000, () => {
+          results.push({ ok: false, ms: Date.now() - started, err: 'timeout' });
+          try { sock.destroy(); } catch (_) {}
+          resolve();
+        });
+        sock.on('error', (e) => {
+          results.push({ ok: false, ms: Date.now() - started, err: (e && e.code) || 'error' });
+          resolve();
+        });
+      }));
+    }
+    return Promise.all(workers).then(() => {
+      const ok = results.filter((r) => r.ok).length;
+      const fail = results.length - ok;
+      const res = {
+        success: true,
+        action: 'tcp_connect_burst',
+        attempts,
+        ok,
+        fail,
+        wallMs: Date.now() - t0,
+        connectMs: summarizeMs(results.map((r) => r.ms)),
+        tcpMaxConnections: TCP_MAX_CONNECTIONS,
+        tcpActiveConnections,
+        note: `메신저 TCP 동시 연결 상한은 ${TCP_MAX_CONNECTIONS}입니다. 초과분은 거절되는 것이 정상입니다.`
+      };
+      loadTestLastReport = { action, at: Date.now(), ...res };
+      return res;
+    });
+  }
+
+  if (action === 'suite') {
+    const users = Math.max(1, Math.min(500, parseInt(payload.usersCount || 200, 10) || 200));
+    const steps = [];
+    const runStep = async (name, fn) => {
+      const t0 = Date.now();
+      try {
+        const out = await Promise.resolve(fn());
+        steps.push({ name, ok: !!(out && out.success !== false), wallMs: Date.now() - t0, result: out });
+      } catch (e) {
+        steps.push({ name, ok: false, wallMs: Date.now() - t0, error: (e && e.message) || String(e) });
+      }
+    };
+    return (async () => {
+      await runStep('inject', () => runLoadTestCommand({ action: 'inject', usersCount: users, persist: true }));
+      await runStep('list_rerender', () => runLoadTestCommand({ action: 'list_rerender', rounds: 30 }));
+      await runStep('profile_churn', () => runLoadTestCommand({ action: 'profile_churn', rounds: 3, usersCount: users }));
+      await runStep('udp_limiter_bench', () => runLoadTestCommand({ action: 'udp_limiter_bench', count: 300, ips: 50 }));
+      await runStep('tcp_connect_burst', () => runLoadTestCommand({ action: 'tcp_connect_burst', count: 16 }));
+      await runStep('event_loop_probe', () => runLoadTestCommand({ action: 'event_loop_probe', durationMs: 1200 }));
+      await runStep('db_persist_bench', () => runLoadTestCommand({ action: 'db_persist_bench', usersCount: Math.min(users, 120) }));
+      const failed = steps.filter((s) => !s.ok).length;
+      const res = {
+        success: failed === 0,
+        action: 'suite',
+        users,
+        failed,
+        steps,
+        onlineLoadTest: countLoadTestPeers(),
+        sustain: !!loadTestSustainTimer,
+        note: '종합 검사 후 모의 접속이 남아 있을 수 있습니다. 필요하면 clear 하세요.'
+      };
+      loadTestLastReport = { action, at: Date.now(), success: res.success, failed, users };
+      return res;
+    })();
   }
 
   return { success: false, msg: `unknown action: ${action}` };
@@ -10942,7 +11285,15 @@ ipcMain.handle('get-load-sim-status', async () => {
   if (!masterSessionActive) {
     return { success: false, msg: '마스터 관리자 로그인이 필요합니다.', onlineLoadTest: 0 };
   }
-  return { success: true, onlineLoadTest: countLoadTestPeers() };
+  return {
+    success: true,
+    onlineLoadTest: countLoadTestPeers(),
+    sustain: !!loadTestSustainTimer,
+    lastReport: loadTestLastReport,
+    tcpActiveConnections,
+    tcpMaxConnections: TCP_MAX_CONNECTIONS,
+    udpStormActive: Date.now() < udpStormUntil
+  };
 });
 
 ipcMain.handle('refresh-users', async () => {

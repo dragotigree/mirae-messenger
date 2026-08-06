@@ -53,6 +53,7 @@ Commands:
   udp        Flood UDP PING packets at a target IP
   tcp-chat   Send many TCP CHAT lines to a target IP
   db         Run SQLite presence-persist microbench
+  suite      Ask local messenger to run the full in-app load suite
   help       Show this help
 
 presence options:
@@ -301,6 +302,19 @@ function cmdDb(extraArgv) {
   child.on('exit', (code) => process.exit(code || 0));
 }
 
+async function cmdSuite(opts) {
+  const host = opts.target || '127.0.0.1';
+  const users = Math.max(1, Math.min(500, parseInt(opts.users || '200', 10) || 200));
+  console.log(`[suite] requesting in-app suite on ${host} (users=${users})…`);
+  const res = await sendTcpJsonLine(host, TCP_PORT, {
+    type: 'LOADTEST_CMD',
+    action: 'suite',
+    usersCount: users
+  }, 120000);
+  console.log('[suite] result:');
+  console.log(JSON.stringify(res, null, 2));
+}
+
 async function main() {
   const cmd = (process.argv[2] || 'help').toLowerCase();
   if (cmd === 'help' || cmd === '-h' || cmd === '--help' || hasFlag('help')) {
@@ -337,6 +351,11 @@ async function main() {
   }
   if (cmd === 'db') {
     cmdDb(process.argv.slice(3));
+    return;
+  }
+  if (cmd === 'suite') {
+    if (!opts.target) opts.target = '127.0.0.1';
+    await cmdSuite(opts);
     return;
   }
 

@@ -3985,6 +3985,19 @@
       cursor: pointer;
       white-space: nowrap;
     }
+    .master-loadsim-btn {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #334155;
+    }
+    .master-loadsim-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .master-loadsim-btn.is-danger { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
+    .master-loadsim-btn.is-danger:hover { background: #ffe4e6; }
     @keyframes modal-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     body.modal-open #custom-titlebar { -webkit-app-region: no-drag; }
     .modal-overlay input, .modal-overlay textarea, .modal-overlay select, .modal-overlay button, .modal-overlay label { -webkit-app-region: no-drag; }
@@ -5017,18 +5030,60 @@
             <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
 
-            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; background:#f8fafc; border-color:#e2e8f0;">
-              <div style="font-size:13px; font-weight:800; color:#0f172a;">🧪 부하 모의 (접속 폭주)</div>
-              <p style="font-size:12px; color:#64748b; margin:0; line-height:1.55;">가상 직원이 한꺼번에 온라인으로 붙는 상황을 이 PC에서 재현합니다. 목록 렌더·DB·프레즌스 부하를 볼 때 사용하세요. (테스트망 IP · 실제 LAN 동료가 아닙니다)</p>
+            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:#e2e8f0;">
+              <div style="font-size:13px; font-weight:800; color:#0f172a;">🧪 부하 검사 스위트</div>
+              <p style="font-size:12px; color:#64748b; margin:0; line-height:1.55;">이 PC에서 접속 폭주·목록 렌더·UDP 제한·TCP 연결·DB·이벤트루프 등을 모의합니다. 테스트망 IP를 쓰며 실제 LAN 동료에게 패킷을 보내지 않습니다.</p>
               <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                 <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">인원
                   <input type="number" id="master-loadsim-users" min="1" max="500" value="200" style="width:72px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;">
                 </label>
-                <button type="button" onclick="runMasterLoadSimInject()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">접속 모의 실행</button>
-                <button type="button" onclick="runMasterLoadSimClear()" style="padding:7px 12px; background:#fff; border:1px solid #fecaca; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; color:#b91c1c;">모의 접속 지우기</button>
+                <span id="master-loadsim-status" style="font-size:11.5px; color:#475569;">모의 접속: 확인 중…</span>
               </div>
-              <div id="master-loadsim-status" style="font-size:11.5px; color:#475569; min-height:1.2em;">모의 접속: 확인 중…</div>
-              <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">CLI: <code>node scripts/load-sim.js presence --users=200</code> · UDP 폭주: <code>node scripts/load-sim.js udp --target=&lt;IP&gt;</code></p>
+
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px;">
+                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                  <div style="font-size:12px; font-weight:800; color:#0f172a;">접속 폭주</div>
+                  <div style="font-size:11px; color:#64748b; line-height:1.45;">가상 직원이 한꺼번에 온라인으로 붙는 상황</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('inject')">폭주 주입</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('sustain_start')">유지 시작</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('sustain_stop')">유지 중지</button>
+                    <button type="button" class="master-loadsim-btn is-danger" onclick="runMasterLoadSimAction('clear')">지우기</button>
+                  </div>
+                </div>
+                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                  <div style="font-size:12px; font-weight:800; color:#0f172a;">목록 · UI</div>
+                  <div style="font-size:11px; color:#64748b; line-height:1.45;">직원 목록 재렌더 · 미읽음 배지 폭주</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('list_rerender')">목록 재렌더</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimUnreadStorm()">미읽음 배지</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('profile_churn')">프로필 변경 폭주</button>
+                  </div>
+                </div>
+                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                  <div style="font-size:12px; font-weight:800; color:#0f172a;">네트워크 보호</div>
+                  <div style="font-size:11px; color:#64748b; line-height:1.45;">UDP 수신 제한 · TCP 동시연결 상한</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('udp_limiter_bench')">UDP 제한</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('tcp_connect_burst')">TCP 연결 폭주</button>
+                  </div>
+                </div>
+                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                  <div style="font-size:12px; font-weight:800; color:#0f172a;">DB · 이벤트루프</div>
+                  <div style="font-size:11px; color:#64748b; line-height:1.45;">SQLite persist · 메인루프 지연</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('db_persist_bench')">DB persist</button>
+                    <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('event_loop_probe')">루프 지연</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <button type="button" onclick="runMasterLoadSimAction('suite')" style="padding:8px 14px; background:#0f172a; color:#fff; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">전체 검사 실행</button>
+                <button type="button" onclick="clearMasterLoadSimLog()" style="padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; color:#475569;">결과 지우기</button>
+              </div>
+              <pre id="master-loadsim-log" style="margin:0; max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:#0f172a; color:#e2e8f0; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">검사를 실행하면 결과가 여기에 쌓입니다.</pre>
+              <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">CLI: <code>node scripts/load-sim.js presence --users=200</code> · UDP 패킷: <code>node scripts/load-sim.js udp --target=&lt;IP&gt;</code></p>
             </div>
           </div>
 
@@ -14813,52 +14868,124 @@
           el.textContent = (res && res.msg) || '상태 확인 실패';
           return;
         }
-        el.textContent = `모의 접속 중: ${Number(res.onlineLoadTest) || 0}명 (약 45초간 PING 없으면 오프라인으로 내려갑니다)`;
+        const parts = [
+          `모의 ${Number(res.onlineLoadTest) || 0}명`,
+          res.sustain ? '유지 ON' : '유지 OFF',
+          `TCP ${res.tcpActiveConnections || 0}/${res.tcpMaxConnections || 8}`
+        ];
+        if (res.udpStormActive) parts.push('UDP스톰');
+        el.textContent = parts.join(' · ');
       } catch (_) {
         el.textContent = '상태 확인 실패';
       }
     }
 
-    async function runMasterLoadSimInject() {
+    function appendMasterLoadSimLog(title, payload) {
+      const log = document.getElementById('master-loadsim-log');
+      if (!log) return;
+      const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+      const body = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+      const block = `[${ts}] ${title}\n${body}\n`;
+      if (log.textContent === '검사를 실행하면 결과가 여기에 쌓입니다.') log.textContent = block;
+      else log.textContent = block + '\n' + log.textContent;
+    }
+
+    function clearMasterLoadSimLog() {
+      const log = document.getElementById('master-loadsim-log');
+      if (log) log.textContent = '검사를 실행하면 결과가 여기에 쌓입니다.';
+    }
+
+    function getMasterLoadSimUserCount() {
+      const input = document.getElementById('master-loadsim-users');
+      const n = Math.max(1, Math.min(500, parseInt(input && input.value ? input.value : '200', 10) || 200));
+      if (input) input.value = String(n);
+      return n;
+    }
+
+    async function runMasterLoadSimAction(action) {
       if (!window.api.runLoadSim) {
         await appAlert('이 버전에서는 부하 모의를 지원하지 않습니다.');
         return;
       }
-      const input = document.getElementById('master-loadsim-users');
-      const n = Math.max(1, Math.min(500, parseInt(input && input.value ? input.value : '200', 10) || 200));
-      if (input) input.value = String(n);
-      const ok = await appConfirm(`가상 직원 ${n}명을 한꺼번에 온라인으로 올릴까요?\n(테스트용 · 실제 LAN 접속이 아닙니다)`);
-      if (!ok) return;
+      const users = getMasterLoadSimUserCount();
+      const labels = {
+        inject: `가상 직원 ${users}명 폭주 주입`,
+        clear: '모의 접속 모두 지우기',
+        sustain_start: '접속 유지(하트비트) 시작',
+        sustain_stop: '접속 유지 중지',
+        list_rerender: '목록 재렌더 검사',
+        profile_churn: '프로필 변경 폭주',
+        udp_limiter_bench: 'UDP 수신 제한 검사',
+        tcp_connect_burst: 'TCP 연결 폭주 검사',
+        db_persist_bench: 'DB persist 벤치',
+        event_loop_probe: '이벤트루프 지연 측정',
+        suite: `전체 검사 (인원 ${users})`
+      };
+      const needConfirm = ['inject', 'clear', 'profile_churn', 'suite', 'db_persist_bench'].includes(action);
+      if (needConfirm) {
+        const ok = await appConfirm(`${labels[action] || action}을(를) 실행할까요?`);
+        if (!ok) return;
+      }
       const statusEl = document.getElementById('master-loadsim-status');
-      if (statusEl) statusEl.textContent = `${n}명 주입 중…`;
+      if (statusEl) statusEl.textContent = `${labels[action] || action} 실행 중…`;
+      const payload = { action, usersCount: users };
+      if (action === 'list_rerender') payload.rounds = 40;
+      if (action === 'profile_churn') payload.rounds = 4;
+      if (action === 'udp_limiter_bench') { payload.count = 400; payload.ips = 60; }
+      if (action === 'tcp_connect_burst') payload.count = 20;
+      if (action === 'db_persist_bench') payload.usersCount = Math.min(users, 200);
+      if (action === 'event_loop_probe') payload.durationMs = 1500;
+      if (action === 'sustain_start') payload.intervalMs = 10000;
       try {
-        const res = await window.api.runLoadSim({ action: 'inject', usersCount: n, persist: true });
+        const res = await window.api.runLoadSim(payload);
+        appendMasterLoadSimLog(labels[action] || action, res || { success: false });
         if (!res || res.success === false) {
-          await appAlert((res && res.msg) || '부하 모의 실패');
-        } else {
-          await appAlert(`모의 접속 ${res.injected || n}명 완료.\n직원 목록을 확인해 보세요.`);
+          await appAlert((res && res.msg) || '검사 실패');
         }
       } catch (e) {
-        await appAlert('부하 모의 중 오류가 발생했습니다.');
+        appendMasterLoadSimLog(labels[action] || action, { success: false, msg: String(e && e.message || e) });
+        await appAlert('부하 검사 중 오류가 발생했습니다.');
       }
       refreshMasterLoadSimStatus();
       try { renderMasterOnlineClients(); } catch (_) {}
       try { renderMasterPeerTraffic(); } catch (_) {}
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { renderCompactList(); } catch (_) {}
+      } else {
+        try { renderUserListTree(true); } catch (_) {}
+      }
     }
 
-    async function runMasterLoadSimClear() {
-      if (!window.api.runLoadSim) return;
-      const ok = await appConfirm('모의 접속(가상 직원)을 모두 지울까요?');
+    async function runMasterLoadSimUnreadStorm() {
+      const users = getMasterLoadSimUserCount();
+      const ok = await appConfirm(`미읽음 배지 폭주를 실행할까요?\n(모의 직원 ${users}명에게 미읽음 1~3개씩 · 대화 내용은 만들지 않습니다)`);
       if (!ok) return;
+      // 모의 접속이 없으면 먼저 주입
       try {
-        const res = await window.api.runLoadSim({ action: 'clear' });
-        if (res && res.success === false) {
-          await appAlert(res.msg || '삭제 실패');
+        const st = await window.api.getLoadSimStatus();
+        if (!st || (Number(st.onlineLoadTest) || 0) < Math.min(users, 20)) {
+          await window.api.runLoadSim({ action: 'inject', usersCount: users, persist: false });
         }
       } catch (_) {}
+      let bumped = 0;
+      for (let i = 1; i <= users; i++) {
+        const nets = ['192.0.2', '198.51.100', '203.0.113'];
+        const idx = i - 1;
+        const ip = `${nets[Math.floor(idx / 254) % nets.length]}.${(idx % 254) + 1}`;
+        const n = (i % 3) + 1;
+        for (let k = 0; k < n; k++) {
+          try { bumpUnread(ip); bumped += 1; } catch (_) {}
+        }
+      }
+      try { refreshUnreadBadges(); } catch (_) {}
+      appendMasterLoadSimLog('미읽음 배지 폭주', { success: true, users, bumpCalls: bumped });
       refreshMasterLoadSimStatus();
-      try { renderMasterOnlineClients(); } catch (_) {}
+      await appAlert(`미읽음 배지 ${bumped}회 반영 완료.\n목록 배지·안읽음 필터를 확인해 보세요.`);
     }
+
+    // 하위 호환
+    async function runMasterLoadSimInject() { return runMasterLoadSimAction('inject'); }
+    async function runMasterLoadSimClear() { return runMasterLoadSimAction('clear'); }
 
     const masterStatusLabel = { ONLINE: '🟢 온라인', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };
 
