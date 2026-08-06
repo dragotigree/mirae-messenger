@@ -1588,20 +1588,23 @@ function extractAndSaveAttachments(messageHtml, options) {
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
-      // 대용량 sync write는 메인 스레드를 막아 '응답 없음'을 유발 — 2MB 초과는 비동기 저장 + data URL 유지
+      // sync write는 메인 스레드를 막아 버튼 클릭까지 버벅임 — 64KB 초과는 비동기
       const bin = Buffer.from(base64Data, 'base64');
-      if (bin.length > 2 * 1024 * 1024) {
+      const SYNC_WRITE_MAX = 64 * 1024;
+      if (bin.length > SYNC_WRITE_MAX || opts.preferAsyncIo) {
         fs.promises.writeFile(filePath, bin).catch((e) => {
           console.error('첨부파일 비동기 저장 오류:', e.message);
         });
-        continue;
-      }
-      try {
-        fs.writeFileSync(filePath, bin);
-      } catch (writeErr) {
-        // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
-        fs.promises.writeFile(filePath, bin).catch(() => {});
-        continue;
+        // preferAsyncIo(백그라운드 compact): 파일 기록은 비동기지만 DB 경로는 mirae-file 로 바꿔 둠
+        if (!(compact && opts.preferAsyncIo)) continue;
+      } else {
+        try {
+          fs.writeFileSync(filePath, bin);
+        } catch (writeErr) {
+          // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
+          fs.promises.writeFile(filePath, bin).catch(() => {});
+          continue;
+        }
       }
       if (compact) {
         replacements.push({
@@ -1635,8 +1638,8 @@ function extractAndSaveAttachments(messageHtml, options) {
   return out;
 }
 
-function compactStoredMessageHtml(messageHtml, msgUid) {
-  return extractAndSaveAttachments(messageHtml, { compact: true, msgUid: msgUid || '' });
+function compactStoredMessageHtml(messageHtml, msgUid, extraOpts) {
+  return extractAndSaveAttachments(messageHtml, Object.assign({ compact: true, msgUid: msgUid || '' }, extraOpts || {}));
 }
 
 /** 재전송용: mirae-file:// → data URL (파일이 없으면 원문 유지) */
@@ -1691,10 +1694,10 @@ function maybeCompactMessageRowByUid(msgUid) {
   );
 }
 
-function compactMessageRowById(rowId, msgUid, messageHtml) {
+function compactMessageRowById(rowId, msgUid, messageHtml, extraOpts) {
   if (!rowId || typeof messageHtml !== 'string' || messageHtml.indexOf('data:') === -1) return;
   try {
-    const compacted = compactStoredMessageHtml(messageHtml, msgUid);
+    const compacted = compactStoredMessageHtml(messageHtml, msgUid, extraOpts);
     if (compacted && compacted !== messageHtml) {
       db.run(`UPDATE messages SET message = ? WHERE id = ?`, [compacted, rowId], logDbErr);
     }
@@ -1703,34 +1706,61 @@ function compactMessageRowById(rowId, msgUid, messageHtml) {
   }
 }
 
-/** DB에 남은 data: base64 메시지를 서서히 mirae-file 로 줄여 힙·채팅 로드 부담을 낮춘다 */
+function isMainWindowActivelyUsed() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    if (!mainWindow.isVisible() || mainWindow.isMinimized()) return false;
+    return !!mainWindow.isFocused();
+  } catch (e) {
+    return false;
+  }
+}
+
+/** DB에 남은 data: base64 메시지를 유휴 시에만 서서히 mirae-file 로 줄인다 (포커스 중엔 건너뛰어 UI 버벅임 방지) */
 function startLegacyMessageCompaction() {
+  let busy = false;
   setInterval(() => {
-    if (legacyMessageCompactDone || !db) return;
+    if (busy || legacyMessageCompactDone || !db) return;
+    // 창에 포커스가 있으면 디스크/디코드 작업을 하지 않음 — 버튼 IPC가 막히는 주원인
+    if (isMainWindowActivelyUsed()) return;
+    busy = true;
     db.all(
       `SELECT id, msg_uid, message, status FROM messages
        WHERE id > ? AND message LIKE '%data:%;base64,%'
-       ORDER BY id ASC LIMIT ?`,
-      [legacyMessageCompactCursor, LEGACY_MSG_COMPACT_BATCH],
+       ORDER BY id ASC LIMIT 1`,
+      [legacyMessageCompactCursor],
       (err, rows) => {
+        const finish = () => { busy = false; };
         if (err) {
           logDbErr(err);
+          finish();
           return;
         }
         if (!rows || !rows.length) {
           legacyMessageCompactDone = true;
           console.log('[compact] 레거시 data: 메시지 정리 완료(또는 대상 없음)');
+          finish();
           return;
         }
-        rows.forEach((r) => {
-          legacyMessageCompactCursor = Math.max(legacyMessageCompactCursor, Number(r.id) || 0);
-          if (r.status === 'PENDING') return;
-          if (typeof r.message !== 'string' || r.message.indexOf('data:') === -1) return;
-          compactMessageRowById(r.id, r.msg_uid, r.message);
+        const r = rows[0];
+        legacyMessageCompactCursor = Math.max(legacyMessageCompactCursor, Number(r.id) || 0);
+        if (r.status === 'PENDING' || typeof r.message !== 'string' || r.message.indexOf('data:') === -1) {
+          finish();
+          return;
+        }
+        // 한 건씩 + 비동기 파일 I/O — 메인 루프 양보
+        setImmediate(() => {
+          try {
+            compactMessageRowById(r.id, r.msg_uid, r.message, { preferAsyncIo: true });
+          } catch (e) {
+            console.error('[compact] 오류:', e && e.message ? e.message : e);
+          } finally {
+            finish();
+          }
         });
       }
     );
-  }, LEGACY_MSG_COMPACT_INTERVAL_MS);
+  }, Math.max(15000, LEGACY_MSG_COMPACT_INTERVAL_MS));
 }
 
 function maybeLogHighMemoryUsage() {
@@ -1742,18 +1772,21 @@ function maybeLogHighMemoryUsage() {
     });
     const totalMB = Math.round(totalKB / 1024);
     const now = Date.now();
-    if (totalMB >= 900 && now - lastMemoryPressureLogAt > 60000) {
+    if (totalMB >= 1100 && now - lastMemoryPressureLogAt > 120000) {
       lastMemoryPressureLogAt = now;
       const parts = metrics.map((m) => `${m.type}:${Math.round(((m.memory && m.memory.workingSetSize) || 0) / 1024)}MB`).join(' ');
       console.warn(`[memory] 합계 ~${totalMB}MB (${parts})`);
       writeToLogFile('warn', `[memory] 합계 ~${totalMB}MB ${parts}`);
-      try { safeWebContentsSend('renderer-memory-trim', { reason: 'pressure', totalMB }); } catch (e) { /* ignore */ }
+      // 포커스 중 trim은 클릭 버벅임을 키우므로 백그라운드일 때만
+      if (!isMainWindowActivelyUsed()) {
+        try { safeWebContentsSend('renderer-memory-trim', { reason: 'pressure', totalMB }); } catch (e) { /* ignore */ }
+      }
     }
   } catch (e) { /* ignore */ }
 }
 
 function startMemoryPressureMonitor() {
-  setInterval(maybeLogHighMemoryUsage, 30000);
+  setInterval(maybeLogHighMemoryUsage, 45000);
 }
 
 /** 메시지 큐/채널용 가상 receiver 키 — 실제 사용자 IP가 아님 */
@@ -2978,10 +3011,6 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
       try { safeWebContentsSend('renderer-memory-trim', { reason: 'hide' }); } catch (e) { /* ignore */ }
-      // Chromium HTTP 캐시만 비움 — 채팅 DB/첨부 파일은 건드리지 않음
-      try {
-        session.defaultSession.clearCache().catch(() => {});
-      } catch (e) { /* ignore */ }
     }
   });
   mainWindow.on('show', () => {

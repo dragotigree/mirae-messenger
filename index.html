@@ -3792,6 +3792,19 @@
     html.ui-animations-off .log-card-item:hover,
     html.ui-animations-off .chat-quick-switcher-item.is-active {
       transform: none !important;
+      transition: none !important;
+    }
+    /* backdrop-filter 는 Windows GPU에서 모달/버튼 클릭 시 버벅임의 원인 — 애니메이션 Off 시 끔 */
+    html.ui-animations-off .modal-overlay,
+    html.ui-animations-off #dm-context-menu,
+    html.ui-animations-off #group-context-menu,
+    html.ui-animations-off #channel-context-menu,
+    html.ui-animations-off #dept-floor-context-menu,
+    html.ui-animations-off #quick-phrase-popover,
+    html.ui-animations-off #screen-capture-popover,
+    html.ui-animations-off #chat-quick-switcher-overlay {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
     }
     .master-admin-modal-card {
       width: min(1080px, 96vw) !important;
@@ -7083,7 +7096,10 @@
 
     const profilePhotoCache = new Map();
     const profilePhotoLoading = new Set();
+    const profilePhotoWaitQueue = [];
     const PROFILE_PHOTO_CACHE_MAX = 40;
+    const PROFILE_PHOTO_LOAD_CONCURRENCY = 2;
+    let profilePhotoLoadsInFlight = 0;
 
     function trimProfilePhotoCache() {
       while (profilePhotoCache.size > PROFILE_PHOTO_CACHE_MAX) {
@@ -7118,20 +7134,32 @@
       return copy;
     }
 
+    let avatarRefreshTimer = null;
+    const avatarRefreshPendingIps = new Set();
+
     function refreshAvatarsForIp(ip) {
-      renderUserListTree();
-      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
-      if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
-      if (activeChatUser && activeChatUser.ip === ip) {
-        const av = document.getElementById('chat-header-avatar');
-        if (av) setupAvatarElement(av, activeChatUser.username, activeChatUser.photo, activeChatUser.ip);
-      }
-      if (activeChatUser && activeChatUser.isGroup) {
-        try {
-          syncActiveGroupChatFromList();
-          renderGroupDetailPanel(activeChatUser);
-        } catch (e) { /* ignore */ }
-      }
+      if (ip) avatarRefreshPendingIps.add(ip);
+      if (avatarRefreshTimer) return;
+      avatarRefreshTimer = setTimeout(() => {
+        avatarRefreshTimer = null;
+        const ips = [...avatarRefreshPendingIps];
+        avatarRefreshPendingIps.clear();
+        renderUserListTree();
+        if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+        if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
+        ips.forEach((oneIp) => {
+          if (activeChatUser && activeChatUser.ip === oneIp) {
+            const av = document.getElementById('chat-header-avatar');
+            if (av) setupAvatarElement(av, activeChatUser.username, activeChatUser.photo, activeChatUser.ip);
+          }
+        });
+        if (activeChatUser && activeChatUser.isGroup) {
+          try {
+            syncActiveGroupChatFromList();
+            renderGroupDetailPanel(activeChatUser);
+          } catch (e) { /* ignore */ }
+        }
+      }, 120);
     }
 
     async function ensureProfilePhotoLoaded(ip) {
@@ -7152,10 +7180,27 @@
       }
     }
 
+    function pumpProfilePhotoQueue() {
+      while (profilePhotoLoadsInFlight < PROFILE_PHOTO_LOAD_CONCURRENCY && profilePhotoWaitQueue.length) {
+        const ip = profilePhotoWaitQueue.shift();
+        if (!ip || cachedPhotoForIp(ip) || profilePhotoLoading.has(ip)) continue;
+        profilePhotoLoadsInFlight += 1;
+        ensureProfilePhotoLoaded(ip).finally(() => {
+          profilePhotoLoadsInFlight = Math.max(0, profilePhotoLoadsInFlight - 1);
+          pumpProfilePhotoQueue();
+        });
+      }
+    }
+
     function queueProfilePhotoLoads(users) {
       (users || []).forEach((u) => {
-        if (u && u.hasPhoto && u.ip && !cachedPhotoForIp(u.ip)) void ensureProfilePhotoLoaded(u.ip);
+        if (u && u.hasPhoto && u.ip && !cachedPhotoForIp(u.ip) && !profilePhotoLoading.has(u.ip)) {
+          if (!profilePhotoWaitQueue.includes(u.ip)) profilePhotoWaitQueue.push(u.ip);
+        }
       });
+      // 대기열 폭주 방지
+      if (profilePhotoWaitQueue.length > 40) profilePhotoWaitQueue.length = 40;
+      pumpProfilePhotoQueue();
     }
 
     function applyProfilePhotoUpdate(data) {
