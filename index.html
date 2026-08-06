@@ -186,7 +186,18 @@
     body { font-size: var(--chat-font-size); }
 
     /* ========== 1단 사이드바 (Slack 스타일) ========== */
-    #sidebar-left { width: var(--sidebar-width, 300px); background: linear-gradient(180deg, var(--sidebar-bg) 0%, #081c32 100%); border-right: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; position: relative; box-shadow: 2px 0 16px rgba(15, 23, 42, 0.06); overflow-x: hidden; }
+    #sidebar-left {
+      width: var(--sidebar-width, 300px);
+      background: linear-gradient(180deg, var(--sidebar-bg) 0%, #081c32 100%);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; position: relative;
+      box-shadow: 2px 0 16px rgba(15, 23, 42, 0.06); overflow-x: hidden;
+      /* 대화 글꼴과 분리 — 목록 항목(유저/채널/부서헤더) 동일 크기 */
+      --sidebar-item-font-size: 12.5px;
+      --sidebar-item-font-weight: 600;
+      --sidebar-meta-font-size: 10.5px;
+      font-size: var(--sidebar-item-font-size);
+    }
     #sidebar-left ::-webkit-scrollbar:horizontal { height: 0; display: none; }
     #sidebar-resize-handle { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 20; transition: background var(--transition-fast); }
     #sidebar-resize-handle:hover, #sidebar-resize-handle.is-dragging { background: rgba(14, 165, 233, 0.35); }
@@ -257,7 +268,7 @@
     .notice-widget-area:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.16); }
     .notice-widget-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; color: #ffffff; }
 
-    #sidebar-left .section-label { padding: 5px 12px 3px 12px; font-size: 12px; }
+    #sidebar-left .section-label { padding: 5px 12px 3px 12px; font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); }
     .section-label { text-transform: uppercase; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.62); padding: 6px 12px 3px 12px; letter-spacing: 0.02em; }
     .section-label .group-chevron { display: inline-block; transition: transform var(--transition-fast); margin-right: 4px; font-size: 11px; opacity: .75; }
     .section-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
@@ -421,9 +432,25 @@
     .service-pause-unlock-btn:hover { filter: brightness(1.06); }
     .service-pause-unlock-btn:active { transform: translateY(1px); }
 
-    #sidebar-left .channel-item { padding: 3px 8px; margin: 0 4px 0 4px; font-size: 12px; gap: 5px; }
+    #sidebar-left .channel-item {
+      padding: 3px 8px; margin: 0 4px 0 4px; gap: 5px;
+      font-size: var(--sidebar-item-font-size);
+      font-weight: var(--sidebar-item-font-weight);
+      letter-spacing: -0.02em;
+    }
+    #sidebar-left .channel-item .channel-label {
+      font-size: var(--sidebar-item-font-size);
+      font-weight: var(--sidebar-item-font-weight);
+      letter-spacing: -0.02em;
+    }
+    #sidebar-left .channel-item .channel-hash,
+    #sidebar-left .channel-item .channel-hash.is-custom-emoji {
+      font-size: var(--sidebar-item-font-size);
+      line-height: 1;
+      min-width: 1.15em;
+    }
 
-    .channel-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; margin: 0 6px 1px 6px; border-radius: var(--radius-sm); color: var(--sidebar-text); font-weight: 500; font-size: 13px; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+    .channel-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; margin: 0 6px 1px 6px; border-radius: var(--radius-sm); color: var(--sidebar-text); font-weight: 600; font-size: 12.5px; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
     .channel-item:hover { background: var(--sidebar-hover); color: #fff; }
     .channel-item.active { background: var(--sidebar-active); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
     .channel-item.is-drop-hover, #chat-header.is-drop-hover, #dm-section-label.is-drop-hover { background: rgba(14, 165, 233, 0.22) !important; box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.75); }
@@ -434,8 +461,8 @@
     .channel-item .channel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .user-card-item[draggable="true"], .compact-list-item.user-drag-source { cursor: grab; }
     .user-card-item.is-user-dragging, .compact-list-item.is-user-dragging { opacity: 0.5; cursor: grabbing; }
-    .channel-hash { opacity: 0.92; font-weight: var(--font-weight-regular); font-size: 14px; min-width: 1.25em; text-align: center; flex-shrink: 0; }
-    .channel-hash.is-custom-emoji { opacity: 1; font-size: 15px; }
+    .channel-hash { opacity: 0.92; font-weight: var(--font-weight-regular); font-size: 12.5px; min-width: 1.15em; text-align: center; flex-shrink: 0; }
+    .channel-hash.is-custom-emoji { opacity: 1; font-size: 12.5px; }
     .title-emoji-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
     .title-emoji-pick-btn { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
@@ -448,7 +475,7 @@
     .ctx-menu-item:hover { background: var(--surface-muted); }
 
     /* ⭐ 서브 섹션/그룹 헤더 */
-    #sidebar-left .subsection-label { font-size: 12px; padding: 4px 10px 3px 10px; margin-top: 2px; line-height: 1.25; }
+    #sidebar-left .subsection-label { font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); padding: 4px 10px 3px 10px; margin-top: 2px; line-height: 1.25; }
     .subsection-label { font-size: 13.5px; font-weight: 600; color: #eef2f7; padding: 5px 10px 3px 10px; letter-spacing: -0.01em; border-bottom: 1px solid rgba(255,255,255,0.05); margin-top: 2px; margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; line-height: 1.35; }
     .subsection-label:hover { background: rgba(255,255,255,0.04); }
     .subsection-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 4px; font-size: 10px; opacity: .75; }
@@ -570,8 +597,18 @@
     #sidebar-left .user-card-item.is-offline { opacity: 0.52; }
     #sidebar-left .user-card-item.is-offline:hover { opacity: 0.82; }
     #sidebar-left .user-card-body { line-height: 1.25; padding-top: 0; }
-    #sidebar-left .user-name-text { font-size: 12px; font-weight: 600; letter-spacing: -0.02em; }
-    #sidebar-left .user-sub-text { font-size: 10.5px; font-weight: 400; color: rgba(255,255,255,0.58); margin-top: 1px; line-height: 1.3; }
+    #sidebar-left .user-name-text {
+      font-size: var(--sidebar-item-font-size);
+      font-weight: var(--sidebar-item-font-weight);
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    #sidebar-left .user-card-item.active .user-name-text,
+    #sidebar-left .user-card-item.is-multi-selected .user-name-text {
+      font-size: var(--sidebar-item-font-size);
+      font-weight: var(--sidebar-item-font-weight);
+    }
+    #sidebar-left .user-sub-text { font-size: var(--sidebar-meta-font-size); font-weight: 400; color: rgba(255,255,255,0.58); margin-top: 1px; line-height: 1.3; }
     #sidebar-left .user-sub-text .user-status-offline { color: #94a3b8; font-weight: 600; }
     #sidebar-left .user-card-item.is-offline .user-name-text { color: rgba(255,255,255,0.78); }
 
@@ -664,7 +701,7 @@
     .user-card-item.is-offline:hover { opacity: 0.82; }
     .user-card-body { flex: 1; min-width: 0; line-height: 1.25; }
     .user-card-unread { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; min-width: 20px; padding-left: 6px; }
-    .user-name-text { font-weight: 600; font-size: 12px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-name-text { font-weight: 600; font-size: 12.5px; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-sub-text { font-size: 10.5px; font-weight: 400; color: rgba(255,255,255,0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #sidebar-left .user-card-item .unread-badge { min-width: 18px; height: 18px; font-size: 10px; font-weight: 700; padding: 0 5px; box-shadow: 0 0 0 2px var(--sidebar-bg); display: inline-flex; align-items: center; justify-content: center; }
     #sidebar-left .channel-item .unread-badge,
