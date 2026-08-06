@@ -3814,6 +3814,10 @@
     .empty-icon-ring {
       animation: ui-float 4.5s ease-in-out infinite;
     }
+    /* 창이 최소화·백그라운드일 때 유휴 CPU/GPU 낭비 방지 (visibilitychange 핸들러에서 토글) */
+    html.is-bg-hidden .empty-icon-ring {
+      animation-play-state: paused;
+    }
     .empty-hint {
       animation: ui-fade-up 0.45s var(--ease-out) both;
     }
@@ -9640,6 +9644,7 @@
     }
 
     document.addEventListener('visibilitychange', () => {
+      document.documentElement.classList.toggle('is-bg-hidden', document.visibilityState !== 'visible');
       if (document.visibilityState !== 'visible') {
         // 다른 화면/최소화 — 이후 실제 입력이 있을 때까지 읽음 금지
         lastUserActivityAt = 0;

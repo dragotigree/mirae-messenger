@@ -685,6 +685,7 @@ async function findNewestUpdateCandidate() {
   for (let i = 1; i < candidates.length; i++) {
     if (compareVersions(candidates[i].version, best.version) > 0) best = candidates[i];
   }
+  best.candidates = candidates; // 호출부가 GitHub 후보를 재조회 없이 재사용할 수 있도록
   return best;
 }
 
@@ -7405,15 +7406,23 @@ const NOTICE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
 
 function pruneScheduleTombstones(done) {
   const cutoff = new Date(Date.now() - SCHEDULE_TOMBSTONE_KEEP_MS).toISOString();
-  db.run(`DELETE FROM deleted_schedules WHERE deleted_at < ?`, [cutoff], () => {
-    if (typeof done === 'function') done();
+  db.all(`SELECT uid FROM deleted_schedules WHERE deleted_at < ?`, [cutoff], (err, rows) => {
+    // 메모리 Set 수명을 DB 보관 기간(120일)과 맞춰 무한 성장 방지
+    if (!err && rows) rows.forEach((r) => scheduleTombstoneMemory.delete(String(r.uid)));
+    db.run(`DELETE FROM deleted_schedules WHERE deleted_at < ?`, [cutoff], () => {
+      if (typeof done === 'function') done();
+    });
   });
 }
 
 function pruneNoticeTombstones(done) {
   const cutoff = new Date(Date.now() - NOTICE_TOMBSTONE_KEEP_MS).toISOString();
-  db.run(`DELETE FROM deleted_notices WHERE deleted_at < ?`, [cutoff], () => {
-    if (typeof done === 'function') done();
+  db.all(`SELECT uid FROM deleted_notices WHERE deleted_at < ?`, [cutoff], (err, rows) => {
+    // 메모리 Set 수명을 DB 보관 기간(120일)과 맞춰 무한 성장 방지
+    if (!err && rows) rows.forEach((r) => noticeTombstoneMemory.delete(String(r.uid)));
+    db.run(`DELETE FROM deleted_notices WHERE deleted_at < ?`, [cutoff], () => {
+      if (typeof done === 'function') done();
+    });
   });
 }
 
@@ -11422,8 +11431,11 @@ async function autoCheckAndApplyUpdate() {
     const best = await findNewestUpdateCandidate();
     if (!best || compareVersions(best.version, APP_VERSION) <= 0) return;
     // 자동 적용은 GitHub를 우선 (Z hang 회피). GitHub에 새 버전이 있을 때만.
-    const gh = await probeUpdateVersionFromSource(DEFAULT_UPDATE_SOURCE_PATH);
-    if (!gh.ok || compareVersions(gh.version, APP_VERSION) <= 0) return;
+    // findNewestUpdateCandidate가 이미 GitHub를 조회해 뒀으므로 재조회하지 않고 재사용한다
+    // (GitHub API 요청은 회당 2건 — 재조회 시 10분마다 PC당 최대 4건까지 늘어나
+    // 비인증 API 시간당 한도를 불필요하게 앞당겨 소진시킬 수 있다).
+    const gh = (best.candidates || []).find((c) => c.kind === 'github') || (best.kind === 'github' ? best : null);
+    if (!gh || compareVersions(gh.version, APP_VERSION) <= 0) return;
     remote = { version: gh.version, notes: gh.notes || '' };
     pendingUpdateFetchPath = gh.sourcePath;
     updateSourcePath = gh.sourcePath;
