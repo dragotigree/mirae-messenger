@@ -1,4 +1,4 @@
 {
-  "version": "1.0.490",
-  "notes": "감사 보완: 471롤백 때 빠진 known_users.phone_no ALTER·DB오류 스로틀·mobile_server 안전로드 복구 (489 TCP/클릭 안정 유지)"
+  "version": "1.0.491",
+  "notes": "미니모드 사이드바에 기본(일반) 화면 전환 아이콘 추가"
 }
