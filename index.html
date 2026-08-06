@@ -14064,6 +14064,12 @@
       refreshNoticePermission();
       updateBoardAuthStatusText();
       showBoardListView();
+      // 다른 PC에 있는 공지도 받아와 전 직원이 읽을 수 있게
+      try {
+        if (window.api && typeof window.api.requestNoticeSync === 'function') {
+          window.api.requestNoticeSync().catch(() => {});
+        }
+      } catch (_) { /* ignore */ }
     }
     function closeBoardModal() {
       document.getElementById('board-modal').style.display = 'none';
@@ -14582,16 +14588,23 @@
             return;
           }
           boardWriteImages = [];
-          // 등록 직후엔 「모두」로 보여 방금 쓴 글이 바로 보이게
           boardCategoryFilter = '__all__';
           localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
-          if (res.notice && res.notice.uid) {
-            const n = { ...res.notice, category: normalizeBoardCategory(res.notice.category || category) };
-            const idx = (cachedNoticesList || []).findIndex((x) => x.uid === n.uid);
-            if (idx >= 0) cachedNoticesList[idx] = n;
-            else cachedNoticesList = [n].concat(cachedNoticesList || []);
-          }
+          const savedNotice = res.notice && res.notice.uid
+            ? { ...res.notice, category: normalizeBoardCategory(res.notice.category || category) }
+            : null;
           await loadNoticesList();
+          // DB 반영이 늦거나 목록이 비면 방금 저장한 글을 목록에 유지
+          if (savedNotice && !(cachedNoticesList || []).some((x) => x.uid === savedNotice.uid)) {
+            cachedNoticesList = [savedNotice].concat(cachedNoticesList || []);
+            renderBoardCategoryFilters(cachedNoticesList);
+            renderFilteredNoticesList();
+          }
+          try {
+            if (window.api && typeof window.api.requestNoticeSync === 'function') {
+              window.api.requestNoticeSync().catch(() => {});
+            }
+          } catch (_) { /* ignore */ }
           showBoardListView();
         }
       } catch (e) {

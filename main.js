@@ -6180,40 +6180,97 @@ function normalizeNoticeCategory(raw) {
   return s.slice(0, 40);
 }
 
-let noticesCategoryColumnReady = false;
+let noticesSchemaReady = false;
+let noticesSchemaEnsuring = null; // callback queue
+/** 삭제된 공지 UID 즉시 기억 (DB 기록 전 레이스 방지) — 아래 const 재선언 없이 여기만 사용 */
+let noticeTombstoneMemory = new Set();
 
-function ensureNoticesCategoryColumn(done) {
+function ensureNoticesTableSchema(done) {
   const finish = typeof done === 'function' ? done : () => {};
   if (!db) {
     finish(false);
     return;
   }
-  if (noticesCategoryColumnReady) {
+  if (noticesSchemaReady) {
     finish(true);
     return;
   }
-  db.all(`PRAGMA table_info(notices)`, [], (err, rows) => {
-    if (err) {
-      console.error('notices schema 확인 실패:', err.message);
-      finish(false);
-      return;
-    }
-    const cols = (rows || []).map((r) => String(r.name || '').toLowerCase());
-    if (cols.includes('category')) {
-      noticesCategoryColumnReady = true;
-      finish(true);
-      return;
-    }
-    db.run(`ALTER TABLE notices ADD COLUMN category TEXT DEFAULT '전체'`, (alterErr) => {
-      if (alterErr && !/duplicate column/i.test(String(alterErr.message || ''))) {
-        console.error('notices.category 추가 실패:', alterErr.message);
-        finish(false);
+  if (Array.isArray(noticesSchemaEnsuring)) {
+    noticesSchemaEnsuring.push(finish);
+    return;
+  }
+  noticesSchemaEnsuring = [finish];
+  const complete = (ok) => {
+    const waiters = noticesSchemaEnsuring || [];
+    noticesSchemaEnsuring = null;
+    if (ok) noticesSchemaReady = true;
+    waiters.forEach((fn) => {
+      try { fn(ok); } catch (_) { /* ignore */ }
+    });
+  };
+
+  const required = [
+    { name: 'uid', ddl: 'uid TEXT' },
+    { name: 'title', ddl: 'title TEXT' },
+    { name: 'content', ddl: 'content TEXT' },
+    { name: 'author_name', ddl: 'author_name TEXT' },
+    { name: 'author_ip', ddl: 'author_ip TEXT' },
+    { name: 'created_at', ddl: 'created_at TEXT' },
+    { name: 'images', ddl: "images TEXT DEFAULT ''" },
+    { name: 'category', ddl: "category TEXT DEFAULT '전체'" }
+  ];
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS notices (
+      uid TEXT PRIMARY KEY,
+      title TEXT,
+      content TEXT,
+      author_name TEXT,
+      author_ip TEXT,
+      created_at TEXT,
+      images TEXT DEFAULT '',
+      category TEXT DEFAULT '전체'
+    )`,
+    (createErr) => {
+      if (createErr) {
+        console.error('notices 테이블 생성 실패:', createErr.message);
+        complete(false);
         return;
       }
-      noticesCategoryColumnReady = true;
-      db.run(`UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(COALESCE(category, '')) = ''`, () => finish(true));
-    });
-  });
+      db.all(`PRAGMA table_info(notices)`, [], (err, rows) => {
+        if (err) {
+          console.error('notices schema 확인 실패:', err.message);
+          complete(false);
+          return;
+        }
+        const cols = new Set((rows || []).map((r) => String(r.name || '').toLowerCase()));
+        const missing = required.filter((c) => !cols.has(c.name));
+        const addNext = (idx) => {
+          if (idx >= missing.length) {
+            db.run(
+              `UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(COALESCE(category, '')) = ''`,
+              () => complete(true)
+            );
+            return;
+          }
+          const col = missing[idx];
+          db.run(`ALTER TABLE notices ADD COLUMN ${col.ddl}`, (alterErr) => {
+            if (alterErr && !/duplicate column/i.test(String(alterErr.message || ''))) {
+              console.error(`notices.${col.name} 추가 실패:`, alterErr.message);
+              // 다음 컬럼도 시도 (부분 스키마라도 INSERT 폴백 가능)
+            }
+            addNext(idx + 1);
+          });
+        };
+        addNext(0);
+      });
+    }
+  );
+}
+
+/** @deprecated 호환용 — ensureNoticesTableSchema 사용 */
+function ensureNoticesCategoryColumn(done) {
+  ensureNoticesTableSchema(done);
 }
 
 function insertNoticeRecord(record, callback) {
@@ -6222,70 +6279,89 @@ function insertNoticeRecord(record, callback) {
   const category = normalizeNoticeCategory(row.category);
   const images = normalizeNoticeImagesField(row.images);
   const saved = { ...row, images, category };
-  const paramsWithCat = [
-    row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at, images, category
+  const base = [row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at];
+
+  const attempts = [
+    {
+      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [...base, images, category]
+    },
+    {
+      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [...base, images]
+    },
+    {
+      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, category) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [...base, category]
+    },
+    {
+      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      params: base
+    }
   ];
-  const paramsNoCat = [
-    row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at, images
-  ];
-  const insertWithoutCategory = (done) => {
-    db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      paramsNoCat,
-      (err2) => {
-        if (!err2) {
-          // 컬럼이 생기면 카테고리 보정
-          noticesCategoryColumnReady = false;
-          ensureNoticesCategoryColumn(() => {
-            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, row.uid], () => {});
-          });
-        }
-        done(err2);
-      }
-    );
-  };
-  ensureNoticesCategoryColumn((ok) => {
-    if (!ok) {
-      insertWithoutCategory((err2) => cb(err2, err2 ? null : saved));
+
+  const tryAt = (idx) => {
+    if (idx >= attempts.length) {
+      cb(new Error('공지 저장 실패: DB 스키마를 맞출 수 없습니다'));
       return;
     }
-    db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      paramsWithCat,
-      (err) => {
-        if (!err) {
-          cb(null, saved);
-          return;
+    const a = attempts[idx];
+    db.run(a.sql, a.params, (err) => {
+      if (!err) {
+        if (idx > 0) {
+          noticesSchemaReady = false;
+          ensureNoticesTableSchema(() => {
+            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, row.uid], () => {});
+            db.run(`UPDATE notices SET images = ? WHERE uid = ?`, [images, row.uid], () => {});
+          });
         }
-        // 구버전 DB / 마이그레이션 지연 시 category 없이 재시도
-        const msg = String(err.message || '');
-        if (/no such column|no column.*category|has no column named category/i.test(msg)) {
-          noticesCategoryColumnReady = false;
-          insertWithoutCategory((err2) => cb(err2, err2 ? null : saved));
-          return;
-        }
-        cb(err);
+        cb(null, saved);
+        return;
       }
-    );
+      const msg = String(err.message || '');
+      if (/no such column|has no column named/i.test(msg)) {
+        noticesSchemaReady = false;
+        tryAt(idx + 1);
+        return;
+      }
+      cb(err);
+    });
+  };
+
+  ensureNoticesTableSchema(() => {
+    if (!row.uid) {
+      cb(new Error('공지 uid 없음'));
+      return;
+    }
+    tryAt(0);
   });
+}
+
+function clearNoticeTombstone(uid, done) {
+  const finish = typeof done === 'function' ? done : () => {};
+  if (!uid) {
+    finish();
+    return;
+  }
+  const key = String(uid);
+  noticeTombstoneMemory.delete(key);
+  if (!db) {
+    finish();
+    return;
+  }
+  db.run(`DELETE FROM deleted_notices WHERE uid = ?`, [key], () => finish());
 }
 
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
-  isNoticeTombstoned(n.uid, (tombstoned) => {
-    if (tombstoned) {
-      db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
-      return;
-    }
-    db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
-      if (row) return;
-      insertNoticeRecord(n, (insErr) => {
-        if (insErr) {
-          console.error('NOTICE_ADD 저장 실패:', insErr.message);
-          return;
-        }
-        if (mainWindow) safeWebContentsSend('notices-update');
-      });
+  // 실시간 추가도 tombstone에 막히지 않도록 정리 후 저장 (작성 PC → 전 직원 전파)
+  clearNoticeTombstone(n.uid, () => {
+    insertNoticeRecord(n, (insErr) => {
+      if (insErr) {
+        console.error('NOTICE_ADD 저장 실패:', insErr.message);
+        return;
+      }
+      if (mainWindow) safeWebContentsSend('notices-update');
     });
   });
 }
@@ -6406,7 +6482,7 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     if ((deletedNoticeUids || []).length) tryPush({ ...baseMeta, deletedNoticeUids });
   }
 
-  // 1b) 공지 — 사진 포함 시 단건 청크로 나눠 전송
+  // 1b) 공지 — 사진 포함 시 단건 청크로 나눠 전송 (한도 초과면 사진 제외하고라도 본문은 전달)
   const noticeList = notices || [];
   let noticeBatch = [];
   const flushNoticeBatch = () => {
@@ -6417,7 +6493,14 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
       return;
     }
     if (noticeBatch.length === 1) {
-      console.error('공지 단건이 TCP 한도를 초과해 동기화에서 제외:', noticeBatch[0] && noticeBatch[0].uid);
+      const only = noticeBatch[0];
+      const slim = Object.assign({}, only, { images: '[]' });
+      const slimObj = { ...baseMeta, notices: [slim], deletedNoticeUids: deletedNoticeUids || [] };
+      if (!tryPush(slimObj)) {
+        console.error('공지 단건이 TCP 한도를 초과해 동기화에서 제외:', only && only.uid);
+      } else {
+        console.warn(`[공지] ${only && only.uid} 사진 제외하고 본문만 동기화`);
+      }
       noticeBatch = [];
       return;
     }
@@ -6538,11 +6621,15 @@ function handleNoticeSyncRequest(senderIP) {
 }
 
 function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster, deletedScheduleUids, deletedNoticeUids) {
+  // 같은 응답에 공지 본문이 있는 UID는 삭제 목록보다 우선 (방금 작성·재동기화 건 보호)
+  const incomingNoticeUids = new Set(
+    (Array.isArray(notices) ? notices : []).map((n) => n && n.uid).filter(Boolean).map(String)
+  );
   // 공지 삭제 목록을 INSERT보다 먼저 적용해 되살림 방지
   if (Array.isArray(deletedNoticeUids) && deletedNoticeUids.length) {
-    rememberNoticeTombstones(deletedNoticeUids);
-    deletedNoticeUids.forEach((uid) => {
-      if (!uid) return;
+    const toDelete = deletedNoticeUids.filter((uid) => uid && !incomingNoticeUids.has(String(uid)));
+    rememberNoticeTombstones(toDelete);
+    toDelete.forEach((uid) => {
       applyLocalNoticeDelete(uid, { notify: false, skipBroadcast: true });
     });
   }
@@ -6843,7 +6930,7 @@ const SCHEDULE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
 const scheduleTombstoneMemory = new Set();
 
 const NOTICE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
-const noticeTombstoneMemory = new Set();
+// noticeTombstoneMemory 는 ensureNoticesTableSchema 상단에서 선언
 
 function pruneScheduleTombstones(done) {
   const cutoff = new Date(Date.now() - SCHEDULE_TOMBSTONE_KEEP_MS).toISOString();
@@ -6963,11 +7050,8 @@ function applyLocalNoticeDelete(uid, opts) {
 
 function upsertNoticeFromSync(n) {
   if (!n || !n.uid) return;
-  isNoticeTombstoned(n.uid, (tombstoned) => {
-    if (tombstoned) {
-      db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], logDbErr);
-      return;
-    }
+  // 동기화 응답에 본문이 온 공지는 tombstone보다 우선해 저장 (전체 직원이 읽을 수 있게)
+  clearNoticeTombstone(n.uid, () => {
     insertNoticeRecord(n, (insErr) => {
       if (insErr) console.error('notice sync upsert 실패:', insErr.message);
     });
@@ -7155,6 +7239,23 @@ function requestNoticeSync(targetIP) {
   client.on('error', () => {});
   client.on('timeout', () => client.destroy());
 }
+
+/** 온라인 동료 몇 명에게 공지 동기화 요청 (게시판 열 때·작성 후) */
+function requestNoticeSyncFromOnlinePeers(limit) {
+  const max = Math.max(1, Math.min(Number(limit) || 8, 20));
+  let n = 0;
+  onlineUsers.forEach((_u, ip) => {
+    if (n >= max) return;
+    if (!ip || ip === MY_IP) return;
+    requestNoticeSync(ip);
+    n += 1;
+  });
+}
+
+ipcMain.handle('request-notice-sync', async () => {
+  requestNoticeSyncFromOnlinePeers(10);
+  return { success: true };
+});
 
 function broadcastToOnlinePeers(payloadObj) {
   const wireData = JSON.stringify(payloadObj) + '\n';
@@ -8939,7 +9040,8 @@ function broadcastGroupJoinNotice(uid, groupName, memberDisplayName, memberIps) 
 }
 
 function generateNoticeUid() {
-  return `${MY_IP}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  const rand = Math.floor(Math.random() * 1e9).toString(36);
+  return `${MY_IP}_${Date.now()}_${rand}`;
 }
 
 function generateMsgUid() {
@@ -8948,11 +9050,30 @@ function generateMsgUid() {
 
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
-    ensureNoticesCategoryColumn(() => {
+    ensureNoticesTableSchema(() => {
       db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) {
           console.error('get-notices 실패:', err.message);
-          resolve([]);
+          // 스키마 이슈면 한 번 더 보정 후 재시도
+          noticesSchemaReady = false;
+          ensureNoticesTableSchema(() => {
+            db.all(`SELECT uid, title, content, author_name, author_ip, created_at, images, category FROM notices ORDER BY created_at DESC`, [], (err2, rows2) => {
+              if (err2) {
+                db.all(`SELECT uid, title, content, author_name, author_ip, created_at FROM notices ORDER BY created_at DESC`, [], (err3, rows3) => {
+                  if (err3) {
+                    resolve([]);
+                    return;
+                  }
+                  resolve((rows3 || []).map((r) => ({ ...r, category: normalizeNoticeCategory(r && r.category), images: r.images || '[]' })));
+                });
+                return;
+              }
+              resolve((rows2 || []).map((r) => ({
+                ...r,
+                category: normalizeNoticeCategory(r && r.category)
+              })));
+            });
+          });
           return;
         }
         resolve((rows || []).map((r) => ({
@@ -8977,14 +9098,35 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images,
       images,
       category
     };
-    insertNoticeRecord(record, (err, saved) => {
-      if (err) {
-        console.error('공지사항 저장 실패:', err.message);
-        resolve({ success: false, error: err.message, msg: err.message });
-        return;
-      }
-      broadcastNoticeWire('NOTICE_ADD', saved);
-      resolve({ success: true, notice: saved });
+    clearNoticeTombstone(record.uid, () => {
+      insertNoticeRecord(record, (err, saved) => {
+        if (err) {
+          console.error('공지사항 저장 실패:', err.message);
+          resolve({ success: false, error: err.message, msg: err.message });
+          return;
+        }
+        // 저장 직후 읽기 검증 — 실패 시 재시도
+        db.get(`SELECT uid FROM notices WHERE uid = ?`, [saved.uid], (getErr, row) => {
+          const finishOk = (notice) => {
+            broadcastNoticeWire('NOTICE_ADD', notice);
+            if (mainWindow) safeWebContentsSend('notices-update');
+            resolve({ success: true, notice });
+          };
+          if (!getErr && row) {
+            finishOk(saved);
+            return;
+          }
+          console.warn('공지 저장 후 조회 실패 — 재저장 시도', saved.uid, getErr && getErr.message);
+          noticesSchemaReady = false;
+          insertNoticeRecord(saved, (err2, saved2) => {
+            if (err2) {
+              resolve({ success: false, error: err2.message, msg: err2.message });
+              return;
+            }
+            finishOk(saved2 || saved);
+          });
+        });
+      });
     });
   });
 });

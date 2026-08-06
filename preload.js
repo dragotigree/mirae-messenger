@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('api', {
   // 📢 공지사항 게시판
   getNotices: () => ipcRenderer.invoke('get-notices'),
   addNotice: (noticeData) => ipcRenderer.invoke('add-notice', noticeData),
+  requestNoticeSync: () => ipcRenderer.invoke('request-notice-sync'),
   updateNotice: (noticeData) => ipcRenderer.invoke('update-notice', noticeData),
   deleteNotice: (uid) => ipcRenderer.invoke('delete-notice', uid),
 
