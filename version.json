@@ -1,4 +1,4 @@
 {
-  "version": "1.0.479",
-  "notes": "긴급: 서브넷 508스캔 완전 OFF·GPU가속 비활성·GOODBYE 508제거 — CPU 13% 상시 점유 완화"
+  "version": "1.0.480",
+  "notes": "핫픽스: 수신 UDP rate-limit(초당 60/IP당 4)·스톰 시 송신 유니캐스트 중단 — 네트워크 폭발·CPU 완화"
 }
