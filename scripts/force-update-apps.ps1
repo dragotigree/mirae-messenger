@@ -133,10 +133,10 @@ $pkgJson = Get-Content -LiteralPath (Join-Path $PackagedApp 'package.json') -Raw
 $verJson = Read-Version $PackagedApp
 Write-Host ("  package.json = " + $pkgJson.version)
 Write-Host ("  version.json = " + $verJson)
-Write-Host ("  Expected: 1.0.476 (stable restore)") -ForegroundColor Yellow
+Write-Host ("  Expected: 1.0.477 (stable restore)") -ForegroundColor Yellow
 
-if ($verJson -ne '1.0.476') {
-  Write-Host 'WARN: version is not 1.0.476 yet. GitHub cache? Re-run in 1 minute.' -ForegroundColor Yellow
+if ($verJson -ne '1.0.477') {
+  Write-Host 'WARN: version is not 1.0.477 yet. GitHub cache? Re-run in 1 minute.' -ForegroundColor Yellow
 }
 
 Write-Host ''
