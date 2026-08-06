@@ -338,6 +338,15 @@ const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
+/** 프레즌스 빠른 하트비트(온라인·최근 동료) */
+const PRESENCE_HEARTBEAT_MS = 4000;
+/** 전체 서브넷(508대) 탐색 주기 — 매 틱 508유니캐스트는 CPU·메모리 스파이크 유발 */
+const PRESENCE_FULL_SCAN_MS = 20000;
+/** 빠른 하트비트 대상: 최근 이 시간 안에 본 동료 */
+const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
+/** 예전 data: URL 메시지를 mirae-file 로 서서히 줄이는 백그라운드 compact */
+const LEGACY_MSG_COMPACT_INTERVAL_MS = 12000;
+const LEGACY_MSG_COMPACT_BATCH = 6;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -375,6 +384,10 @@ let udpBindRetryTimer = null;
 let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
+let presenceFullScanDueAt = 0;
+let legacyMessageCompactCursor = 0;
+let legacyMessageCompactDone = false;
+let lastMemoryPressureLogAt = 0;
 
 const MY_IP = getMyIP();
 
@@ -1690,6 +1703,59 @@ function compactMessageRowById(rowId, msgUid, messageHtml) {
   }
 }
 
+/** DB에 남은 data: base64 메시지를 서서히 mirae-file 로 줄여 힙·채팅 로드 부담을 낮춘다 */
+function startLegacyMessageCompaction() {
+  setInterval(() => {
+    if (legacyMessageCompactDone || !db) return;
+    db.all(
+      `SELECT id, msg_uid, message, status FROM messages
+       WHERE id > ? AND message LIKE '%data:%;base64,%'
+       ORDER BY id ASC LIMIT ?`,
+      [legacyMessageCompactCursor, LEGACY_MSG_COMPACT_BATCH],
+      (err, rows) => {
+        if (err) {
+          logDbErr(err);
+          return;
+        }
+        if (!rows || !rows.length) {
+          legacyMessageCompactDone = true;
+          console.log('[compact] 레거시 data: 메시지 정리 완료(또는 대상 없음)');
+          return;
+        }
+        rows.forEach((r) => {
+          legacyMessageCompactCursor = Math.max(legacyMessageCompactCursor, Number(r.id) || 0);
+          if (r.status === 'PENDING') return;
+          if (typeof r.message !== 'string' || r.message.indexOf('data:') === -1) return;
+          compactMessageRowById(r.id, r.msg_uid, r.message);
+        });
+      }
+    );
+  }, LEGACY_MSG_COMPACT_INTERVAL_MS);
+}
+
+function maybeLogHighMemoryUsage() {
+  try {
+    const metrics = app.getAppMetrics();
+    let totalKB = 0;
+    metrics.forEach((m) => {
+      totalKB += Number((m.memory && m.memory.workingSetSize) || 0);
+    });
+    const totalMB = Math.round(totalKB / 1024);
+    const now = Date.now();
+    if (totalMB >= 900 && now - lastMemoryPressureLogAt > 60000) {
+      lastMemoryPressureLogAt = now;
+      const parts = metrics.map((m) => `${m.type}:${Math.round(((m.memory && m.memory.workingSetSize) || 0) / 1024)}MB`).join(' ');
+      console.warn(`[memory] 합계 ~${totalMB}MB (${parts})`);
+      writeToLogFile('warn', `[memory] 합계 ~${totalMB}MB ${parts}`);
+      try { safeWebContentsSend('renderer-memory-trim', { reason: 'pressure', totalMB }); } catch (e) { /* ignore */ }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function startMemoryPressureMonitor() {
+  setInterval(maybeLogHighMemoryUsage, 30000);
+}
+
 /** 메시지 큐/채널용 가상 receiver 키 — 실제 사용자 IP가 아님 */
 function isSyntheticReceiverKey(ip) {
   const s = String(ip || '').trim();
@@ -2911,12 +2977,20 @@ function createWindow() {
   mainWindow.on('hide', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
+      try { safeWebContentsSend('renderer-memory-trim', { reason: 'hide' }); } catch (e) { /* ignore */ }
+      // Chromium HTTP 캐시만 비움 — 채팅 DB/첨부 파일은 건드리지 않음
+      try {
+        session.defaultSession.clearCache().catch(() => {});
+      } catch (e) { /* ignore */ }
     }
   });
   mainWindow.on('show', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
     }
+  });
+  mainWindow.on('minimize', () => {
+    try { safeWebContentsSend('renderer-memory-trim', { reason: 'minimize' }); } catch (e) { /* ignore */ }
   });
   mainWindow.on('focus', () => { toastUiState.focused = true; });
   mainWindow.on('blur', () => { toastUiState.focused = false; });
@@ -3413,8 +3487,12 @@ ipcMain.handle('get-desktop-capture-sources', async () => {
 ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
   try {
     const primary = screen.getPrimaryDisplay();
-    const thumbW = Math.min(7680, Math.max(640, Math.round(primary.size.width * primary.scaleFactor)));
-    const thumbH = Math.min(4320, Math.max(480, Math.round(primary.size.height * primary.scaleFactor)));
+    // 4K·고배율 캡처는 메인/렌더러 힙을 수백 MB 단위로 순간 점유 → 긴 변 1920 상한
+    const rawW = Math.max(640, Math.round(primary.size.width * primary.scaleFactor));
+    const rawH = Math.max(480, Math.round(primary.size.height * primary.scaleFactor));
+    const scale = Math.min(1, 1920 / Math.max(rawW, rawH));
+    const thumbW = Math.max(640, Math.round(rawW * scale));
+    const thumbH = Math.max(480, Math.round(rawH * scale));
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
       thumbnailSize: { width: thumbW, height: thumbH },
@@ -3424,7 +3502,7 @@ ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
     if (!source || !source.thumbnail || source.thumbnail.isEmpty()) {
       return { success: false, error: 'EMPTY_CAPTURE' };
     }
-    const jpeg = source.thumbnail.toJPEG(88);
+    const jpeg = source.thumbnail.toJPEG(82);
     const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
     return { success: true, dataUrl };
   } catch (err) {
@@ -3484,6 +3562,8 @@ app.whenReady().then(async () => {
   startMobileServer(db, MY_IP);
   startScheduledMessageChecker();
   startPresenceSweeper();
+  startLegacyMessageCompaction();
+  startMemoryPressureMonitor();
   startAutoBackup();
   startUpdateChecker();
   startPendingWipeRetryLoop();
@@ -3575,10 +3655,11 @@ function startUdpDiscovery() {
 
     if (!presenceFlushTimersStarted) {
       presenceFlushTimersStarted = true;
+      presenceFullScanDueAt = 0; // 첫 PING은 전체 서브넷 탐색
       setInterval(() => {
         registerSelf();
         if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-      }, 4000);
+      }, PRESENCE_HEARTBEAT_MS);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
       setInterval(() => flushAllPendingOutboundMessages(), 15000);
     }
@@ -3717,6 +3798,35 @@ function registerSelf() {
   notifyUserList();
 }
 
+function collectPresenceHeartbeatIps() {
+  const out = new Set();
+  const now = Date.now();
+  onlineUsers.forEach((_u, ip) => {
+    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.add(ip);
+  });
+  allKnownUsers.forEach((u, ip) => {
+    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+    const beat = Number((u && u.lastPingAt) || 0) || Number((u && u.lastSeen) || 0) || 0;
+    if (beat && now - beat <= PRESENCE_RECENT_PEER_MS) out.add(ip);
+  });
+  return Array.from(out);
+}
+
+function sendPresenceUnicastBatches(socket, packet, ips) {
+  if (!socket || !packet || !ips || !ips.length) return;
+  let i = 0;
+  const BATCH = 48;
+  const sendBatch = () => {
+    if (!globalUdpSocket || globalUdpSocket !== socket) return;
+    const end = Math.min(i + BATCH, ips.length);
+    for (; i < end; i++) {
+      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
+    }
+    if (i < ips.length) setImmediate(sendBatch);
+  };
+  sendBatch();
+}
+
 function broadcastPresence(socket) {
   if (!socket) return;
   if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
@@ -3733,19 +3843,15 @@ function broadcastPresence(socket) {
     appVersion: APP_VERSION
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
-  socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
-  // 다른 층 대역 유니캐스트(최대 508개) — 한 틱에 몰아보내면 메인 루프가 잠깐 멈출 수 있어 배치
-  const ips = KNOWN_SUBNET_HOST_IPS;
-  let i = 0;
-  const BATCH = 64;
-  const sendBatch = () => {
-    const end = Math.min(i + BATCH, ips.length);
-    for (; i < end; i++) {
-      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
-    }
-    if (i < ips.length) setImmediate(sendBatch);
-  };
-  sendBatch();
+  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
+
+  const now = Date.now();
+  const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
+  if (doFullScan) presenceFullScanDueAt = now + PRESENCE_FULL_SCAN_MS;
+
+  // 평소: 온라인·최근 동료만 유니캐스트(CPU 스파이크 완화). 주기적으로만 전체 서브넷 탐색.
+  const ips = doFullScan ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
+  sendPresenceUnicastBatches(socket, packet, ips);
 }
 
 function broadcastGoodbye() {
@@ -7328,7 +7434,7 @@ ipcMain.handle('get-chat-shared-archive', async (event, targetIP) => {
   return new Promise((resolve) => {
     const sql = `SELECT id, sender_name, sender_ip, message, msg_uid,
       strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_at_local
-      FROM messages WHERE ${scope.where}${mediaWhere} ORDER BY id DESC LIMIT 2500`;
+      FROM messages WHERE ${scope.where}${mediaWhere} ORDER BY id DESC LIMIT 500`;
     db.all(sql, scope.params, (err, rows) => {
       if (err) {
         logDbErr(err);

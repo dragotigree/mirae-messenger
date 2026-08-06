@@ -7083,7 +7083,7 @@
 
     const profilePhotoCache = new Map();
     const profilePhotoLoading = new Set();
-    const PROFILE_PHOTO_CACHE_MAX = 100;
+    const PROFILE_PHOTO_CACHE_MAX = 40;
 
     function trimProfilePhotoCache() {
       while (profilePhotoCache.size > PROFILE_PHOTO_CACHE_MAX) {
@@ -7173,6 +7173,42 @@
       }
       refreshAvatarsForIp(data.ip);
     }
+
+    function trimRendererMemory(reason, opts) {
+      const options = opts || {};
+      try {
+        // 프로필 사진 캐시를 절반으로 줄여 디코딩된 비트맵 압력을 낮춘다
+        const keep = Math.max(8, Math.floor(PROFILE_PHOTO_CACHE_MAX / 2));
+        while (profilePhotoCache.size > keep) {
+          const oldest = profilePhotoCache.keys().next().value;
+          profilePhotoCache.delete(oldest);
+        }
+        if (options.trimChatDom) {
+          const msgsEl = document.getElementById('chat-messages-area');
+          if (msgsEl && !activeChatUser) {
+            msgsEl.innerHTML = '';
+          } else if (msgsEl && msgsEl.children.length > 100) {
+            while (msgsEl.children.length > 100) {
+              msgsEl.removeChild(msgsEl.firstChild);
+            }
+          }
+        }
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug('[memory-trim]', reason || 'manual', 'photos=', profilePhotoCache.size);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    if (window.api && typeof window.api.onRendererMemoryTrim === 'function') {
+      window.api.onRendererMemoryTrim((data) => {
+        const reason = (data && data.reason) || 'ipc';
+        trimRendererMemory(reason, { trimChatDom: reason === 'pressure' || reason === 'hide' || reason === 'minimize' });
+      });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) trimRendererMemory('visibility', { trimChatDom: false });
+    });
+
     let userFilterKeyword = '';
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
@@ -16525,7 +16561,7 @@
     let chatSharedTab = 'media';
     let chatSharedCache = { channelKey: '', photos: [], files: [], links: [], loading: false };
     let chatSharedLoadSeq = 0;
-    const MAX_SHARED_PHOTOS_RENDER = 360;
+    const MAX_SHARED_PHOTOS_RENDER = 120;
 
     function syncChatSharedArchiveBtnUi() {
       const drawer = document.getElementById('chat-shared-drawer');
@@ -18129,8 +18165,9 @@
       const wasNearBottom = isMe || isNearChatBottom();
       const dateKey = resolveChatDateKey(sentAtLabelForPending, options);
 
-      // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 제한 (예: 300개)
-      if (container.children.length > 300) {
+      // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 (이미지가 많으면 RAM이 급증)
+      const MAX_CHAT_DOM_NODES = 160;
+      while (container.children.length > MAX_CHAT_DOM_NODES) {
         container.removeChild(container.firstChild);
         // 맨 위가 날짜선만 남지 않도록 정리
         while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
