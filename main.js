@@ -398,9 +398,15 @@ const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 /** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
-const PRESENCE_HEARTBEAT_MS = 10000;
+const PRESENCE_HEARTBEAT_MS = 15000;
 /** 전체 서브넷 508 스캔 OFF (1.0.486). 브로드캐스트 + 온라인 동료만 */
 const PRESENCE_FULL_SCAN_ENABLED = false;
+/** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
+const UDP_RX_MAX_PER_SEC = 30;
+const UDP_RX_MAX_PER_IP_PER_SEC = 3;
+/** 수신이 이 값을 넘으면 잠시 송신 유니캐스트 중단(브로드캐스트만) */
+const UDP_STORM_THRESHOLD_PER_SEC = 20;
+const UDP_STORM_COOLDOWN_MS = 12000;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -439,6 +445,12 @@ let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
 let lastSelfRegisterSig = '';
+let udpRxWindowStart = 0;
+let udpRxWindowCount = 0;
+/** @type {Map<string, { start: number, count: number }>} */
+const udpRxPerIpWindow = new Map();
+let udpStormUntil = 0;
+let udpDropLoggedAt = 0;
 /** 부팅 직후 이 시각까지 대용량 TCP 동기화(NOTICE_SYNC/FILE)를 막아 UI 프리징 방지 */
 let networkQuietUntil = 0;
 let tcpActiveConnections = 0;
@@ -2850,6 +2862,12 @@ db.serialize(() => {
     }
   });
 
+  // 과거「나에게 보내기」실패분이 PENDING으로 남은 경우 SENT로 정리
+  db.run(
+    `UPDATE messages SET status = 'SENT' WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'`,
+    [MY_IP, MY_IP],
+    logDbErr
+  );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
@@ -3808,6 +3826,7 @@ function startUdpDiscovery() {
 
   globalUdpSocket.on('message', (msg, rinfo) => {
     if (rinfo.address === MY_IP) return;
+    if (!allowUdpReceive(rinfo.address)) return;
 
     try {
       const data = JSON.parse(msg.toString('utf8'));
@@ -3985,6 +4004,39 @@ function registerSelf() {
   notifyUserList();
 }
 
+
+function allowUdpReceive(fromIp) {
+  const now = Date.now();
+  if (now - udpRxWindowStart >= 1000) {
+    udpRxWindowStart = now;
+    udpRxWindowCount = 0;
+  }
+  if (udpRxWindowCount >= UDP_RX_MAX_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+    if (now - udpDropLoggedAt > 10000) {
+      udpDropLoggedAt = now;
+      console.warn(`[udp] receive storm — dropping packets (>${UDP_RX_MAX_PER_SEC}/s)`);
+    }
+    return false;
+  }
+  const ip = String(fromIp || '');
+  let bucket = udpRxPerIpWindow.get(ip);
+  if (!bucket || now - bucket.start >= 1000) {
+    bucket = { start: now, count: 0 };
+    udpRxPerIpWindow.set(ip, bucket);
+  }
+  if (bucket.count >= UDP_RX_MAX_PER_IP_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+    return false;
+  }
+  bucket.count += 1;
+  udpRxWindowCount += 1;
+  if (udpRxWindowCount >= UDP_STORM_THRESHOLD_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+  }
+  return true;
+}
+
 function collectPresenceHeartbeatIps() {
   const out = [];
   onlineUsers.forEach((_u, ip) => {
@@ -4010,6 +4062,9 @@ function broadcastPresence(socket) {
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
   try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
+
+  // 수신 UDP 폭주 중에는 유니캐스트 하트비트를 잠시 멈춰 메인루프를 지킨다
+  if (Date.now() < udpStormUntil) return;
 
   // 1.0.486: 기본은 온라인 동료만. 전체 508 유니캐스트는 클릭/커서 프리징의 주원인.
   const ips = PRESENCE_FULL_SCAN_ENABLED ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
@@ -6683,6 +6738,26 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
         error: '첨부/메시지가 너무 큽니다. 네트워크 전송 한도(약 400KB)를 초과합니다. 이미지는 자동 압축되며, 큰 파일은 공유 폴더를 이용해 주세요.',
         uid: msgUid
       });
+      return;
+    }
+
+    // 나에게 보내기: 수신측이 senderIP===MY_IP 를 무시하므로 TCP 불필요. 로컬 SENT로 보관.
+    if (targetIP === MY_IP) {
+      extractAndSaveAttachments(message, { msgUid });
+      appendChatLog(`DM_${targetIP}`, partnerName || senderLabelForMe(), myProfile.username, message);
+      db.run(
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
+        [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
+        function (insertErr) {
+          if (insertErr) {
+            logDbErr(insertErr);
+            finish({ status: 'ERROR', error: insertErr.message || 'DB 저장 실패', uid: msgUid });
+            return;
+          }
+          compactMessageRowById(this.lastID, msgUid, message);
+          finish({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID });
+        }
+      );
       return;
     }
 
