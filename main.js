@@ -8,12 +8,7 @@ const https = require('https');
 const transportHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 8 });
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
-let startMobileServer = null;
-try {
-  startMobileServer = require('./mobile_server').startMobileServer;
-} catch (e) {
-  console.warn('[mobile] mobile_server.js 로드 실패:', e && e.message ? e.message : e);
-}
+const { startMobileServer } = require('./mobile_server');
 
 function loadScheduleXlsxBuilder() {
   try {
@@ -33,14 +28,6 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
   process.exit(0);
-}
-
-// GPU 가속은 기본 ON 유지.
-// 1.0.479에서 disableHardwareAcceleration()을 켰더니 소프트웨어 렌더가
-// 유휴 상태에서도 CPU ~12%를 상시 점유하는 경우가 있어 되돌림.
-// 필요 시 환경변수 MIRAE_DISABLE_GPU=1 로만 비활성.
-if (process.env.MIRAE_DISABLE_GPU === '1') {
-  try { app.disableHardwareAcceleration(); } catch (e) { /* ignore */ }
 }
 
 // mirae-file:// 첨부 미리보기용 — app ready 전에 등록해야 img/src에서 로드됨
@@ -329,8 +316,8 @@ const NORMAL_MIN_HEIGHT = 600;
 
 const UDP_PORT = 41234;
 const TCP_PORT = 41235;
-/** UDP PING — 하트비트 6초 기준, 연속 미수신 시 오프라인 */
-const PRESENCE_STALE_MS = 20000;
+/** UDP PING 간격(4초) 기준 — 연속 2회 이상 없으면 오프라인. 강제 종료·전원 OFF 시 GOODBYE가 없어도 빠르게 반영 */
+const PRESENCE_STALE_MS = 10000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
@@ -350,22 +337,7 @@ const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
-const USER_LIST_NOTIFY_DEBOUNCE_MS = 1200;
-/** 평소 하트비트: 온라인 동료만 */
-const PRESENCE_HEARTBEAT_MS = 10000;
-/** 전체 서브넷 508 탐색 — OFF (CPU 12%+ 주원인). 브로드캐스트+온라인 유니캐스트만 */
-const PRESENCE_FULL_SCAN_ENABLED = false;
-const PRESENCE_FULL_SCAN_MS = 600000;
-/** 하트비트 대상(레거시 상수, 현재 미사용) */
-const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
-/** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
-const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
-/** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
-const UDP_RX_MAX_PER_SEC = 60;
-const UDP_RX_MAX_PER_IP_PER_SEC = 4;
-/** 수신이 이 값을 넘으면 잠시 송신 유니캐스트 중단(브로드캐스트만) */
-const UDP_STORM_THRESHOLD_PER_SEC = 40;
-const UDP_STORM_COOLDOWN_MS = 8000;
+const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -403,16 +375,6 @@ let udpBindRetryTimer = null;
 let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
-let presenceFullScanDueAt = 0;
-let lastSelfRegisterSig = '';
-/** @type {Map<string, number>} ip -> last DB persist at */
-const knownUserPersistAt = new Map();
-let udpRxWindowStart = 0;
-let udpRxWindowCount = 0;
-/** @type {Map<string, { start: number, count: number }>} */
-const udpRxPerIpWindow = new Map();
-let udpStormUntil = 0;
-let udpDropLoggedAt = 0;
 
 const MY_IP = getMyIP();
 
@@ -2254,14 +2216,10 @@ function checkpointWal() {
 
 function logDbErr(err) {
   if (!err) return;
-  const msg = String(err.message || err);
-  // 동일 오류가 초당 수십 번 찍히면 콘솔/IPC만으로 CPU가 올라감 — 10초에 1회만
-  const now = Date.now();
-  if (!logDbErr._last) logDbErr._last = { msg: '', at: 0 };
-  if (logDbErr._last.msg === msg && now - logDbErr._last.at < 10000) return;
-  logDbErr._last = { msg, at: now };
-  console.error('DB 오류:', msg);
-  logToRendererConsole('error', 'DB 오류: ' + msg);
+  console.error('DB 오류:', err.message);
+  // 이 로그는 main 프로세스 쪽이라 npm start로 켰을 때만 터미널에 보인다.
+  // 패키징된 프로그램에서도 보이도록 화면(개발자 도구 콘솔)에도 함께 남긴다.
+  logToRendererConsole('error', 'DB 오류: ' + err.message);
 }
 
 let logsDirEnsured = false;
@@ -2379,10 +2337,8 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS known_users (
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
   )`, logDbErr);
-  // 예전 DB에는 phone_no 등이 없을 수 있음 — 없으면 INSERT마다 SQLITE_ERROR로 CPU/콘솔 폭주
-  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER'].forEach((colDef) => {
-    db.run(`ALTER TABLE known_users ADD COLUMN ${colDef}`, () => {});
-  });
+  db.run(`ALTER TABLE known_users ADD COLUMN photo TEXT`, () => {});
+  db.run(`ALTER TABLE known_users ADD COLUMN last_seen_at INTEGER`, () => {});
   // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
   db.run(
     `DELETE FROM known_users WHERE ip LIKE 'BCAST:%' OR ip LIKE 'DEPTPEER:%' OR ip LIKE 'FLOORPEER:%'
@@ -3525,13 +3481,7 @@ app.whenReady().then(async () => {
   registerGlobalShortcuts();
   startUdpDiscovery();
   startTcpServer();
-  if (typeof startMobileServer === 'function') {
-    try { startMobileServer(db, MY_IP); } catch (e) {
-      console.warn('[mobile] startMobileServer 실패:', e && e.message ? e.message : e);
-    }
-  } else {
-    console.warn('[mobile] startMobileServer 없음 — mobile_server.js 업데이트 필요');
-  }
+  startMobileServer(db, MY_IP);
   startScheduledMessageChecker();
   startPresenceSweeper();
   startAutoBackup();
@@ -3625,11 +3575,10 @@ function startUdpDiscovery() {
 
     if (!presenceFlushTimersStarted) {
       presenceFlushTimersStarted = true;
-      presenceFullScanDueAt = 0; // first tick: full subnet discovery
       setInterval(() => {
         registerSelf();
         if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-      }, PRESENCE_HEARTBEAT_MS);
+      }, 4000);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
       setInterval(() => flushAllPendingOutboundMessages(), 15000);
     }
@@ -3637,14 +3586,9 @@ function startUdpDiscovery() {
 
   globalUdpSocket.on('message', (msg, rinfo) => {
     if (rinfo.address === MY_IP) return;
-    if (!allowUdpReceive(rinfo.address)) return;
 
     try {
-      // 짧은 패킷만 파싱 — 대용량/쓰레기 UDP는 스킵
-      if (!msg || msg.length < 2 || msg.length > 2048) return;
       const data = JSON.parse(msg.toString('utf8'));
-      if (!data || typeof data.type !== 'string') return;
-      if (data.type !== 'PING' && data.type !== 'GOODBYE') return;
       if (data.type === 'GOODBYE') {
         const leftAt = Number(data.leftAt) || Date.now();
         if (markPeerOffline(rinfo.address, leftAt)) {
@@ -3656,41 +3600,6 @@ function startUdpDiscovery() {
       if (data.type === 'PING') {
         const previouslyKnown = allKnownUsers.get(rinfo.address);
         const now = Date.now();
-        const wasOffline = !onlineUsers.has(rinfo.address);
-
-        // Fast path: 이미 온라인 + 프로필 동일 → 메모리 lastPingAt만 (DB/IPC 없음)
-        // 구버전 동료가 4초마다 508스캔하면 여기로 수천 패킷/분이 들어온다.
-        if (!wasOffline && previouslyKnown) {
-          const rank = data.rank || '';
-          const dept = data.dept || '';
-          const floor = data.floor || '';
-          const extNo = data.extNo || '';
-          const phone = data.phone || '';
-          const statusState = data.statusState || 'ONLINE';
-          const appVersion = data.appVersion || previouslyKnown.appVersion || '';
-          const same =
-            previouslyKnown.username === data.username &&
-            previouslyKnown.rank === rank &&
-            previouslyKnown.dept === dept &&
-            previouslyKnown.floor === floor &&
-            previouslyKnown.extNo === extNo &&
-            previouslyKnown.phone === phone &&
-            previouslyKnown.statusState === statusState &&
-            previouslyKnown.appVersion === appVersion;
-          if (same) {
-            previouslyKnown.lastPingAt = now;
-            previouslyKnown.online = true;
-            const live = onlineUsers.get(rinfo.address);
-            if (live) {
-              live.lastPingAt = now;
-              live.online = true;
-            } else {
-              onlineUsers.set(rinfo.address, previouslyKnown);
-            }
-            return;
-          }
-        }
-
         const overlay = {
           ip: rinfo.address,
           username: data.username,
@@ -3707,11 +3616,13 @@ function startUdpDiscovery() {
           isMe: false
         };
         const userObj = mergeUserProfile(previouslyKnown, overlay, true);
+        // lastSeen = 마지막 '종료/오프라인' 시각. 접속 중에는 갱신하지 않는다.
         userObj.lastPingAt = now;
         if (previouslyKnown && Number(previouslyKnown.lastSeen) > 0) {
           userObj.lastSeen = Number(previouslyKnown.lastSeen);
         }
 
+        const wasOffline = !onlineUsers.has(rinfo.address);
         const profileChanged = !previouslyKnown
           || previouslyKnown.username !== userObj.username
           || previouslyKnown.rank !== userObj.rank
@@ -3725,10 +3636,9 @@ function startUdpDiscovery() {
 
         onlineUsers.set(rinfo.address, userObj);
         allKnownUsers.set(rinfo.address, userObj);
-        if (wasOffline || profileChanged) {
-          persistKnownUserSnapshot(userObj, { force: true });
-          notifyUserList();
-        }
+        persistKnownUserSnapshot(userObj);
+
+        if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
           resendPendingMessages(rinfo.address);
@@ -3779,7 +3689,6 @@ function registerSelf() {
     if (prev) {
       allKnownUsers.set(MY_IP, { ...prev, online: false, isMe: true });
     }
-    lastSelfRegisterSig = 'blocked';
     notifyUserList();
     return;
   }
@@ -3802,73 +3711,10 @@ function registerSelf() {
     online: true,
     isMe: true
   };
-  const sig = [
-    me.username, me.rank, me.dept, me.floor, me.extNo, me.phone, me.statusState, me.appVersion,
-    me.photo ? '1' : '0'
-  ].join('|');
-  const unchanged = onlineUsers.has(MY_IP) && sig === lastSelfRegisterSig;
   onlineUsers.set(MY_IP, me);
   allKnownUsers.set(MY_IP, me);
-  if (unchanged) return; // 하트비트마다 DB/UI 갱신하지 않음
-  lastSelfRegisterSig = sig;
-  persistKnownUserSnapshot(me, { force: true });
+  persistKnownUserSnapshot(me);
   notifyUserList();
-}
-
-function allowUdpReceive(fromIp) {
-  const now = Date.now();
-  if (now - udpRxWindowStart >= 1000) {
-    udpRxWindowStart = now;
-    udpRxWindowCount = 0;
-  }
-  if (udpRxWindowCount >= UDP_RX_MAX_PER_SEC) {
-    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
-    if (now - udpDropLoggedAt > 10000) {
-      udpDropLoggedAt = now;
-      console.warn(`[udp] receive storm — dropping packets (>${UDP_RX_MAX_PER_SEC}/s)`);
-    }
-    return false;
-  }
-  const ip = String(fromIp || '');
-  let bucket = udpRxPerIpWindow.get(ip);
-  if (!bucket || now - bucket.start >= 1000) {
-    bucket = { start: now, count: 0 };
-    udpRxPerIpWindow.set(ip, bucket);
-  }
-  if (bucket.count >= UDP_RX_MAX_PER_IP_PER_SEC) {
-    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
-    return false;
-  }
-  bucket.count += 1;
-  udpRxWindowCount += 1;
-  if (udpRxWindowCount >= UDP_STORM_THRESHOLD_PER_SEC) {
-    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
-  }
-  return true;
-}
-
-function collectPresenceHeartbeatIps() {
-  // 온라인인 동료만 — allKnownUsers 전체 순회/유니캐스트는 CPU를 다시 올림
-  const out = [];
-  onlineUsers.forEach((_u, ip) => {
-    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.push(ip);
-  });
-  return out;
-}
-
-function sendPresenceUnicastBatches(socket, packet, ips) {
-  if (!socket || !packet || !ips || !ips.length) return;
-  let i = 0;
-  const BATCH = 24;
-  const sendBatch = () => {
-    if (!globalUdpSocket || globalUdpSocket !== socket) return;
-    const end = Math.min(i + BATCH, ips.length);
-    for (; i < end; i++) {
-      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
-    }
-    if (i < ips.length) setImmediate(sendBatch);
-  };
-  sendBatch();
 }
 
 function broadcastPresence(socket) {
@@ -3886,22 +3732,20 @@ function broadcastPresence(socket) {
     statusState: myProfile.statusState,
     appVersion: APP_VERSION
   }));
-  // 같은 대역은 브로드캐스트
-  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
-
-  // 수신 폭주 중에는 유니캐스트 송신 중단 (브로드캐스트만) — 네트워크 폭발 완화
-  if (Date.now() < udpStormUntil) return;
-
-  // 1.0.479+: 전체 서브넷 508 유니캐스트는 기본 OFF
-  if (PRESENCE_FULL_SCAN_ENABLED) {
-    const now = Date.now();
-    const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
-    if (doFullScan) presenceFullScanDueAt = now + PRESENCE_FULL_SCAN_MS;
-    const ips = doFullScan ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
-    sendPresenceUnicastBatches(socket, packet, ips);
-    return;
-  }
-  sendPresenceUnicastBatches(socket, packet, collectPresenceHeartbeatIps());
+  // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
+  socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
+  // 다른 층 대역 유니캐스트(최대 508개) — 한 틱에 몰아보내면 메인 루프가 잠깐 멈출 수 있어 배치
+  const ips = KNOWN_SUBNET_HOST_IPS;
+  let i = 0;
+  const BATCH = 64;
+  const sendBatch = () => {
+    const end = Math.min(i + BATCH, ips.length);
+    for (; i < end; i++) {
+      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
+    }
+    if (i < ips.length) setImmediate(sendBatch);
+  };
+  sendBatch();
 }
 
 function broadcastGoodbye() {
@@ -3914,9 +3758,7 @@ function broadcastGoodbye() {
   try {
     globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
   } catch (e) { /* ignore */ }
-  // 전체 508 유니캐스트는 종료 순간 CPU 스파이크만 키움 — 온라인 동료에게만
-  onlineUsers.forEach((_u, ip) => {
-    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+  KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
     try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
 }
@@ -4169,14 +4011,9 @@ function userObjFromKnownUsersRow(row) {
   return obj;
 }
 
-function persistKnownUserSnapshot(u, opts) {
+function persistKnownUserSnapshot(u) {
   if (!u || !u.ip) return;
   if (isSyntheticReceiverKey(u.ip)) return;
-  const force = !!(opts && opts.force);
-  const now = Date.now();
-  const prevAt = knownUserPersistAt.get(u.ip) || 0;
-  if (!force && prevAt && now - prevAt < PRESENCE_DB_PERSIST_MIN_MS) return;
-  knownUserPersistAt.set(u.ip, now);
   db.get(`SELECT * FROM known_users WHERE ip = ?`, [u.ip], (err, row) => {
     if (err) logDbErr(err);
     const existing = row ? userObjFromKnownUsersRow(row) : null;

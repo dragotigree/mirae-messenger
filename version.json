@@ -1,4 +1,4 @@
 {
-  "version": "1.0.482",
-  "notes": "핫픽스: known_users.phone_no 컬럼 마이그레이션·DB오류 로그 스로틀·mobile_server 안전로드 — 콘솔 SQLITE_ERROR 폭주/버벅임 수정"
+  "version": "1.0.485",
+  "notes": "롤백: 어제 저녁 안정본(1.0.471) 복구 — 472~484 CPU 실험 되돌림. 응답없음 완화(Z미러·SQLite·OneDrive·프레즌스) 유지"
 }
