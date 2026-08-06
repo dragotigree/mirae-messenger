@@ -1,6 +1,6 @@
 # Force 1.0.495 — restore lost features + UDP shield. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'f15a10bb50699d21e338bbd4c1882f44b5a67042'
+$Ref = 'f3fe7f593daa0be0fca26e9749b553aa351fa640'
 $Expected = '1.0.495'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
