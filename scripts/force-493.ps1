@@ -1,6 +1,6 @@
 # Force 1.0.493 — master peer traffic monitor. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = '5de25774b453ce4f5742dabc11223b856317df5b'
 $Expected = '1.0.493'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
