@@ -1,6 +1,6 @@
 # Force 1.0.492 — update cache-bust + no large in-place write freeze. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = 'c5a77ed8a4ff4b73b7310800d87eb1e39d388cf6'
 $Expected = '1.0.492'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
