@@ -185,6 +185,53 @@ function getInstallPathInfo() {
   };
 }
 
+/**
+ * AppData가 OneDrive면 SQLite/preload마다 메인스레드가 멈춰 로딩 커서만 돈다.
+ * C:\\Apps\\Mirae Messenger 설치본은 userData를 같은 디스크의 userdata로 고정한다.
+ */
+function ensureAppsLocalUserData() {
+  if (process.platform !== 'win32') return;
+  try {
+    const preferred = 'C:\\Apps\\Mirae Messenger\\userdata';
+    const exec = String(process.execPath || '').replace(/\//g, '\\').toLowerCase();
+    const dirn = String(__dirname || '').replace(/\//g, '\\').toLowerCase();
+    const underApps = exec.includes('\\apps\\mirae messenger\\') || dirn.includes('\\apps\\mirae messenger\\');
+    let prev = '';
+    try { prev = app.getPath('userData'); } catch (e) { prev = ''; }
+    const cloudPrev = isCloudSyncedPath(prev) || isCloudSyncedPath(process.env.APPDATA || '');
+    if (!underApps && !cloudPrev) return;
+
+    try { fs.mkdirSync(preferred, { recursive: true }); } catch (e) { /* ignore */ }
+    app.setPath('userData', preferred);
+    console.log('[userdata] local:', preferred, underApps ? '(Apps install)' : '(cloud AppData redirect)');
+
+    if (prev && path.resolve(prev) !== path.resolve(preferred)) {
+      const names = [
+        'mirae_messenger.db',
+        'mirae_messenger.db-wal',
+        'mirae_messenger.db-shm',
+        'last-integrity-check.txt'
+      ];
+      for (const name of names) {
+        const src = path.join(prev, name);
+        const dst = path.join(preferred, name);
+        try {
+          if (fs.existsSync(src) && !fs.existsSync(dst)) {
+            fs.copyFileSync(src, dst);
+            console.log('[userdata] migrated', name);
+          }
+        } catch (e) {
+          console.warn('[userdata] migrate skip', name, e.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[userdata] redirect failed:', e && e.message ? e.message : e);
+  }
+}
+
+ensureAppsLocalUserData();
+
 async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
   const cloud = isCloudSyncedPath(destPath) || isCloudSyncedPath(sourcePath);
   const maxRetries = cloud ? Math.min(retries, 3) : retries;
@@ -3470,30 +3517,51 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('미래병원 메신저');
   }
-  const pendingApplied = await applyPendingUpdatesOnStartup();
-  if (pendingApplied > 0) {
-    console.log(`[업데이트] 보류 파일 ${pendingApplied}개 적용됨`);
+  // 보류 업데이트·preload 캐시는 타임아웃 — OneDrive/잠금 시 무한 대기 방지
+  try {
+    const pendingApplied = await withTimeout(applyPendingUpdatesOnStartup(), 8000, 'pending-update');
+    if (pendingApplied > 0) {
+      console.log(`[업데이트] 보류 파일 ${pendingApplied}개 적용됨`);
+    }
+  } catch (e) {
+    console.warn('[업데이트] 보류 적용 스킵:', e && e.message ? e.message : e);
   }
   try {
-    await initPreloadScriptCache();
+    await withTimeout(initPreloadScriptCache(), 6000, 'preload-cache');
   } catch (e) {
-    console.error('[preload-cache] 시작 시 캐시 초기화 실패:', e.message);
+    console.warn('[preload-cache] 타임아웃/실패 — 설치 폴더 preload 사용:', e && e.message ? e.message : e);
+    resolvedMainPreloadPath = path.join(__dirname, 'preload.js');
+    resolvedToastPreloadPath = path.join(__dirname, 'toast-preload.js');
   }
-  initSpellCheckerSession();
+  try { initSpellCheckerSession(); } catch (e) { /* ignore */ }
   registerMiraeFileProtocol();
+  // 창을 먼저 연다 — 네트워크/UDP보다 UI 응답이 우선
   createWindow();
   createTray();
   registerGlobalShortcuts();
-  startUdpDiscovery();
-  startTcpServer();
-  startMobileServer(db, MY_IP);
-  startScheduledMessageChecker();
-  startPresenceSweeper();
-  startAutoBackup();
-  startUpdateChecker();
-  startPendingWipeRetryLoop();
-  // 1.0.471: 부팅 시 Z: 미러 비활성 — Z드라이브 hang이 Electron '응답 없음'의 주원인.
-  // 수동 「Z드라이브에 공유」및 업데이트 직후 미러(타임아웃)만 유지.
+
+  setTimeout(() => {
+    try { startUdpDiscovery(); } catch (e) { console.error('UDP start', e); }
+    try { startTcpServer(); } catch (e) { console.error('TCP start', e); }
+    try {
+      if (typeof startMobileServer === 'function') startMobileServer(db, MY_IP);
+    } catch (e) { console.warn('[mobile]', e && e.message ? e.message : e); }
+  }, 1200);
+
+  setTimeout(() => {
+    try { startScheduledMessageChecker(); } catch (e) { /* ignore */ }
+    try { startPresenceSweeper(); } catch (e) { /* ignore */ }
+    try { startAutoBackup(); } catch (e) { /* ignore */ }
+    try { startUpdateChecker(); } catch (e) { /* ignore */ }
+    try { startPendingWipeRetryLoop(); } catch (e) { /* ignore */ }
+    setTimeout(() => {
+      try {
+        broadcastWipeClaim();
+        flushAllPendingWipesForOnlinePeers();
+      } catch (e) { /* ignore */ }
+    }, 2000);
+  }, 3500);
+
   const installInfo = getInstallPathInfo();
   if (installInfo.cloudSynced) {
     console.warn('[설치경로]', installInfo.warning);
@@ -3502,11 +3570,6 @@ app.whenReady().then(async () => {
       safeWebContentsSend('install-path-warning', installInfo);
     }, 2500);
   }
-  // 부팅 직후: 다른 PC에 내 IP 대상 삭제 예약이 있으면 받아 즉시 적용
-  setTimeout(() => {
-    broadcastWipeClaim();
-    flushAllPendingWipesForOnlinePeers();
-  }, 3500);
 });
 
 app.on('before-quit', () => {
@@ -9613,6 +9676,11 @@ async function autoCheckAndApplyUpdate() {
   if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
   if (updateApplyInFlight) return;
+  // Z:/공유폴더 자동검사는 드라이브 hang 시 로딩 커서 고정의 주원인 → GitHub만 자동
+  const meta = parseUpdateSource(updateSourcePath);
+  if (meta.kind !== 'github') {
+    return;
+  }
   let remote;
   try {
     const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
