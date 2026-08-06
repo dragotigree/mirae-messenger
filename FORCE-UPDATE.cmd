@@ -4,20 +4,21 @@ title Mirae Messenger FORCE UPDATE
 echo.
 echo ========================================
 echo  Mirae Messenger FORCE UPDATE
-echo  Uses commit SHA (avoids GitHub CDN cache)
+echo  Commit-pinned (avoids GitHub CDN cache)
 echo ========================================
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop'; ^
-  $ref='c61c87fa60eec01bdd7f82ab67a9c6d2737dc267'; ^
-  $u='https://raw.githubusercontent.com/dragotigree/mirae-messenger/'+$ref+'/scripts/force-update-apps.ps1'; ^
+  $scriptRef='693d61ab84c721b92a458934b791b0f0eb2662db'; ^
+  $appRef='c61c87fa60eec01bdd7f82ab67a9c6d2737dc267'; ^
+  $u='https://raw.githubusercontent.com/dragotigree/mirae-messenger/'+$scriptRef+'/scripts/force-update-apps.ps1'; ^
   $o=Join-Path $env:TEMP 'mirae-force-update-apps.ps1'; ^
-  Write-Host ('Downloading script from commit '+$ref); ^
+  Write-Host ('Script: '+$scriptRef); ^
+  Write-Host ('App:    '+$appRef+' (1.0.478)'); ^
   Invoke-WebRequest -Uri ($u+'?t='+[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -OutFile $o -UseBasicParsing; ^
-  & $o -RepoRef $ref -ExpectedVersion '1.0.478'"
+  & $o -RepoRef $appRef -ExpectedVersion '1.0.478'"
 echo.
 if errorlevel 1 (
-  echo FAILED. Try this in PowerShell:
-  echo powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/dragotigree/mirae-messenger/c61c87fa60eec01bdd7f82ab67a9c6d2737dc267/scripts/force-update-apps.ps1' -OutFile $env:TEMP\mm-force.ps1 -UseBasicParsing; & $env:TEMP\mm-force.ps1 -RepoRef c61c87fa60eec01bdd7f82ab67a9c6d2737dc267 -ExpectedVersion 1.0.478"
+  echo FAILED.
 )
 pause
