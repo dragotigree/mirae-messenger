@@ -1,6 +1,6 @@
 ﻿# Force install Mirae 1.0.480. No prompts. Commit-pinned.
 $ErrorActionPreference = 'Stop'
-$Ref = 'REPLACE_REF'
+$Ref = '514c61ded0cc5e1db3ae90bbefc576105f1573ee'
 $Expected = '1.0.480'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
