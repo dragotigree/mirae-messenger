@@ -634,6 +634,60 @@ function compareVersions(a, b) {
   return 0;
 }
 
+/** 수동/자동 적용 시 실제 fetch 소스 (Z가 구버전이면 GitHub로 전환) */
+let pendingUpdateFetchPath = '';
+
+async function probeUpdateVersionFromSource(sourcePath) {
+  const prev = updateSourcePath;
+  const normalized = normalizeUpdateSourcePath(sourcePath);
+  if (!normalized) return { ok: false, error: new Error('empty source') };
+  try {
+    updateSourcePath = normalized;
+    const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
+    const remote = parseUpdateJsonText(raw);
+    const ver = String((remote && remote.version) || '');
+    if (!ver) return { ok: false, error: new Error('version.json에 version 없음') };
+    return {
+      ok: true,
+      version: ver,
+      notes: (remote && remote.notes) || '',
+      sourcePath: normalized,
+      kind: parseUpdateSource(normalized).kind
+    };
+  } catch (e) {
+    return { ok: false, error: e, sourcePath: normalized };
+  } finally {
+    updateSourcePath = prev;
+  }
+}
+
+/** 설정 소스 + GitHub 중 더 새 version.json 선택 (Z 브리지가  lagged 일 때 대비) */
+async function findNewestUpdateCandidate() {
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
+  const seen = new Set();
+  const paths = [];
+  const pushPath = (p) => {
+    const n = normalizeUpdateSourcePath(p);
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    paths.push(n);
+  };
+  pushPath(updateSourcePath);
+  pushPath(DEFAULT_UPDATE_SOURCE_PATH);
+
+  const candidates = [];
+  for (const p of paths) {
+    const probed = await probeUpdateVersionFromSource(p);
+    if (probed.ok) candidates.push(probed);
+  }
+  if (!candidates.length) return null;
+  let best = candidates[0];
+  for (let i = 1; i < candidates.length; i++) {
+    if (compareVersions(candidates[i].version, best.version) > 0) best = candidates[i];
+  }
+  return best;
+}
+
 /** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
 async function mirrorLocalInstallToZBridge(opts = {}) {
   const force = !!(opts && opts.force);
@@ -10658,16 +10712,20 @@ ipcMain.handle('check-for-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
   try {
-    const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
-    const remote = parseUpdateJsonText(raw);
-    const available = compareVersions(remote.version, APP_VERSION) > 0;
-    const src = parseUpdateSource(updateSourcePath);
+    // Z 브리지가 구버전이어도 GitHub에 새 버전이 있으면 그걸 최신으로 안내
+    const best = await findNewestUpdateCandidate();
+    if (!best) {
+      return { available: false, msg: '업데이트 소스에서 version.json을 찾을 수 없습니다. 경로(Z:\\...\\messenger) 또는 GitHub 연결을 확인해 주세요.' };
+    }
+    const available = compareVersions(best.version, APP_VERSION) > 0;
+    pendingUpdateFetchPath = available ? best.sourcePath : '';
     return {
       available,
-      remoteVersion: remote.version,
+      remoteVersion: best.version,
       currentVersion: APP_VERSION,
-      notes: remote.notes || '',
-      sourceKind: src.kind
+      notes: best.notes || '',
+      sourceKind: best.kind,
+      sourcePath: best.sourcePath
     };
   } catch (e) {
     if (e.code === 'ENOENT') {
@@ -10881,11 +10939,23 @@ ipcMain.handle('apply-update', async () => {
     updateApplyInFlight = false;
     return { success: false, msg: '업데이트 소스가 설정되지 않았습니다.' };
   }
+  const prevSource = updateSourcePath;
   try {
+    // 확인 단계에서 GitHub가 더 새로웠다면 그 경로에서 받는다
+    if (pendingUpdateFetchPath) {
+      updateSourcePath = normalizeUpdateSourcePath(pendingUpdateFetchPath);
+    } else {
+      const best = await findNewestUpdateCandidate();
+      if (best && compareVersions(best.version, APP_VERSION) > 0) {
+        updateSourcePath = best.sourcePath;
+      }
+    }
     await applyUpdateFiles();
+    pendingUpdateFetchPath = '';
     setTimeout(() => { broadcastGoodbye(); isQuitting = true; app.relaunch(); app.exit(); }, 600);
     return { success: true };
   } catch (e) {
+    updateSourcePath = prevSource;
     return { success: false, msg: '업데이트 적용 중 오류가 발생했습니다: ' + e.message + ' (파일 접근 권한을 확인해 주세요)' };
   } finally {
     updateApplyInFlight = false;
@@ -11318,18 +11388,20 @@ async function autoCheckAndApplyUpdate() {
   if (updateMode === 'manual') return; // 수동 모드: 설정에서 「지금 확인」할 때만 적용
   if (autoUpdateAlreadyApplied) return; // 이미 파일을 갈아끼우고 재시작 대기 중이면 다시 검사하지 않음
   if (updateApplyInFlight) return;
-  // Z:/공유폴더 자동검사는 드라이브 hang 시 로딩 커서 고정의 주원인 → GitHub만 자동
-  const meta = parseUpdateSource(updateSourcePath);
-  if (meta.kind !== 'github') {
-    return;
-  }
+  // 설정이 Z여도 GitHub에 새 버전이 있으면 자동 적용 (Z만 보면 영원히 구버전 "최신"으로 멈춤)
   let remote;
+  const prevSource = updateSourcePath;
   try {
-    const raw = (await readUpdateSourceBytes('version.json')).toString('utf8');
-    remote = parseUpdateJsonText(raw);
-    if (compareVersions(remote.version, APP_VERSION) <= 0) return;
+    const best = await findNewestUpdateCandidate();
+    if (!best || compareVersions(best.version, APP_VERSION) <= 0) return;
+    // 자동 적용은 GitHub를 우선 (Z hang 회피). GitHub에 새 버전이 있을 때만.
+    const gh = await probeUpdateVersionFromSource(DEFAULT_UPDATE_SOURCE_PATH);
+    if (!gh.ok || compareVersions(gh.version, APP_VERSION) <= 0) return;
+    remote = { version: gh.version, notes: gh.notes || '' };
+    pendingUpdateFetchPath = gh.sourcePath;
+    updateSourcePath = gh.sourcePath;
   } catch (e) {
-    // GitHub 접근 실패·version.json 없음은 조용히 넘어간다
+    updateSourcePath = prevSource;
     return;
   }
 
@@ -11342,9 +11414,16 @@ async function autoCheckAndApplyUpdate() {
       currentVersion: APP_VERSION,
       notes: remote.notes || ''
     });
-    // soft: 핵심 파일만·보류폴더만·Z미러 생략 (Cursor 배포 직후 자동업데이트 프리즈 완화)
+    // soft: 핵심 파일만·보류폴더만 (Cursor 배포 직후 자동업데이트 프리즈 완화)
     await applyUpdateFiles({ soft: true });
+    // soft 후에도 Z 브리지가 구버전이면 짧게 미러 시도 (다른 PC가 Z만 볼 때 대비)
+    try {
+      if (!isCloudSyncedInstallPath()) {
+        await mirrorLocalInstallToZBridge({ force: true, timeoutMs: 8000 });
+      }
+    } catch (_) { /* ignore */ }
     pendingUpdateRemoteVersion = remote.version;
+    pendingUpdateFetchPath = '';
     safeWebContentsSend('auto-update-ready', {
       remoteVersion: remote.version,
       currentVersion: APP_VERSION,
@@ -11360,6 +11439,7 @@ async function autoCheckAndApplyUpdate() {
     }, 30000);
   } catch (e) {
     autoUpdateAlreadyApplied = false;
+    updateSourcePath = prevSource;
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
     // 혼란이 생기지 않도록 한다.
     safeWebContentsSend('auto-update-failed', { msg: e.message });
