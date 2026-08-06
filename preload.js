@@ -123,6 +123,7 @@ contextBridge.exposeInMainWorld('api', {
   setChatPin: (payload) => ipcRenderer.invoke('set-chat-pin', payload),
   clearChatPin: (channelKey) => ipcRenderer.invoke('clear-chat-pin', channelKey),
   onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
+  onDbCorruptRecovery: (callback) => ipcRenderer.on('db-corrupt-recovery', (e, data) => callback(data)),
 
   // 🩺 당직의 / 의료진 OFF
   getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),

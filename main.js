@@ -2811,14 +2811,21 @@ function getTrayIcon() {
 const dbPath = path.join(app.getPath('userData'), 'mirae_messenger.db');
 const db = new sqlite3.Database(dbPath);
 
-db.on('error', (err) => {
-  console.error('❌ 데이터베이스 오류(무시하고 계속 진행):', err.message);
-});
+const DB_CORRUPT_USER_MSG =
+  '로컬 데이터베이스가 손상되었습니다. 백업에서 복구한 뒤 앱을 다시 시작합니다. 복구가 끝나면 공지를 다시 작성해 주세요.';
 
-// 🛡 SQLite 안정성 강화: PC가 강제 종료(정전, 블루스크린)되어도 DB가 깨지지 않도록.
-// (아래 세 문장은 순서가 중요해서 serialize()로 묶는다 — WAL 모드 설정 → 동기화 설정 → (선택) 무결성 검사.
-//  단, serialize()는 SQLite 문장끼리의 순서만 보장할 뿐, 그 안의 콜백에서 하는 파일 복사 같은
-//  비-SQLite 비동기 작업까지 기다려주지는 않으므로 복구 로직은 아래에서 별도로 안전하게 처리한다.)
+let dbCorruptRecoveryScheduled = false;
+
+function isSqliteCorruptError(err) {
+  const msg = String((err && err.message) || err || '');
+  return /SQLITE_CORRUPT|SQLITE_NOTADB|malformed|disk image is malformed|file is not a database|database disk image/i.test(msg);
+}
+
+function userFacingDbError(err) {
+  if (isSqliteCorruptError(err)) return DB_CORRUPT_USER_MSG;
+  return String((err && err.message) || err || '알 수 없는 DB 오류');
+}
+
 function integrityCheckMarkerPath() {
   return path.join(app.getPath('userData'), 'last-integrity-check.txt');
 }
@@ -2839,6 +2846,129 @@ function markIntegrityCheckDone() {
   } catch (e) { /* ignore */ }
 }
 
+function clearIntegrityCheckMarker() {
+  try { fs.unlinkSync(integrityCheckMarkerPath()); } catch (e) { /* ignore */ }
+}
+
+function sqliteCheckRowOk(row) {
+  if (!row) return false;
+  const v = row.integrity_check != null ? row.integrity_check
+    : (row.quick_check != null ? row.quick_check : Object.values(row)[0]);
+  return String(v || '') === 'ok';
+}
+
+function probeSqliteFileHealthy(filePath) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(!!ok);
+    };
+    const timer = setTimeout(() => finish(false), 8000);
+    try {
+      const testDb = new sqlite3.Database(filePath, sqlite3.OPEN_READONLY, (openErr) => {
+        if (openErr) {
+          clearTimeout(timer);
+          finish(false);
+          return;
+        }
+        testDb.get('PRAGMA quick_check', (err, row) => {
+          testDb.close(() => {
+            clearTimeout(timer);
+            finish(!err && sqliteCheckRowOk(row));
+          });
+        });
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      finish(false);
+    }
+  });
+}
+
+async function findHealthyAutoBackup() {
+  const dir = path.join(app.getPath('userData'), 'backups');
+  const names = (await fs.promises.readdir(dir).catch(() => []))
+    .filter((n) => n.startsWith('auto_backup_') && n.endsWith('.db'))
+    .sort()
+    .reverse();
+  for (const name of names) {
+    const p = path.join(dir, name);
+    if (await probeSqliteFileHealthy(p)) return { path: p, name };
+  }
+  return null;
+}
+
+async function stashAndReplaceMessengerDb(sourcePathOrNull) {
+  const stamp = Date.now();
+  const corruptedCopy = `${dbPath}.corrupted_${stamp}`;
+  await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
+  await fs.promises.copyFile(`${dbPath}-wal`, `${corruptedCopy}-wal`).catch(() => {});
+  await fs.promises.copyFile(`${dbPath}-shm`, `${corruptedCopy}-shm`).catch(() => {});
+  if (sourcePathOrNull) {
+    await fs.promises.copyFile(sourcePathOrNull, dbPath);
+  } else {
+    await fs.promises.unlink(dbPath).catch(() => {});
+  }
+  await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
+  await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+  return corruptedCopy;
+}
+
+/**
+ * SQLITE_CORRUPT 등 감지 시: 연결 종료 → 건전한 자동백업으로 교체 → 재시작.
+ * 백업이 없으면 WAL 정리 후, 본파일이 여전히 나쁘면 빈 DB로 재시작.
+ */
+function scheduleDbCorruptRecovery(reason) {
+  if (dbCorruptRecoveryScheduled) return;
+  dbCorruptRecoveryScheduled = true;
+  clearIntegrityCheckMarker();
+  console.error('[DB] corrupt recovery scheduled:', reason || '');
+  if (mainWindow) {
+    try {
+      safeWebContentsSend('db-corrupt-recovery', {
+        reason: String(reason || ''),
+        message: DB_CORRUPT_USER_MSG
+      });
+    } catch (_) { /* ignore */ }
+  }
+  setTimeout(() => {
+    db.close(async () => {
+      try {
+        const healthy = await findHealthyAutoBackup();
+        if (healthy) {
+          const kept = await stashAndReplaceMessengerDb(healthy.path);
+          console.error(`[DB] restored from ${healthy.name}; corrupt kept as ${path.basename(kept)}`);
+        } else {
+          await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
+          await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+          if (await probeSqliteFileHealthy(dbPath)) {
+            console.error('[DB] no backup; cleared WAL/SHM and main DB looks healthy');
+          } else {
+            const kept = await stashAndReplaceMessengerDb(null);
+            console.error(`[DB] no healthy backup — empty DB on next launch; corrupt kept as ${path.basename(kept)}`);
+          }
+        }
+        app.relaunch();
+        app.exit(0);
+      } catch (e) {
+        console.error('[DB] automatic recovery failed:', e && e.message);
+        app.exit(1);
+      }
+    });
+  }, 500);
+}
+
+db.on('error', (err) => {
+  console.error('❌ 데이터베이스 오류:', err && err.message);
+  if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('db-event');
+});
+
+// 🛡 SQLite 안정성 강화: PC가 강제 종료(정전, 블루스크린)되어도 DB가 깨지지 않도록.
+// (아래 세 문장은 순서가 중요해서 serialize()로 묶는다 — WAL 모드 설정 → 동기화 설정 → (선택) 무결성 검사.
+//  단, serialize()는 SQLite 문장끼리의 순서만 보장할 뿐, 그 안의 콜백에서 하는 파일 복사 같은
+//  비-SQLite 비동기 작업까지 기다려주지는 않으므로 복구 로직은 아래에서 별도로 안전하게 처리한다.)
 db.serialize(() => {
   db.run(`PRAGMA journal_mode = WAL`);
   db.run(`PRAGMA synchronous = NORMAL`);
@@ -2846,39 +2976,15 @@ db.serialize(() => {
   if (!shouldRunIntegrityCheck()) {
     console.log('[DB] integrity_check 생략 (최근 7일 이내 검사함)');
   } else {
-  db.get(`PRAGMA integrity_check`, (err, row) => {
-    markIntegrityCheckDone();
-    const ok = !err && row && row.integrity_check === 'ok';
-    if (ok) return;
-    console.error('⚠️ 데이터베이스 손상 감지 — 최근 백업으로 복구를 시도합니다:', err ? err.message : row);
-    // ⚠️ 파일이 열려있는 채로는(특히 Windows에서) 백업으로 통째로 덮어쓸 수 없다.
-    // 그래서 연결부터 완전히 닫은 뒤 파일을 바꾸고, 재시작을 강제한다.
-    db.close(async () => {
-      try {
-        const dir = path.join(app.getPath('userData'), 'backups');
-        const names = (await fs.promises.readdir(dir).catch(() => [])).filter(n => n.startsWith('auto_backup_')).sort().reverse();
-        if (names.length === 0) {
-          console.error('⚠️ 복구할 백업이 없습니다. 프로그램을 강제 종료합니다 — 관리자에게 문의해 주세요.');
-          app.exit(1);
-          return;
-        }
-        const latestBackup = path.join(dir, names[0]);
-        const corruptedCopy = dbPath + `.corrupted_${Date.now()}`;
-        await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
-        await fs.promises.copyFile(latestBackup, dbPath);
-        // 손상됐던 세션의 -wal/-shm 보조 파일이 남아있으면 복구한 본 파일과 안 맞을 수 있으니 정리한다.
-        await fs.promises.unlink(dbPath + '-wal').catch(() => {});
-        await fs.promises.unlink(dbPath + '-shm').catch(() => {});
-        console.error(`✅ ${names[0]} 백업으로 복구했습니다. 손상된 원본은 ${path.basename(corruptedCopy)}로 보관됩니다. 자동으로 재시작합니다.`);
-        // 복구 직후엔 반드시 새 프로세스로 깨끗하게 다시 열어야 하므로, 안내 없이 바로 재시작한다.
-        app.relaunch();
-        app.exit(0);
-      } catch (e) {
-        console.error('❌ 자동 복구 실패:', e.message, '— 관리자에게 문의해 주세요.');
-        app.exit(1);
+    db.get(`PRAGMA integrity_check`, (err, row) => {
+      const ok = !err && sqliteCheckRowOk(row);
+      if (ok) {
+        markIntegrityCheckDone();
+        return;
       }
+      console.error('⚠️ 데이터베이스 손상 감지 — 백업 복구를 시작합니다:', err ? err.message : row);
+      scheduleDbCorruptRecovery('startup-integrity');
     });
-  });
   }
 });
 
@@ -2901,6 +3007,7 @@ function logDbErr(err) {
   logDbErr._last = { msg, at: now };
   console.error('DB 오류:', msg);
   logToRendererConsole('error', 'DB 오류: ' + msg);
+  if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('logDbErr');
 }
 
 let logsDirEnsured = false;
@@ -6252,11 +6359,13 @@ function ensureNoticesTableSchema(done) {
     (createErr) => {
       if (createErr) {
         console.error('notices 테이블 생성 실패:', createErr.message);
+        if (isSqliteCorruptError(createErr)) scheduleDbCorruptRecovery('notices-schema');
         complete(false);
         return;
       }
       db.all(`PRAGMA table_info(notices)`, [], (err, rows) => {
         if (err) {
+          if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('notices-schema-info');
           console.error('notices schema 확인 실패:', err.message);
           complete(false);
           return;
@@ -6343,6 +6452,11 @@ function insertNoticeRecord(record, callback, opts) {
         return;
       }
       const msg = String(err.message || '');
+      if (isSqliteCorruptError(err)) {
+        scheduleDbCorruptRecovery('notice-insert');
+        cb(new Error(DB_CORRUPT_USER_MSG));
+        return;
+      }
       if (/no such column|has no column named/i.test(msg)) {
         noticesSchemaReady = false;
         tryAt(uid, idx + 1, uidAttempt);
@@ -9362,7 +9476,9 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images,
       insertNoticeRecord(record, (err, saved) => {
         if (err) {
           console.error('공지사항 저장 실패:', err.message);
-          resolve({ success: false, error: err.message, msg: err.message });
+          const msg = userFacingDbError(err);
+          if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('add-notice');
+          resolve({ success: false, error: msg, msg, corrupt: isSqliteCorruptError(err) });
           return;
         }
         // UI는 즉시 응답 — 동료 PC 전파는 다음 틱에 (다수 접속 시 딜레이 방지)
@@ -9391,13 +9507,23 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
         `UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`,
         [title, content, imagesJson, categoryNorm, uid],
         (err) => {
+          if (err && isSqliteCorruptError(err)) {
+            scheduleDbCorruptRecovery('update-notice');
+            resolve({ success: false, msg: DB_CORRUPT_USER_MSG, corrupt: true });
+            return;
+          }
           if (err && /no column.*category|category/i.test(String(err.message || ''))) {
             db.run(
               `UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`,
               [title, content, imagesJson, uid],
               (err2) => {
+                if (err2 && isSqliteCorruptError(err2)) {
+                  scheduleDbCorruptRecovery('update-notice');
+                  resolve({ success: false, msg: DB_CORRUPT_USER_MSG, corrupt: true });
+                  return;
+                }
                 if (!err2 && mainWindow) safeWebContentsSend('notices-update');
-                resolve({ success: !err2, msg: err2 ? err2.message : undefined });
+                resolve({ success: !err2, msg: err2 ? userFacingDbError(err2) : undefined });
                 if (!err2) {
                   setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
                 }
@@ -9406,7 +9532,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
             return;
           }
           if (!err && mainWindow) safeWebContentsSend('notices-update');
-          resolve({ success: !err, msg: err ? err.message : undefined });
+          resolve({ success: !err, msg: err ? userFacingDbError(err) : undefined });
           if (!err) {
             setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
           }
@@ -11789,6 +11915,17 @@ async function performAutoBackupIfNeeded() {
     let alreadyExists = true;
     try { await fs.promises.access(todayFile); } catch (e) { alreadyExists = false; }
     if (!alreadyExists) {
+      // 손상된 DB를 백업으로 남기지 않음
+      const healthy = await new Promise((resolve) => {
+        db.get('PRAGMA quick_check', (err, row) => {
+          resolve(!err && sqliteCheckRowOk(row));
+        });
+      });
+      if (!healthy) {
+        console.error('[DB] skip auto backup — current DB failed quick_check');
+        scheduleDbCorruptRecovery('backup-quick-check');
+        return;
+      }
       await checkpointWal();
       await fs.promises.copyFile(dbPath, todayFile);
     }
