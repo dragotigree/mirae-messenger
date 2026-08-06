@@ -14128,6 +14128,9 @@
 
     const MAX_NOTICE_IMAGES = 2;
     let boardWriteImages = [];
+    /** 'create' | 'edit' — hidden uid 잔존으로 수정이 새글처럼 덮어쓰는 것 방지 */
+    let boardWriteMode = 'create';
+    let boardWriteEditingUid = '';
 
     function parseNoticeImages(raw) {
       if (Array.isArray(raw)) {
@@ -14513,6 +14516,7 @@
       document.getElementById('board-write-view').style.display = 'block';
       document.getElementById('board-header-actions').style.display = 'none';
 
+      const submitBtn = document.getElementById('board-write-submit-btn');
       if (uid) {
         const n = cachedNoticesList.find(x => x.uid === uid);
         if (!canModifyNotice(n)) {
@@ -14521,13 +14525,18 @@
           else showBoardListView();
           return;
         }
+        boardWriteMode = 'edit';
+        boardWriteEditingUid = String(uid);
         document.getElementById('board-modal-title').textContent = '✍️ 공지사항 수정';
         document.getElementById('board-write-uid').value = uid;
         document.getElementById('board-write-title').value = n ? n.title : '';
         document.getElementById('board-write-content').value = n ? n.content : '';
         boardWriteImages = parseNoticeImages(n && n.images);
         fillBoardWriteCategorySelect(n && n.category);
+        if (submitBtn) submitBtn.textContent = '✔ 수정 저장';
       } else {
+        boardWriteMode = 'create';
+        boardWriteEditingUid = '';
         document.getElementById('board-modal-title').textContent = '✍️ 새 공지사항 작성';
         document.getElementById('board-write-uid').value = '';
         document.getElementById('board-write-title').value = '';
@@ -14536,6 +14545,7 @@
         // 기본: 내 부서가 있으면 부서, 없으면 전체
         const myDept = (myProfile && myProfile.dept) ? String(myProfile.dept).trim() : '';
         fillBoardWriteCategorySelect(myDept || '전체');
+        if (submitBtn) submitBtn.textContent = '✔ 등록';
       }
       renderBoardPhotoPreview();
       document.getElementById('board-write-title').focus();
@@ -14544,7 +14554,10 @@
     function cancelBoardWrite() {
       boardWriteImages = [];
       renderBoardPhotoPreview();
-      const uid = document.getElementById('board-write-uid').value;
+      const uid = boardWriteMode === 'edit' ? boardWriteEditingUid : '';
+      boardWriteMode = 'create';
+      boardWriteEditingUid = '';
+      document.getElementById('board-write-uid').value = '';
       if (uid) showBoardDetailView(uid);
       else showBoardListView();
     }
@@ -14552,7 +14565,8 @@
     let isSubmittingNotice = false;
     async function submitBoardWrite() {
       if (isSubmittingNotice) return;
-      const uid = document.getElementById('board-write-uid').value;
+      const isEdit = boardWriteMode === 'edit' && !!boardWriteEditingUid;
+      const uid = isEdit ? boardWriteEditingUid : '';
       const title = document.getElementById('board-write-title').value.trim();
       const content = document.getElementById('board-write-content').value.trim();
       const category = normalizeBoardCategory(document.getElementById('board-write-category')?.value);
@@ -14568,10 +14582,10 @@
       const prevSubmitLabel = submitBtn ? submitBtn.textContent : '';
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = '등록 중…';
+        submitBtn.textContent = isEdit ? '저장 중…' : '등록 중…';
       }
       try {
-        if (uid) {
+        if (isEdit) {
           const existing = (cachedNoticesList || []).find((x) => x.uid === uid);
           if (!canModifyNotice(existing)) {
             await appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
@@ -14583,11 +14597,18 @@
             return;
           }
           boardWriteImages = [];
+          boardWriteMode = 'create';
+          boardWriteEditingUid = '';
+          document.getElementById('board-write-uid').value = '';
           boardCategoryFilter = '__all__';
           localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
           await loadNoticesList();
           showBoardDetailView(uid);
         } else {
+          // 새 글 — hidden uid 가 남아 있어도 무조건 추가
+          document.getElementById('board-write-uid').value = '';
+          boardWriteEditingUid = '';
+          boardWriteMode = 'create';
           const res = await window.api.addNotice({ title, content, images, category, authorName: getNoticeAuthorDisplayName() });
           if (!res || !res.success) {
             await appAlert((res && (res.msg || res.error)) || '공지사항 등록에 실패했습니다. 다시 시도해 주세요.');
@@ -14599,14 +14620,13 @@
           const savedNotice = res.notice && res.notice.uid
             ? { ...res.notice, category: normalizeBoardCategory(res.notice.category || category) }
             : null;
-          // 목록을 기다리지 않고 바로 표시 (등록 후 딜레이 방지)
+          // 기존 목록에 합치기 (다른 카테고리 공지 유지)
           if (savedNotice) {
             cachedNoticesList = [savedNotice].concat((cachedNoticesList || []).filter((x) => x.uid !== savedNotice.uid));
             renderBoardCategoryFilters(cachedNoticesList);
             renderFilteredNoticesList();
           }
           showBoardListView({ skipReload: true });
-          // 백그라운드 새로고침만 (전체 sync 요청은 열 때만 — 작성 직후 폭주 방지)
           loadNoticesList().catch(() => {});
         }
       } catch (e) {
@@ -14615,7 +14635,7 @@
         isSubmittingNotice = false;
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = prevSubmitLabel || '✔ 등록';
+          submitBtn.textContent = prevSubmitLabel || (isEdit ? '✔ 수정 저장' : '✔ 등록');
         }
       }
     }

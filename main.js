@@ -6273,34 +6273,39 @@ function ensureNoticesCategoryColumn(done) {
   ensureNoticesTableSchema(done);
 }
 
-function insertNoticeRecord(record, callback) {
+function insertNoticeRecord(record, callback, opts) {
   const cb = typeof callback === 'function' ? callback : () => {};
+  const o = opts || {};
+  // sync/수신: 같은 uid면 갱신. 로컬 새 작성: INSERT만 (REPLACE 금지 → 다른 카테고리 공지 덮어쓰기 방지)
+  const allowReplace = !!o.allowReplace;
   const row = record || {};
   const category = normalizeNoticeCategory(row.category);
   const images = normalizeNoticeImagesField(row.images);
-  const saved = { ...row, images, category };
-  const base = [row.uid, row.title, row.content, row.author_name, row.author_ip, row.created_at];
+  let saved = { ...row, images, category };
+  const baseOf = (uid) => [uid, row.title, row.content, row.author_name, row.author_ip, row.created_at];
 
-  const attempts = [
+  const verb = allowReplace ? 'INSERT OR REPLACE' : 'INSERT';
+  const attemptsFor = (uid) => [
     {
-      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      params: [...base, images, category]
+      sql: `${verb} INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [...baseOf(uid), images, category]
     },
     {
-      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      params: [...base, images]
+      sql: `${verb} INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [...baseOf(uid), images]
     },
     {
-      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, category) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      params: [...base, category]
+      sql: `${verb} INTO notices (uid, title, content, author_name, author_ip, created_at, category) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [...baseOf(uid), category]
     },
     {
-      sql: `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      params: base
+      sql: `${verb} INTO notices (uid, title, content, author_name, author_ip, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      params: baseOf(uid)
     }
   ];
 
-  const tryAt = (idx) => {
+  const tryAt = (uid, idx, uidAttempt) => {
+    const attempts = attemptsFor(uid);
     if (idx >= attempts.length) {
       cb(new Error('공지 저장 실패: DB 스키마를 맞출 수 없습니다'));
       return;
@@ -6308,11 +6313,12 @@ function insertNoticeRecord(record, callback) {
     const a = attempts[idx];
     db.run(a.sql, a.params, (err) => {
       if (!err) {
+        saved = { ...saved, uid };
         if (idx > 0) {
           noticesSchemaReady = false;
           ensureNoticesTableSchema(() => {
-            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, row.uid], () => {});
-            db.run(`UPDATE notices SET images = ? WHERE uid = ?`, [images, row.uid], () => {});
+            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, uid], () => {});
+            db.run(`UPDATE notices SET images = ? WHERE uid = ?`, [images, uid], () => {});
           });
         }
         cb(null, saved);
@@ -6321,7 +6327,12 @@ function insertNoticeRecord(record, callback) {
       const msg = String(err.message || '');
       if (/no such column|has no column named/i.test(msg)) {
         noticesSchemaReady = false;
-        tryAt(idx + 1);
+        tryAt(uid, idx + 1, uidAttempt);
+        return;
+      }
+      // 로컬 새 작성 중 uid 충돌 → 새 uid로 재시도 (기존 공지는 유지)
+      if (!allowReplace && /UNIQUE|constraint|PRIMARY KEY/i.test(msg) && uidAttempt < 3) {
+        tryAt(generateNoticeUid(), 0, uidAttempt + 1);
         return;
       }
       cb(err);
@@ -6333,7 +6344,7 @@ function insertNoticeRecord(record, callback) {
       cb(new Error('공지 uid 없음'));
       return;
     }
-    tryAt(0);
+    tryAt(row.uid, 0, 0);
   });
 }
 
@@ -6356,12 +6367,20 @@ function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
   // 실시간 추가도 tombstone에 막히지 않도록 정리 후 저장 (작성 PC → 전 직원 전파)
   clearNoticeTombstone(n.uid, () => {
-    insertNoticeRecord(n, (insErr) => {
-      if (insErr) {
-        console.error('NOTICE_ADD 저장 실패:', insErr.message);
+    db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
+      if (row) {
+        // 이미 있으면 내용만 갱신 (다른 공지 REPLACE 금지)
+        upsertNoticeFromSync(n);
+        if (mainWindow) safeWebContentsSend('notices-update');
         return;
       }
-      if (mainWindow) safeWebContentsSend('notices-update');
+      insertNoticeRecord(n, (insErr) => {
+        if (insErr) {
+          console.error('NOTICE_ADD 저장 실패:', insErr.message);
+          return;
+        }
+        if (mainWindow) safeWebContentsSend('notices-update');
+      }, { allowReplace: false });
     });
   });
 }
@@ -7052,8 +7071,34 @@ function upsertNoticeFromSync(n) {
   if (!n || !n.uid) return;
   // 동기화 응답에 본문이 온 공지는 tombstone보다 우선해 저장 (전체 직원이 읽을 수 있게)
   clearNoticeTombstone(n.uid, () => {
-    insertNoticeRecord(n, (insErr) => {
-      if (insErr) console.error('notice sync upsert 실패:', insErr.message);
+    const category = normalizeNoticeCategory(n.category);
+    const images = normalizeNoticeImagesField(n.images);
+    ensureNoticesTableSchema(() => {
+      // uid 기준으로만 갱신 — REPLACE 금지(다른 UNIQUE 컬럼 때문에 이웃 공지가 지워지는 것 방지)
+      db.run(
+        `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`,
+        [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid],
+        function onUpd(err) {
+          if (!err && this && this.changes > 0) return;
+          // category/images 없는 구스키마 폴백
+          if (err && /no such column|has no column named/i.test(String(err.message || ''))) {
+            db.run(
+              `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ? WHERE uid = ?`,
+              [n.title, n.content, n.author_name, n.author_ip, n.created_at, n.uid],
+              function onUpd2(err2) {
+                if (!err2 && this && this.changes > 0) return;
+                insertNoticeRecord({ ...n, images, category }, (insErr) => {
+                  if (insErr) console.error('notice sync upsert 실패:', insErr.message);
+                }, { allowReplace: false });
+              }
+            );
+            return;
+          }
+          insertNoticeRecord({ ...n, images, category }, (insErr) => {
+            if (insErr) console.error('notice sync upsert 실패:', insErr.message);
+          }, { allowReplace: false });
+        }
+      );
     });
   });
 }
@@ -9068,8 +9113,9 @@ function broadcastGroupJoinNotice(uid, groupName, memberDisplayName, memberIps) 
 }
 
 function generateNoticeUid() {
-  const rand = Math.floor(Math.random() * 1e9).toString(36);
-  return `${MY_IP}_${Date.now()}_${rand}`;
+  const rand = Math.floor(Math.random() * 1e12).toString(36);
+  const salt = Math.floor(Math.random() * 1e6).toString(36);
+  return `${MY_IP || 'ip'}_${Date.now()}_${rand}_${salt}`;
 }
 
 function generateMsgUid() {
