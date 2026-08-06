@@ -1,6 +1,6 @@
 # Force 1.0.494 — soft auto-update (no freeze on Cursor deploy). No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = '23fe57b1c143ec44f87428ccd463da3a2f006fd2'
 $Expected = '1.0.494'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
