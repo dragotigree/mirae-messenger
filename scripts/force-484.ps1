@@ -1,6 +1,6 @@
 # Force install Mirae 1.0.484. Occlusion off + no backdrop blur. No prompts.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = '515cfdd0878b3b5c7b9292925f134188143a103a'
 $Expected = '1.0.484'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
