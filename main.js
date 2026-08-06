@@ -11341,6 +11341,7 @@ async function performClearAllChatHistory(opts) {
     'messages',
     'chat_view_clears',
     'chat_pins',
+    'deleted_chat_pins',
     'scheduled_messages',
     'channel_read_cursors'
   ];
