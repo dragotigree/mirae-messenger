@@ -1,6 +1,6 @@
 # Force 1.0.497 — presence stale align (no flicker). No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = '0e6ef664145089b2a5b551bf11d243f01a895930'
+\$Ref = 'd842b5839e0ca5faca9427470b0c0b97a377010c'
 $Expected = '1.0.497'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
