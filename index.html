@@ -442,7 +442,7 @@
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
-    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; backdrop-filter: none; -webkit-backdrop-filter: none; animation: menu-pop 0.18s var(--ease-spring); }
+    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; backdrop-filter: blur(12px); animation: menu-pop 0.18s var(--ease-spring); }
     @keyframes menu-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .ctx-menu-item { padding: 9px 12px; font-size: 12.5px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary); font-weight: 600; transition: background var(--transition-fast); }
     .ctx-menu-item:hover { background: var(--surface-muted); }
@@ -3633,7 +3633,7 @@
       box-sizing: border-box;
     }
 
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.45); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
 
@@ -3792,19 +3792,6 @@
     html.ui-animations-off .log-card-item:hover,
     html.ui-animations-off .chat-quick-switcher-item.is-active {
       transform: none !important;
-      transition: none !important;
-    }
-    /* backdrop-filter 는 Windows GPU에서 모달/버튼 클릭 시 버벅임의 원인 — 애니메이션 Off 시 끔 */
-    html.ui-animations-off .modal-overlay,
-    html.ui-animations-off #dm-context-menu,
-    html.ui-animations-off #group-context-menu,
-    html.ui-animations-off #channel-context-menu,
-    html.ui-animations-off #dept-floor-context-menu,
-    html.ui-animations-off #quick-phrase-popover,
-    html.ui-animations-off #screen-capture-popover,
-    html.ui-animations-off #chat-quick-switcher-overlay {
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
     }
     .master-admin-modal-card {
       width: min(1080px, 96vw) !important;
@@ -7096,10 +7083,7 @@
 
     const profilePhotoCache = new Map();
     const profilePhotoLoading = new Set();
-    const profilePhotoWaitQueue = [];
-    const PROFILE_PHOTO_CACHE_MAX = 40;
-    const PROFILE_PHOTO_LOAD_CONCURRENCY = 2;
-    let profilePhotoLoadsInFlight = 0;
+    const PROFILE_PHOTO_CACHE_MAX = 100;
 
     function trimProfilePhotoCache() {
       while (profilePhotoCache.size > PROFILE_PHOTO_CACHE_MAX) {
@@ -7134,32 +7118,20 @@
       return copy;
     }
 
-    let avatarRefreshTimer = null;
-    const avatarRefreshPendingIps = new Set();
-
     function refreshAvatarsForIp(ip) {
-      if (ip) avatarRefreshPendingIps.add(ip);
-      if (avatarRefreshTimer) return;
-      avatarRefreshTimer = setTimeout(() => {
-        avatarRefreshTimer = null;
-        const ips = [...avatarRefreshPendingIps];
-        avatarRefreshPendingIps.clear();
-        renderUserListTree();
-        if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
-        if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
-        ips.forEach((oneIp) => {
-          if (activeChatUser && activeChatUser.ip === oneIp) {
-            const av = document.getElementById('chat-header-avatar');
-            if (av) setupAvatarElement(av, activeChatUser.username, activeChatUser.photo, activeChatUser.ip);
-          }
-        });
-        if (activeChatUser && activeChatUser.isGroup) {
-          try {
-            syncActiveGroupChatFromList();
-            renderGroupDetailPanel(activeChatUser);
-          } catch (e) { /* ignore */ }
-        }
-      }, 120);
+      renderUserListTree();
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+      if (document.getElementById('master-admin-modal')?.style.display === 'flex') renderMasterOnlineClients();
+      if (activeChatUser && activeChatUser.ip === ip) {
+        const av = document.getElementById('chat-header-avatar');
+        if (av) setupAvatarElement(av, activeChatUser.username, activeChatUser.photo, activeChatUser.ip);
+      }
+      if (activeChatUser && activeChatUser.isGroup) {
+        try {
+          syncActiveGroupChatFromList();
+          renderGroupDetailPanel(activeChatUser);
+        } catch (e) { /* ignore */ }
+      }
     }
 
     async function ensureProfilePhotoLoaded(ip) {
@@ -7180,27 +7152,10 @@
       }
     }
 
-    function pumpProfilePhotoQueue() {
-      while (profilePhotoLoadsInFlight < PROFILE_PHOTO_LOAD_CONCURRENCY && profilePhotoWaitQueue.length) {
-        const ip = profilePhotoWaitQueue.shift();
-        if (!ip || cachedPhotoForIp(ip) || profilePhotoLoading.has(ip)) continue;
-        profilePhotoLoadsInFlight += 1;
-        ensureProfilePhotoLoaded(ip).finally(() => {
-          profilePhotoLoadsInFlight = Math.max(0, profilePhotoLoadsInFlight - 1);
-          pumpProfilePhotoQueue();
-        });
-      }
-    }
-
     function queueProfilePhotoLoads(users) {
       (users || []).forEach((u) => {
-        if (u && u.hasPhoto && u.ip && !cachedPhotoForIp(u.ip) && !profilePhotoLoading.has(u.ip)) {
-          if (!profilePhotoWaitQueue.includes(u.ip)) profilePhotoWaitQueue.push(u.ip);
-        }
+        if (u && u.hasPhoto && u.ip && !cachedPhotoForIp(u.ip)) void ensureProfilePhotoLoaded(u.ip);
       });
-      // 대기열 폭주 방지
-      if (profilePhotoWaitQueue.length > 40) profilePhotoWaitQueue.length = 40;
-      pumpProfilePhotoQueue();
     }
 
     function applyProfilePhotoUpdate(data) {
@@ -7218,59 +7173,11 @@
       }
       refreshAvatarsForIp(data.ip);
     }
-
-    function trimRendererMemory(reason, opts) {
-      const options = opts || {};
-      try {
-        // 프로필 사진 캐시를 절반으로 줄여 디코딩된 비트맵 압력을 낮춘다
-        const keep = Math.max(8, Math.floor(PROFILE_PHOTO_CACHE_MAX / 2));
-        while (profilePhotoCache.size > keep) {
-          const oldest = profilePhotoCache.keys().next().value;
-          profilePhotoCache.delete(oldest);
-        }
-        if (options.trimChatDom) {
-          const msgsEl = document.getElementById('chat-messages-area');
-          if (msgsEl && !activeChatUser) {
-            msgsEl.innerHTML = '';
-          } else if (msgsEl && msgsEl.children.length > 100) {
-            while (msgsEl.children.length > 100) {
-              msgsEl.removeChild(msgsEl.firstChild);
-            }
-          }
-        }
-        if (typeof console !== 'undefined' && console.debug) {
-          console.debug('[memory-trim]', reason || 'manual', 'photos=', profilePhotoCache.size);
-        }
-      } catch (e) { /* ignore */ }
-    }
-
-    if (window.api && typeof window.api.onRendererMemoryTrim === 'function') {
-      window.api.onRendererMemoryTrim((data) => {
-        const reason = (data && data.reason) || 'ipc';
-        trimRendererMemory(reason, { trimChatDom: reason === 'pressure' || reason === 'hide' || reason === 'minimize' });
-      });
-    }
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) trimRendererMemory('visibility', { trimChatDom: false });
-    });
-
     let userFilterKeyword = '';
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
     let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
-    // 1.0.475 긴급: 조작 불능급 리소스 폭주 PC에 한 번 안정성 프리셋 강제 적용
-    const PERF_EMERGENCY_KEY = 'miraePerfEmergency475';
-    if (localStorage.getItem(PERF_EMERGENCY_KEY) !== '1') {
-      appSettings.stabilityModeEnabled = true;
-      appSettings.uiAnimationsEnabled = false;
-      appSettings.showUserListAvatars = false;
-      appSettings.spellcheck = false;
-      appSettings.scheduleAlarmEnabled = false;
-      localStorage.setItem(PERF_EMERGENCY_KEY, '1');
-      localStorage.setItem('appSettings', JSON.stringify(appSettings));
-      console.warn('[perf] 1.0.475 긴급 안정성 프리셋 적용 (아바타/애니메이션/맞춤법 Off)');
-    }
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -8837,9 +8744,7 @@
     window.api.onUserListUpdate((users) => {
       persistContactSnapshotsFromUserList(users);
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
-      if (appSettings.showUserListAvatars !== false) {
-        queueProfilePhotoLoads(users);
-      }
+      queueProfilePhotoLoads(users);
       const selecting = sidebarSelectedUserIps.size > 0;
       renderUserListTree();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
@@ -16620,7 +16525,7 @@
     let chatSharedTab = 'media';
     let chatSharedCache = { channelKey: '', photos: [], files: [], links: [], loading: false };
     let chatSharedLoadSeq = 0;
-    const MAX_SHARED_PHOTOS_RENDER = 120;
+    const MAX_SHARED_PHOTOS_RENDER = 360;
 
     function syncChatSharedArchiveBtnUi() {
       const drawer = document.getElementById('chat-shared-drawer');
@@ -18224,9 +18129,8 @@
       const wasNearBottom = isMe || isNearChatBottom();
       const dateKey = resolveChatDateKey(sentAtLabelForPending, options);
 
-      // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 (이미지가 많으면 RAM이 급증)
-      const MAX_CHAT_DOM_NODES = 160;
-      while (container.children.length > MAX_CHAT_DOM_NODES) {
+      // 메모리 누수 방지: 화면에 유지하는 최대 말풍선 노드 수 제한 (예: 300개)
+      if (container.children.length > 300) {
         container.removeChild(container.firstChild);
         // 맨 위가 날짜선만 남지 않도록 정리
         while (container.firstChild && container.firstChild.classList && container.firstChild.classList.contains('chat-date-sep')) {
