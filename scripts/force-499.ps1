@@ -1,6 +1,6 @@
 # Force 1.0.499 — load-sim tool. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = '394d7b22121e2104f7b3b4043ea3c862e5983178'
 $Expected = '1.0.499'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
