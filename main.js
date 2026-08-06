@@ -30,10 +30,13 @@ if (!gotSingleInstanceLock) {
   process.exit(0);
 }
 
-// 일부 Windows GPU 드라이버에서 Chromium 합성이 CPU를 상시 잡아먹음 → 소프트웨어 렌더로 완화
-try {
-  app.disableHardwareAcceleration();
-} catch (e) { /* ignore */ }
+// GPU 가속은 기본 ON 유지.
+// 1.0.479에서 disableHardwareAcceleration()을 켰더니 소프트웨어 렌더가
+// 유휴 상태에서도 CPU ~12%를 상시 점유하는 경우가 있어 되돌림.
+// 필요 시 환경변수 MIRAE_DISABLE_GPU=1 로만 비활성.
+if (process.env.MIRAE_DISABLE_GPU === '1') {
+  try { app.disableHardwareAcceleration(); } catch (e) { /* ignore */ }
+}
 
 // mirae-file:// 첨부 미리보기용 — app ready 전에 등록해야 img/src에서 로드됨
 try {
