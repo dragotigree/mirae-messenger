@@ -6349,7 +6349,12 @@ function insertNoticeRecord(record, callback, opts) {
         return;
       }
       // 로컬 새 작성 중 uid 충돌 → 새 uid로 재시도 (기존 공지는 유지)
+      // sync 경로(forbidNewUidOnConflict)는 절대 새 uid를 만들지 않음 — 중복 공지 방지
       if (!allowReplace && /UNIQUE|constraint|PRIMARY KEY/i.test(msg) && uidAttempt < 3) {
+        if (o.forbidNewUidOnConflict) {
+          cb(err);
+          return;
+        }
         tryAt(generateNoticeUid(), 0, uidAttempt + 1);
         return;
       }
@@ -6645,10 +6650,34 @@ function handleNoticeSyncRequest(senderIP) {
                             deletedScheduleUids,
                             deletedNoticeUids
                           );
-                          if (chunks.length) {
-                            chunks[0].chatPins = chatPins || [];
-                            chunks[0].dutyRoster = dutyRoster || [];
-                            chunks[0].deletedChatPins = deletedChatPins;
+                          const pinChunk = {
+                            type: 'NOTICE_SYNC_RESPONSE',
+                            notices: [],
+                            operators: [],
+                            schedules: [],
+                            profileOverrides: [],
+                            deletedScheduleUids: [],
+                            deletedNoticeUids: [],
+                            chatPins: chatPins || [],
+                            deletedChatPins,
+                            dutyRoster: dutyRoster || [],
+                            updateSourcePath: updateSourcePath || ''
+                          };
+                          const pinChunkBytes = Buffer.byteLength(JSON.stringify(pinChunk) + '\n', 'utf8');
+                          if (pinChunkBytes <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                            chunks.unshift(pinChunk);
+                          } else {
+                            // pin/duty 만으로도 크면 분리 전송
+                            const dutyOnly = { ...pinChunk, chatPins: [], deletedChatPins: [] };
+                            const pinsOnly = { ...pinChunk, dutyRoster: [] };
+                            if (Buffer.byteLength(JSON.stringify(dutyOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                              chunks.unshift(dutyOnly);
+                            }
+                            if (Buffer.byteLength(JSON.stringify(pinsOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                              chunks.unshift(pinsOnly);
+                            } else {
+                              console.error('chatPins/deletedChatPins 동기화 청크가 너무 큼 — 건너뜀');
+                            }
                           }
                           tcpWriteJsonLines(senderIP, chunks);
                         }
@@ -6710,9 +6739,14 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   }
   // 삭제 목록을 일정 INSERT보다 먼저 적용해야 되살림을 막을 수 있음
   // (DB INSERT는 비동기이므로 메모리 tombstone을 먼저 올려 레이스를 차단)
+  // 같은 응답에 일정 본문이 있는 UID는 삭제 목록보다 우선
+  const incomingScheduleUids = new Set(
+    (Array.isArray(schedules) ? schedules : []).map((s) => s && s.uid).filter(Boolean).map(String)
+  );
   if (Array.isArray(deletedScheduleUids) && deletedScheduleUids.length) {
-    rememberScheduleTombstones(deletedScheduleUids);
-    deletedScheduleUids.forEach((uid) => {
+    const toDelete = deletedScheduleUids.filter((uid) => uid && !incomingScheduleUids.has(String(uid)));
+    rememberScheduleTombstones(toDelete);
+    toDelete.forEach((uid) => {
       if (!uid) return;
       applyLocalScheduleDelete(uid, { notify: false });
     });
@@ -6870,7 +6904,9 @@ function upsertChatPinRow(pin, broadcast) {
   if (!key) return Promise.resolve();
 
   if (pin._clear) {
-    return clearChatPinRow(key, pin.cleared_at || new Date().toISOString(), !!broadcast, { force: true });
+    // 피어 해제는 force:false — 로컬이 더 나중에 재고정한 경우 유지
+    // 로컬 사용자 해제는 clear-chat-pin → clearChatPinRow(..., force:true)
+    return clearChatPinRow(key, pin.cleared_at || new Date().toISOString(), !!broadcast, { force: false });
   }
 
   const pinnedAt = String(pin.pinned_at || new Date().toISOString());
@@ -7208,31 +7244,47 @@ function upsertNoticeFromSync(n) {
     const category = normalizeNoticeCategory(n.category);
     const images = normalizeNoticeImagesField(n.images);
     ensureNoticesTableSchema(() => {
-      // uid 기준으로만 갱신 — REPLACE 금지(다른 UNIQUE 컬럼 때문에 이웃 공지가 지워지는 것 방지)
-      db.run(
-        `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`,
-        [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid],
-        function onUpd(err) {
-          if (!err && this && this.changes > 0) return;
-          // category/images 없는 구스키마 폴백
-          if (err && /no such column|has no column named/i.test(String(err.message || ''))) {
-            db.run(
-              `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ? WHERE uid = ?`,
-              [n.title, n.content, n.author_name, n.author_ip, n.created_at, n.uid],
-              function onUpd2(err2) {
-                if (!err2 && this && this.changes > 0) return;
-                insertNoticeRecord({ ...n, images, category }, (insErr) => {
-                  if (insErr) console.error('notice sync upsert 실패:', insErr.message);
-                }, { allowReplace: false });
-              }
-            );
+      const applyUpdate = (onDone) => {
+        db.run(
+          `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`,
+          [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid],
+          function onUpd(err) {
+            if (!err) {
+              if (typeof onDone === 'function') onDone(null, this && this.changes > 0);
+              return;
+            }
+            // category/images 없는 구스키마 폴백
+            if (/no such column|has no column named/i.test(String(err.message || ''))) {
+              db.run(
+                `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ? WHERE uid = ?`,
+                [n.title, n.content, n.author_name, n.author_ip, n.created_at, n.uid],
+                function onUpd2(err2) {
+                  if (typeof onDone === 'function') onDone(err2 || null, !err2 && this && this.changes > 0);
+                }
+              );
+              return;
+            }
+            if (typeof onDone === 'function') onDone(err, false);
+          }
+        );
+      };
+
+      // 이미 있으면 UPDATE만 — changes===0(동일 내용)이어도 INSERT/새 uid 생성 금지
+      db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (selErr, existing) => {
+        if (existing) {
+          applyUpdate(() => {});
+          return;
+        }
+        insertNoticeRecord({ ...n, images, category }, (insErr) => {
+          if (!insErr) return;
+          // 레이스로 UNIQUE 난 경우 새 uid 만들지 말고 기존 행 UPDATE
+          if (/UNIQUE|constraint|PRIMARY KEY/i.test(String(insErr.message || ''))) {
+            applyUpdate(() => {});
             return;
           }
-          insertNoticeRecord({ ...n, images, category }, (insErr) => {
-            if (insErr) console.error('notice sync upsert 실패:', insErr.message);
-          }, { allowReplace: false });
-        }
-      );
+          console.error('notice sync upsert 실패:', insErr.message);
+        }, { allowReplace: false, forbidNewUidOnConflict: true });
+      });
     });
   });
 }
@@ -9344,6 +9396,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
               `UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`,
               [title, content, imagesJson, uid],
               (err2) => {
+                if (!err2 && mainWindow) safeWebContentsSend('notices-update');
                 resolve({ success: !err2, msg: err2 ? err2.message : undefined });
                 if (!err2) {
                   setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
@@ -9352,6 +9405,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
             );
             return;
           }
+          if (!err && mainWindow) safeWebContentsSend('notices-update');
           resolve({ success: !err, msg: err ? err.message : undefined });
           if (!err) {
             setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
