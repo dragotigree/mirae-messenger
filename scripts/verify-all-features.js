@@ -82,7 +82,9 @@ function testNoticeSync() {
   ok('공지 tombstone 본문 우선', /incomingNoticeUids/.test(mainSrc));
   ok('일정 tombstone 본문 우선', /incomingScheduleUids/.test(mainSrc));
   ok('quiet 후 NOTICE_SYNC 재요청', /TCP listening after quiet period[\s\S]{0,300}?requestNoticeSyncFromOnlinePeers/.test(mainSrc));
-  ok('update-notice notices-update', /update-notice[\s\S]*?safeWebContentsSend\('notices-update'\)/.test(mainSrc));
+  ok('update-notice notices-update', /update-notice[\s\S]*?notifyNoticesChanged\(\)/.test(mainSrc));
+  ok('NOTICE_SYNC 이미지 예산', /NOTICE_SYNC_IMAGES_BUDGET_BYTES/.test(mainSrc) && /slimNoticesForBulkSync/.test(mainSrc));
+  ok('NOTICE_SYNC 요청 쿨다운', /NOTICE_SYNC_REQUEST_COOLDOWN_MS/.test(mainSrc));
 }
 
 function testDutyFlag() {
