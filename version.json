@@ -1,4 +1,4 @@
 {
-  "version": "1.0.487",
-  "notes": "긴급: userData를 C:\\Apps\\...\\userdata로 고정(OneDrive AppData 프리징)·창 먼저·Z자동업데이트 OFF·preload 타임아웃 — 로딩커서 고정 수정"
+  "version": "1.0.488",
+  "notes": "긴급: TCP 폭주 차단(동시접속 제한·부팅 45초 대용량 sync 드롭)·SAFE_UI 모드 — TCP버퍼초과로 클릭불가/로딩커서 수정"
 }
