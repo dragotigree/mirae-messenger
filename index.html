@@ -14290,7 +14290,33 @@
       showAutoUpdateBanner(data);
     });
 
+    if (window.api.onAutoUpdateStarted) {
+      window.api.onAutoUpdateStarted((data) => {
+        const ver = (data && data.remoteVersion) ? data.remoteVersion : '';
+        showAppUpdateProgress('업데이트 받는 중', [
+          ver ? `새 버전 ${ver}을 준비하고 있습니다.` : '새 버전을 준비하고 있습니다.',
+          '',
+          '실행 중인 파일은 건드리지 않고 안전하게 받습니다.',
+          '',
+          '잠시만 기다려 주세요.'
+        ].join('\n'));
+      });
+    }
+    if (window.api.onAppUpdateProgress) {
+      window.api.onAppUpdateProgress((data) => {
+        if (!data || !data.file) return;
+        const el = document.getElementById('app-update-progress');
+        if (!el || !el.classList.contains('is-visible')) {
+          showAppUpdateProgress('업데이트 받는 중', `파일: ${data.file}`);
+        } else {
+          const descEl = document.getElementById('app-update-progress-desc');
+          if (descEl) descEl.innerHTML = formatAppUpdateProgressDesc(`받는 중: ${data.file}`);
+        }
+      });
+    }
+
     window.api.onAutoUpdateFailed(async (data) => {
+      hideAppUpdateProgress();
       await appAlert('자동 업데이트 적용에 실패했습니다.\n\n' + (data && data.msg ? data.msg : '알 수 없는 오류') + '\n\n마스터 인증 후 환경설정 화면의 "지금 확인" 버튼으로 다시 시도해 주세요.');
     });
 

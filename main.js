@@ -9281,8 +9281,9 @@ ipcMain.handle('check-for-update', async () => {
   }
 });
 
-async function applyUpdateFiles() {
-  // package.json을 포함해야 버전 번호(APP_VERSION)도 함께 갱신된다.
+async function applyUpdateFiles(opts = {}) {
+  // soft(자동업데이트): 실행 중 in-place/대용량/Z미러를 피해 '응답 없음' 완화
+  const soft = !!(opts && opts.soft);
   const filesToUpdate = [
     'main.js',
     'preload.js',
@@ -9294,21 +9295,25 @@ async function applyUpdateFiles() {
     'lib/minimal-xlsx.js',
     'excalidraw-editor.html',
     'preload-excalidraw.js',
-    'lib/excalidraw-app.js',
-    'lib/excalidraw-app.css'
+    'mobile_server.js'
   ];
-  const optionalAssets = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
-  try {
-    const remoteListBuf = await readUpdateSourceBytes('vendor/excalidraw/asset-list.json');
-    const remoteList = parseUpdateJsonText(remoteListBuf.toString('utf8'));
-    const remoteFiles = Array.isArray(remoteList && remoteList.files) ? remoteList.files : [];
-    for (const f of remoteFiles) {
-      const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
-      if (rel && rel !== 'vendor/excalidraw/asset-list.json') optionalAssets.push(rel);
-    }
-  } catch (e) { /* optional fonts/locales */ }
-  const backupDir = path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
-  await fs.promises.mkdir(backupDir, { recursive: true });
+  if (!soft) {
+    filesToUpdate.push('lib/excalidraw-app.js', 'lib/excalidraw-app.css');
+  }
+  const optionalAssets = soft ? [] : ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
+  if (!soft) {
+    try {
+      const remoteListBuf = await readUpdateSourceBytes('vendor/excalidraw/asset-list.json');
+      const remoteList = parseUpdateJsonText(remoteListBuf.toString('utf8'));
+      const remoteFiles = Array.isArray(remoteList && remoteList.files) ? remoteList.files : [];
+      for (const f of remoteFiles) {
+        const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
+        if (rel && rel !== 'vendor/excalidraw/asset-list.json') optionalAssets.push(rel);
+      }
+    } catch (e) { /* optional fonts/locales */ }
+  }
+  const backupDir = soft ? '' : path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
+  if (backupDir) await fs.promises.mkdir(backupDir, { recursive: true });
   const fileResults = [];
   let expectedVersion = null;
 
@@ -9317,11 +9322,17 @@ async function applyUpdateFiles() {
 
   for (const f of filesToUpdate) {
     await yieldUi();
+    if (soft) await sleepMs(20);
     safeWebContentsSend('app-update-progress', { phase: 'download', file: f });
     let remoteBuf;
     try {
       remoteBuf = await readUpdateSourceBytes(f);
     } catch (e) {
+      // mobile_server 등은 구버전에 없을 수 있음 — soft에서는 선택
+      if (soft && f === 'mobile_server.js') {
+        fileResults.push({ file: f, copied: true, optionalMissing: true });
+        continue;
+      }
       fileResults.push({ file: f, copied: false, reason: `GitHub에 없음/접근실패(${e.message})` });
       continue;
     }
@@ -9332,18 +9343,20 @@ async function applyUpdateFiles() {
         expectedVersion = remotePkg.version;
       } catch (e) {}
     }
+    if (backupDir) {
+      try {
+        await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
+        await fs.promises.access(localPath);
+        await fs.promises.copyFile(localPath, path.join(backupDir, f.replace(/\//g, '_')));
+      } catch (e) {}
+    }
     try {
-      await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
-      await fs.promises.access(localPath);
-      await fs.promises.copyFile(localPath, path.join(backupDir, f.replace(/\//g, '_')));
-    } catch (e) {}
-    try {
-      // OneDrive·대용량: 실행 중 in-place 덮어쓰기는 잠금·프리즈 → 보류 폴더에만 두고 재시작 적용
-      const preferPending = isCloudSyncedInstallPath() || (remoteBuf && remoteBuf.length >= LARGE_INPLACE_BYTES);
+      // soft·OneDrive·대용량: 실행 중 in-place 덮어쓰기 금지 → 보류 폴더 후 재시작 적용
+      const preferPending = soft || isCloudSyncedInstallPath() || (remoteBuf && remoteBuf.length >= LARGE_INPLACE_BYTES);
       if (preferPending) {
         await stagePendingUpdateBuffer(f, remoteBuf);
         fileResults.push({ file: f, copied: true, pendingRestart: true });
-        console.warn(`[업데이트] ${preferPending && isCloudSyncedInstallPath() ? 'OneDrive' : '대용량'} — ${f} 재시작 후 적용 예약`);
+        console.warn(`[업데이트] ${soft ? 'soft' : (isCloudSyncedInstallPath() ? 'OneDrive' : '대용량')} — ${f} 재시작 후 적용 예약`);
         continue;
       }
       await writeBufferWithRetry(localPath, remoteBuf);
@@ -9379,10 +9392,12 @@ async function applyUpdateFiles() {
     const localPath = path.join(__dirname, rel);
     try {
       await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
-      try {
-        await fs.promises.access(localPath);
-        await fs.promises.copyFile(localPath, path.join(backupDir, rel.replace(/\//g, '_')));
-      } catch (e) {}
+      if (backupDir) {
+        try {
+          await fs.promises.access(localPath);
+          await fs.promises.copyFile(localPath, path.join(backupDir, rel.replace(/\//g, '_')));
+        } catch (e) {}
+      }
       if (isCloudSyncedInstallPath() || (remoteBuf && remoteBuf.length >= LARGE_INPLACE_BYTES)) {
         await stagePendingUpdateBuffer(rel, remoteBuf);
         fileResults.push({ file: rel, copied: true, pendingRestart: true });
@@ -9408,13 +9423,13 @@ async function applyUpdateFiles() {
   }
 
   // 핵심 JS/HTML/package만 모두 복사되면 성공으로 본다. assets는 없으면 경고만.
-  const requiredResults = fileResults.filter((r) => filesToUpdate.includes(r.file));
+  const requiredResults = fileResults.filter((r) => filesToUpdate.includes(r.file) && !r.optionalMissing);
   // (예외 없이 끝났다고 해서 실제로 반영됐다는 보장은 없다 — 파일 잠금 등으로 조용히 실패할 수 있다.)
   let verifiedVersion = null;
   const anyPending = requiredResults.some((r) => r.pendingRestart);
   try {
-    if (anyPending && isCloudSyncedInstallPath()) {
-      // package.json이 보류만 된 경우 — 예정 버전은 expectedVersion으로 검증
+    if (anyPending) {
+      // 보류만 된 경우 — 설치 폴더 package.json은 아직 구버전일 수 있음
       verifiedVersion = expectedVersion || APP_VERSION;
     } else {
       const localPkg = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'package.json'), 'utf8'));
@@ -9425,7 +9440,7 @@ async function applyUpdateFiles() {
   const allCopied = requiredResults.every(r => r.copied);
   const versionMatches = !expectedVersion || verifiedVersion === expectedVersion || anyPending;
   if (!allCopied || !versionMatches) {
-    const failedFiles = fileResults.filter(r => !r.copied).map(r => `${r.file}(${r.reason})`).join(', ');
+    const failedFiles = fileResults.filter(r => !r.copied && filesToUpdate.includes(r.file) && !r.optionalMissing).map(r => `${r.file}(${r.reason})`).join(', ');
     console.error('[업데이트] 검증 실패 — 예상 버전:', expectedVersion, '/ 실제 버전:', verifiedVersion, '/ 실패한 파일:', failedFiles || '없음');
     throw new Error(
       !versionMatches
@@ -9433,6 +9448,9 @@ async function applyUpdateFiles() {
         : `다음 파일을 복사하지 못했습니다: ${failedFiles} (쓰기 권한을 확인해 주세요)`
     );
   }
+
+  // soft(자동)에서는 Z 드라이브 미러를 하지 않음 — 공유폴더 hang이 '응답 없음'의 흔한 원인
+  if (soft) return;
 
   // GitHub에서 받은 최신본을 Z 브리지에도 공유 (Z 연결된 PC만, 실패·타임아웃해도 업데이트는 성공)
   try {
@@ -9912,8 +9930,14 @@ async function autoCheckAndApplyUpdate() {
   updateApplyInFlight = true;
   autoUpdateAlreadyApplied = true; // 중복 적용 방지 (실패 시 아래에서 해제)
   try {
-    // 새 버전을 발견하면 바로 파일을 교체해 둔다. (실제 반영은 재시작해야 이루어짐)
-    await applyUpdateFiles();
+    // 진행 UI를 먼저 띄워 '응답 없음'처럼 보이지 않게 한다
+    safeWebContentsSend('auto-update-started', {
+      remoteVersion: remote.version,
+      currentVersion: APP_VERSION,
+      notes: remote.notes || ''
+    });
+    // soft: 핵심 파일만·보류폴더만·Z미러 생략 (Cursor 배포 직후 자동업데이트 프리즈 완화)
+    await applyUpdateFiles({ soft: true });
     pendingUpdateRemoteVersion = remote.version;
     safeWebContentsSend('auto-update-ready', {
       remoteVersion: remote.version,

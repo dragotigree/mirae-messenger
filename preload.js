@@ -157,6 +157,8 @@ contextBridge.exposeInMainWorld('api', {
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
   applyUpdate: () => ipcRenderer.invoke('apply-update'),
   onAutoUpdateReady: (callback) => ipcRenderer.on('auto-update-ready', (e, data) => callback(data)),
+  onAutoUpdateStarted: (callback) => ipcRenderer.on('auto-update-started', (e, data) => callback(data)),
+  onAppUpdateProgress: (callback) => ipcRenderer.on('app-update-progress', (e, data) => callback(data)),
   onOpenChatFromToast: (callback) => ipcRenderer.on('open-chat-from-toast', (e, data) => callback(data)),
   onAutoUpdateFailed: (callback) => ipcRenderer.on('auto-update-failed', (e, data) => callback(data)),
   restartNowForUpdate: () => ipcRenderer.invoke('restart-now-for-update'),
