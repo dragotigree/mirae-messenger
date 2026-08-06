@@ -14252,6 +14252,7 @@
 
     let autoUpdateCountdownTimer = null;
     function showAutoUpdateBanner(data) {
+      hideAppUpdateProgress();
       const banner = document.getElementById('auto-update-banner');
       document.getElementById('auto-update-version').textContent = data.remoteVersion || '';
       let remaining = data.countdownSeconds || 30;
