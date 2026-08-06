@@ -6,7 +6,7 @@ param(
   [string]$RepoOwner = 'dragotigree',
   [string]$RepoName = 'mirae-messenger',
   [string]$RepoRef = '',
-  [string]$ExpectedVersion = '1.0.478'
+  [string]$ExpectedVersion = '1.0.479'
 )
 
 $ErrorActionPreference = 'Stop'

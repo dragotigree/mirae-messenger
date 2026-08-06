@@ -30,6 +30,11 @@ if (!gotSingleInstanceLock) {
   process.exit(0);
 }
 
+// 일부 Windows GPU 드라이버에서 Chromium 합성이 CPU를 상시 잡아먹음 → 소프트웨어 렌더로 완화
+try {
+  app.disableHardwareAcceleration();
+} catch (e) { /* ignore */ }
+
 // mirae-file:// 첨부 미리보기용 — app ready 전에 등록해야 img/src에서 로드됨
 try {
   protocol.registerSchemesAsPrivileged([
@@ -339,10 +344,11 @@ const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 1200;
 /** 평소 하트비트: 온라인 동료만 */
-const PRESENCE_HEARTBEAT_MS = 8000;
-/** 전체 서브넷 탐색 — 부팅 후 드물게 (다른 PC의 구버전 스캔 폭주와 별개) */
+const PRESENCE_HEARTBEAT_MS = 10000;
+/** 전체 서브넷 508 탐색 — OFF (CPU 12%+ 주원인). 브로드캐스트+온라인 유니캐스트만 */
+const PRESENCE_FULL_SCAN_ENABLED = false;
 const PRESENCE_FULL_SCAN_MS = 600000;
-/** 하트비트 대상(레거시): 최근 동료 보조 포함 시간 — 현재는 온라인만 사용 */
+/** 하트비트 대상(레거시 상수, 현재 미사용) */
 const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
 /** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
 const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
@@ -3814,13 +3820,16 @@ function broadcastPresence(socket) {
   // 같은 대역은 브로드캐스트
   try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
 
-  const now = Date.now();
-  const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
-  if (doFullScan) presenceFullScanDueAt = now + PRESENCE_FULL_SCAN_MS;
-
-  // 평소: 온라인·최근 동료만. 2분마다만 전체 서브넷(508) 탐색 — CPU 12% 스파이크 방지
-  const ips = doFullScan ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
-  sendPresenceUnicastBatches(socket, packet, ips);
+  // 1.0.479: 전체 서브넷 508 유니캐스트는 기본 OFF — CPU 13% 상시 점유 방지
+  if (PRESENCE_FULL_SCAN_ENABLED) {
+    const now = Date.now();
+    const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
+    if (doFullScan) presenceFullScanDueAt = now + PRESENCE_FULL_SCAN_MS;
+    const ips = doFullScan ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
+    sendPresenceUnicastBatches(socket, packet, ips);
+    return;
+  }
+  sendPresenceUnicastBatches(socket, packet, collectPresenceHeartbeatIps());
 }
 
 function broadcastGoodbye() {
@@ -3833,7 +3842,9 @@ function broadcastGoodbye() {
   try {
     globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
   } catch (e) { /* ignore */ }
-  KNOWN_SUBNET_HOST_IPS.forEach((ip) => {
+  // 전체 508 유니캐스트는 종료 순간 CPU 스파이크만 키움 — 온라인 동료에게만
+  onlineUsers.forEach((_u, ip) => {
+    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
     try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
 }
