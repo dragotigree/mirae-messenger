@@ -131,6 +131,8 @@ contextBridge.exposeInMainWorld('api', {
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   setWindowViewMode: (mode, savedBounds) => ipcRenderer.invoke('set-window-view-mode', mode, savedBounds),
   getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
+  snapCompactWindow: (edge) => ipcRenderer.invoke('snap-compact-window', edge),
+  setCompactSizePreset: (preset) => ipcRenderer.invoke('set-compact-size-preset', preset),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
   clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),

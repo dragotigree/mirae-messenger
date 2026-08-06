@@ -2169,6 +2169,37 @@
     .compact-more-cell-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #191919; }
     .compact-more-cell-icon .icon-glyph { width: 24px; height: 24px; }
     .compact-more-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #999; }
+    .compact-window-tools {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #e8e8e8;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .compact-window-tools-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #888;
+      letter-spacing: -0.02em;
+    }
+    .compact-window-tools-row { display: flex; gap: 6px; }
+    .compact-window-tools-row button {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 6px;
+      border: 1px solid #e2e8e0;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .compact-window-tools-row button:hover { background: #f1f5f9; color: #0f172a; }
 
     .msg-row-bubble { display: flex; flex-direction: column; max-width: 78%; margin: 4px 0; }
     .msg-row-bubble.is-me { align-items: flex-end; align-self: flex-end; margin-left: auto; }
@@ -4534,6 +4565,19 @@
               <button type="button" class="compact-more-cell" onclick="openCodeAlertModal()"><span class="compact-more-cell-icon" style="font-size:20px;line-height:1;">🚨</span>코드</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
               <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
+            </div>
+            <div class="compact-window-tools">
+              <div class="compact-window-tools-title">미니 창 배치</div>
+              <div class="compact-window-tools-row">
+                <button type="button" onclick="snapCompactWindowEdge('left')">← 좌측</button>
+                <button type="button" onclick="snapCompactWindowEdge('right')">우측 →</button>
+                <button type="button" onclick="snapCompactWindowEdge('top-right')">↗ 우상</button>
+              </div>
+              <div class="compact-window-tools-row">
+                <button type="button" onclick="applyCompactSizePreset('narrow')">좁게</button>
+                <button type="button" onclick="applyCompactSizePreset('normal')">보통</button>
+                <button type="button" onclick="applyCompactSizePreset('wide')">넓게</button>
+              </div>
             </div>
             <div class="compact-more-footer">
               <span>Mirae Messenger</span>

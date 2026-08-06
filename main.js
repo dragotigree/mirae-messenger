@@ -10121,6 +10121,58 @@ function prepareWindowForBoundsChange() {
   if (mainWindow.isMinimized()) mainWindow.restore();
 }
 
+/** 미니모드: 화면 가장자리로 창 스냅 (길게누르기 제외 · PC 배치용) */
+ipcMain.handle('snap-compact-window', async (event, edge) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
+  prepareWindowForBoundsChange();
+  const b = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(b) || screen.getDisplayNearestPoint({ x: b.x, y: b.y });
+  const area = display.workArea;
+  const width = Math.min(Math.max(b.width, COMPACT_MIN_WIDTH), area.width);
+  const height = Math.min(Math.max(b.height, COMPACT_MIN_HEIGHT), area.height);
+  const side = String(edge || '').toLowerCase();
+  let x = b.x;
+  let y = area.y + Math.max(0, Math.round((area.height - height) / 2));
+  if (side === 'left') x = area.x + 8;
+  else if (side === 'right') x = area.x + area.width - width - 8;
+  else if (side === 'top-right') {
+    x = area.x + area.width - width - 8;
+    y = area.y + 8;
+  } else if (side === 'bottom-right') {
+    x = area.x + area.width - width - 8;
+    y = area.y + area.height - height - 8;
+  } else {
+    x = area.x + area.width - width - 8;
+    y = area.y + area.height - height - 8;
+  }
+  const bounds = clampBoundsToWorkArea({ x, y, width, height });
+  mainWindow.setBounds(bounds);
+  return { success: true, bounds };
+});
+
+ipcMain.handle('set-compact-size-preset', async (event, preset) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
+  prepareWindowForBoundsChange();
+  const map = {
+    narrow: { width: COMPACT_MIN_WIDTH, height: Math.max(COMPACT_MIN_HEIGHT, 560) },
+    normal: { width: COMPACT_DEFAULT_WIDTH, height: COMPACT_DEFAULT_HEIGHT },
+    wide: { width: Math.max(COMPACT_DEFAULT_WIDTH, 560), height: Math.max(COMPACT_DEFAULT_HEIGHT, 720) }
+  };
+  const size = map[String(preset || 'normal')] || map.normal;
+  const cur = mainWindow.getBounds();
+  const bounds = clampBoundsToWorkArea({
+    x: cur.x,
+    y: cur.y,
+    width: size.width,
+    height: size.height
+  });
+  mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
+  mainWindow.setBounds(bounds);
+  return { success: true, bounds, preset: String(preset || 'normal') };
+});
+
 ipcMain.handle('set-window-view-mode', async (event, mode, savedBounds) => {
   if (!mainWindow) return { success: false };
   prepareWindowForBoundsChange();
