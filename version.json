@@ -1,4 +1,4 @@
 {
-  "version": "1.0.478",
-  "notes": "핫픽스: 수신 PING 폭풍 시 DB/UI 생략(이미 온라인·동일 프로필), registerSelf 반복 저장 제거 — 타 PC 구버전 스캔에도 CPU 12% 완화"
+  "version": "1.0.479",
+  "notes": "긴급: 서브넷 508스캔 완전 OFF·GPU가속 비활성·GOODBYE 508제거 — CPU 13% 상시 점유 완화"
 }
