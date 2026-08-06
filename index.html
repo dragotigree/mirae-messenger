@@ -9682,7 +9682,13 @@
 
     window.api.onNoticesUpdate(() => {
       const boardModal = document.getElementById('board-modal');
-      if (boardModal && boardModal.style.display === 'flex') loadNoticesList();
+      if (boardModal && boardModal.style.display === 'flex') {
+        if (window._noticesReloadTimer) return;
+        window._noticesReloadTimer = setTimeout(() => {
+          window._noticesReloadTimer = null;
+          loadNoticesList().catch(() => {});
+        }, 500);
+      }
     });
 
     window.api.onScheduledMessageSent((data) => {
@@ -14497,9 +14503,21 @@
       renderFilteredNoticesList();
     }
 
-    function showBoardDetailView(uid) {
-      const n = cachedNoticesList.find(x => x.uid === uid);
+    async function showBoardDetailView(uid) {
+      let n = cachedNoticesList.find(x => x.uid === uid);
       if (!n) return;
+      // 목록 IPC에서 큰 사진은 빠질 수 있음 — 상세 열 때 단건 조회
+      if ((n.hasImages || n.imagesBytes > 0) && (!n.images || n.images === '[]' || parseNoticeImages(n.images).length === 0)) {
+        try {
+          if (window.api.getNotice) {
+            const full = await window.api.getNotice(uid);
+            if (full) {
+              n = { ...n, ...full, category: normalizeBoardCategory(full.category) };
+              cachedNoticesList = cachedNoticesList.map((x) => (x.uid === uid ? n : x));
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }
 
       document.getElementById('board-list-view').style.display = 'none';
       document.getElementById('board-write-view').style.display = 'none';

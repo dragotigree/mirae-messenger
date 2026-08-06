@@ -4336,7 +4336,7 @@ app.whenReady().then(async () => {
         console.log('[network] TCP listening after quiet period');
         // quiet 동안 놓친 NOTICE_SYNC 를 보완 — 온라인 동료에게 재요청
         setTimeout(() => {
-          try { requestNoticeSyncFromOnlinePeers(5); } catch (e) { /* ignore */ }
+          try { requestNoticeSyncFromOnlinePeers(3); } catch (e) { /* ignore */ }
         }, 1200);
       } catch (e) { console.error('TCP start', e); }
     }, NETWORK_QUIET_MS);
@@ -6301,6 +6301,69 @@ function normalizeNoticeImagesField(raw) {
   );
 }
 
+/**
+ * NOTICE_SYNC 대량 전송용 — base64 사진이 힙/CPU를 폭주시켜 PC가 뻗는 것을 막는다.
+ * 최근 소수 공지만 사진을 싣고, 나머지는 본문만 동기화 (실시간 NOTICE_ADD 가 사진을 먼저 전달).
+ */
+const NOTICE_SYNC_IMAGES_BUDGET_BYTES = 600 * 1024;
+const NOTICE_SYNC_RECENT_WITH_IMAGES = 8;
+
+function slimNoticesForBulkSync(notices) {
+  const list = Array.isArray(notices) ? notices.slice() : [];
+  // 최신순으로 예산 배분
+  list.sort((a, b) => String(b && b.created_at || '').localeCompare(String(a && a.created_at || '')));
+  let used = 0;
+  let withImg = 0;
+  return list.map((n) => {
+    if (!n) return n;
+    const imgs = String(n.images || '');
+    if (!imgs || imgs === '[]' || imgs.length < 32) return n;
+    if (withImg >= NOTICE_SYNC_RECENT_WITH_IMAGES || used + imgs.length > NOTICE_SYNC_IMAGES_BUDGET_BYTES) {
+      return Object.assign({}, n, { images: '[]' });
+    }
+    withImg += 1;
+    used += imgs.length;
+    return n;
+  });
+}
+
+/** 목록 IPC용 — 거대 base64 를 렌더러에 그대로 넣지 않음 */
+function mapNoticeRowForListIpc(r) {
+  const row = r || {};
+  const images = String(row.images || '[]');
+  const hasImages = images.length > 8 && images !== '[]';
+  const tooBig = images.length > 4096;
+  return {
+    uid: row.uid,
+    title: row.title,
+    content: row.content,
+    author_name: row.author_name,
+    author_ip: row.author_ip,
+    created_at: row.created_at,
+    category: normalizeNoticeCategory(row.category),
+    images: tooBig ? '[]' : (images || '[]'),
+    hasImages: hasImages || tooBig,
+    imagesBytes: hasImages ? images.length : 0
+  };
+}
+
+let noticesUpdateDebounceTimer = null;
+function notifyNoticesChanged() {
+  if (!mainWindow) return;
+  if (noticesUpdateDebounceTimer) return;
+  noticesUpdateDebounceTimer = setTimeout(() => {
+    noticesUpdateDebounceTimer = null;
+    if (mainWindow) safeWebContentsSend('notices-update');
+  }, 450);
+}
+
+/** 피어별 NOTICE_SYNC 요청 쿨다운 — 온오프 깜빡임 때 폭주 방지 */
+const noticeSyncLastRequestAt = new Map();
+const NOTICE_SYNC_REQUEST_COOLDOWN_MS = 60 * 1000;
+let noticeSyncResponsesInFlight = 0;
+const NOTICE_SYNC_MAX_IN_FLIGHT = 1;
+const noticeSyncRequestQueue = [];
+
 /** 공지 카테고리: 전체 | 업데이트 | 부서명 */
 function normalizeNoticeCategory(raw) {
   const s = String(raw == null ? '' : raw).trim();
@@ -6511,7 +6574,7 @@ function handleNoticeAdd(n) {
       if (row) {
         // 이미 있으면 내용만 갱신 (다른 공지 REPLACE 금지)
         upsertNoticeFromSync(n);
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
         return;
       }
       insertNoticeRecord(n, (insErr) => {
@@ -6519,7 +6582,7 @@ function handleNoticeAdd(n) {
           console.error('NOTICE_ADD 저장 실패:', insErr.message);
           return;
         }
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       }, { allowReplace: false });
     });
   });
@@ -6530,7 +6593,7 @@ function handleNoticeUpdate(n) {
   isNoticeTombstoned(n.uid, (tombstoned) => {
     if (tombstoned) {
       db.run(`DELETE FROM notices WHERE uid = ?`, [String(n.uid)], () => {
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       });
       return;
     }
@@ -6541,20 +6604,20 @@ function handleNoticeUpdate(n) {
     if (hasImagesField && hasCategoryField) {
       const images = normalizeNoticeImagesField(n.images);
       db.run(`UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`, [n.title, n.content, images, category, n.uid], () => {
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       });
     } else if (hasImagesField) {
       const images = normalizeNoticeImagesField(n.images);
       db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       });
     } else if (hasCategoryField) {
       db.run(`UPDATE notices SET title = ?, content = ?, category = ? WHERE uid = ?`, [n.title, n.content, category, n.uid], () => {
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       });
     } else {
       db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
       });
     }
   });
@@ -6737,8 +6800,26 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
 }
 
 function handleNoticeSyncRequest(senderIP) {
+  if (!senderIP) return;
+  if (noticeSyncResponsesInFlight >= NOTICE_SYNC_MAX_IN_FLIGHT) {
+    if (!noticeSyncRequestQueue.includes(senderIP)) {
+      noticeSyncRequestQueue.push(senderIP);
+      if (noticeSyncRequestQueue.length > 12) noticeSyncRequestQueue.shift();
+    }
+    return;
+  }
+  noticeSyncResponsesInFlight += 1;
+  const finishSync = () => {
+    noticeSyncResponsesInFlight = Math.max(0, noticeSyncResponsesInFlight - 1);
+    const next = noticeSyncRequestQueue.shift();
+    if (next) setTimeout(() => handleNoticeSyncRequest(next), 80);
+  };
   db.all(`SELECT * FROM notices`, [], (err, notices) => {
-    if (err) return;
+    if (err) {
+      finishSync();
+      return;
+    }
+    const slimNotices = slimNoticesForBulkSync(notices || []);
     db.all(`SELECT * FROM notice_operators`, [], (err2, operators) => {
       db.all(`SELECT * FROM hospital_schedules`, [], (err3, schedules) => {
         db.all(`SELECT * FROM user_profile_overrides`, [], (err4, profileOverridesRows) => {
@@ -6756,47 +6837,50 @@ function handleNoticeSyncRequest(senderIP) {
                         `SELECT channel_key, cleared_at FROM deleted_chat_pins ORDER BY cleared_at DESC LIMIT 5000`,
                         [],
                         (err9, deletedChatPinRows) => {
-                          const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
-                          const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
-                          const deletedChatPins = (deletedChatPinRows || []).filter((r) => r && r.channel_key);
-                          const chunks = buildNoticeSyncPayloadChunks(
-                            notices || [],
-                            operators || [],
-                            schedules || [],
-                            profileOverridesRows || [],
-                            deletedScheduleUids,
-                            deletedNoticeUids
-                          );
-                          const pinChunk = {
-                            type: 'NOTICE_SYNC_RESPONSE',
-                            notices: [],
-                            operators: [],
-                            schedules: [],
-                            profileOverrides: [],
-                            deletedScheduleUids: [],
-                            deletedNoticeUids: [],
-                            chatPins: chatPins || [],
-                            deletedChatPins,
-                            dutyRoster: dutyRoster || [],
-                            updateSourcePath: updateSourcePath || ''
-                          };
-                          const pinChunkBytes = Buffer.byteLength(JSON.stringify(pinChunk) + '\n', 'utf8');
-                          if (pinChunkBytes <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                            chunks.unshift(pinChunk);
-                          } else {
-                            // pin/duty 만으로도 크면 분리 전송
-                            const dutyOnly = { ...pinChunk, chatPins: [], deletedChatPins: [] };
-                            const pinsOnly = { ...pinChunk, dutyRoster: [] };
-                            if (Buffer.byteLength(JSON.stringify(dutyOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                              chunks.unshift(dutyOnly);
-                            }
-                            if (Buffer.byteLength(JSON.stringify(pinsOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                              chunks.unshift(pinsOnly);
+                          try {
+                            const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
+                            const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
+                            const deletedChatPins = (deletedChatPinRows || []).filter((r) => r && r.channel_key);
+                            const chunks = buildNoticeSyncPayloadChunks(
+                              slimNotices,
+                              operators || [],
+                              schedules || [],
+                              profileOverridesRows || [],
+                              deletedScheduleUids,
+                              deletedNoticeUids
+                            );
+                            const pinChunk = {
+                              type: 'NOTICE_SYNC_RESPONSE',
+                              notices: [],
+                              operators: [],
+                              schedules: [],
+                              profileOverrides: [],
+                              deletedScheduleUids: [],
+                              deletedNoticeUids: [],
+                              chatPins: chatPins || [],
+                              deletedChatPins,
+                              dutyRoster: dutyRoster || [],
+                              updateSourcePath: updateSourcePath || ''
+                            };
+                            const pinChunkBytes = Buffer.byteLength(JSON.stringify(pinChunk) + '\n', 'utf8');
+                            if (pinChunkBytes <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                              chunks.unshift(pinChunk);
                             } else {
-                              console.error('chatPins/deletedChatPins 동기화 청크가 너무 큼 — 건너뜀');
+                              const dutyOnly = { ...pinChunk, chatPins: [], deletedChatPins: [] };
+                              const pinsOnly = { ...pinChunk, dutyRoster: [] };
+                              if (Buffer.byteLength(JSON.stringify(dutyOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                                chunks.unshift(dutyOnly);
+                              }
+                              if (Buffer.byteLength(JSON.stringify(pinsOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
+                                chunks.unshift(pinsOnly);
+                              } else {
+                                console.error('chatPins/deletedChatPins 동기화 청크가 너무 큼 — 건너뜀');
+                              }
                             }
+                            tcpWriteJsonLines(senderIP, chunks);
+                          } finally {
+                            finishSync();
                           }
-                          tcpWriteJsonLines(senderIP, chunks);
                         }
                       );
                     }
@@ -6826,9 +6910,9 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   }
   if (Array.isArray(notices)) {
     notices.forEach((n) => upsertNoticeFromSync(n));
-    if (mainWindow) safeWebContentsSend('notices-update');
+    notifyNoticesChanged();
   } else if (Array.isArray(deletedNoticeUids) && deletedNoticeUids.length) {
-    if (mainWindow) safeWebContentsSend('notices-update');
+    notifyNoticesChanged();
   }
   if (Array.isArray(operators)) {
     operators.forEach(o => {
@@ -7348,7 +7432,7 @@ function applyLocalNoticeDelete(uid, opts) {
   }
   recordNoticeTombstone(uid, () => {
     db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (err) => {
-      if (!err && o.notify !== false && mainWindow) safeWebContentsSend('notices-update');
+      if (!err && o.notify !== false) notifyNoticesChanged();
       if (typeof o.done === 'function') o.done(err || null);
     });
   });
@@ -7578,6 +7662,11 @@ function handleGroupRenameNotice(payload) {
 }
 
 function requestNoticeSync(targetIP) {
+  if (!targetIP || targetIP === MY_IP) return;
+  const now = Date.now();
+  const last = noticeSyncLastRequestAt.get(targetIP) || 0;
+  if (now - last < NOTICE_SYNC_REQUEST_COOLDOWN_MS) return;
+  noticeSyncLastRequestAt.set(targetIP, now);
   const client = new net.Socket();
   client.setTimeout(1200);
   client.connect(TCP_PORT, targetIP, () => {
@@ -7590,7 +7679,7 @@ function requestNoticeSync(targetIP) {
 
 /** 온라인 동료 몇 명에게 공지 동기화 요청 (게시판 열 때) */
 function requestNoticeSyncFromOnlinePeers(limit) {
-  const max = Math.max(1, Math.min(Number(limit) || 5, 12));
+  const max = Math.max(1, Math.min(Number(limit) || 3, 8));
   const ips = [];
   onlineUsers.forEach((_u, ip) => {
     if (ip && ip !== MY_IP) ips.push(ip);
@@ -7601,7 +7690,7 @@ function requestNoticeSyncFromOnlinePeers(limit) {
     const t = ips[i]; ips[i] = ips[j]; ips[j] = t;
   }
   ips.slice(0, max).forEach((ip, idx) => {
-    setTimeout(() => requestNoticeSync(ip), idx * 80);
+    setTimeout(() => requestNoticeSync(ip), idx * 120);
   });
 }
 
@@ -9431,7 +9520,6 @@ ipcMain.handle('get-notices', async () => {
       db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) {
           console.error('get-notices 실패:', err.message);
-          // 스키마 이슈면 한 번 더 보정 후 재시도
           noticesSchemaReady = false;
           ensureNoticesTableSchema(() => {
             db.all(`SELECT uid, title, content, author_name, author_ip, created_at, images, category FROM notices ORDER BY created_at DESC`, [], (err2, rows2) => {
@@ -9441,22 +9529,37 @@ ipcMain.handle('get-notices', async () => {
                     resolve([]);
                     return;
                   }
-                  resolve((rows3 || []).map((r) => ({ ...r, category: normalizeNoticeCategory(r && r.category), images: r.images || '[]' })));
+                  resolve((rows3 || []).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
                 });
                 return;
               }
-              resolve((rows2 || []).map((r) => ({
-                ...r,
-                category: normalizeNoticeCategory(r && r.category)
-              })));
+              resolve((rows2 || []).map((r) => mapNoticeRowForListIpc(r)));
             });
           });
           return;
         }
-        resolve((rows || []).map((r) => ({
-          ...r,
-          category: normalizeNoticeCategory(r && r.category)
-        })));
+        resolve((rows || []).map((r) => mapNoticeRowForListIpc(r)));
+      });
+    });
+  });
+});
+
+ipcMain.handle('get-notice', async (event, uid) => {
+  const key = String(uid || '').trim();
+  if (!key) return null;
+  return new Promise((resolve) => {
+    ensureNoticesTableSchema(() => {
+      db.get(`SELECT * FROM notices WHERE uid = ?`, [key], (err, row) => {
+        if (err || !row) {
+          resolve(null);
+          return;
+        }
+        resolve({
+          ...row,
+          category: normalizeNoticeCategory(row.category),
+          images: row.images || '[]',
+          hasImages: !!(row.images && String(row.images).length > 8 && String(row.images) !== '[]')
+        });
       });
     });
   });
@@ -9488,7 +9591,7 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images,
           return;
         }
         // UI는 즉시 응답 — 동료 PC 전파는 다음 틱에 (다수 접속 시 딜레이 방지)
-        if (mainWindow) safeWebContentsSend('notices-update');
+        notifyNoticesChanged();
         resolve({ success: true, notice: saved });
         setImmediate(() => {
           try { broadcastNoticeWire('NOTICE_ADD', saved); } catch (e) {
@@ -9528,7 +9631,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
                   resolve({ success: false, msg: DB_CORRUPT_USER_MSG, corrupt: true });
                   return;
                 }
-                if (!err2 && mainWindow) safeWebContentsSend('notices-update');
+                if (!err2) notifyNoticesChanged();
                 resolve({ success: !err2, msg: err2 ? userFacingDbError(err2) : undefined });
                 if (!err2) {
                   setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
@@ -9537,7 +9640,7 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
             );
             return;
           }
-          if (!err && mainWindow) safeWebContentsSend('notices-update');
+          if (!err) notifyNoticesChanged();
           resolve({ success: !err, msg: err ? userFacingDbError(err) : undefined });
           if (!err) {
             setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
