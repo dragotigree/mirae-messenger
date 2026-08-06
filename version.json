@@ -1,4 +1,4 @@
 {
-  "version": "1.0.517",
-  "notes": "업데이트 확인 시 Z가 구버전이면 GitHub(최신)도 함께 조회"
+  "version": "1.0.518",
+  "notes": "업데이트: Z/CDN 구버전 오인 수정 — GitHub API·raw 중 더 새 version 사용"
 }

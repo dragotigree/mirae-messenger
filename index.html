@@ -14824,12 +14824,14 @@
       try {
         const res = await window.api.checkForUpdate();
         if (res.available) {
-          resultEl.innerHTML = `🆕 새 버전 ${res.remoteVersion}이 있습니다 (현재 ${res.currentVersion})${res.notes ? '<br>' + res.notes : ''}<br><button type="button" id="apply-update-now-btn" onclick="applyUpdateNow()" style="margin-top:6px; padding:6px 12px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer;">지금 업데이트하고 재시작</button>`;
+          const srcHint = res.sourceKind === 'github' ? ' · GitHub' : (res.sourceKind === 'folder' ? ' · 공유폴더' : '');
+          resultEl.innerHTML = `🆕 새 버전 ${res.remoteVersion}이 있습니다 (현재 ${res.currentVersion})${srcHint}${res.notes ? '<br>' + res.notes : ''}<br><button type="button" id="apply-update-now-btn" onclick="applyUpdateNow()" style="margin-top:6px; padding:6px 12px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:11px; font-weight:700; cursor:pointer;">지금 업데이트하고 재시작</button>`;
         } else if (res.msg) {
           resultEl.textContent = res.msg;
         } else {
           const remoteHint = res.remoteVersion ? ` (원격 ${res.remoteVersion})` : '';
-          resultEl.textContent = `✅ 이미 최신 버전입니다.${remoteHint}`;
+          const srcHint = res.sourceKind === 'folder' ? ' · 공유폴더' : (res.sourceKind === 'github' ? ' · GitHub' : '');
+          resultEl.textContent = `✅ 이미 최신 버전입니다.${remoteHint}${srcHint}`;
         }
       } catch (e) {
         resultEl.textContent = '확인 중 오류가 발생했습니다.';
