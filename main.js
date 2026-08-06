@@ -30,6 +30,13 @@ if (!gotSingleInstanceLock) {
   process.exit(0);
 }
 
+try {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+} catch (e) { /* ignore */ }
+if (process.env.MIRAE_DISABLE_GPU === '1') {
+  try { app.disableHardwareAcceleration(); } catch (e) { /* ignore */ }
+}
+
 // mirae-file:// 첨부 미리보기용 — app ready 전에 등록해야 img/src에서 로드됨
 try {
   protocol.registerSchemesAsPrivileged([
@@ -427,6 +434,11 @@ let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
 let lastSelfRegisterSig = '';
+/** 부팅 직후 이 시각까지 대용량 TCP 동기화(NOTICE_SYNC/FILE)를 막아 UI 프리징 방지 */
+let networkQuietUntil = 0;
+let tcpActiveConnections = 0;
+const TCP_MAX_CONNECTIONS = 8;
+const NETWORK_QUIET_MS = 45000;
 
 const MY_IP = getMyIP();
 
@@ -3541,6 +3553,15 @@ app.whenReady().then(async () => {
   registerGlobalShortcuts();
 
   setTimeout(() => {
+    if (isSafeUiMode()) {
+      console.warn('[SAFE_UI] userdata\\SAFE_UI.txt 감지 — UDP/TCP/모바일 서버를 시작하지 않습니다.');
+      udpStatus = 'safe-ui';
+      tcpStatus = 'safe-ui';
+      notifyNetworkStatus();
+      return;
+    }
+    networkQuietUntil = Date.now() + NETWORK_QUIET_MS;
+    console.log(`[network] quiet ${NETWORK_QUIET_MS / 1000}s — heavy TCP sync deferred`);
     try { startUdpDiscovery(); } catch (e) { console.error('UDP start', e); }
     try { startTcpServer(); } catch (e) { console.error('TCP start', e); }
     try {
@@ -3624,6 +3645,19 @@ function notifyNetworkStatus() {
     safeWebContentsSend('network-status-update', {
       myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()
     });
+  }
+}
+
+function isNetworkQuietPeriod() {
+  return Date.now() < networkQuietUntil;
+}
+
+function isSafeUiMode() {
+  try {
+    return fs.existsSync(path.join(app.getPath('userData'), 'SAFE_UI.txt'))
+      || process.env.MIRAE_SAFE_UI === '1';
+  } catch (e) {
+    return process.env.MIRAE_SAFE_UI === '1';
   }
 }
 
@@ -3744,15 +3778,18 @@ function startUdpDiscovery() {
         if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
-          resendPendingMessages(rinfo.address);
-          requestNoticeSync(rinfo.address);
-          syncGroupsWithPeer(rinfo.address);
-          tryDeliverPendingWipe(rinfo.address);
-          maybeSyncServicePauseToPeer(rinfo.address);
-          if (myProfile.photo) {
-            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
-          } else {
-            sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_REQUEST' });
+          // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
+          if (!isNetworkQuietPeriod()) {
+            resendPendingMessages(rinfo.address);
+            requestNoticeSync(rinfo.address);
+            syncGroupsWithPeer(rinfo.address);
+            tryDeliverPendingWipe(rinfo.address);
+            maybeSyncServicePauseToPeer(rinfo.address);
+            if (myProfile.photo) {
+              sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_SYNC', ip: MY_IP, photo: myProfile.photo });
+            } else {
+              sendToIps([rinfo.address], { type: 'PROFILE_PHOTO_REQUEST' });
+            }
           }
         }
       }
@@ -4601,23 +4638,47 @@ function startTcpServer() {
     tcpServerInstance = null;
   }
   const server = net.createServer((socket) => {
+    if (tcpActiveConnections >= TCP_MAX_CONNECTIONS) {
+      try { socket.destroy(); } catch (e) { /* ignore */ }
+      return;
+    }
+    tcpActiveConnections += 1;
     let buffer = '';
+    const release = () => {
+      tcpActiveConnections = Math.max(0, tcpActiveConnections - 1);
+    };
+    socket.once('close', release);
+    socket.once('error', release);
 
     const drain = () => {
       let idx;
+      let processed = 0;
       while ((idx = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 1);
         parseAndRoute(line, socket);
+        processed += 1;
+        // 한 틱에 너무 많은 라인을 처리하면 UI가 멈춤 — 양보
+        if (processed >= 8 && buffer.indexOf('\n') !== -1) {
+          setImmediate(drain);
+          return;
+        }
       }
     };
 
     socket.on('data', (chunk) => {
+      // 대용량 문자열 += 는 메인스레드를 크게 잡아먹음
+      if (chunk.length > MAX_TCP_LINE_BUFFER) {
+        console.error('TCP 수신 청크 과다 — 연결을 끊습니다.');
+        buffer = '';
+        try { socket.destroy(); } catch (e) { /* ignore */ }
+        return;
+      }
       buffer += chunk.toString('utf8');
       if (buffer.length > MAX_TCP_LINE_BUFFER) {
         console.error('TCP 수신 버퍼 초과 — 연결을 끊습니다.');
         buffer = '';
-        socket.destroy();
+        try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
       }
       drain();
@@ -4663,6 +4724,17 @@ function routeIncomingPayload(payload, senderIP) {
   try {
     touchPeerPresence(senderIP);
     const type = payload.type || 'CHAT';
+    // 부팅 직후 대용량 동기화는 UI 프리징의 주원인 — 조용히 드롭
+    if (isNetworkQuietPeriod()) {
+      if (
+        type === 'NOTICE_SYNC_REQUEST'
+        || type === 'NOTICE_SYNC_RESPONSE'
+        || type === 'PROFILE_PHOTO_SYNC'
+        || String(type).startsWith('FILE_XFER')
+      ) {
+        return;
+      }
+    }
     switch (type) {
     case 'CHAT': handleIncomingChat(payload, senderIP); break;
     case 'BROADCAST': handleIncomingBroadcast(payload, senderIP); break;
