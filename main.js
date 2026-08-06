@@ -3279,8 +3279,7 @@ db.serialize(() => {
     username TEXT PRIMARY KEY, password_hash TEXT, display_name TEXT, added_at TEXT
   )`, logDbErr);
   db.run(`ALTER TABLE notice_operators ADD COLUMN can_manage_duty INTEGER DEFAULT 0`, () => {});
-  // 작성 권한자 = 당직·OFF 포함 (기존 계정도 일괄 부여)
-  db.run(`UPDATE notice_operators SET can_manage_duty = 1 WHERE COALESCE(can_manage_duty, 0) = 0`, () => {});
+  // 신규 컬럼만 DEFAULT — 부팅마다 0→1로 덮지 않음 (마스터가 끈 권한 유지)
 
   // 채널·1:1 대화 상단 공지 고정 (채널당 1개)
   db.run(`CREATE TABLE IF NOT EXISTS chat_pins (
@@ -4335,6 +4334,10 @@ app.whenReady().then(async () => {
       try {
         startTcpServer();
         console.log('[network] TCP listening after quiet period');
+        // quiet 동안 놓친 NOTICE_SYNC 를 보완 — 온라인 동료에게 재요청
+        setTimeout(() => {
+          try { requestNoticeSyncFromOnlinePeers(5); } catch (e) { /* ignore */ }
+        }, 1200);
       } catch (e) { console.error('TCP start', e); }
     }, NETWORK_QUIET_MS);
   }, 1200);
@@ -5593,7 +5596,7 @@ function routeIncomingPayload(payload, senderIP) {
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
     case 'SCHEDULE_DELETE': handleScheduleDelete(payload.uid); break;
     case 'SCHEDULE_EDIT': handleScheduleEdit(payload.schedule); break;
-    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload); break;
+    case 'MESSAGE_EDIT': handleIncomingMessageEdit(payload, senderIP); break;
     case 'MESSAGE_REACTION': handleIncomingMessageReaction(payload, senderIP); break;
     case 'MSG_ACK': handleMsgAck(payload); break;
     case 'GROUP_SYNC': handleGroupSync(payload.group); break;
@@ -9460,6 +9463,9 @@ ipcMain.handle('get-notices', async () => {
 });
 
 ipcMain.handle('add-notice', async (event, { title, content, authorName, images, category }) => {
+  if (!masterSessionActive && !noticeOperatorSessionActive) {
+    return { success: false, msg: '공지 작성 권한이 없습니다. 작성자 로그인 후 다시 시도해 주세요.' };
+  }
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
     const record = {
@@ -9559,6 +9565,7 @@ ipcMain.handle('delete-notice', async (event, uid) => {
 });
 
 ipcMain.handle('get-notice-operators', async () => {
+  if (!masterSessionActive) return [];
   return new Promise((resolve) => {
     db.all(`SELECT username, display_name, added_at, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators ORDER BY added_at DESC`, [], (err, rows) => {
       const cleaned = (rows || []).map((row) => {
@@ -9614,6 +9621,7 @@ ipcMain.handle('update-notice-operator-display-name', async (event, { username, 
 });
 
 ipcMain.handle('add-notice-operator', async (event, { username, password, displayName, canManageDuty }) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
     const password_hash = hashPassword(password);
@@ -9648,6 +9656,7 @@ ipcMain.handle('set-notice-operator-duty-perm', async (event, { username, canMan
 });
 
 ipcMain.handle('delete-notice-operator', async (event, username) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
     db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], (err) => {
       if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DELETE', username });
@@ -9664,16 +9673,16 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
       }
-      // 작성 권한자 로그인 = 당직·OFF(일정등록) 포함
+      // 작성 권한자 로그인 — 당직·OFF는 DB 플래그 존중
       noticeOperatorSessionActive = true;
-      noticeOperatorCanManageDutySession = true;
+      noticeOperatorCanManageDutySession = !!(row.can_manage_duty);
       noticeOperatorDisplayNameSession = String(row.display_name || '').trim();
       noticeOperatorUsernameSession = user;
       resolve({
         success: true,
         displayName: row.display_name,
         username: user,
-        canManageDuty: true
+        canManageDuty: !!(row.can_manage_duty)
       });
     });
   });
@@ -9844,18 +9853,39 @@ ipcMain.handle('export-schedule-board-excel', async (event, payload) => {
 });
 
 ipcMain.handle('set-notice-operator-session', async (event, active, canManageDuty, meta) => {
-  noticeOperatorSessionActive = !!active;
-  // 작성 권한자 세션이 활성면 당직·OFF도 허용 (별도 플래그 무시)
-  noticeOperatorCanManageDutySession = !!active;
-  if (active) {
-    const m = (meta && typeof meta === 'object') ? meta : {};
-    noticeOperatorDisplayNameSession = String(m.displayName || m.display_name || '').trim();
-    noticeOperatorUsernameSession = String(m.username || '').trim();
-  } else {
+  if (!active) {
+    noticeOperatorSessionActive = false;
+    noticeOperatorCanManageDutySession = false;
     noticeOperatorDisplayNameSession = '';
     noticeOperatorUsernameSession = '';
+    return { success: true };
   }
-  return { success: true };
+  // 자동 로그인 복원: 계정이 DB에 있을 때만 세션 허용 (임의 권한 부여 방지)
+  const m = (meta && typeof meta === 'object') ? meta : {};
+  const user = String(m.username || '').trim();
+  if (!user) {
+    return { success: false, msg: '작성 권한자 정보가 없습니다.' };
+  }
+  return new Promise((resolve) => {
+    db.get(`SELECT username, display_name, COALESCE(can_manage_duty, 0) AS can_manage_duty FROM notice_operators WHERE username = ?`, [user], (err, row) => {
+      if (err || !row) {
+        noticeOperatorSessionActive = false;
+        noticeOperatorCanManageDutySession = false;
+        noticeOperatorDisplayNameSession = '';
+        noticeOperatorUsernameSession = '';
+        resolve({ success: false, msg: '작성 권한자 계정을 찾을 수 없습니다.' });
+        return;
+      }
+      noticeOperatorSessionActive = true;
+      const duty = (canManageDuty === false || canManageDuty === 0 || canManageDuty === '0')
+        ? false
+        : !!(row.can_manage_duty);
+      noticeOperatorCanManageDutySession = duty;
+      noticeOperatorDisplayNameSession = String(m.displayName || m.display_name || row.display_name || '').trim();
+      noticeOperatorUsernameSession = user;
+      resolve({ success: true, canManageDuty: duty });
+    });
+  });
 });
 
 function isAuthorOfRecord(row) {
@@ -10253,12 +10283,23 @@ ipcMain.handle('edit-message', async (event, { msgUid, targetIP, groupUid, newMe
   });
 });
 
-function handleIncomingMessageEdit(payload) {
-  if (!payload || !payload.msgUid) return;
-  db.run(`UPDATE messages SET message = ? WHERE msg_uid = ?`, [payload.newMessage, payload.msgUid], logDbErr);
-  if (mainWindow) {
-    safeWebContentsSend('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
-  }
+function handleIncomingMessageEdit(payload, senderIP) {
+  if (!payload || !payload.msgUid || !senderIP) return;
+  // 보낸 사람 IP와 일치하는 메시지만 수정 — LAN 스푸핑 방지
+  db.run(
+    `UPDATE messages SET message = ? WHERE msg_uid = ? AND sender_ip = ?`,
+    [payload.newMessage, payload.msgUid, senderIP],
+    function onEdit(err) {
+      if (err) {
+        logDbErr(err);
+        return;
+      }
+      if (!this || !this.changes) return;
+      if (mainWindow) {
+        safeWebContentsSend('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
+      }
+    }
+  );
 }
 
 function fetchReactionSummariesForKeys(keys, callback) {

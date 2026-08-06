@@ -6817,10 +6817,9 @@
 
     function syncNoticeOperatorSessionToMain() {
       if (!window.api.setNoticeOperatorSession) return Promise.resolve();
-      // 작성 권한자 로그인 = 공지·병원일정·당직·OFF 모두 가능
       return window.api.setNoticeOperatorSession(
         !!isNoticeOperatorAuthenticated,
-        !!isNoticeOperatorAuthenticated,
+        !!noticeOperatorCanManageDuty,
         isNoticeOperatorAuthenticated
           ? { displayName: currentOperatorName || '', username: currentOperatorUsername || '' }
           : null
@@ -6854,8 +6853,7 @@
           isNoticeOperatorAuthenticated = true;
           currentOperatorName = String(data.displayName);
           currentOperatorUsername = String(data.username || '').trim();
-          // 작성 권한자 세션이면 당직·OFF 포함 (구버전 localStorage의 false 무시)
-          noticeOperatorCanManageDuty = true;
+          noticeOperatorCanManageDuty = data.canManageDuty !== false && data.canManageDuty !== 0;
         } else {
           isNoticeOperatorAuthenticated = false;
           currentOperatorName = '';
@@ -6873,8 +6871,7 @@
     }
 
     function canManageDutyRoster() {
-      // 등록된 작성 권한자면 당직의·OFF(일정등록)도 가능 (별도 체크 불필요)
-      return !!(isMasterAuthenticated || isNoticeOperatorAuthenticated);
+      return !!(isMasterAuthenticated || (isNoticeOperatorAuthenticated && noticeOperatorCanManageDuty));
     }
 
     function dutyRosterAuthLabel() {
@@ -16334,8 +16331,8 @@
         isNoticeOperatorAuthenticated = true;
         currentOperatorName = res.displayName || username;
         currentOperatorUsername = username;
-        // 작성 권한자 = 당직·OFF 포함
-        noticeOperatorCanManageDuty = true;
+        // 작성 권한자 = 당직·OFF는 DB can_manage_duty 존중
+        noticeOperatorCanManageDuty = !!res.canManageDuty;
         await saveNoticeOperatorSession();
         closeOperatorLoginModal();
         refreshNoticePermission();
