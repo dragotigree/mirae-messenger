@@ -1,4 +1,4 @@
 {
-  "version": "1.0.482",
-  "notes": "핫픽스: known_users.phone_no 컬럼 마이그레이션·DB오류 로그 스로틀·mobile_server 안전로드 — 콘솔 SQLITE_ERROR 폭주/버벅임 수정"
+  "version": "1.0.483",
+  "notes": "핫픽스: 채팅 헤더 상시 backdrop-filter 제거(유휴 CPU)~UDP 수신 상한 강화·맞춤법 ko-KR 무효코드 제거 — 설치는 정상, 버벅임 추가 완화"
 }

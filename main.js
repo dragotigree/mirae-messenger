@@ -361,11 +361,11 @@ const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
 /** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
 const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
 /** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
-const UDP_RX_MAX_PER_SEC = 60;
-const UDP_RX_MAX_PER_IP_PER_SEC = 4;
+const UDP_RX_MAX_PER_SEC = 30;
+const UDP_RX_MAX_PER_IP_PER_SEC = 3;
 /** 수신이 이 값을 넘으면 잠시 송신 유니캐스트 중단(브로드캐스트만) */
-const UDP_STORM_THRESHOLD_PER_SEC = 40;
-const UDP_STORM_COOLDOWN_MS = 8000;
+const UDP_STORM_THRESHOLD_PER_SEC = 20;
+const UDP_STORM_COOLDOWN_MS = 12000;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -2894,7 +2894,16 @@ function initSpellCheckerSession() {
   const ses = session.defaultSession;
   if (!ses) return;
   try {
-    ses.setSpellCheckerLanguages(['ko-KR', 'en-US']);
+    // Electron/Chromium에 ko-KR 사전 코드가 없어 "Invalid language code" 스팸이 난다.
+    // 사용 가능한 언어만 고른다 (대개 en-US).
+    const available = (typeof ses.availableSpellCheckerLanguages === 'function'
+      ? ses.availableSpellCheckerLanguages()
+      : (ses.availableSpellCheckerLanguages || [])) || [];
+    const pick = ['en-US', 'en', 'ko'].filter((code) => available.includes(code));
+    if (pick.length) ses.setSpellCheckerLanguages(pick);
+    else {
+      try { ses.setSpellCheckerLanguages(['en-US']); } catch (_) { /* ignore */ }
+    }
     ses.setSpellCheckerEnabled(spellCheckerEnabled);
   } catch (e) {
     console.error('맞춤법 검사 초기화 오류:', e.message);

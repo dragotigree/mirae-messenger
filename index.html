@@ -803,7 +803,8 @@
       border-bottom: 1px solid var(--border-soft);
       display: flex; flex-direction: row; align-items: center;
       justify-content: space-between; gap: 10px;
-      background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+      /* 상시 backdrop-filter blur는 Windows Electron에서 유휴 CPU ~10%+ 유발 */
+      background: #fff;
       flex-shrink: 0; min-width: 0;
     }
     .chat-header-actions {
@@ -1011,7 +1012,7 @@
     .chat-shared-drawer.is-open { display: flex; }
     .chat-shared-top {
       flex-shrink: 0; border-bottom: 1px solid var(--border-soft);
-      background: rgba(255,255,255,0.96); backdrop-filter: blur(8px);
+      background: #fff;
     }
     .chat-shared-head {
       display: flex; align-items: center; gap: 10px;
@@ -3793,6 +3794,21 @@
     html.ui-animations-off .log-card-item:hover,
     html.ui-animations-off .chat-quick-switcher-item.is-active {
       transform: none !important;
+      transition: none !important;
+    }
+    /* backdrop-filter 는 Windows GPU에서 클릭·스크롤 버벅임 원인 — 애니메이션 Off 시 끔 */
+    html.ui-animations-off .modal-overlay,
+    html.ui-animations-off .app-update-progress,
+    html.ui-animations-off #dm-context-menu,
+    html.ui-animations-off #group-context-menu,
+    html.ui-animations-off #channel-context-menu,
+    html.ui-animations-off #dept-floor-context-menu,
+    html.ui-animations-off #quick-phrase-popover,
+    html.ui-animations-off #screen-capture-popover,
+    html.ui-animations-off #chat-slash-popover,
+    html.ui-animations-off #chat-quick-switcher-overlay {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
     }
     .master-admin-modal-card {
       width: min(1080px, 96vw) !important;
