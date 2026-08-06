@@ -15,7 +15,10 @@ $files = @(
   'assets/compact/compact-overlay.css','assets/compact/phosphor-paths.json','assets/splash.png'
 )
 Write-Host "=== FORCE ROLLBACK 1.0.485 (= 1.0.471 yesterday evening) ===" -ForegroundColor Cyan
-if (-not (Test-Path -LiteralPath (Join-Path $App 'index.html'))) { Write-Host "ERROR missing $App" -ForegroundColor Red; exit 1 }
+if (-not (Test-Path -LiteralPath (Join-Path $App 'index.html'))) {
+  Write-Host "ERROR missing $App" -ForegroundColor Red
+  throw "missing app folder"
+}
 Get-Process -Name 'MiraeMessenger','electron' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 $wc = New-Object System.Net.WebClient
@@ -29,7 +32,10 @@ foreach ($rel in $files) {
   if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
   try { Write-Host "  $rel"; $wc.DownloadFile($url, $dst) }
   catch {
-    if ($rel -match 'splash\.png$|compact-overlay|phosphor-paths|excalidraw-app') { continue }
+    if ($rel -match 'splash\.png$|compact-overlay|phosphor-paths|excalidraw-app') {
+      Write-Host "  (skip optional $rel)" -ForegroundColor DarkYellow
+      continue
+    }
     throw
   }
 }
@@ -39,7 +45,11 @@ $main = Get-Content -LiteralPath (Join-Path $App 'main.js') -Raw -Encoding UTF8
 # 471 markers: no UDP_RX storm shield (480+), no CalculateNativeWinOcclusion (484)
 $is471Lineage = -not $main.Contains('UDP_RX_MAX_PER_SEC') -and -not $main.Contains('CalculateNativeWinOcclusion')
 Write-Host "version.json=$ver package.json=$pkg lineage471=$is471Lineage"
-if ($ver -ne $Expected -or $pkg -ne $Expected -or -not $is471Lineage) { Write-Host 'FAIL' -ForegroundColor Red; exit 2 }
+if ($ver -ne $Expected -or $pkg -ne $Expected -or -not $is471Lineage) {
+  Write-Host 'FAIL' -ForegroundColor Red
+  throw "verify failed ver=$ver pkg=$pkg lineage471=$is471Lineage"
+}
 Write-Host 'OK: 1.0.485 installed (yesterday evening 1.0.471 code)' -ForegroundColor Green
 Write-Host 'Run: C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\MiraeMessenger.exe'
-exit 0
+# IMPORTANT: do not call exit — iex would close the whole PowerShell window
+return
