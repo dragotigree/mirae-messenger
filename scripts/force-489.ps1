@@ -1,6 +1,6 @@
 # Force 1.0.489 — TCP listen deferred 45s. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = '385191437c02c388ef118f062f0497ef5a7f2a03'
 $Expected = '1.0.489'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
