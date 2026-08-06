@@ -2122,6 +2122,41 @@
     .compact-filter-chip:hover { color: #333; background: #e8e8e8; }
     .compact-filter-chip.is-active { background: #191919; color: #fff; }
 
+    .compact-inbox-bar {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+      padding: 8px 14px 0; background: #fff;
+    }
+    .compact-inbox-bar[hidden] { display: none !important; }
+    .compact-inbox-count {
+      flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: #334155;
+      letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .compact-inbox-btn {
+      flex-shrink: 0; border: 1px solid #e2e8f0; background: #f8fafc; color: #334155;
+      border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 700;
+      cursor: pointer; letter-spacing: -0.02em;
+    }
+    .compact-inbox-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .compact-inbox-btn.is-danger { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
+    .compact-inbox-btn.is-danger:hover { background: #ffe4e6; }
+
+    .sidebar-inbox-bar {
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+      padding: 0 10px 8px 10px;
+    }
+    .sidebar-inbox-bar[hidden] { display: none !important; }
+    .sidebar-inbox-count {
+      flex: 1; min-width: 0; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.82);
+      letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sidebar-inbox-btn {
+      flex-shrink: 0; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.88); border-radius: 7px; padding: 4px 7px;
+      font-size: 10.5px; font-weight: 700; cursor: pointer; letter-spacing: -0.03em;
+    }
+    .sidebar-inbox-btn:hover { background: rgba(255,255,255,0.14); }
+    .sidebar-inbox-btn.is-danger { color: #fecaca; border-color: rgba(248,113,113,0.35); background: rgba(127,29,29,0.28); }
+
     .compact-search { padding: 8px 14px 6px; flex-shrink: 0; position: relative; background: #fff; }
     .compact-search input { width: 100%; padding: 9px 36px 9px 36px; border-radius: 8px; border: none; background: #f5f5f5; font-size: 13px; outline: none; color: #191919; }
     .compact-search input::placeholder { color: #999; }
@@ -4446,6 +4481,15 @@
             <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터(직급 없음) 표시">공용</button>
             <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
           </div>
+          <div class="sidebar-pref-seg" role="group" aria-label="안읽음만">
+            <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">안읽</button>
+          </div>
+        </div>
+        <div class="sidebar-inbox-bar" id="sidebar-inbox-bar" hidden>
+          <span class="sidebar-inbox-count" id="sidebar-inbox-count">미읽음 0</span>
+          <button type="button" class="sidebar-inbox-btn" onclick="openFirstUnreadChat()" title="가장 많은 미읽음 열기">열기</button>
+          <button type="button" class="sidebar-inbox-btn" onclick="openNextUnreadChat()" title="다음 미읽음 (Ctrl+U)">다음</button>
+          <button type="button" class="sidebar-inbox-btn is-danger" onclick="markAllUnreadAsReadLocal()" title="미읽음 배지만 지우기 (대화 내용은 유지)">모두 처리</button>
         </div>
         <div id="user-list-tree"></div>
         <div id="user-multi-select-bar" aria-live="polite">
@@ -4525,6 +4569,12 @@
             <button type="button" class="compact-filter-chip" data-compact-filter="unread" onclick="setCompactListFilter('unread')">안읽음</button>
             <button type="button" class="compact-filter-chip" data-compact-filter="online" onclick="setCompactListFilter('online')">온라인</button>
             <button type="button" class="compact-filter-chip" data-compact-filter="favorite" onclick="setCompactListFilter('favorite')">즐겨찾기</button>
+          </div>
+          <div class="compact-inbox-bar" id="compact-inbox-bar" hidden>
+            <span class="compact-inbox-count" id="compact-inbox-count">미읽음 0</span>
+            <button type="button" class="compact-inbox-btn" onclick="openFirstUnreadChat()" title="가장 많은 미읽음 열기">열기</button>
+            <button type="button" class="compact-inbox-btn" onclick="openNextUnreadChat()" title="다음 미읽음 (Ctrl+U)">다음</button>
+            <button type="button" class="compact-inbox-btn is-danger" onclick="markAllUnreadAsReadLocal()" title="미읽음 배지만 지우기 (대화 내용은 유지)">모두 처리</button>
           </div>
           <div class="compact-search" id="compact-search-wrap">
             <span class="compact-search-icon" data-ui-icon="search"></span>
@@ -7257,6 +7307,7 @@
     let userFilterKeyword = '';
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
+    let sidebarUnreadOnly = localStorage.getItem('sidebarUnreadOnly') === 'true';
 
     let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
     if (!appSettings.defaultViewMode) {
@@ -7407,9 +7458,11 @@
         if (pref === 'grouping') on = val === grouping;
         else if (pref === 'presence') on = val === presence;
         else if (pref === 'shared') on = val === shared;
+        else if (pref === 'unread') on = sidebarUnreadOnly && val === 'on';
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
+      syncSidebarInboxBar();
     }
 
     function persistDirectoryListPrefsAndRefresh() {
@@ -7418,6 +7471,7 @@
       syncSidebarListPrefsUi();
       lastUserListStructureKey = '';
       renderUserListTree(true);
+      renderGroupChannels();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
         try { renderCompactList(); } catch (e) { /* ignore */ }
       }
@@ -7436,9 +7490,25 @@
         const showShared = value !== 'hide';
         if (showSharedPcsInDirectory() === showShared) return;
         appSettings.showSharedPcs = showShared;
+      } else if (pref === 'unread') {
+        const next = !sidebarUnreadOnly;
+        if (sidebarUnreadOnly === next) return;
+        sidebarUnreadOnly = next;
+        localStorage.setItem('sidebarUnreadOnly', sidebarUnreadOnly ? 'true' : 'false');
       } else {
         return;
       }
+      persistDirectoryListPrefsAndRefresh();
+    }
+
+    function setSidebarUnreadOnly(on) {
+      const next = !!on;
+      if (sidebarUnreadOnly === next) {
+        syncSidebarListPrefsUi();
+        return;
+      }
+      sidebarUnreadOnly = next;
+      localStorage.setItem('sidebarUnreadOnly', sidebarUnreadOnly ? 'true' : 'false');
       persistDirectoryListPrefsAndRefresh();
     }
 
@@ -8924,6 +8994,100 @@
       return Object.values(unreadCounts).reduce((sum, n) => sum + (n || 0), 0);
     }
 
+    function getUnreadChatEntriesSorted() {
+      return Object.entries(unreadCounts || {})
+        .filter(([, n]) => (n || 0) > 0)
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+    }
+
+    function openChatByUnreadKey(key) {
+      const k = String(key || '').trim();
+      if (!k) return false;
+      openChatFromToastChannelKey(k);
+      return true;
+    }
+
+    function openFirstUnreadChat() {
+      const entries = getUnreadChatEntriesSorted();
+      if (!entries.length) {
+        if (isCompactMode) {
+          setCompactRailTab('chat');
+          setCompactListFilter('unread');
+        } else {
+          setSidebarUnreadOnly(true);
+        }
+        syncUnreadInboxBars();
+        return false;
+      }
+      if (isCompactMode) setCompactRailTab('chat');
+      return openChatByUnreadKey(entries[0][0]);
+    }
+
+    function openNextUnreadChat() {
+      const entries = getUnreadChatEntriesSorted();
+      if (!entries.length) {
+        if (isCompactMode) setCompactListFilter('unread');
+        else setSidebarUnreadOnly(true);
+        syncUnreadInboxBars();
+        return false;
+      }
+      const cur = activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : '';
+      let idx = entries.findIndex(([k]) => k === cur);
+      if (idx < 0) idx = -1;
+      const next = entries[(idx + 1) % entries.length];
+      if (isCompactMode) setCompactRailTab('chat');
+      return openChatByUnreadKey(next[0]);
+    }
+
+    // 미니모드 호환 별칭
+    function openFirstUnreadCompactChat() { return openFirstUnreadChat(); }
+    function openNextUnreadCompactChat() { return openNextUnreadChat(); }
+
+    async function markAllUnreadAsReadLocal() {
+      const keys = Object.keys(unreadCounts || {}).filter((k) => (unreadCounts[k] || 0) > 0);
+      if (!keys.length) {
+        await appAlert('처리할 미읽음이 없습니다.');
+        return;
+      }
+      if (!await appConfirm(`미읽음 ${keys.length}개 방을 처리함으로 표시할까요?\n(대화 내용은 그대로 두고 배지만 지웁니다)`)) return;
+      keys.forEach((k) => { delete unreadCounts[k]; });
+      saveUnreadCounts();
+      refreshUnreadBadges();
+      invalidateCompactRecentConversations();
+      syncUnreadInboxBars();
+      if (!activeChatUser) {
+        lastUserListStructureKey = '';
+        renderUserListTree(true);
+        renderGroupChannels();
+        if (document.body.classList.contains('compact-mode')) renderCompactList();
+      }
+    }
+
+    function syncCompactInboxBar() {
+      const bar = document.getElementById('compact-inbox-bar');
+      const countEl = document.getElementById('compact-inbox-count');
+      if (!bar) return;
+      const total = getTotalUnread();
+      const show = isCompactMode && !activeChatUser && compactRailTab === 'chat' && compactListFilter === 'unread';
+      bar.hidden = !show;
+      if (countEl) countEl.textContent = total > 0 ? `미읽음 ${total}` : '미읽음 없음';
+    }
+
+    function syncSidebarInboxBar() {
+      const bar = document.getElementById('sidebar-inbox-bar');
+      const countEl = document.getElementById('sidebar-inbox-count');
+      if (!bar) return;
+      const total = getTotalUnread();
+      const show = !isCompactMode && sidebarUnreadOnly;
+      bar.hidden = !show;
+      if (countEl) countEl.textContent = total > 0 ? `미읽음 ${total}` : '미읽음 없음';
+    }
+
+    function syncUnreadInboxBars() {
+      syncCompactInboxBar();
+      syncSidebarInboxBar();
+    }
+
     function formatUnreadBadge(n) {
       return n > 99 ? '99+' : String(n);
     }
@@ -8960,6 +9124,12 @@
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+      else if (sidebarUnreadOnly) {
+        lastUserListStructureKey = '';
+        renderUserListTree(true);
+        renderGroupChannels();
+      }
+      syncUnreadInboxBars();
     }
 
     function setModalOpenState(isOpen) {
@@ -9690,6 +9860,7 @@
       activeChatUser = null;
       renderUserListTree();
       updateMainPanelVisibility();
+      syncUnreadInboxBars();
     }
 
     /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
@@ -9983,6 +10154,7 @@
       else updateCompactOnlineCount();
       syncCompactFilterChipUi();
       if (tab !== 'more') renderCompactList();
+      syncCompactInboxBar();
     }
 
     function focusCompactSearchInput() {
@@ -10024,6 +10196,7 @@
       compactListFilter = filter;
       localStorage.setItem('compactListFilter', filter);
       syncCompactFilterChipUi();
+      syncCompactInboxBar();
       renderCompactList();
     }
 
@@ -10446,10 +10619,12 @@
           compactListFilter === 'favorite' ? '즐겨찾기한 직원의 대화가 없습니다.' :
           userFilterKeyword ? '검색 결과가 없습니다.' : '아직 대화가 없습니다.\n직원 탭에서 대화를 시작해 보세요.';
         container.appendChild(emptyHintEl);
+        syncCompactInboxBar();
         return;
       }
 
       rows.forEach((row) => appendCompactConversationItem(container, row));
+      syncCompactInboxBar();
     }
 
     function renderCompactStaffDirectory(container) {
@@ -10531,6 +10706,7 @@
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       syncCompactFilterChipUi();
       pruneSidebarUserSelection();
+      syncCompactInboxBar();
     }
 
     function onCompactSearchInput(v) {
@@ -11870,9 +12046,16 @@
       const body = document.getElementById('channels-section-body');
       if (!body) return;
       body.innerHTML = '';
-      const entries = getOrderedChannelEntries();
+      let entries = getOrderedChannelEntries();
+      if (sidebarUnreadOnly) {
+        entries = entries.filter((entry) => {
+          if (entry.key === 'TRANSPORT' || entry.key === 'CODE_ALERT') return false;
+          return (entry.unread || 0) > 0;
+        });
+      }
       if (entries.length === 0) {
-        body.innerHTML = `<div style="padding:4px 18px; font-size:11px; color:var(--sidebar-text-dim);">표시할 채널이 없습니다</div>`;
+        body.innerHTML = `<div style="padding:4px 18px; font-size:11px; color:var(--sidebar-text-dim);">${sidebarUnreadOnly ? '안 읽은 채널이 없습니다' : '표시할 채널이 없습니다'}</div>`;
+        syncSidebarInboxBar();
         return;
       }
       entries.forEach((entry) => {
@@ -11897,6 +12080,7 @@
         body.appendChild(el);
       });
       updateBroadcastUnreadBadge();
+      syncSidebarInboxBar();
     }
 
     function renderGroupChannels() {
@@ -13359,6 +13543,8 @@
         u.username.toLowerCase().includes(userFilterKeyword) ||
         (u.dept || '').toLowerCase().includes(userFilterKeyword) ||
         (u.floor || '').toLowerCase().includes(userFilterKeyword)
+        ) && (
+          !sidebarUnreadOnly || getUnreadForUser(u) > 0
         )
       );
 
@@ -13400,6 +13586,8 @@
       if (sortedGroupKeys.length === 0 && favorites.length === 0) {
         const emptyMsg = userFilterKeyword
           ? '검색 결과가 없습니다.'
+          : sidebarUnreadOnly
+            ? '안 읽은 대화가 없습니다.'
           : !showOfflineUsersInDirectory()
             ? '현재 온라인인 직원이 없습니다.'
             : !showSharedPcsInDirectory()
@@ -13407,6 +13595,7 @@
               : '표시할 사용자가 없습니다.';
         treeEl.innerHTML = `<div style="text-align:center; color:var(--sidebar-text-dim); font-size:12px; padding:20px 0;">${emptyMsg}</div>`;
         lastUserListStructureKey = structureKey + '|empty';
+        syncSidebarInboxBar();
         return;
       }
 
@@ -13456,6 +13645,7 @@
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       pruneSidebarUserSelection();
+      syncSidebarInboxBar();
     }
 
     function pruneSidebarUserSelection() {
@@ -22574,6 +22764,14 @@
         return;
       }
       if (handleCtrlFSearchShortcut(e)) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'u' || e.key === 'U' || e.code === 'KeyU')) {
+        if (!isPrivacyScreenLocked) {
+          e.preventDefault();
+          if (activeChatUser && getTotalUnread() > 0) openNextUnreadChat();
+          else openFirstUnreadChat();
+          return;
+        }
+      }
       if (document.body.classList.contains('compact-mode')) {
         if (e.key === 'Escape' && activeChatUser) {
           e.preventDefault();
