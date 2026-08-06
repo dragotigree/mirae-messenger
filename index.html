@@ -8826,6 +8826,12 @@
     window.api.onSchedulesUpdate(() => { refreshSchedulesFromServer(); });
     window.api.onDutyRosterUpdate(() => { refreshDutyRosterFromServer(); });
     window.api.onChatPinsUpdate(() => { refreshActiveChatPinBanner(); });
+    if (window.api && typeof window.api.onDbCorruptRecovery === 'function') {
+      window.api.onDbCorruptRecovery((data) => {
+        const msg = (data && data.message) || '로컬 데이터베이스가 손상되어 복구 후 다시 시작합니다.';
+        appAlert(msg).catch(() => {});
+      });
+    }
     refreshSchedulesFromServer();
     refreshDutyRosterFromServer();
     window.api.onGroupChatsUpdate(() => { refreshGroupChats().catch((e) => console.error('그룹 갱신 실패:', e)); });
