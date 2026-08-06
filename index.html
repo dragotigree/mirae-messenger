@@ -4840,6 +4840,7 @@
         <nav class="settings-nav" aria-label="관리자 메뉴">
           <button type="button" class="settings-nav-btn active" data-master-tab="operators" onclick="setMasterAdminTab('operators')">운영자 계정</button>
           <button type="button" class="settings-nav-btn" data-master-tab="clients" onclick="setMasterAdminTab('clients')">접속 PC</button>
+          <button type="button" class="settings-nav-btn" data-master-tab="traffic" onclick="setMasterAdminTab('traffic')">부하 감시</button>
           <button type="button" class="settings-nav-btn" data-master-tab="pause" onclick="setMasterAdminTab('pause')">전체 일시중지</button>
           <button type="button" class="settings-nav-btn" data-master-tab="security" onclick="setMasterAdminTab('security')">비밀번호</button>
         </nav>
@@ -4888,6 +4889,20 @@
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">「사용 중지」는 안내 문구와 함께 해당 PC만 잠급니다. 「로그 삭제」는 오프라인이어도 예약되며, 대상 PC가 접속하면 바로 실행됩니다. (대상 PC 마스터 비밀번호가 이 PC와 같아야 합니다.)</p>
+          </div>
+
+          <div class="settings-panel" data-master-panel="traffic" style="max-width:none;">
+            <h3 class="settings-panel-title">부하 감시</h3>
+            <p class="settings-panel-desc">이 PC가 <b>받은</b> 네트워크 트래픽 기준입니다. 최근 1분 메시지·용량이 많거나 버퍼 초과가 있으면 「주의/과다」로 표시됩니다. (앱 재시작 전까지만 집계)</p>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div id="master-traffic-meta" style="font-size:12px; color:#64748b;">집계 중…</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" onclick="resetMasterPeerTrafficStats()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">집계 초기화</button>
+                <button type="button" onclick="renderMasterPeerTraffic()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+              </div>
+            </div>
+            <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
+            <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
           </div>
 
           <div class="settings-panel" data-master-panel="pause">
@@ -14321,6 +14336,101 @@
       if (key === 'clients') {
         try { renderMasterOnlineClients(); } catch (_) {}
       }
+      if (key === 'traffic') {
+        try { renderMasterPeerTraffic(); } catch (_) {}
+      }
+    }
+
+    function formatTrafficBytes(n) {
+      const v = Number(n) || 0;
+      if (v < 1024) return `${v} B`;
+      if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+      return `${(v / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function formatTrafficAge(ts) {
+      const t = Number(ts) || 0;
+      if (!t) return '-';
+      const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+      if (sec < 60) return `${sec}초 전`;
+      if (sec < 3600) return `${Math.floor(sec / 60)}분 전`;
+      return `${Math.floor(sec / 3600)}시간 전`;
+    }
+
+    async function renderMasterPeerTraffic() {
+      const box = document.getElementById('master-peer-traffic-box');
+      const meta = document.getElementById('master-traffic-meta');
+      if (!box) return;
+      if (!window.api.getPeerTrafficStats) {
+        box.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">이 버전에서는 부하 감시를 지원하지 않습니다.</div>`;
+        return;
+      }
+      box.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">불러오는 중…</div>`;
+      let res;
+      try {
+        res = await window.api.getPeerTrafficStats();
+      } catch (e) {
+        box.innerHTML = `<div style="padding:16px; text-align:center; color:#b91c1c; font-size:12px;">조회 실패</div>`;
+        return;
+      }
+      if (!res || res.success === false) {
+        box.innerHTML = `<div style="padding:16px; text-align:center; color:#b91c1c; font-size:12px;">${escapeHtml((res && res.msg) || '마스터 로그인이 필요합니다.')}</div>`;
+        if (meta) meta.textContent = '';
+        return;
+      }
+      const rows = Array.isArray(res.rows) ? res.rows : [];
+      const hot = rows.filter((r) => r.level === 'hot').length;
+      const warn = rows.filter((r) => r.level === 'warn').length;
+      if (meta) {
+        meta.textContent = `최근 ${res.windowSec || 60}초 · TCP 연결 ${res.tcpActiveConnections || 0}/${res.tcpMaxConnections || 8} · 과다 ${hot} · 주의 ${warn} · 전체 ${rows.length}`;
+      }
+      if (!rows.length) {
+        box.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">아직 수신 기록이 없습니다. 메신저를 잠시 쓰거나 「응답 없음」이 난 뒤 다시 확인해 보세요.</div>`;
+        return;
+      }
+      const levelLabel = {
+        hot: '<span style="color:#b91c1c; font-weight:800;">과다</span>',
+        warn: '<span style="color:#c2410c; font-weight:800;">주의</span>',
+        ok: '<span style="color:#15803d; font-weight:700;">정상</span>'
+      };
+      const tableHead = `<table class="master-clients-table">
+        <colgroup>
+          <col style="width:12%"><col style="width:18%"><col style="width:14%"><col style="width:12%">
+          <col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:12%">
+        </colgroup>
+        <thead><tr>
+          <th>판정</th><th>이름</th><th>IP</th><th>1분 메시지</th>
+          <th>1분 용량</th><th>버퍼초과</th><th>최근</th><th>주요 유형</th>
+        </tr></thead><tbody>`;
+      const body = rows.map((r) => {
+        const name = (r.username || '').trim() || '-';
+        const rowBg = r.level === 'hot' ? 'background:#fef2f2;' : (r.level === 'warn' ? 'background:#fff7ed;' : '');
+        return `<tr style="border-top:1px solid #f1f5f9; ${rowBg}">
+          <td>${levelLabel[r.level] || r.level}</td>
+          <td style="font-weight:700; color:#0f172a;" title="${escapeHtml(name)}">${escapeHtml(name)}${r.online ? '' : ' <span style="color:#94a3b8; font-size:10px;">(오프)</span>'}</td>
+          <td style="font-family:monospace; font-size:11.5px;">${escapeHtml(r.ip || '-')}</td>
+          <td style="font-weight:700; color:${r.msgs1m >= 120 ? '#b91c1c' : '#334155'};">${Number(r.msgs1m) || 0}</td>
+          <td style="font-weight:700; color:${r.bytes1m >= 1.5 * 1024 * 1024 ? '#b91c1c' : '#334155'};">${formatTrafficBytes(r.bytes1m)}</td>
+          <td style="font-weight:800; color:${r.overflowCount ? '#b91c1c' : '#64748b'};">${Number(r.overflowCount) || 0}${r.largeChunkCount ? ` <span style="font-size:10px; color:#c2410c;">(큰청크 ${r.largeChunkCount})</span>` : ''}</td>
+          <td style="color:#64748b;">${escapeHtml(formatTrafficAge(r.lastAt))}</td>
+          <td style="color:#64748b; font-size:11px;" title="${escapeHtml(r.topTypes || '')}">${escapeHtml(r.topTypes || '-')}</td>
+        </tr>`;
+      }).join('');
+      box.innerHTML = tableHead + body + '</tbody></table>';
+    }
+
+    async function resetMasterPeerTrafficStats() {
+      if (!window.api.resetPeerTrafficStats) return;
+      const ok = await appConfirm('부하 집계를 모두 지울까요?');
+      if (!ok) return;
+      try {
+        const res = await window.api.resetPeerTrafficStats();
+        if (res && res.success === false) {
+          await appAlert(res.msg || '초기화 실패');
+          return;
+        }
+      } catch (_) {}
+      renderMasterPeerTraffic();
     }
 
     const masterStatusLabel = { ONLINE: '🟢 온라인', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };

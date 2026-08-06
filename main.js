@@ -445,6 +445,104 @@ let tcpActiveConnections = 0;
 const TCP_MAX_CONNECTIONS = 8;
 const NETWORK_QUIET_MS = 45000;
 
+/** 피어별 수신 트래픽(이 PC 기준) — 마스터 「부하 감시」용 */
+const PEER_TRAFFIC_WINDOW_MS = 60 * 1000;
+const peerTrafficByIp = new Map();
+
+function getPeerTrafficEntry(ip) {
+  const key = String(ip || '').trim();
+  if (!key) return null;
+  let e = peerTrafficByIp.get(key);
+  if (!e) {
+    e = {
+      ip: key,
+      bytesTotal: 0,
+      msgsTotal: 0,
+      overflowCount: 0,
+      largeChunkCount: 0,
+      lastAt: 0,
+      samples: [],
+      byType: Object.create(null)
+    };
+    peerTrafficByIp.set(key, e);
+  }
+  return e;
+}
+
+function prunePeerTrafficSamples(e, now) {
+  if (!e || !e.samples) return;
+  const cut = now - PEER_TRAFFIC_WINDOW_MS;
+  while (e.samples.length && e.samples[0].t < cut) e.samples.shift();
+}
+
+function recordPeerTraffic(ip, opts = {}) {
+  try {
+    const e = getPeerTrafficEntry(ip);
+    if (!e) return;
+    const now = Date.now();
+    const bytes = Math.max(0, Number(opts.bytes) || 0);
+    const msgs = Math.max(0, Number(opts.msgs) || 0);
+    e.bytesTotal += bytes;
+    e.msgsTotal += msgs;
+    e.lastAt = now;
+    if (opts.overflow) e.overflowCount += 1;
+    if (opts.largeChunk) e.largeChunkCount += 1;
+    if (opts.type) {
+      const t = String(opts.type).slice(0, 40);
+      e.byType[t] = (e.byType[t] || 0) + 1;
+    }
+    if (bytes || msgs) e.samples.push({ t: now, bytes, msgs });
+    prunePeerTrafficSamples(e, now);
+  } catch (_) { /* ignore */ }
+}
+
+function peerTrafficLevel(bytes1m, msgs1m, overflowCount) {
+  if (overflowCount >= 2 || msgs1m >= 300 || bytes1m >= 5 * 1024 * 1024) return 'hot';
+  if (overflowCount >= 1 || msgs1m >= 120 || bytes1m >= 1.5 * 1024 * 1024) return 'warn';
+  return 'ok';
+}
+
+function listPeerTrafficStats() {
+  const now = Date.now();
+  const rows = [];
+  peerTrafficByIp.forEach((e) => {
+    prunePeerTrafficSamples(e, now);
+    let bytes1m = 0;
+    let msgs1m = 0;
+    for (const s of e.samples) {
+      bytes1m += s.bytes;
+      msgs1m += s.msgs;
+    }
+    const typeEntries = Object.entries(e.byType || {}).sort((a, b) => b[1] - a[1]);
+    const topTypes = typeEntries.slice(0, 3).map(([t, n]) => `${t}×${n}`).join(', ');
+    const known = allKnownUsers.get(e.ip) || onlineUsers.get(e.ip) || null;
+    const level = peerTrafficLevel(bytes1m, msgs1m, e.overflowCount);
+    rows.push({
+      ip: e.ip,
+      username: known ? `${known.rank || ''} ${known.username || ''}`.trim() : '',
+      dept: known ? (known.dept || '') : '',
+      online: !!(known && (onlineUsers.has(e.ip) || known.online)),
+      bytes1m,
+      msgs1m,
+      bytesTotal: e.bytesTotal,
+      msgsTotal: e.msgsTotal,
+      overflowCount: e.overflowCount,
+      largeChunkCount: e.largeChunkCount,
+      lastAt: e.lastAt,
+      topTypes,
+      level
+    });
+  });
+  const order = { hot: 0, warn: 1, ok: 2 };
+  rows.sort((a, b) => {
+    const lo = (order[a.level] ?? 9) - (order[b.level] ?? 9);
+    if (lo !== 0) return lo;
+    if (b.bytes1m !== a.bytes1m) return b.bytes1m - a.bytes1m;
+    return b.msgs1m - a.msgs1m;
+  });
+  return rows;
+}
+
 const MY_IP = getMyIP();
 
 let myProfile = {
@@ -4695,6 +4793,7 @@ function startTcpServer() {
       const from = String((socket.remoteAddress || '').replace('::ffff:', '') || '?');
       if (chunk.length > MAX_TCP_LINE_BUFFER) {
         console.error(`[TCP] 청크 과다 from=${from} bytes=${chunk.length} — 연결 종료`);
+        recordPeerTraffic(from, { bytes: chunk.length, largeChunk: true, overflow: true, type: 'TCP_CHUNK_OVERSIZE' });
         buffer = '';
         try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
@@ -4704,16 +4803,19 @@ function startTcpServer() {
       buffer += chunk.toString('utf8');
       if (buffer.length > softCap && buffer.indexOf('\n') === -1) {
         console.error(`[TCP] 버퍼 초과(개행 없음) from=${from} bytes=${buffer.length} head=${JSON.stringify(buffer.slice(0, 80))} — 연결 종료`);
+        recordPeerTraffic(from, { bytes: chunk.length, overflow: true, type: 'TCP_BUFFER_OVERFLOW' });
         buffer = '';
         try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
       }
       if (buffer.length > MAX_TCP_LINE_BUFFER) {
         console.error(`[TCP] 버퍼 초과 from=${from} bytes=${buffer.length} — 연결 종료`);
+        recordPeerTraffic(from, { bytes: chunk.length, overflow: true, type: 'TCP_BUFFER_OVERFLOW' });
         buffer = '';
         try { socket.destroy(); } catch (e) { /* ignore */ }
         return;
       }
+      recordPeerTraffic(from, { bytes: chunk.length });
       drain();
     });
     socket.on('end', () => {
@@ -4747,6 +4849,10 @@ function parseAndRoute(line, socket) {
     const payload = JSON.parse(line);
     const senderIP = (socket.remoteAddress || '').replace('::ffff:', '');
     if (!senderIP) return;
+    recordPeerTraffic(senderIP, {
+      msgs: 1,
+      type: payload && payload.type ? payload.type : 'CHAT'
+    });
     routeIncomingPayload(payload, senderIP);
   } catch (e) {
     console.error('TCP 페이로드 파싱 오류:', e.message);
@@ -10496,6 +10602,26 @@ function startAutoBackup() {
 ipcMain.handle('get-network-status', async () => ({
   myIp: MY_IP, udpStatus, tcpStatus, onlineCount: countOnlinePeopleForStatus()
 }));
+
+ipcMain.handle('get-peer-traffic-stats', async () => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.', rows: [], windowSec: 60 };
+  }
+  return {
+    success: true,
+    rows: listPeerTrafficStats(),
+    windowSec: Math.round(PEER_TRAFFIC_WINDOW_MS / 1000),
+    tcpActiveConnections,
+    tcpMaxConnections: TCP_MAX_CONNECTIONS,
+    collectedAt: Date.now()
+  };
+});
+
+ipcMain.handle('reset-peer-traffic-stats', async () => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  peerTrafficByIp.clear();
+  return { success: true };
+});
 
 ipcMain.handle('refresh-users', async () => {
   registerSelf();
