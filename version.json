@@ -1,4 +1,4 @@
 {
-  "version": "1.0.489",
-  "notes": "긴급: 부팅 45초간 TCP 수신 자체 OFF(UDP만)·버퍼초과 시 송신 IP 로그 — TCP폭주로 클릭불가 재발 차단"
+  "version": "1.0.490",
+  "notes": "감사 보완: 471롤백 때 빠진 known_users.phone_no ALTER·DB오류 스로틀·mobile_server 안전로드 복구 (489 TCP/클릭 안정 유지)"
 }

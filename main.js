@@ -8,7 +8,12 @@ const https = require('https');
 const transportHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 8 });
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
-const { startMobileServer } = require('./mobile_server');
+let startMobileServer = null;
+try {
+  startMobileServer = require('./mobile_server').startMobileServer;
+} catch (e) {
+  console.warn('[mobile] mobile_server.js 로드 실패:', e && e.message ? e.message : e);
+}
 
 function loadScheduleXlsxBuilder() {
   try {
