@@ -1,4 +1,4 @@
-# Mirae Messenger — GitHub main 최신 파일을 로컬 설치 폴더에 직접 덮어쓰기
+﻿# Mirae Messenger — GitHub main 최신 파일을 로컬 설치 폴더에 직접 덮어쓰기
 # 예:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\manual-update-from-github.ps1 -ForceKill
 #   powershell -ExecutionPolicy Bypass -File .\scripts\manual-update-from-github.ps1 -ForceKill -TargetAppDir "C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app"
@@ -28,6 +28,7 @@ $files = @(
   'index.html',
   'package.json',
   'version.json',
+  'mobile_server.js',
   'toast.html',
   'toast-preload.js',
   'lib/minimal-xlsx.js',

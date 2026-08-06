@@ -23,6 +23,7 @@ $files = @(
   'index.html',
   'package.json',
   'version.json',
+  'mobile_server.js',
   'toast.html',
   'toast-preload.js',
   'lib/minimal-xlsx.js',
