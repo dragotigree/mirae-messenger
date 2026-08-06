@@ -14139,7 +14139,8 @@
         } else if (res.msg) {
           resultEl.textContent = res.msg;
         } else {
-          resultEl.textContent = '✅ 이미 최신 버전입니다.';
+          const remoteHint = res.remoteVersion ? ` (원격 ${res.remoteVersion})` : '';
+          resultEl.textContent = `✅ 이미 최신 버전입니다.${remoteHint}`;
         }
       } catch (e) {
         resultEl.textContent = '확인 중 오류가 발생했습니다.';

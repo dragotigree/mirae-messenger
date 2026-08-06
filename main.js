@@ -730,22 +730,27 @@ async function fetchGithubUpdateFile(meta, relPath) {
   const filePath = String(relPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
   const token = loadGithubUpdateToken();
   const isLargeHint = /excalidraw-app\.(js|css)$/i.test(filePath) || /^vendor\//i.test(filePath);
-  const timeoutMs = isLargeHint ? 180000 : 45000;
+  // version.json은 CDN(max-age=300)에 막히면 새 버전을 못 봄 → raw+캐시버스트 우선·짧은 타임아웃
+  const isVersionMeta = /^(version|package)\.json$/i.test(filePath);
+  const timeoutMs = isLargeHint ? 180000 : (isVersionMeta ? 15000 : 45000);
   const ua = { 'User-Agent': 'MiraeMessenger-Updater' };
+  const noCache = { 'Cache-Control': 'no-cache', Pragma: 'no-cache' };
 
-  // 대용량은 Contents API(1MB 제한/타임아웃)보다 raw URL을 먼저 시도
-  const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}`;
-  const rawHeaders = { ...ua };
+  // 대용량·버전메타는 Contents API보다 raw URL을 먼저 시도
+  const bust = Date.now();
+  const rawUrl = `https://raw.githubusercontent.com/${meta.owner}/${meta.repo}/${meta.ref}/${filePath}?t=${bust}`;
+  const rawHeaders = { ...ua, ...noCache };
   if (token) rawHeaders.Authorization = `Bearer ${token}`;
 
   const apiUrl = `https://api.github.com/repos/${meta.owner}/${meta.repo}/contents/${filePath}?ref=${encodeURIComponent(meta.ref)}`;
   const apiHeaders = {
     ...ua,
+    ...noCache,
     Accept: 'application/vnd.github.raw+json'
   };
   if (token) apiHeaders.Authorization = `Bearer ${token}`;
 
-  const tryOrder = isLargeHint
+  const tryOrder = (isLargeHint || isVersionMeta)
     ? [
         () => httpsGetBuffer(rawUrl, rawHeaders, { timeoutMs }),
         () => httpsGetBuffer(apiUrl, apiHeaders, { timeoutMs })
@@ -9201,7 +9206,12 @@ async function applyUpdateFiles() {
   const fileResults = [];
   let expectedVersion = null;
 
+  const LARGE_INPLACE_BYTES = 512 * 1024; // 실행 중 대용량 덮어쓰기 → Windows '응답 없음'
+  const yieldUi = () => new Promise((r) => setImmediate(r));
+
   for (const f of filesToUpdate) {
+    await yieldUi();
+    safeWebContentsSend('app-update-progress', { phase: 'download', file: f });
     let remoteBuf;
     try {
       remoteBuf = await readUpdateSourceBytes(f);
@@ -9222,11 +9232,12 @@ async function applyUpdateFiles() {
       await fs.promises.copyFile(localPath, path.join(backupDir, f.replace(/\//g, '_')));
     } catch (e) {}
     try {
-      // OneDrive 설치: 실행 중 in-place 덮어쓰기는 잠금·프리즈 → 보류 폴더에만 두고 재시작 적용
-      if (isCloudSyncedInstallPath()) {
+      // OneDrive·대용량: 실행 중 in-place 덮어쓰기는 잠금·프리즈 → 보류 폴더에만 두고 재시작 적용
+      const preferPending = isCloudSyncedInstallPath() || (remoteBuf && remoteBuf.length >= LARGE_INPLACE_BYTES);
+      if (preferPending) {
         await stagePendingUpdateBuffer(f, remoteBuf);
         fileResults.push({ file: f, copied: true, pendingRestart: true });
-        console.warn(`[업데이트] OneDrive 경로 — ${f} 재시작 후 적용 예약`);
+        console.warn(`[업데이트] ${preferPending && isCloudSyncedInstallPath() ? 'OneDrive' : '대용량'} — ${f} 재시작 후 적용 예약`);
         continue;
       }
       await writeBufferWithRetry(localPath, remoteBuf);
@@ -9251,6 +9262,7 @@ async function applyUpdateFiles() {
   }
 
   for (const rel of optionalAssets) {
+    await yieldUi();
     let remoteBuf;
     try {
       remoteBuf = await readUpdateSourceBytes(rel);
@@ -9265,7 +9277,7 @@ async function applyUpdateFiles() {
         await fs.promises.access(localPath);
         await fs.promises.copyFile(localPath, path.join(backupDir, rel.replace(/\//g, '_')));
       } catch (e) {}
-      if (isCloudSyncedInstallPath()) {
+      if (isCloudSyncedInstallPath() || (remoteBuf && remoteBuf.length >= LARGE_INPLACE_BYTES)) {
         await stagePendingUpdateBuffer(rel, remoteBuf);
         fileResults.push({ file: rel, copied: true, pendingRestart: true });
         continue;
