@@ -1,4 +1,4 @@
 {
-  "version": "1.0.481",
-  "notes": "핫픽스: GPU가속 기본 복구(소프트웨어렌더 CPU 12% 방지)·빈화면 infinite 애니메이션 제거 — 네트워크 0인데 CPU만 높은 경우 완화"
+  "version": "1.0.482",
+  "notes": "핫픽스: known_users.phone_no 컬럼 마이그레이션·DB오류 로그 스로틀·mobile_server 안전로드 — 콘솔 SQLITE_ERROR 폭주/버벅임 수정"
 }

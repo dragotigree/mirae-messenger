@@ -8,7 +8,12 @@ const https = require('https');
 const transportHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 8 });
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
-const { startMobileServer } = require('./mobile_server');
+let startMobileServer = null;
+try {
+  startMobileServer = require('./mobile_server').startMobileServer;
+} catch (e) {
+  console.warn('[mobile] mobile_server.js 로드 실패:', e && e.message ? e.message : e);
+}
 
 function loadScheduleXlsxBuilder() {
   try {
@@ -2249,10 +2254,14 @@ function checkpointWal() {
 
 function logDbErr(err) {
   if (!err) return;
-  console.error('DB 오류:', err.message);
-  // 이 로그는 main 프로세스 쪽이라 npm start로 켰을 때만 터미널에 보인다.
-  // 패키징된 프로그램에서도 보이도록 화면(개발자 도구 콘솔)에도 함께 남긴다.
-  logToRendererConsole('error', 'DB 오류: ' + err.message);
+  const msg = String(err.message || err);
+  // 동일 오류가 초당 수십 번 찍히면 콘솔/IPC만으로 CPU가 올라감 — 10초에 1회만
+  const now = Date.now();
+  if (!logDbErr._last) logDbErr._last = { msg: '', at: 0 };
+  if (logDbErr._last.msg === msg && now - logDbErr._last.at < 10000) return;
+  logDbErr._last = { msg, at: now };
+  console.error('DB 오류:', msg);
+  logToRendererConsole('error', 'DB 오류: ' + msg);
 }
 
 let logsDirEnsured = false;
@@ -2370,8 +2379,10 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS known_users (
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
   )`, logDbErr);
-  db.run(`ALTER TABLE known_users ADD COLUMN photo TEXT`, () => {});
-  db.run(`ALTER TABLE known_users ADD COLUMN last_seen_at INTEGER`, () => {});
+  // 예전 DB에는 phone_no 등이 없을 수 있음 — 없으면 INSERT마다 SQLITE_ERROR로 CPU/콘솔 폭주
+  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER'].forEach((colDef) => {
+    db.run(`ALTER TABLE known_users ADD COLUMN ${colDef}`, () => {});
+  });
   // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
   db.run(
     `DELETE FROM known_users WHERE ip LIKE 'BCAST:%' OR ip LIKE 'DEPTPEER:%' OR ip LIKE 'FLOORPEER:%'
@@ -3514,7 +3525,13 @@ app.whenReady().then(async () => {
   registerGlobalShortcuts();
   startUdpDiscovery();
   startTcpServer();
-  startMobileServer(db, MY_IP);
+  if (typeof startMobileServer === 'function') {
+    try { startMobileServer(db, MY_IP); } catch (e) {
+      console.warn('[mobile] startMobileServer 실패:', e && e.message ? e.message : e);
+    }
+  } else {
+    console.warn('[mobile] startMobileServer 없음 — mobile_server.js 업데이트 필요');
+  }
   startScheduledMessageChecker();
   startPresenceSweeper();
   startAutoBackup();
