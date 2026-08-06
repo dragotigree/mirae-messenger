@@ -14568,7 +14568,7 @@
       openBoardWriteView(null);
     }
 
-    function openBoardWriteView(uid) {
+    async function openBoardWriteView(uid) {
       document.getElementById('board-list-view').style.display = 'none';
       document.getElementById('board-detail-view').style.display = 'none';
       document.getElementById('board-write-view').style.display = 'block';
@@ -14576,7 +14576,16 @@
 
       const submitBtn = document.getElementById('board-write-submit-btn');
       if (uid) {
-        const n = cachedNoticesList.find(x => x.uid === uid);
+        let n = cachedNoticesList.find(x => x.uid === uid);
+        if (n && (n.hasImages || n.imagesBytes > 0) && parseNoticeImages(n.images).length === 0 && window.api.getNotice) {
+          try {
+            const full = await window.api.getNotice(uid);
+            if (full) {
+              n = { ...n, ...full, category: normalizeBoardCategory(full.category) };
+              cachedNoticesList = cachedNoticesList.map((x) => (x.uid === uid ? n : x));
+            }
+          } catch (e) { /* ignore */ }
+        }
         if (!canModifyNotice(n)) {
           appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
           if (n) showBoardDetailView(uid);
