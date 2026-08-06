@@ -7013,9 +7013,17 @@
       return (a.username || '').localeCompare(b.username || '', 'ko');
     }
 
+    /** 미설정·기본 플레이스홀더 이름 (말풍선에 「이름없음」으로 안 보이게) */
+    function isPlaceholderUsername(name) {
+      const s = scrubBrokenDisplayChars(name);
+      if (!s) return true;
+      return /^(이름없음|이름\s*없음|미설정|unnamed|unknown|n\/?a)$/i.test(s);
+    }
+
     function displayNameFromParts(rank, username, fallback) {
       const r = normalizeRankText(rank);
       let n = scrubBrokenDisplayChars(username);
+      if (isPlaceholderUsername(n)) n = '';
       if (r && n) {
         while (n === r || n.startsWith(`${r} `)) {
           if (n === r) return r;
@@ -23300,7 +23308,7 @@
       if (clearAllResultEl) clearAllResultEl.textContent = '';
       try {
         const p = await window.api.getMyProfile();
-        document.getElementById('setting-name').value = p.username || '';
+        document.getElementById('setting-name').value = isPlaceholderUsername(p.username) ? '' : (p.username || '');
         currentProfilePhotoValue = p.photo || '';
         renderSettingPhotoPreview(p.username, currentProfilePhotoValue);
 
@@ -23442,8 +23450,8 @@
     : true;
 
   const username = document.getElementById('setting-name').value.trim();
-  if (!username) {
-    await appAlert('성명(표시 이름)은 필수입니다.\n예: 물리치료실1');
+  if (!username || isPlaceholderUsername(username)) {
+    await appAlert('성명(표시 이름)은 필수입니다.\n예: 홍길동 · 물리치료실1\n(「이름없음」은 사용할 수 없습니다)');
     document.getElementById('setting-name')?.focus();
     return;
   }

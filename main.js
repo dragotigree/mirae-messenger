@@ -558,7 +558,7 @@ function listPeerTrafficStats() {
 const MY_IP = getMyIP();
 
 let myProfile = {
-  username: '이름없음',
+  username: '',
   rank: '',
   dept: '',
   floor: '',
@@ -2485,9 +2485,17 @@ function scrubBrokenDisplayChars(str) {
     .replace(/^[\s\u00A0]+|[\s\u00A0]+$/g, '');
 }
 
+/** 미설정·기본 플레이스홀더 이름 (말풍선에 그대로 노출하지 않음) */
+function isPlaceholderUsername(name) {
+  const s = scrubBrokenDisplayChars(name);
+  if (!s) return true;
+  return /^(이름없음|이름\s*없음|미설정|unnamed|unknown|n\/?a)$/i.test(s);
+}
+
 function displayNameFromParts(rank, username, fallback) {
   const r = normalizeRankText(rank);
   let n = scrubBrokenDisplayChars(username);
+  if (isPlaceholderUsername(n)) n = '';
   if (r && n) {
     while (n === r || n.startsWith(`${r} `)) {
       if (n === r) return r;
@@ -3418,7 +3426,10 @@ db.serialize(() => {
       // 빈 문자열로 저장한 직급·내선·휴대폰이 기본값으로 되살아나지 않게 nullish만 보정한다.
       const strOrEmpty = (v) => (v != null ? String(v) : '');
       myProfile = {
-        username: (row.username && String(row.username).trim()) || '이름없음',
+        username: (() => {
+          const u = (row.username && String(row.username).trim()) || '';
+          return isPlaceholderUsername(u) ? '' : u;
+        })(),
         rank: strOrEmpty(row.rank),
         dept: strOrEmpty(row.dept),
         floor: strOrEmpty(row.floor),
@@ -3428,9 +3439,13 @@ db.serialize(() => {
         photo: row.photo || ''
       };
       profileLoaded = true;
-      logToRendererConsole('info', `[프로필] DB에서 불러옴: ${myProfile.username} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
+      logToRendererConsole('info', `[프로필] DB에서 불러옴: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
+      // 예전 기본값「이름없음」이 DB에 남아 있으면 비워서 말풍선에 안 나오게
+      if (row.username && isPlaceholderUsername(row.username)) {
+        db.run(`UPDATE user_profile SET username = '' WHERE id = 1`, logDbErr);
+      }
     } else {
-      logToRendererConsole('info', `[프로필] DB에 저장된 프로필이 없어 기본값으로 새로 만듭니다: ${myProfile.username} ${myProfile.rank}`);
+      logToRendererConsole('info', `[프로필] DB에 저장된 프로필이 없어 기본값으로 새로 만듭니다: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank}`);
       db.run(`INSERT INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || ''], () => {
           profileLoaded = true;
@@ -8669,10 +8684,14 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
   // 아직 DB에서 실제 저장된 프로필을 다 불러오기 전에 저장하면, 하드코딩된 기본값 위에 새 값만
   // 얹은 상태로 덮어써서 나머지 정보가 기본값으로 되돌아갈 수 있어, 로딩이 끝날 때까지 잠깐 기다린다.
   await waitForProfileLoaded(2000);
-  const photoChanged = typeof newProfile.photo === 'string' && newProfile.photo !== myProfile.photo;
-  myProfile = { ...myProfile, ...newProfile };
-  console.log('[프로필] 저장:', myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo);
-  logToRendererConsole('info', `[프로필] 저장: ${myProfile.username} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
+  const incoming = newProfile || {};
+  if (Object.prototype.hasOwnProperty.call(incoming, 'username') && isPlaceholderUsername(incoming.username)) {
+    incoming.username = '';
+  }
+  const photoChanged = typeof incoming.photo === 'string' && incoming.photo !== myProfile.photo;
+  myProfile = { ...myProfile, ...incoming };
+  console.log('[프로필] 저장:', myProfile.username || '(이름 미설정)', myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo);
+  logToRendererConsole('info', `[프로필] 저장: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
   db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || ''], logDbErr);
   registerSelf();
