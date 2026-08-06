@@ -1,4 +1,4 @@
 {
-  "version": "1.0.474",
-  "notes": "수동 업데이트: exe가 읽는 dist\\...\\resources\\app 경로를 우선 갱신 (소스 폴더만 올려 버전이 안 바뀌던 문제)"
+  "version": "1.0.475",
+  "notes": "긴급: 리소스 폭주 완화(전체스캔 2분·compact OFF·안정성 프리셋) + C:\\Apps 패키지 강제 업데이트(FORCE-UPDATE.cmd)"
 }

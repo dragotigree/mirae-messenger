@@ -442,7 +442,7 @@
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
-    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; backdrop-filter: blur(12px); animation: menu-pop 0.18s var(--ease-spring); }
+    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; backdrop-filter: none; -webkit-backdrop-filter: none; animation: menu-pop 0.18s var(--ease-spring); }
     @keyframes menu-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .ctx-menu-item { padding: 9px 12px; font-size: 12.5px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary); font-weight: 600; transition: background var(--transition-fast); }
     .ctx-menu-item:hover { background: var(--surface-muted); }
@@ -3633,7 +3633,7 @@
       box-sizing: border-box;
     }
 
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(8px); z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.45); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
     .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
 
@@ -7259,6 +7259,18 @@
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
 
     let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
+    // 1.0.475 긴급: 조작 불능급 리소스 폭주 PC에 한 번 안정성 프리셋 강제 적용
+    const PERF_EMERGENCY_KEY = 'miraePerfEmergency475';
+    if (localStorage.getItem(PERF_EMERGENCY_KEY) !== '1') {
+      appSettings.stabilityModeEnabled = true;
+      appSettings.uiAnimationsEnabled = false;
+      appSettings.showUserListAvatars = false;
+      appSettings.spellcheck = false;
+      appSettings.scheduleAlarmEnabled = false;
+      localStorage.setItem(PERF_EMERGENCY_KEY, '1');
+      localStorage.setItem('appSettings', JSON.stringify(appSettings));
+      console.warn('[perf] 1.0.475 긴급 안정성 프리셋 적용 (아바타/애니메이션/맞춤법 Off)');
+    }
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -8825,7 +8837,9 @@
     window.api.onUserListUpdate((users) => {
       persistContactSnapshotsFromUserList(users);
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
-      queueProfilePhotoLoads(users);
+      if (appSettings.showUserListAvatars !== false) {
+        queueProfilePhotoLoads(users);
+      }
       const selecting = sidebarSelectedUserIps.size > 0;
       renderUserListTree();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
