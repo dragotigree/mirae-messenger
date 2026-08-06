@@ -1,6 +1,6 @@
 # Force install Mirae 1.0.483. Chat-header blur CPU fix + UDP tighten. No prompts.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_COMMIT'
+$Ref = '44f9d9bff8e752cce06d161016515ff020190e49'
 $Expected = '1.0.483'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
