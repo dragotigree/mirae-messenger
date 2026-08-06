@@ -14075,13 +14075,13 @@
       document.getElementById('board-modal').style.display = 'none';
     }
 
-    function showBoardListView() {
+    function showBoardListView(opts) {
       document.getElementById('board-list-view').style.display = 'flex';
       document.getElementById('board-write-view').style.display = 'none';
       document.getElementById('board-detail-view').style.display = 'none';
       document.getElementById('board-header-actions').style.display = 'flex';
       document.getElementById('board-modal-title').textContent = '📋 미래병원 사내 공지사항 게시판';
-      loadNoticesList();
+      if (!(opts && opts.skipReload)) loadNoticesList();
     }
 
     function updateBoardAuthStatusText() {
@@ -14605,7 +14605,7 @@
               window.api.requestNoticeSync().catch(() => {});
             }
           } catch (_) { /* ignore */ }
-          showBoardListView();
+          showBoardListView({ skipReload: true });
         }
       } catch (e) {
         await appAlert('공지사항 저장 중 오류: ' + ((e && e.message) || e));
