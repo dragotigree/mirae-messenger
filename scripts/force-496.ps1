@@ -1,6 +1,6 @@
 # Force 1.0.496 — compact window snap only. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = '17ae971b0160b569eb3eaffbbb323f4963d36f67'
+$Ref = 'fa06c278e4298669868da4accb17e7a994c3872f'
 $Expected = '1.0.496'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
