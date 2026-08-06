@@ -4644,7 +4644,10 @@ function startTcpServer() {
     }
     tcpActiveConnections += 1;
     let buffer = '';
+    let released = false;
     const release = () => {
+      if (released) return;
+      released = true;
       tcpActiveConnections = Math.max(0, tcpActiveConnections - 1);
     };
     socket.once('close', release);
