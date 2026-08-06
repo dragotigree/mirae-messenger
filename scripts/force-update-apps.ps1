@@ -1,7 +1,6 @@
 ﻿# Mirae Messenger - Force update packaged app under C:\Apps
-# Safe for Windows PowerShell 5.1 (ASCII-only strings to avoid encoding parse errors)
-# Example:
-#   powershell -ExecutionPolicy Bypass -File .\scripts\force-update-apps.ps1
+# ASCII-only for Windows PowerShell 5.1 encoding safety
+# Updates: C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app
 
 param(
   [string]$RepoRawBase = 'https://raw.githubusercontent.com/dragotigree/mirae-messenger/main'
@@ -96,16 +95,16 @@ function Update-AppDir([string]$appDir, $wc, [long]$bust) {
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ' Mirae Messenger FORCE UPDATE (Apps)' -ForegroundColor Cyan
+Write-Host ' Restores stable build to packaged exe' -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ''
-Write-Host 'Packaged app path (exe reads this):'
+Write-Host 'THIS is the folder exe actually uses:'
 Write-Host ("  " + $PackagedApp)
 Write-Host ''
 
 if (-not (Test-AppDir $PackagedApp)) {
   Write-Host 'ERROR: packaged app folder not found.' -ForegroundColor Red
   Write-Host ("  expected: " + $PackagedApp + '\index.html')
-  Write-Host '  Check: C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64'
   exit 1
 }
 
@@ -117,7 +116,7 @@ $wc.Headers['User-Agent'] = 'MiraeMessenger-ForceUpdate'
 $wc.CachePolicy = New-Object System.Net.Cache.RequestCachePolicy([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
 $bust = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
-Write-Host '[3/4] Overwriting packaged resources\app (required)...' -ForegroundColor Yellow
+Write-Host '[3/4] Overwriting packaged resources\app ...' -ForegroundColor Yellow
 $ver = Update-AppDir -appDir $PackagedApp -wc $wc -bust $bust
 if (-not $ver) { exit 1 }
 
@@ -134,14 +133,15 @@ $pkgJson = Get-Content -LiteralPath (Join-Path $PackagedApp 'package.json') -Raw
 $verJson = Read-Version $PackagedApp
 Write-Host ("  package.json = " + $pkgJson.version)
 Write-Host ("  version.json = " + $verJson)
+Write-Host ("  Expected: 1.0.476 (stable restore)") -ForegroundColor Yellow
 
-if ($pkgJson.version -ne $verJson) {
-  Write-Host 'WARN: package.json and version.json differ.' -ForegroundColor Yellow
+if ($verJson -ne '1.0.476') {
+  Write-Host 'WARN: version is not 1.0.476 yet. GitHub cache? Re-run in 1 minute.' -ForegroundColor Yellow
 }
 
 Write-Host ''
 Write-Host ("FORCE UPDATE OK: " + $verJson) -ForegroundColor Green
-Write-Host ("Run: " + $ExePath) -ForegroundColor Green
+Write-Host ("Run ONLY this exe: " + $ExePath) -ForegroundColor Green
 Write-Host ''
 
 if (Test-Path -LiteralPath $ExePath) {

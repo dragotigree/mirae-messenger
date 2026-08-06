@@ -316,8 +316,8 @@ const NORMAL_MIN_HEIGHT = 600;
 
 const UDP_PORT = 41234;
 const TCP_PORT = 41235;
-/** UDP PING — 너무 짧으면 CPU, 너무 길면 타 클라이언트가 오프라인으로 봄 */
-const PRESENCE_STALE_MS = 22000;
+/** UDP PING 간격(4초) 기준 — 연속 2회 이상 없으면 오프라인. 강제 종료·전원 OFF 시 GOODBYE가 없어도 빠르게 반영 */
+const PRESENCE_STALE_MS = 10000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
@@ -337,17 +337,7 @@ const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 const SENT_ACK_MAX_RETRIES = 4;
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
-const USER_LIST_NOTIFY_DEBOUNCE_MS = 1800;
-/** 프레즌스 하트비트(온라인·최근 동료만) */
-const PRESENCE_HEARTBEAT_MS = 6000;
-/** 전체 서브넷(508대) 탐색 — 리소스 폭주 주원인, 드물게만 */
-const PRESENCE_FULL_SCAN_MS = 120000;
-/** 빠른 하트비트 대상: 최근 이 시간 안에 본 동료 */
-const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
-/** 1.0.475: 레거시 compact 기본 OFF (포커스 중 디스크 I/O가 조작 불능 유발) */
-const LEGACY_MSG_COMPACT_ENABLED = false;
-const LEGACY_MSG_COMPACT_INTERVAL_MS = 30000;
-const LEGACY_MSG_COMPACT_BATCH = 1;
+const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -385,10 +375,6 @@ let udpBindRetryTimer = null;
 let tcpBindRetryTimer = null;
 let tcpServerInstance = null;
 let presenceFlushTimersStarted = false;
-let presenceFullScanDueAt = 0;
-let legacyMessageCompactCursor = 0;
-let legacyMessageCompactDone = false;
-let lastMemoryPressureLogAt = 0;
 
 const MY_IP = getMyIP();
 
@@ -1589,23 +1575,20 @@ function extractAndSaveAttachments(messageHtml, options) {
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
-      // sync write는 메인 스레드를 막아 버튼 클릭까지 버벅임 — 64KB 초과는 비동기
+      // 대용량 sync write는 메인 스레드를 막아 '응답 없음'을 유발 — 2MB 초과는 비동기 저장 + data URL 유지
       const bin = Buffer.from(base64Data, 'base64');
-      const SYNC_WRITE_MAX = 64 * 1024;
-      if (bin.length > SYNC_WRITE_MAX || opts.preferAsyncIo) {
+      if (bin.length > 2 * 1024 * 1024) {
         fs.promises.writeFile(filePath, bin).catch((e) => {
           console.error('첨부파일 비동기 저장 오류:', e.message);
         });
-        // preferAsyncIo(백그라운드 compact): 파일 기록은 비동기지만 DB 경로는 mirae-file 로 바꿔 둠
-        if (!(compact && opts.preferAsyncIo)) continue;
-      } else {
-        try {
-          fs.writeFileSync(filePath, bin);
-        } catch (writeErr) {
-          // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
-          fs.promises.writeFile(filePath, bin).catch(() => {});
-          continue;
-        }
+        continue;
+      }
+      try {
+        fs.writeFileSync(filePath, bin);
+      } catch (writeErr) {
+        // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
+        fs.promises.writeFile(filePath, bin).catch(() => {});
+        continue;
       }
       if (compact) {
         replacements.push({
@@ -1639,8 +1622,8 @@ function extractAndSaveAttachments(messageHtml, options) {
   return out;
 }
 
-function compactStoredMessageHtml(messageHtml, msgUid, extraOpts) {
-  return extractAndSaveAttachments(messageHtml, Object.assign({ compact: true, msgUid: msgUid || '' }, extraOpts || {}));
+function compactStoredMessageHtml(messageHtml, msgUid) {
+  return extractAndSaveAttachments(messageHtml, { compact: true, msgUid: msgUid || '' });
 }
 
 /** 재전송용: mirae-file:// → data URL (파일이 없으면 원문 유지) */
@@ -1695,103 +1678,16 @@ function maybeCompactMessageRowByUid(msgUid) {
   );
 }
 
-function compactMessageRowById(rowId, msgUid, messageHtml, extraOpts) {
+function compactMessageRowById(rowId, msgUid, messageHtml) {
   if (!rowId || typeof messageHtml !== 'string' || messageHtml.indexOf('data:') === -1) return;
   try {
-    const compacted = compactStoredMessageHtml(messageHtml, msgUid, extraOpts);
+    const compacted = compactStoredMessageHtml(messageHtml, msgUid);
     if (compacted && compacted !== messageHtml) {
       db.run(`UPDATE messages SET message = ? WHERE id = ?`, [compacted, rowId], logDbErr);
     }
   } catch (e) {
     console.error('메시지 compact 오류:', e.message);
   }
-}
-
-function isMainWindowActivelyUsed() {
-  try {
-    if (!mainWindow || mainWindow.isDestroyed()) return false;
-    if (!mainWindow.isVisible() || mainWindow.isMinimized()) return false;
-    return !!mainWindow.isFocused();
-  } catch (e) {
-    return false;
-  }
-}
-
-/** DB에 남은 data: base64 메시지를 유휴 시에만 서서히 mirae-file 로 줄인다 (포커스 중엔 건너뛰어 UI 버벅임 방지) */
-function startLegacyMessageCompaction() {
-  if (!LEGACY_MSG_COMPACT_ENABLED) {
-    console.log('[compact] 레거시 compact 비활성 (LEGACY_MSG_COMPACT_ENABLED=false)');
-    return;
-  }
-  let busy = false;
-  setInterval(() => {
-    if (busy || legacyMessageCompactDone || !db) return;
-    // 창에 포커스가 있으면 디스크/디코드 작업을 하지 않음 — 버튼 IPC가 막히는 주원인
-    if (isMainWindowActivelyUsed()) return;
-    busy = true;
-    db.all(
-      `SELECT id, msg_uid, message, status FROM messages
-       WHERE id > ? AND message LIKE '%data:%;base64,%'
-       ORDER BY id ASC LIMIT 1`,
-      [legacyMessageCompactCursor],
-      (err, rows) => {
-        const finish = () => { busy = false; };
-        if (err) {
-          logDbErr(err);
-          finish();
-          return;
-        }
-        if (!rows || !rows.length) {
-          legacyMessageCompactDone = true;
-          console.log('[compact] 레거시 data: 메시지 정리 완료(또는 대상 없음)');
-          finish();
-          return;
-        }
-        const r = rows[0];
-        legacyMessageCompactCursor = Math.max(legacyMessageCompactCursor, Number(r.id) || 0);
-        if (r.status === 'PENDING' || typeof r.message !== 'string' || r.message.indexOf('data:') === -1) {
-          finish();
-          return;
-        }
-        // 한 건씩 + 비동기 파일 I/O — 메인 루프 양보
-        setImmediate(() => {
-          try {
-            compactMessageRowById(r.id, r.msg_uid, r.message, { preferAsyncIo: true });
-          } catch (e) {
-            console.error('[compact] 오류:', e && e.message ? e.message : e);
-          } finally {
-            finish();
-          }
-        });
-      }
-    );
-  }, Math.max(15000, LEGACY_MSG_COMPACT_INTERVAL_MS));
-}
-
-function maybeLogHighMemoryUsage() {
-  try {
-    const metrics = app.getAppMetrics();
-    let totalKB = 0;
-    metrics.forEach((m) => {
-      totalKB += Number((m.memory && m.memory.workingSetSize) || 0);
-    });
-    const totalMB = Math.round(totalKB / 1024);
-    const now = Date.now();
-    if (totalMB >= 1100 && now - lastMemoryPressureLogAt > 120000) {
-      lastMemoryPressureLogAt = now;
-      const parts = metrics.map((m) => `${m.type}:${Math.round(((m.memory && m.memory.workingSetSize) || 0) / 1024)}MB`).join(' ');
-      console.warn(`[memory] 합계 ~${totalMB}MB (${parts})`);
-      writeToLogFile('warn', `[memory] 합계 ~${totalMB}MB ${parts}`);
-      // 포커스 중 trim은 클릭 버벅임을 키우므로 백그라운드일 때만
-      if (!isMainWindowActivelyUsed()) {
-        try { safeWebContentsSend('renderer-memory-trim', { reason: 'pressure', totalMB }); } catch (e) { /* ignore */ }
-      }
-    }
-  } catch (e) { /* ignore */ }
-}
-
-function startMemoryPressureMonitor() {
-  setInterval(maybeLogHighMemoryUsage, 45000);
 }
 
 /** 메시지 큐/채널용 가상 receiver 키 — 실제 사용자 IP가 아님 */
@@ -3015,16 +2911,12 @@ function createWindow() {
   mainWindow.on('hide', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
-      try { safeWebContentsSend('renderer-memory-trim', { reason: 'hide' }); } catch (e) { /* ignore */ }
     }
   });
   mainWindow.on('show', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
     }
-  });
-  mainWindow.on('minimize', () => {
-    try { safeWebContentsSend('renderer-memory-trim', { reason: 'minimize' }); } catch (e) { /* ignore */ }
   });
   mainWindow.on('focus', () => { toastUiState.focused = true; });
   mainWindow.on('blur', () => { toastUiState.focused = false; });
@@ -3521,12 +3413,8 @@ ipcMain.handle('get-desktop-capture-sources', async () => {
 ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
   try {
     const primary = screen.getPrimaryDisplay();
-    // 4K·고배율 캡처는 메인/렌더러 힙을 수백 MB 단위로 순간 점유 → 긴 변 1920 상한
-    const rawW = Math.max(640, Math.round(primary.size.width * primary.scaleFactor));
-    const rawH = Math.max(480, Math.round(primary.size.height * primary.scaleFactor));
-    const scale = Math.min(1, 1920 / Math.max(rawW, rawH));
-    const thumbW = Math.max(640, Math.round(rawW * scale));
-    const thumbH = Math.max(480, Math.round(rawH * scale));
+    const thumbW = Math.min(7680, Math.max(640, Math.round(primary.size.width * primary.scaleFactor)));
+    const thumbH = Math.min(4320, Math.max(480, Math.round(primary.size.height * primary.scaleFactor)));
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
       thumbnailSize: { width: thumbW, height: thumbH },
@@ -3536,7 +3424,7 @@ ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
     if (!source || !source.thumbnail || source.thumbnail.isEmpty()) {
       return { success: false, error: 'EMPTY_CAPTURE' };
     }
-    const jpeg = source.thumbnail.toJPEG(82);
+    const jpeg = source.thumbnail.toJPEG(88);
     const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
     return { success: true, dataUrl };
   } catch (err) {
@@ -3596,8 +3484,6 @@ app.whenReady().then(async () => {
   startMobileServer(db, MY_IP);
   startScheduledMessageChecker();
   startPresenceSweeper();
-  startLegacyMessageCompaction();
-  startMemoryPressureMonitor();
   startAutoBackup();
   startUpdateChecker();
   startPendingWipeRetryLoop();
@@ -3689,11 +3575,10 @@ function startUdpDiscovery() {
 
     if (!presenceFlushTimersStarted) {
       presenceFlushTimersStarted = true;
-      presenceFullScanDueAt = 0; // 첫 PING은 전체 서브넷 탐색
       setInterval(() => {
         registerSelf();
         if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-      }, PRESENCE_HEARTBEAT_MS);
+      }, 4000);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
       setInterval(() => flushAllPendingOutboundMessages(), 15000);
     }
@@ -3832,35 +3717,6 @@ function registerSelf() {
   notifyUserList();
 }
 
-function collectPresenceHeartbeatIps() {
-  const out = new Set();
-  const now = Date.now();
-  onlineUsers.forEach((_u, ip) => {
-    if (ip && ip !== MY_IP && !isSyntheticReceiverKey(ip)) out.add(ip);
-  });
-  allKnownUsers.forEach((u, ip) => {
-    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
-    const beat = Number((u && u.lastPingAt) || 0) || Number((u && u.lastSeen) || 0) || 0;
-    if (beat && now - beat <= PRESENCE_RECENT_PEER_MS) out.add(ip);
-  });
-  return Array.from(out);
-}
-
-function sendPresenceUnicastBatches(socket, packet, ips) {
-  if (!socket || !packet || !ips || !ips.length) return;
-  let i = 0;
-  const BATCH = 24;
-  const sendBatch = () => {
-    if (!globalUdpSocket || globalUdpSocket !== socket) return;
-    const end = Math.min(i + BATCH, ips.length);
-    for (; i < end; i++) {
-      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
-    }
-    if (i < ips.length) setImmediate(sendBatch);
-  };
-  sendBatch();
-}
-
 function broadcastPresence(socket) {
   if (!socket) return;
   if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
@@ -3877,15 +3733,19 @@ function broadcastPresence(socket) {
     appVersion: APP_VERSION
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
-  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
-
-  const now = Date.now();
-  const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
-  if (doFullScan) presenceFullScanDueAt = now + PRESENCE_FULL_SCAN_MS;
-
-  // 평소: 온라인·최근 동료만 유니캐스트(CPU 스파이크 완화). 주기적으로만 전체 서브넷 탐색.
-  const ips = doFullScan ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
-  sendPresenceUnicastBatches(socket, packet, ips);
+  socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255');
+  // 다른 층 대역 유니캐스트(최대 508개) — 한 틱에 몰아보내면 메인 루프가 잠깐 멈출 수 있어 배치
+  const ips = KNOWN_SUBNET_HOST_IPS;
+  let i = 0;
+  const BATCH = 64;
+  const sendBatch = () => {
+    const end = Math.min(i + BATCH, ips.length);
+    for (; i < end; i++) {
+      try { socket.send(packet, 0, packet.length, UDP_PORT, ips[i]); } catch (e) { /* ignore */ }
+    }
+    if (i < ips.length) setImmediate(sendBatch);
+  };
+  sendBatch();
 }
 
 function broadcastGoodbye() {
@@ -7468,7 +7328,7 @@ ipcMain.handle('get-chat-shared-archive', async (event, targetIP) => {
   return new Promise((resolve) => {
     const sql = `SELECT id, sender_name, sender_ip, message, msg_uid,
       strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_at_local
-      FROM messages WHERE ${scope.where}${mediaWhere} ORDER BY id DESC LIMIT 500`;
+      FROM messages WHERE ${scope.where}${mediaWhere} ORDER BY id DESC LIMIT 2500`;
     db.all(sql, scope.params, (err, rows) => {
       if (err) {
         logDbErr(err);

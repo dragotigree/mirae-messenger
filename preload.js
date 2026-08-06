@@ -147,7 +147,6 @@ contextBridge.exposeInMainWorld('api', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getInstallPathInfo: () => ipcRenderer.invoke('get-install-path-info'),
   onInstallPathWarning: (callback) => ipcRenderer.on('install-path-warning', (e, data) => callback(data)),
-  onRendererMemoryTrim: (callback) => ipcRenderer.on('renderer-memory-trim', (e, data) => callback(data)),
   mirrorUpdateToZBridge: () => ipcRenderer.invoke('mirror-update-to-z-bridge'),
   getUpdateSourcePath: () => ipcRenderer.invoke('get-update-source-path'),
   setUpdateSourcePath: (folderPath) => ipcRenderer.invoke('set-update-source-path', folderPath),
