@@ -1,6 +1,6 @@
 # Force 1.0.501 — load test suite. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = 'd41c40cf7fbe3dfdaf60261473d2ae33cfe4e7d3'
 $Expected = '1.0.501'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
