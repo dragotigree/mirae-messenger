@@ -4236,7 +4236,7 @@ function broadcastGoodbye() {
   } catch (e) { /* ignore */ }
   // 전체 508 유니캐스트는 종료 순간 클릭 프리징만 키움 — 온라인 동료에게만
   onlineUsers.forEach((_u, ip) => {
-    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip)) return;
+    if (!ip || ip === MY_IP || isSyntheticReceiverKey(ip) || isLoadTestPeerIp(ip)) return;
     try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
   });
 }
