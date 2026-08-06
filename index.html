@@ -14593,19 +14593,15 @@
           const savedNotice = res.notice && res.notice.uid
             ? { ...res.notice, category: normalizeBoardCategory(res.notice.category || category) }
             : null;
-          await loadNoticesList();
-          // DB 반영이 늦거나 목록이 비면 방금 저장한 글을 목록에 유지
-          if (savedNotice && !(cachedNoticesList || []).some((x) => x.uid === savedNotice.uid)) {
-            cachedNoticesList = [savedNotice].concat(cachedNoticesList || []);
+          // 목록을 기다리지 않고 바로 표시 (등록 후 딜레이 방지)
+          if (savedNotice) {
+            cachedNoticesList = [savedNotice].concat((cachedNoticesList || []).filter((x) => x.uid !== savedNotice.uid));
             renderBoardCategoryFilters(cachedNoticesList);
             renderFilteredNoticesList();
           }
-          try {
-            if (window.api && typeof window.api.requestNoticeSync === 'function') {
-              window.api.requestNoticeSync().catch(() => {});
-            }
-          } catch (_) { /* ignore */ }
           showBoardListView({ skipReload: true });
+          // 백그라운드 새로고침만 (전체 sync 요청은 열 때만 — 작성 직후 폭주 방지)
+          loadNoticesList().catch(() => {});
         }
       } catch (e) {
         await appAlert('공지사항 저장 중 오류: ' + ((e && e.message) || e));

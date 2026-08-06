@@ -7240,36 +7240,64 @@ function requestNoticeSync(targetIP) {
   client.on('timeout', () => client.destroy());
 }
 
-/** 온라인 동료 몇 명에게 공지 동기화 요청 (게시판 열 때·작성 후) */
+/** 온라인 동료 몇 명에게 공지 동기화 요청 (게시판 열 때) */
 function requestNoticeSyncFromOnlinePeers(limit) {
-  const max = Math.max(1, Math.min(Number(limit) || 8, 20));
-  let n = 0;
+  const max = Math.max(1, Math.min(Number(limit) || 5, 12));
+  const ips = [];
   onlineUsers.forEach((_u, ip) => {
-    if (n >= max) return;
-    if (!ip || ip === MY_IP) return;
-    requestNoticeSync(ip);
-    n += 1;
+    if (ip && ip !== MY_IP) ips.push(ip);
+  });
+  // 랜덤하게 소수만 요청 — 접속 많을 때 전원 sync 폭주 완화
+  for (let i = ips.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = ips[i]; ips[i] = ips[j]; ips[j] = t;
+  }
+  ips.slice(0, max).forEach((ip, idx) => {
+    setTimeout(() => requestNoticeSync(ip), idx * 80);
   });
 }
 
 ipcMain.handle('request-notice-sync', async () => {
-  requestNoticeSyncFromOnlinePeers(10);
+  requestNoticeSyncFromOnlinePeers(5);
   return { success: true };
 });
 
 function broadcastToOnlinePeers(payloadObj) {
-  const wireData = JSON.stringify(payloadObj) + '\n';
-  onlineUsers.forEach((u, ip) => {
-    if (ip === MY_IP) return;
-    const client = new net.Socket();
-    client.setTimeout(1200);
-    client.connect(TCP_PORT, ip, () => {
-      client.write(wireData);
-      client.end();
-    });
-    client.on('error', () => {});
-    client.on('timeout', () => client.destroy());
+  let wireData;
+  try {
+    wireData = JSON.stringify(payloadObj) + '\n';
+  } catch (e) {
+    console.error('broadcastToOnlinePeers stringify 실패:', e && e.message);
+    return;
+  }
+  const ips = [];
+  onlineUsers.forEach((_u, ip) => {
+    if (ip && ip !== MY_IP) ips.push(ip);
   });
+  if (!ips.length) return;
+  // 한꺼번에 connect 하면 작성 PC가 멈춘 것처럼 보이므로 소량씩 나눠 전송
+  let i = 0;
+  const BATCH = 6;
+  const pump = () => {
+    const end = Math.min(i + BATCH, ips.length);
+    for (; i < end; i++) {
+      const ip = ips[i];
+      const client = new net.Socket();
+      client.setTimeout(1200);
+      client.connect(TCP_PORT, ip, () => {
+        try {
+          client.write(wireData);
+          client.end();
+        } catch (_) {
+          client.destroy();
+        }
+      });
+      client.on('error', () => {});
+      client.on('timeout', () => client.destroy());
+    }
+    if (i < ips.length) setImmediate(pump);
+  };
+  setImmediate(pump);
 }
 
 function sendToIps(ipList, payloadObj) {
@@ -9105,26 +9133,13 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images,
           resolve({ success: false, error: err.message, msg: err.message });
           return;
         }
-        // 저장 직후 읽기 검증 — 실패 시 재시도
-        db.get(`SELECT uid FROM notices WHERE uid = ?`, [saved.uid], (getErr, row) => {
-          const finishOk = (notice) => {
-            broadcastNoticeWire('NOTICE_ADD', notice);
-            if (mainWindow) safeWebContentsSend('notices-update');
-            resolve({ success: true, notice });
-          };
-          if (!getErr && row) {
-            finishOk(saved);
-            return;
+        // UI는 즉시 응답 — 동료 PC 전파는 다음 틱에 (다수 접속 시 딜레이 방지)
+        if (mainWindow) safeWebContentsSend('notices-update');
+        resolve({ success: true, notice: saved });
+        setImmediate(() => {
+          try { broadcastNoticeWire('NOTICE_ADD', saved); } catch (e) {
+            console.error('공지 전파 실패:', e && e.message);
           }
-          console.warn('공지 저장 후 조회 실패 — 재저장 시도', saved.uid, getErr && getErr.message);
-          noticesSchemaReady = false;
-          insertNoticeRecord(saved, (err2, saved2) => {
-            if (err2) {
-              resolve({ success: false, error: err2.message, msg: err2.message });
-              return;
-            }
-            finishOk(saved2 || saved);
-          });
         });
       });
     });
@@ -9149,14 +9164,18 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
               `UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`,
               [title, content, imagesJson, uid],
               (err2) => {
-                if (!err2) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
                 resolve({ success: !err2, msg: err2 ? err2.message : undefined });
+                if (!err2) {
+                  setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
+                }
               }
             );
             return;
           }
-          if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
           resolve({ success: !err, msg: err ? err.message : undefined });
+          if (!err) {
+            setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
+          }
         }
       );
     });
