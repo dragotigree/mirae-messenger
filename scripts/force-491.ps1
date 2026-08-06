@@ -1,6 +1,6 @@
 # Force 1.0.491 — mini-mode rail icon to return to normal mode. No exit.
 $ErrorActionPreference = 'Stop'
-$Ref = 'PLACEHOLDER_SHA'
+$Ref = '9ad33229f46acbf8f66ef512011350e6cce7b601'
 $Expected = '1.0.491'
 $App = 'C:\Apps\Mirae Messenger\dist\MiraeMessenger-win32-x64\resources\app'
 $Base = "https://raw.githubusercontent.com/dragotigree/mirae-messenger/$Ref"
