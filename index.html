@@ -19634,8 +19634,12 @@
       const key = getActiveChatChannelKey();
       if (!key) return;
       if (!await appConfirm('이 대화의 공지 고정을 해제할까요?')) return;
-      await window.api.clearChatPin(key);
       renderChatPinBanner(null);
+      try {
+        await window.api.clearChatPin(key);
+      } catch (e) {
+        refreshActiveChatPinBanner();
+      }
     }
 
     function scrollToPinnedChatMessage() {
