@@ -3136,13 +3136,16 @@ db.serialize(() => {
     author_name TEXT,
     author_ip TEXT,
     created_at TEXT,
-    images TEXT DEFAULT ''
+    images TEXT DEFAULT '',
+    category TEXT DEFAULT '전체'
   )`, logDbErr);
   // 예전 버전에서 이미 notices 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
-  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT'].forEach(colDef => {
+  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT', 'category TEXT'].forEach(colDef => {
     db.run(`ALTER TABLE notices ADD COLUMN ${colDef}`, () => {});
   });
+  // 카테고리 없는 기존 공지는 전체로
+  db.run(`UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(category) = ''`, () => {});
   setTimeout(() => {
     db.all(`SELECT rowid FROM notices WHERE uid IS NULL OR uid = ''`, [], (err, rows) => {
       if (err || !rows) return;
@@ -6151,6 +6154,13 @@ function normalizeNoticeImagesField(raw) {
   );
 }
 
+/** 공지 카테고리: 전체 | 업데이트 | 부서명 */
+function normalizeNoticeCategory(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '전체';
+  return s.slice(0, 40);
+}
+
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
   isNoticeTombstoned(n.uid, (tombstoned) => {
@@ -6161,9 +6171,10 @@ function handleNoticeAdd(n) {
     db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
       if (row) return;
       const images = normalizeNoticeImagesField(n.images);
+      const category = normalizeNoticeCategory(n.category);
       db.run(
-        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images],
+        `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category],
         () => { if (mainWindow) safeWebContentsSend('notices-update'); }
       );
     });
@@ -6181,9 +6192,20 @@ function handleNoticeUpdate(n) {
     }
     // images 필드가 없는 구버전 업데이트는 기존 사진을 지우지 않음
     const hasImagesField = n && Object.prototype.hasOwnProperty.call(n, 'images');
-    if (hasImagesField) {
+    const hasCategoryField = n && Object.prototype.hasOwnProperty.call(n, 'category');
+    const category = hasCategoryField ? normalizeNoticeCategory(n.category) : null;
+    if (hasImagesField && hasCategoryField) {
+      const images = normalizeNoticeImagesField(n.images);
+      db.run(`UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`, [n.title, n.content, images, category, n.uid], () => {
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
+    } else if (hasImagesField) {
       const images = normalizeNoticeImagesField(n.images);
       db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
+        if (mainWindow) safeWebContentsSend('notices-update');
+      });
+    } else if (hasCategoryField) {
+      db.run(`UPDATE notices SET title = ?, content = ?, category = ? WHERE uid = ?`, [n.title, n.content, category, n.uid], () => {
         if (mainWindow) safeWebContentsSend('notices-update');
       });
     } else {
@@ -6838,9 +6860,10 @@ function upsertNoticeFromSync(n) {
       return;
     }
     const images = normalizeNoticeImagesField(n.images);
+    const category = normalizeNoticeCategory(n.category);
     db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images],
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [n.uid, n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category],
       logDbErr
     );
   });
@@ -8820,10 +8843,11 @@ ipcMain.handle('get-notices', async () => {
   });
 });
 
-ipcMain.handle('add-notice', async (event, { title, content, authorName, images }) => {
+ipcMain.handle('add-notice', async (event, { title, content, authorName, images, category }) => {
   return new Promise((resolve) => {
     const fallbackAuthor = displayNameFromParts(myProfile.rank, myProfile.username, '관리자') || '관리자';
     const imagesJson = normalizeNoticeImagesField(images);
+    const categoryNorm = normalizeNoticeCategory(category);
     const record = {
       uid: generateNoticeUid(),
       title,
@@ -8831,11 +8855,12 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images 
       author_name: (authorName && String(authorName).trim()) || fallbackAuthor,
       author_ip: MY_IP,
       created_at: new Date().toISOString(),
-      images: imagesJson
+      images: imagesJson,
+      category: categoryNorm
     };
     db.run(
-      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.title, record.content, record.author_name, record.author_ip, record.created_at, record.images],
+      `INSERT OR REPLACE INTO notices (uid, title, content, author_name, author_ip, created_at, images, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.title, record.content, record.author_name, record.author_ip, record.created_at, record.images, record.category],
       (err) => {
         if (err) {
           console.error('공지사항 저장 실패:', err.message);
@@ -8849,17 +8874,22 @@ ipcMain.handle('add-notice', async (event, { title, content, authorName, images 
   });
 });
 
-ipcMain.handle('update-notice', async (event, { uid, title, content, images }) => {
+ipcMain.handle('update-notice', async (event, { uid, title, content, images, category }) => {
   const allowed = await noticeModifyAllowed(uid);
   if (!allowed) {
     return { success: false, msg: '본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)' };
   }
   return new Promise((resolve) => {
     const imagesJson = normalizeNoticeImagesField(images);
-    db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [title, content, imagesJson, uid], (err) => {
-      if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson });
-      resolve({ success: !err });
-    });
+    const categoryNorm = normalizeNoticeCategory(category);
+    db.run(
+      `UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`,
+      [title, content, imagesJson, categoryNorm, uid],
+      (err) => {
+        if (!err) broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm });
+        resolve({ success: !err });
+      }
+    );
   });
 });
 

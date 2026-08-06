@@ -3684,7 +3684,34 @@
     .board-notice-title { font-weight: var(--font-weight-bold); font-size: 14px; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px; min-width: 0; }
     .board-notice-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .board-notice-photo-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #0369a1; background: #e0f2fe; border-radius: 999px; padding: 2px 7px; }
+    .board-notice-cat-badge {
+      flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
+      color: #334155; background: #f1f5f9; border: 1px solid #e2e8f0;
+    }
+    .board-notice-cat-badge.is-all { color: #0369a1; background: #e0f2fe; border-color: #bae6fd; }
+    .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }
+    .board-notice-cat-badge.is-dept { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
     .board-notice-meta { font-size: 11px; color: var(--text-muted); }
+    .board-category-row {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; flex-shrink: 0;
+    }
+    .board-category-chip {
+      flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid #e2e8f0;
+      background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .board-category-chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .board-category-chip.is-active { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .board-write-category-row {
+      display: flex; flex-direction: column; gap: 6px; margin-top: 2px;
+    }
+    .board-write-category-label { font-size: 12px; font-weight: 700; color: #475569; }
+    .board-write-category-select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg);
+      font-size: 13px; font-family: inherit; background: #fff; color: #0f172a; outline: none;
+    }
+    .board-write-category-select:focus {
+      border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
     .board-form-input, .board-form-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 13px; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none; }
     .board-form-input:focus, .board-form-textarea:focus { border-color: rgba(14, 165, 233, 0.45); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1); }
     .board-form-textarea { min-height: 180px; resize: vertical; line-height: 1.6; }
@@ -5372,14 +5399,19 @@
       </div>
 
       <!-- 목록 화면 -->
-      <div id="board-list-view" style="flex:1; overflow-y:auto;">
-        <div id="board-list-container"></div>
+      <div id="board-list-view" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0;">
+        <div class="board-category-row" id="board-category-filters" aria-label="공지 카테고리"></div>
+        <div id="board-list-container" style="flex:1;"></div>
       </div>
 
       <!-- 글쓰기/수정 화면 -->
       <div id="board-write-view" style="flex:1; overflow-y:auto;">
         <input type="hidden" id="board-write-uid">
-        <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요">
+        <div class="board-write-category-row">
+          <label class="board-write-category-label" for="board-write-category">카테고리</label>
+          <select id="board-write-category" class="board-write-category-select" aria-label="공지 카테고리"></select>
+        </div>
+        <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요" style="margin-top:10px;">
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
         <div class="board-photo-toolbar">
           <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
@@ -8584,6 +8616,7 @@
     let allLogsSearchDebounce = null;
     let allLogsFilter = 'all';
     let cachedNoticesList = [];
+    let boardCategoryFilter = localStorage.getItem('boardCategoryFilter') || '__all__';
     let chatSearchDebounce = null;
     /** 대화방 Ctrl+F 검색 중일 때 하이라이트용 키워드 */
     let activeChatSearchKeyword = '';
@@ -14025,7 +14058,7 @@
     }
 
     function showBoardListView() {
-      document.getElementById('board-list-view').style.display = 'block';
+      document.getElementById('board-list-view').style.display = 'flex';
       document.getElementById('board-write-view').style.display = 'none';
       document.getElementById('board-detail-view').style.display = 'none';
       document.getElementById('board-header-actions').style.display = 'flex';
@@ -14267,27 +14300,103 @@
       if (preview) preview.remove();
     }
 
-    async function loadNoticesList() {
-      const container = document.getElementById('board-list-container');
-      const notices = await window.api.getNotices();
-      const seenUids = new Set();
-      cachedNoticesList = (notices || []).filter(n => {
-        if (!n || !n.uid || seenUids.has(n.uid)) return false;
-        seenUids.add(n.uid);
-        return true;
+    function normalizeBoardCategory(raw) {
+      const s = String(raw == null ? '' : raw).trim();
+      return s || '전체';
+    }
+
+    function getBoardCategoryOptions() {
+      const depts = (typeof getDeptList === 'function' ? getDeptList() : [])
+        .map((d) => String(d || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'ko'));
+      // 고정: 전체(전사) · 업데이트 + 현재 직원 부서들
+      const fixed = ['전체', '업데이트'];
+      const out = [...fixed];
+      depts.forEach((d) => {
+        if (!out.includes(d)) out.push(d);
       });
-      if (cachedNoticesList.length === 0) {
-        container.innerHTML = `<div style="text-align:center; color:#64748b; padding:60px 20px;">등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}</div>`;
+      return out;
+    }
+
+    function boardCategoryBadgeClass(cat) {
+      if (cat === '전체') return 'is-all';
+      if (cat === '업데이트') return 'is-update';
+      return 'is-dept';
+    }
+
+    function renderBoardCategoryFilters(notices) {
+      const row = document.getElementById('board-category-filters');
+      if (!row) return;
+      const counts = Object.create(null);
+      (notices || []).forEach((n) => {
+        const c = normalizeBoardCategory(n && n.category);
+        counts[c] = (counts[c] || 0) + 1;
+      });
+      const options = getBoardCategoryOptions();
+      // 목록에만 있는 옛 카테고리도 칩에 포함
+      Object.keys(counts).forEach((c) => {
+        if (!options.includes(c)) options.push(c);
+      });
+      const chips = [{ key: '__all__', label: '모두', count: (notices || []).length }]
+        .concat(options.map((c) => ({ key: c, label: c, count: counts[c] || 0 })));
+      if (!chips.some((c) => c.key === boardCategoryFilter)) boardCategoryFilter = '__all__';
+      row.innerHTML = '';
+      chips.forEach((chip) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `board-category-chip${boardCategoryFilter === chip.key ? ' is-active' : ''}`;
+        btn.textContent = chip.count > 0 ? `${chip.label} ${chip.count}` : chip.label;
+        btn.onclick = () => {
+          boardCategoryFilter = chip.key;
+          localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
+          renderBoardCategoryFilters(cachedNoticesList);
+          renderFilteredNoticesList();
+        };
+        row.appendChild(btn);
+      });
+    }
+
+    function fillBoardWriteCategorySelect(selected) {
+      const sel = document.getElementById('board-write-category');
+      if (!sel) return;
+      const options = getBoardCategoryOptions();
+      const cur = normalizeBoardCategory(selected);
+      if (cur && !options.includes(cur)) options.unshift(cur);
+      sel.innerHTML = options.map((c) => {
+        const hint = c === '전체' ? '전사 공지' : (c === '업데이트' ? '업데이트 내용' : '부서 공지');
+        return `<option value="${escapeHtml(c)}">${escapeHtml(c)} · ${hint}</option>`;
+      }).join('');
+      sel.value = options.includes(cur) ? cur : '전체';
+    }
+
+    function getFilteredNoticesList() {
+      const list = cachedNoticesList || [];
+      if (boardCategoryFilter === '__all__') return list;
+      return list.filter((n) => normalizeBoardCategory(n.category) === boardCategoryFilter);
+    }
+
+    function renderFilteredNoticesList() {
+      const container = document.getElementById('board-list-container');
+      if (!container) return;
+      const filtered = getFilteredNoticesList();
+      if (filtered.length === 0) {
+        const emptyHint = boardCategoryFilter === '__all__'
+          ? `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`
+          : `"${escapeHtml(boardCategoryFilter === '__all__' ? '모두' : boardCategoryFilter)}" 카테고리에 공지가 없습니다.`;
+        container.innerHTML = `<div style="text-align:center; color:#64748b; padding:60px 20px;">${emptyHint}</div>`;
         return;
       }
       container.innerHTML = '';
-      cachedNoticesList.forEach(n => {
+      filtered.forEach((n) => {
         const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
         const imgCount = parseNoticeImages(n.images).length;
+        const cat = normalizeBoardCategory(n.category);
         const row = document.createElement('div');
         row.className = 'board-notice-row';
         row.innerHTML = `
           <div class="board-notice-title">
+            <span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(cat)}</span>
             <span class="board-notice-title-text">${escapeHtml(n.title || '')}</span>
             ${imgCount ? `<span class="board-notice-photo-badge">📷 ${imgCount}</span>` : ''}
           </div>
@@ -14296,6 +14405,18 @@
         row.onclick = () => showBoardDetailView(n.uid);
         container.appendChild(row);
       });
+    }
+
+    async function loadNoticesList() {
+      const notices = await window.api.getNotices();
+      const seenUids = new Set();
+      cachedNoticesList = (notices || []).filter((n) => {
+        if (!n || !n.uid || seenUids.has(n.uid)) return false;
+        seenUids.add(n.uid);
+        return true;
+      }).map((n) => ({ ...n, category: normalizeBoardCategory(n.category) }));
+      renderBoardCategoryFilters(cachedNoticesList);
+      renderFilteredNoticesList();
     }
 
     function showBoardDetailView(uid) {
@@ -14309,8 +14430,11 @@
       document.getElementById('board-modal-title').textContent = '📋 공지사항 보기';
 
       const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
+      const cat = normalizeBoardCategory(n.category);
       document.getElementById('board-detail-title').textContent = n.title;
-      document.getElementById('board-detail-meta').textContent = `작성자: ${formatNoticeAuthorName(n)} · ${createdDisplay}`;
+      document.getElementById('board-detail-meta').innerHTML =
+        `<span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(cat)}</span>`
+        + ` · 작성자: ${escapeHtml(formatNoticeAuthorName(n))} · ${escapeHtml(createdDisplay)}`;
       document.getElementById('board-detail-content').textContent = n.content || '';
 
       const imagesEl = document.getElementById('board-detail-images');
@@ -14367,12 +14491,16 @@
         document.getElementById('board-write-title').value = n ? n.title : '';
         document.getElementById('board-write-content').value = n ? n.content : '';
         boardWriteImages = parseNoticeImages(n && n.images);
+        fillBoardWriteCategorySelect(n && n.category);
       } else {
         document.getElementById('board-modal-title').textContent = '✍️ 새 공지사항 작성';
         document.getElementById('board-write-uid').value = '';
         document.getElementById('board-write-title').value = '';
         document.getElementById('board-write-content').value = '';
         boardWriteImages = [];
+        // 기본: 내 부서가 있으면 부서, 없으면 전체
+        const myDept = (myProfile && myProfile.dept) ? String(myProfile.dept).trim() : '';
+        fillBoardWriteCategorySelect(myDept || '전체');
       }
       renderBoardPhotoPreview();
       document.getElementById('board-write-title').focus();
@@ -14392,6 +14520,7 @@
       const uid = document.getElementById('board-write-uid').value;
       const title = document.getElementById('board-write-title').value.trim();
       const content = document.getElementById('board-write-content').value.trim();
+      const category = normalizeBoardCategory(document.getElementById('board-write-category')?.value);
       const images = boardWriteImages.slice(0, MAX_NOTICE_IMAGES);
       if (!title) { await appAlert('제목을 입력해 주세요.'); return; }
       if (!content && images.length === 0) {
@@ -14407,18 +14536,22 @@
             await appAlert('본인이 작성한 공지만 수정할 수 있습니다. (마스터는 전체 가능)');
             return;
           }
-          const res = await window.api.updateNotice({ uid, title, content, images });
+          const res = await window.api.updateNotice({ uid, title, content, images, category });
           if (!res || !res.success) {
             await appAlert((res && res.msg) || '공지사항 수정에 실패했습니다. 다시 시도해 주세요.');
             return;
           }
           boardWriteImages = [];
+          boardCategoryFilter = category;
+          localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
           await loadNoticesList();
           showBoardDetailView(uid);
         } else {
-          const res = await window.api.addNotice({ title, content, images, authorName: getNoticeAuthorDisplayName() });
+          const res = await window.api.addNotice({ title, content, images, category, authorName: getNoticeAuthorDisplayName() });
           if (!res || !res.success) { await appAlert('공지사항 등록에 실패했습니다. 다시 시도해 주세요.'); return; }
           boardWriteImages = [];
+          boardCategoryFilter = category;
+          localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
           await loadNoticesList();
           showBoardListView();
         }
