@@ -375,8 +375,8 @@ const NORMAL_MIN_HEIGHT = 600;
 
 const UDP_PORT = 41234;
 const TCP_PORT = 41235;
-/** UDP PING 간격(4초) 기준 — 연속 2회 이상 없으면 오프라인. 강제 종료·전원 OFF 시 GOODBYE가 없어도 빠르게 반영 */
-const PRESENCE_STALE_MS = 10000;
+/** 하트비트(PRESENCE_HEARTBEAT_MS)보다 짧으면 온라인↔오프라인 깜빡임·목록 재렌더 폭주 */
+const PRESENCE_STALE_MS = 45000;
 /** UDP로 한 번이라도 본 동료는 이 기간 동안 목록에 유지 (프로그램 미실행·오프라인 포함) */
 const KNOWN_USER_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_TCP_LINE_BUFFER = 512 * 1024;
