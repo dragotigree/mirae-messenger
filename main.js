@@ -352,6 +352,12 @@ const PRESENCE_FULL_SCAN_MS = 600000;
 const PRESENCE_RECENT_PEER_MS = 10 * 60 * 1000;
 /** 동일 IP PING으로 DB에 쓰는 최소 간격 (프로필 변경·신규 접속 제외) */
 const PRESENCE_DB_PERSIST_MIN_MS = 5 * 60 * 1000;
+/** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
+const UDP_RX_MAX_PER_SEC = 60;
+const UDP_RX_MAX_PER_IP_PER_SEC = 4;
+/** 수신이 이 값을 넘으면 잠시 송신 유니캐스트 중단(브로드캐스트만) */
+const UDP_STORM_THRESHOLD_PER_SEC = 40;
+const UDP_STORM_COOLDOWN_MS = 8000;
 
 // 🏢 병원 내 층(부서)별로 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트(255.255.255.255)가
 // 다른 대역까지 넘어가지 못하는 문제가 있었다. 다른 대역의 브로드캐스트 주소(예: .255)로 보내는
@@ -393,6 +399,12 @@ let presenceFullScanDueAt = 0;
 let lastSelfRegisterSig = '';
 /** @type {Map<string, number>} ip -> last DB persist at */
 const knownUserPersistAt = new Map();
+let udpRxWindowStart = 0;
+let udpRxWindowCount = 0;
+/** @type {Map<string, { start: number, count: number }>} */
+const udpRxPerIpWindow = new Map();
+let udpStormUntil = 0;
+let udpDropLoggedAt = 0;
 
 const MY_IP = getMyIP();
 
@@ -3605,9 +3617,14 @@ function startUdpDiscovery() {
 
   globalUdpSocket.on('message', (msg, rinfo) => {
     if (rinfo.address === MY_IP) return;
+    if (!allowUdpReceive(rinfo.address)) return;
 
     try {
+      // 짧은 패킷만 파싱 — 대용량/쓰레기 UDP는 스킵
+      if (!msg || msg.length < 2 || msg.length > 2048) return;
       const data = JSON.parse(msg.toString('utf8'));
+      if (!data || typeof data.type !== 'string') return;
+      if (data.type !== 'PING' && data.type !== 'GOODBYE') return;
       if (data.type === 'GOODBYE') {
         const leftAt = Number(data.leftAt) || Date.now();
         if (markPeerOffline(rinfo.address, leftAt)) {
@@ -3778,6 +3795,38 @@ function registerSelf() {
   notifyUserList();
 }
 
+function allowUdpReceive(fromIp) {
+  const now = Date.now();
+  if (now - udpRxWindowStart >= 1000) {
+    udpRxWindowStart = now;
+    udpRxWindowCount = 0;
+  }
+  if (udpRxWindowCount >= UDP_RX_MAX_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+    if (now - udpDropLoggedAt > 10000) {
+      udpDropLoggedAt = now;
+      console.warn(`[udp] receive storm — dropping packets (>${UDP_RX_MAX_PER_SEC}/s)`);
+    }
+    return false;
+  }
+  const ip = String(fromIp || '');
+  let bucket = udpRxPerIpWindow.get(ip);
+  if (!bucket || now - bucket.start >= 1000) {
+    bucket = { start: now, count: 0 };
+    udpRxPerIpWindow.set(ip, bucket);
+  }
+  if (bucket.count >= UDP_RX_MAX_PER_IP_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+    return false;
+  }
+  bucket.count += 1;
+  udpRxWindowCount += 1;
+  if (udpRxWindowCount >= UDP_STORM_THRESHOLD_PER_SEC) {
+    udpStormUntil = Math.max(udpStormUntil, now + UDP_STORM_COOLDOWN_MS);
+  }
+  return true;
+}
+
 function collectPresenceHeartbeatIps() {
   // 온라인인 동료만 — allKnownUsers 전체 순회/유니캐스트는 CPU를 다시 올림
   const out = [];
@@ -3820,7 +3869,10 @@ function broadcastPresence(socket) {
   // 같은 대역은 브로드캐스트
   try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
 
-  // 1.0.479: 전체 서브넷 508 유니캐스트는 기본 OFF — CPU 13% 상시 점유 방지
+  // 수신 폭주 중에는 유니캐스트 송신 중단 (브로드캐스트만) — 네트워크 폭발 완화
+  if (Date.now() < udpStormUntil) return;
+
+  // 1.0.479+: 전체 서브넷 508 유니캐스트는 기본 OFF
   if (PRESENCE_FULL_SCAN_ENABLED) {
     const now = Date.now();
     const doFullScan = !presenceFullScanDueAt || now >= presenceFullScanDueAt;
