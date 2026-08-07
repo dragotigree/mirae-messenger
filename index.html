@@ -193,14 +193,7 @@
       background: #ffffff; border-right: 1px solid var(--border);
       padding: 14px 0 12px;
     }
-    #icon-rail-brand {
-      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-      background: linear-gradient(145deg, #1d4ed8, #0f172a);
-      color: #fff; font-size: 11px; font-weight: 800; letter-spacing: -0.04em;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 18px; cursor: default;
-    }
-    #icon-rail-nav { display: flex; flex-direction: column; gap: 8px; }
+    #icon-rail-nav { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
     #icon-rail-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; align-items: center; }
     .icon-rail-btn {
       width: 40px; height: 40px; border-radius: 13px; border: none; background: transparent;
@@ -479,6 +472,51 @@
     }
     .service-pause-unlock-btn:hover { filter: brightness(1.06); }
     .service-pause-unlock-btn:active { transform: translateY(1px); }
+
+    /* 🔒 사용중지 잠금화면 — 좌/우 분할 로그인 카드 (색상은 은은하게) */
+    .lock-split-card {
+      width: min(880px, 94vw); max-height: min(560px, 88vh);
+      border-radius: 28px; overflow: hidden; display: flex;
+      background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+    }
+    .lock-split-left {
+      flex: 1 1 44%; min-width: 0; position: relative; overflow: hidden;
+      background: linear-gradient(165deg, #93c5fd 0%, #60a5fa 55%, #3b82f6 100%);
+      color: #fff; padding: 48px 40px; display: flex; flex-direction: column; justify-content: center;
+    }
+    .lock-split-left::before,
+    .lock-split-left::after {
+      content: ''; position: absolute; border: 1.5px solid rgba(255, 255, 255, 0.28); border-radius: 50%; pointer-events: none;
+    }
+    .lock-split-left::before { width: 260px; height: 260px; left: -100px; bottom: -120px; }
+    .lock-split-left::after { width: 170px; height: 170px; left: -40px; bottom: -70px; }
+    .lock-split-brand { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; position: relative; z-index: 1; }
+    .lock-split-tagline { margin-top: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.92); line-height: 1.6; position: relative; z-index: 1; max-width: 260px; }
+    .lock-split-right {
+      flex: 1 1 56%; min-width: 0; padding: 44px 44px; background: #fff;
+      display: flex; flex-direction: column; justify-content: center; gap: 12px; overflow-y: auto;
+    }
+    .lock-split-right h2 { margin: 0; font-size: 21px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
+    .lock-split-right p.sub { margin: 0; font-size: 12.5px; color: #94a3b8; }
+    .lock-input-wrap { position: relative; }
+    .lock-input-wrap .lock-input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: #94a3b8; pointer-events: none; display: flex; }
+    .lock-input-wrap .lock-input-icon .icon-glyph { width: 16px; height: 16px; display: block; }
+    .lock-input-wrap input {
+      width: 100%; box-sizing: border-box; padding: 12px 14px 12px 40px;
+      border: 1px solid transparent; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-family: inherit; color: #0f172a;
+      transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    }
+    .lock-input-wrap input:focus { outline: none; background: #fff; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+    .lock-submit-btn {
+      margin-top: 4px; padding: 13px; background: #3b82f6; color: #fff; border: none; border-radius: 12px;
+      font-size: 13.5px; font-weight: 700; cursor: pointer; letter-spacing: -0.01em; transition: background 0.12s;
+    }
+    .lock-submit-btn:hover { background: #2f6fe0; }
+    @media (max-width: 720px) {
+      .lock-split-card { flex-direction: column; max-height: 92vh; overflow-y: auto; }
+      .lock-split-left { padding: 30px 26px; }
+      .lock-split-right { padding: 30px 26px; }
+    }
 
     #sidebar-left .channel-item {
       padding: 7px 8px; margin: 0 4px 1px 4px; gap: 7px;
@@ -4587,7 +4625,6 @@
 
   <div id="app-body-row">
   <div id="app-icon-rail">
-    <div id="icon-rail-brand" title="미래병원 메신저">미래</div>
     <div id="icon-rail-nav">
       <button type="button" class="icon-rail-btn is-active" id="icon-rail-chat-btn" title="대화" onclick="scrollSidebarToBlock('channels')" data-ui-icon="chatBubble"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
@@ -5426,28 +5463,28 @@
   </div>
 
   <!-- 🔒 메신저 사용 중지(잠금) 오버레이 — 마스터 아이디·비밀번호로만 해제 -->
-  <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.92); align-items:center; justify-content:center;">
-    <div style="width:min(440px,92vw); background:#fff; border-radius:24px; padding:32px 28px 26px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:16px;">
-      <div class="service-pause-brand" style="margin-bottom:2px;">
-        <div class="service-pause-logo" aria-hidden="true">미래</div>
-        <div class="service-pause-brand-text">
-          <div class="service-pause-product">미래병원 메신저</div>
-          <div class="service-pause-badge" style="color:#b91c1c; background:#fee2e2;">사용 중지</div>
+  <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:#e7edf5; align-items:center; justify-content:center;">
+    <div class="lock-split-card">
+      <div class="lock-split-left">
+        <div class="lock-split-brand">미래병원 메신저</div>
+        <div class="lock-split-tagline">병원 내부 전용 메신저입니다.<br>마스터 관리자 인증이 필요합니다.</div>
+      </div>
+      <div class="lock-split-right">
+        <h2>메신저 사용이 중지되었습니다</h2>
+        <p class="sub">마스터 계정으로 로그인하면 다시 사용할 수 있어요</p>
+        <div id="usage-lock-overlay-reason" style="margin-top:2px; padding:12px 14px; border-radius:14px; background:#fef2f2; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
+        <div id="usage-lock-overlay-desc" style="font-size:12px; color:#94a3b8; line-height:1.55;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
+        <div class="lock-input-wrap" style="margin-top:8px;">
+          <span class="lock-input-icon" data-ui-icon="shieldUser"></span>
+          <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username">
         </div>
+        <div class="lock-input-wrap">
+          <span class="lock-input-icon" data-ui-icon="lock"></span>
+          <input type="password" id="usage-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter') confirmUsageLockUnlock()">
+        </div>
+        <div id="usage-lock-unlock-error" style="font-size:12px; color:#dc2626; min-height:1.2em;"></div>
+        <button type="button" class="lock-submit-btn" onclick="confirmUsageLockUnlock()">사용 재개 (마스터 인증)</button>
       </div>
-      <div>
-        <div style="font-size:18px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">메신저 사용이 중지되었습니다</div>
-        <div id="usage-lock-overlay-reason" style="margin-top:12px; padding:12px 14px; border-radius:14px; background:#fef2f2; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
-        <div id="usage-lock-overlay-desc" style="font-size:12.5px; color:#64748b; line-height:1.55; margin-top:10px;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
-      </div>
-      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; font-weight:600;">마스터 아이디
-        <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username" style="padding:11px 14px; border:1px solid transparent; border-radius:12px; font-size:13px; background:#f1f5f9;">
-      </label>
-      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; font-weight:600;">마스터 비밀번호
-        <input type="password" id="usage-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" style="padding:11px 14px; border:1px solid transparent; border-radius:12px; font-size:13px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') confirmUsageLockUnlock()">
-      </label>
-      <div id="usage-lock-unlock-error" style="font-size:12px; color:#dc2626; min-height:1.2em;"></div>
-      <button type="button" onclick="confirmUsageLockUnlock()" style="padding:13px; background:#0f172a; color:#fff; border:none; border-radius:14px; font-size:13.5px; font-weight:700; cursor:pointer; letter-spacing:-0.01em;">사용 재개 (마스터 인증)</button>
     </div>
   </div>
 
@@ -6641,7 +6678,7 @@
       <div id="master-auth-error" style="display:none; color:#ef4444; font-size:11.5px; margin-top:6px; font-weight:600;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top: 12px;">
         <button onclick="closeMasterAuthModal()" style="padding:9px 14px; background:#f1f5f9; border:none; border-radius: 12px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">취소</button>
-        <button onclick="submitMasterAuth()" style="padding:9px 18px; background:#0f172a; color:white; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">인증</button>
+        <button onclick="submitMasterAuth()" style="padding:9px 18px; background:#3b82f6; color:white; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">인증</button>
       </div>
     </div>
   </div>
