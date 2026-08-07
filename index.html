@@ -4622,6 +4622,7 @@
   <div id="app-body-row">
   <div id="app-icon-rail">
     <div id="icon-rail-nav">
+      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"></button>
       <button type="button" class="icon-rail-btn is-active" id="icon-rail-chat-btn" title="대화" onclick="scrollSidebarToBlock('channels')" data-ui-icon="chatBubble"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" onclick="scrollSidebarToBlock('users')" title="직원 목록" data-ui-icon="users"></button>
@@ -4634,13 +4635,6 @@
   </div>
   <div id="sidebar-left">
     <div id="sidebar-resize-handle" title="너비 조절"></div>
-
-    <div class="notice-widget-area" onclick="openBoardModal()">
-      <div class="notice-widget-header">
-        <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="notice"></span> 원내 공지사항</span>
-        <span style="font-size:11px; color:#1d4ed8; font-weight:700;">열기 →</span>
-      </div>
-    </div>
 
     <div id="sidebar-main-sections" class="sidebar-main-sections">
       <!-- 「다이렉트 메시지」 헤더(빠른 전송 버튼이 빠지며 빈 줄만 남음)는 제거 — DM은
