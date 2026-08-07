@@ -1200,6 +1200,11 @@
       font-size: 11px; font-weight: var(--font-weight-bold); color: #facc15;
       line-height: 1; display: none; flex-shrink: 0; align-self: center;
     }
+    /* ✉️ 쪽지(여러 명에게 개별 발송)에 함께 실어 보내는 받는사람 목록 — 메시지 본문과 구분되게 */
+    .ipmsg-recipients-tag {
+      font-size: 11px; color: #64748b; background: #f1f5f9; border-radius: 10px;
+      padding: 4px 8px; margin-bottom: 6px; display: inline-block; font-weight: 600;
+    }
     .msg-content-line {
       display: flex; align-items: flex-end; gap: 6px; max-width: 100%;
     }
@@ -9921,7 +9926,16 @@
       const parts = [];
       if (text) parts.push(textToMessageHtml(text));
       if (imageHtml) parts.push(imageHtml);
-      const html = parts.join('<br>');
+      // 쪽지는 1:1 DM으로 각자 따로 전송되므로, 받는 사람끼리는 서로 누가 같이 받았는지 알 길이
+      // 없었다 — 받는 사람 목록을 메시지 끝에 함께 실어 보내 모두가 같은 정보를 보게 한다.
+      const recipientNames = ips.map((ip) => {
+        const u = (allUsers || []).find((x) => x.ip === ip);
+        return (u && u.username) || ip;
+      });
+      // 사이드바·토스트 미리보기(stripHtmlToPreview)는 태그 없이 순수 텍스트만 뽑아서 앞부분
+      // 200자를 보여주므로, 받는사람 태그를 맨 뒤에 붙여 미리보기가 태그로 시작하지 않게 한다.
+      const recipientsTag = `<div class="ipmsg-recipients-tag">📨 받는 사람 (${ips.length}명): ${escapeHtml(recipientNames.join(', '))}</div>`;
+      const html = parts.join('<br>') + '<br>' + recipientsTag;
       const btn = document.getElementById('ipmsg-send-btn');
       if (btn) { btn.disabled = true; btn.textContent = '전송 중…'; }
       let ok = 0;
