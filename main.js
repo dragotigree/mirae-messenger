@@ -2898,9 +2898,60 @@ const DB_CORRUPT_USER_MSG =
 
 let dbCorruptRecoveryScheduled = false;
 
+/**
+ * "malformed database schema (X) - table X already exists" 형태는 sqlite_master에 X 하나만
+ * 중복/충돌 기록된 국소 손상이지 DB 전체 페이지 손상이 아니다. 그런데도 실제로는 이 메시지에
+ * "malformed"가 들어있어 전체 DB 복구(백업 복원→재시작)를 반복 유발한 적이 있다 — 복원한 백업에도
+ * 같은 X가 이미 있으니 또 같은 에러가 나서 몇 시간 동안 재시작만 반복하며 디스크를 19GB 채운 사고.
+ * 이런 국소 스키마 충돌은 해당 테이블만 지우고 다시 만들면 끝나므로 전체 DB를 버릴 필요가 없다.
+ */
+function parseBenignSchemaConflict(err) {
+  const msg = String((err && err.message) || err || '');
+  const m = msg.match(/malformed database schema \((\w+)\)\s*-\s*(?:table|index)\s+\1\s+already exists/i);
+  return m ? m[1] : null;
+}
+
 function isSqliteCorruptError(err) {
+  if (parseBenignSchemaConflict(err)) return false;
   const msg = String((err && err.message) || err || '');
   return /SQLITE_CORRUPT|SQLITE_NOTADB|malformed|disk image is malformed|file is not a database|database disk image/i.test(msg);
+}
+
+/** parseBenignSchemaConflict로 찾아낸 테이블만 좁혀서 재생성 — 알려진 테이블만 지원 */
+const RECREATABLE_SCHEMA_SQL = {
+  chat_pins: `CREATE TABLE chat_pins (
+    channel_key TEXT PRIMARY KEY,
+    msg_uid TEXT,
+    message_html TEXT,
+    preview_text TEXT,
+    sender_name TEXT,
+    pinned_at TEXT,
+    pinned_by_name TEXT,
+    pinned_by_ip TEXT
+  )`,
+  deleted_chat_pins: `CREATE TABLE deleted_chat_pins (
+    channel_key TEXT PRIMARY KEY,
+    cleared_at TEXT NOT NULL
+  )`
+};
+const schemaConflictRepairedThisSession = new Set();
+
+function tryRepairBenignSchemaConflict(err) {
+  const table = parseBenignSchemaConflict(err);
+  if (!table || !RECREATABLE_SCHEMA_SQL[table]) return false;
+  if (schemaConflictRepairedThisSession.has(table)) return true; // 이미 시도함 — 재시도 폭주 방지
+  schemaConflictRepairedThisSession.add(table);
+  console.error(`[DB] "${table}" 스키마 국소 충돌 감지 — 전체 복구 대신 이 테이블만 재생성:`, err && err.message);
+  db.run(`DROP TABLE IF EXISTS ${table}`, () => {
+    db.run(RECREATABLE_SCHEMA_SQL[table], (recreateErr) => {
+      if (recreateErr) {
+        console.error(`[DB] "${table}" 재생성 실패:`, recreateErr.message);
+      } else {
+        console.log(`[DB] "${table}" 재생성 완료 (기존 데이터는 비워짐)`);
+      }
+    });
+  });
+  return true;
 }
 
 function userFacingDbError(err) {
@@ -2932,6 +2983,32 @@ function clearIntegrityCheckMarker() {
   try { fs.unlinkSync(integrityCheckMarkerPath()); } catch (e) { /* ignore */ }
 }
 
+/** 손상 복구가 계속 실패해 재시작만 반복하는 것을 막는 안전장치용 카운터 파일 */
+function dbRecoveryAttemptCountPath() {
+  return path.join(app.getPath('userData'), 'db-recovery-attempts.txt');
+}
+
+function readDbRecoveryAttemptCount() {
+  try {
+    return parseInt(fs.readFileSync(dbRecoveryAttemptCountPath(), 'utf8').trim(), 10) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function bumpDbRecoveryAttemptCount() {
+  const next = readDbRecoveryAttemptCount() + 1;
+  try { fs.writeFileSync(dbRecoveryAttemptCountPath(), String(next), 'utf8'); } catch (e) { /* ignore */ }
+  return next;
+}
+
+function resetDbRecoveryAttemptCount() {
+  try { fs.unlinkSync(dbRecoveryAttemptCountPath()); } catch (e) { /* ignore */ }
+}
+
+/** 이 이상 연속으로 복구를 시도했으면 백업 탐색을 건너뛰고 바로 빈 DB로 확정해 루프를 끊는다 */
+const DB_RECOVERY_MAX_ATTEMPTS = 3;
+
 function sqliteCheckRowOk(row) {
   if (!row) return false;
   const v = row.integrity_check != null ? row.integrity_check
@@ -2947,7 +3024,11 @@ function probeSqliteFileHealthy(filePath) {
       settled = true;
       resolve(!!ok);
     };
-    const timer = setTimeout(() => finish(false), 8000);
+    // ⚠️ quick_check는 integrity_check보다 느슨해서, 여기서 "건강하다"고 통과시킨 백업이
+    // 다음 부팅의 (더 엄격한) integrity_check에서 다시 손상으로 판정되면 복원↔재감염을
+    // 끝없이 반복하는 켜짐/꺼짐 루프가 생긴다. 부팅 시 검사와 동일한 기준을 쓴다.
+    // 대용량 DB는 검사에 8초 넘게 걸릴 수 있어 타임아웃도 넉넉히 잡는다.
+    const timer = setTimeout(() => finish(false), 25000);
     try {
       const testDb = new sqlite3.Database(filePath, sqlite3.OPEN_READONLY, (openErr) => {
         if (openErr) {
@@ -2955,7 +3036,7 @@ function probeSqliteFileHealthy(filePath) {
           finish(false);
           return;
         }
-        testDb.get('PRAGMA quick_check', (err, row) => {
+        testDb.get('PRAGMA integrity_check', (err, row) => {
           testDb.close(() => {
             clearTimeout(timer);
             finish(!err && sqliteCheckRowOk(row));
@@ -3018,14 +3099,22 @@ function scheduleDbCorruptRecovery(reason) {
   setTimeout(() => {
     db.close(async () => {
       try {
-        const healthy = await findHealthyAutoBackup();
+        // 백업을 복원해도 다음 부팅에서 다시 "손상"으로 판정되면 복원↔재감염이 끝없이
+        // 반복된다(실제로 326MB 백업 하나를 반복 복원하며 디스크를 19GB까지 채운 사고가 있었음).
+        // 연속 실패가 이 횟수를 넘으면 더는 백업을 믿지 않고 바로 빈 DB로 확정해 루프를 끊는다.
+        const attempt = bumpDbRecoveryAttemptCount();
+        const giveUpOnBackups = attempt > DB_RECOVERY_MAX_ATTEMPTS;
+        if (giveUpOnBackups) {
+          console.error(`[DB] 복구 ${attempt}회째 반복 — 백업 신뢰 중단, 빈 DB로 확정`);
+        }
+        const healthy = giveUpOnBackups ? null : await findHealthyAutoBackup();
         if (healthy) {
           const kept = await stashAndReplaceMessengerDb(healthy.path);
           console.error(`[DB] restored from ${healthy.name}; corrupt kept as ${path.basename(kept)}`);
         } else {
           await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
           await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
-          if (await probeSqliteFileHealthy(dbPath)) {
+          if (!giveUpOnBackups && await probeSqliteFileHealthy(dbPath)) {
             console.error('[DB] no backup; cleared WAL/SHM and main DB looks healthy');
           } else {
             const kept = await stashAndReplaceMessengerDb(null);
@@ -3044,6 +3133,7 @@ function scheduleDbCorruptRecovery(reason) {
 
 db.on('error', (err) => {
   console.error('❌ 데이터베이스 오류:', err && err.message);
+  if (tryRepairBenignSchemaConflict(err)) return;
   if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('db-event');
 });
 
@@ -3062,6 +3152,7 @@ db.serialize(() => {
       const ok = !err && sqliteCheckRowOk(row);
       if (ok) {
         markIntegrityCheckDone();
+        resetDbRecoveryAttemptCount();
         return;
       }
       console.error('⚠️ 데이터베이스 손상 감지 — 백업 복구를 시작합니다:', err ? err.message : row);
@@ -3089,6 +3180,7 @@ function logDbErr(err) {
   logDbErr._last = { msg, at: now };
   console.error('DB 오류:', msg);
   logToRendererConsole('error', 'DB 오류: ' + msg);
+  if (tryRepairBenignSchemaConflict(err)) return;
   if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('logDbErr');
 }
 
