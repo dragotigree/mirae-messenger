@@ -5845,11 +5845,11 @@
           <div class="settings-version-line">현재 버전 <b id="update-current-version">-</b></div>
           <div class="settings-radio-stack">
             <label class="settings-radio-row">
-              <input type="radio" name="update-mode" value="auto" id="update-mode-auto" checked onchange="onUpdateModeChange('auto')">
+              <input type="radio" name="update-mode" value="auto" id="update-mode-auto" onchange="onUpdateModeChange('auto')">
               <span><b>자동</b><small>새 버전이 있으면 받아 재시작</small></span>
             </label>
             <label class="settings-radio-row">
-              <input type="radio" name="update-mode" value="manual" id="update-mode-manual" onchange="onUpdateModeChange('manual')">
+              <input type="radio" name="update-mode" value="manual" id="update-mode-manual" checked onchange="onUpdateModeChange('manual')">
               <span><b>수동</b><small>「지금 확인」할 때만 업데이트</small></span>
             </label>
           </div>
@@ -14753,7 +14753,7 @@
       if (zBtn) zBtn.style.display = isMasterAuthenticated ? 'inline-block' : 'none';
       document.getElementById('update-check-result').textContent = '';
       try {
-        const mode = (window.api.getUpdateMode && await window.api.getUpdateMode()) || 'auto';
+        const mode = (window.api.getUpdateMode && await window.api.getUpdateMode()) || 'manual';
         const autoEl = document.getElementById('update-mode-auto');
         const manualEl = document.getElementById('update-mode-manual');
         if (autoEl && manualEl) {

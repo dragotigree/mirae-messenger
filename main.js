@@ -615,8 +615,8 @@ let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
 /** 업데이트 파일 적용 중 중복 진입 방지 */
 let updateApplyInFlight = false;
-/** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트 */
-let updateMode = 'auto';
+/** 'auto' | 'manual' — 자동 적용·재시작 vs 설정에서만 수동 업데이트. 기본값은 manual(자동 업데이트 없음). */
+let updateMode = 'manual';
 
 // 🚑 이동요청시스템(mirae-transport) 연동: 이동기사에게 이동 요청을 전달하는 앱스크립트 웹앱 주소.
 let transportWebappUrl = '';
@@ -1841,21 +1841,14 @@ function extractAndSaveAttachments(messageHtml, options) {
       const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
-      // 대용량 sync write는 메인 스레드를 막아 '응답 없음'을 유발 — 2MB 초과는 비동기 저장 + data URL 유지
+      // sync 파일쓰기는 메인 스레드를 막아 '응답 없음'을 유발한다 — 백신 실시간 검사가 파일마다
+      // 지연을 더하면 첨부 몇 개짜리 메시지 하나로도 수십 초씩 전체가 멈출 수 있었음(실제 발생 확인).
+      // 크기와 무관하게 항상 비동기로 저장한다. 저장 파일명은 쓰기 전에 이미 확정되므로
+      // 압축 표기(mirae-file://)로 즉시 바꿔도 안전하다.
       const bin = Buffer.from(base64Data, 'base64');
-      if (bin.length > 2 * 1024 * 1024) {
-        fs.promises.writeFile(filePath, bin).catch((e) => {
-          console.error('첨부파일 비동기 저장 오류:', e.message);
-        });
-        continue;
-      }
-      try {
-        fs.writeFileSync(filePath, bin);
-      } catch (writeErr) {
-        // OneDrive 잠금 등 — 비동기로 재시도하고 data URL은 그대로 둠
-        fs.promises.writeFile(filePath, bin).catch(() => {});
-        continue;
-      }
+      fs.promises.writeFile(filePath, bin).catch((e) => {
+        console.error('첨부파일 저장 오류:', e.message);
+      });
       if (compact) {
         replacements.push({
           from: full,
@@ -3207,6 +3200,22 @@ function writeToLogFile(level, message) {
   } catch (e) { /* 로그 저장 실패는 무시 — 로그 때문에 프로그램이 멈추면 안 된다 */ }
 }
 
+/** 진단용: 메인 프로세스 JS 이벤트 루프가 실제로 막혀있었는지 측정 — "응답없음" 원인이
+ * JS 쪽(무한루프 등)인지 네이티브/GPU 쪽인지 구분하기 위한 임시 계측. */
+(function startEventLoopLagMonitor() {
+  const INTERVAL_MS = 200;
+  const LAG_THRESHOLD_MS = 300;
+  let last = Date.now();
+  setInterval(() => {
+    const now = Date.now();
+    const drift = now - last - INTERVAL_MS;
+    last = now;
+    if (drift > LAG_THRESHOLD_MS) {
+      writeToLogFile('warn', `[진단] 이벤트 루프 지연 ${drift}ms`);
+    }
+  }, INTERVAL_MS);
+})();
+
 function cleanupOldLogFiles() {
   const dir = getLogsDir();
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
@@ -3626,13 +3635,13 @@ db.serialize(() => {
   db.run(`ALTER TABLE app_settings ADD COLUMN notify_read_receipts INTEGER DEFAULT 1`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
   db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'auto'`, () => {});
+  db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'manual'`, () => {});
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
       transportWebappUrl = DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = app.getPath('downloads');
-      updateMode = 'auto';
+      updateMode = 'manual';
       db.run(`INSERT INTO app_settings (id, show_notification_preview, update_source_path, transport_webapp_url, download_folder_path, update_mode) VALUES (1, 1, ?, ?, ?, ?)`, [updateSourcePath, transportWebappUrl, downloadFolderPath, updateMode], logDbErr);
     } else {
       showNotificationPreview = !!row.show_notification_preview;
@@ -3647,7 +3656,11 @@ db.serialize(() => {
       } else {
         incomingNotifyMode = 'toast';
       }
-      updateMode = row.update_mode === 'manual' ? 'manual' : 'auto';
+      // 자동 업데이트를 전면 폐지 — 예전에 'auto'로 저장돼 있던 PC도 이번 실행부터 강제로 수동 전환.
+      updateMode = 'manual';
+      if (row.update_mode !== 'manual') {
+        db.run(`UPDATE app_settings SET update_mode = 'manual' WHERE id = 1`, [], logDbErr);
+      }
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
@@ -4618,6 +4631,13 @@ function isSafeUiMode() {
   }
 }
 
+/** 재접속 시 공지·그룹·삭제예약 등 전체 재동기화 폭주 방지 — Wi-Fi 불안정 등으로 자주
+ * 오프라인↔온라인을 오가는 PC 하나 때문에 이 PC 전체가 반복적으로 무거운 동기화를
+ * 떠안는 것을 막는다(실제로 이 때문에 메인 프로세스가 반복적으로 수십 초씩 응답없음 상태에
+ * 빠지는 것을 확인함). 대기 중인 메시지 재전송만은 매번 가볍게 시도한다. */
+const RECONNECT_CASCADE_COOLDOWN_MS = 3 * 60 * 1000;
+const lastReconnectCascadeAt = new Map();
+
 function startUdpDiscovery() {
   if (globalUdpSocket) {
     try { globalUdpSocket.removeAllListeners(); globalUdpSocket.close(); } catch (e) { /* ignore */ }
@@ -4644,6 +4664,16 @@ function startUdpDiscovery() {
   });
 
   globalUdpSocket.on('message', (msg, rinfo) => {
+    const __t0 = Date.now();
+    try {
+      return handleUdpMessage(msg, rinfo);
+    } finally {
+      const __dt = Date.now() - __t0;
+      if (__dt > 300) writeToLogFile('warn', `[진단] UDP message from=${rinfo && rinfo.address} ${__dt}ms`);
+    }
+  });
+
+  function handleUdpMessage(msg, rinfo) {
     if (rinfo.address === MY_IP) return;
     if (!allowUdpReceive(rinfo.address)) return;
 
@@ -4739,6 +4769,14 @@ function startUdpDiscovery() {
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
+            // Wi-Fi 불안정 등으로 자주 깜빡이는 PC는 여기서 더 진행하지 않고 쿨다운만
+            // 갱신 — 재접속마다 공지·그룹 전체 재동기화를 반복하면 이 PC가 계속 멈춘다.
+            const nowTs = Date.now();
+            const lastCascade = lastReconnectCascadeAt.get(rinfo.address) || 0;
+            if (nowTs - lastCascade < RECONNECT_CASCADE_COOLDOWN_MS) {
+              return;
+            }
+            lastReconnectCascadeAt.set(rinfo.address, nowTs);
             requestNoticeSync(rinfo.address);
             syncGroupsWithPeer(rinfo.address);
             tryDeliverPendingWipe(rinfo.address);
@@ -4752,7 +4790,7 @@ function startUdpDiscovery() {
         }
       }
     } catch (e) {}
-  });
+  }
 
   globalUdpSocket.on('error', (err) => {
     console.error('UDP 소켓 오류:', err);
@@ -5590,6 +5628,16 @@ function notifyUserListNow() {
 function startPresenceSweeper() {
   let ipChangeNoticeSent = false;
   setInterval(() => {
+    const __t0 = Date.now();
+    try {
+      return presenceSweepTick();
+    } finally {
+      const __dt = Date.now() - __t0;
+      if (__dt > 300) writeToLogFile('warn', `[진단] presenceSweepTick ${__dt}ms`);
+    }
+  }, 3000);
+
+  function presenceSweepTick() {
     // 🌐 DHCP 갱신 등으로 이 PC의 IP가 바뀌면, 살아있는 동안엔 예전 IP로 계속 통신하게 되어
     // 다른 PC들이 나를 못 찾게 된다. IP 자체를 실시간으로 바꿔 쓰는 건 워낙 여러 곳(메시지 기록,
     // 상대방이 알고 있는 내 주소 등)에 영향을 줘서 위험하므로, 감지되면 재시작을 안내한다.
@@ -5623,7 +5671,7 @@ function startPresenceSweeper() {
     });
 
     if (changed) notifyUserList();
-  }, 3000);
+  }
 }
 
 function startTcpServer() {
@@ -5745,6 +5793,17 @@ function parseAndRoute(line, socket) {
 }
 
 function routeIncomingPayload(payload, senderIP) {
+  const __t0 = Date.now();
+  const __type = payload && payload.type;
+  try {
+    return routeIncomingPayloadInner(payload, senderIP);
+  } finally {
+    const __dt = Date.now() - __t0;
+    if (__dt > 300) writeToLogFile('warn', `[진단] routeIncomingPayload(${__type}) from=${senderIP} ${__dt}ms`);
+  }
+}
+
+function routeIncomingPayloadInner(payload, senderIP) {
   try {
     touchPeerPresence(senderIP);
     const type = payload.type || 'CHAT';
@@ -6917,14 +6976,23 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     noticeBatch = rest;
     flushNoticeBatch();
   };
+  // ⚠️ 예전엔 매 공지마다 "지금까지 쌓인 배치 전체"를 JSON.stringify + byteLength로 다시
+  // 측정했다(O(n²)). 공지가 9만 건대로 쌓이자(병원 입퇴원 이력이 계속 누적) 이 함수 하나가
+  // 60~90초씩 메인 스레드를 통째로 잡아먹어 "응답없음"의 실제 원인이 됨을 CPU 프로파일로 확인함.
+  // 봉투(baseMeta) 크기는 고정이므로 한 번만 재고, 공지 1건의 바이트만 누적으로 더한다.
+  const noticeEnvelopeBytes = Buffer.byteLength(
+    JSON.stringify({ ...baseMeta, notices: [], deletedNoticeUids: deletedNoticeUids || [] }) + '\n',
+    'utf8'
+  );
+  let noticeBatchBytes = noticeEnvelopeBytes;
   noticeList.forEach((n) => {
-    noticeBatch.push(n);
-    const probe = { ...baseMeta, notices: noticeBatch, deletedNoticeUids: deletedNoticeUids || [] };
-    if (Buffer.byteLength(JSON.stringify(probe) + '\n', 'utf8') > NOTICE_SYNC_SAFE_LINE_BYTES) {
-      noticeBatch.pop();
+    const itemBytes = Buffer.byteLength(JSON.stringify(n), 'utf8') + (noticeBatch.length ? 1 : 0);
+    if (noticeBatch.length && noticeBatchBytes + itemBytes > NOTICE_SYNC_SAFE_LINE_BYTES) {
       flushNoticeBatch();
-      noticeBatch.push(n);
+      noticeBatchBytes = noticeEnvelopeBytes;
     }
+    noticeBatch.push(n);
+    noticeBatchBytes += itemBytes;
   });
   flushNoticeBatch();
 
@@ -8792,6 +8860,9 @@ function deliverPendingChatRow(row, targetIP) {
   const retryKey = row.msg_uid ? String(row.msg_uid) : inflightKey;
   const tries = sentAckRetryCount.get(retryKey) || 0;
   if (tries >= SENT_ACK_MAX_RETRIES) {
+    // 상한에 도달한 항목은 더 조회되지 않으므로 카운터를 지운다 — 장시간 켜둔 채로
+    // 오프라인 상대와의 메시지가 쌓이면 이 Map이 끝없이 커지는 것을 방지.
+    sentAckRetryCount.delete(retryKey);
     releaseInflight();
     return;
   }
