@@ -246,13 +246,17 @@
     .settings-profile-avatar .avatar-emoji { font-size: 28px; }
     .msg-avatar .avatar-emoji { font-size: 15px; }
     .group-member-avatar .avatar-emoji { font-size: 14px; }
-    .avatar-cute-0 { background: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-1 { background: linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-2 { background: linear-gradient(135deg, #bfdbfe 0%, #60a5fa 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-3 { background: linear-gradient(135deg, #bbf7d0 0%, #4ade80 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-4 { background: linear-gradient(135deg, #ddd6fe 0%, #a78bfa 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-5 { background: linear-gradient(135deg, #fed7aa 0%, #fb923c 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-6 { background: linear-gradient(135deg, #99f6e4 0%, #2dd4bf 100%) !important; box-shadow: none !important; color: #fff; }
+    /* ⚠️ "너무 알록달록하다"는 피드백으로 무지개 팔레트(노랑·분홍·초록·보라·주황·청록) 폐지 —
+       사람 구분은 이니셜 텍스트로 충분하므로, 전부 기본 아바타와 같은 파란색 계열 톤으로
+       통일해 차분하게 정리한다. JS의 avatar-cute-N 배정 로직은 그대로 두되(다른 곳에서
+       참조할 수 있어 건드리지 않음) 실제 보이는 색만 한 가지 계열로 맞춘다. */
+    .avatar-cute-0 { background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-1 { background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-2 { background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-3 { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-4 { background: linear-gradient(135deg, #93c5fd 0%, #2563eb 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-5 { background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-6 { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important; box-shadow: none !important; color: #fff; }
 
     .avatar-status-badge { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; position: absolute; bottom: -1px; right: -1px; }
     #sidebar-left .avatar-status-badge { border-color: var(--sidebar-bg); }
