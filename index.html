@@ -17,7 +17,7 @@
       --chat-font-size: 14px;
       --sidebar-bg: #ffffff;
       --sidebar-hover: #f1f5f9;
-      --sidebar-active: #3b82f6;
+      --sidebar-active: #dbeafe;
       --sidebar-text: #0f172a;
       --sidebar-text-dim: rgba(15,23,42,0.48);
       --accent: #2563eb;
@@ -467,7 +467,7 @@
 
     .channel-item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; margin: 0 6px 1px 6px; border-radius: var(--radius-sm); color: var(--sidebar-text); font-weight: 600; font-size: 12.5px; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
     .channel-item:hover { background: var(--sidebar-hover); color: var(--text-primary); }
-    .channel-item.active { background: var(--sidebar-active); color: #fff; box-shadow: none; }
+    .channel-item.active { background: var(--sidebar-active); color: var(--sidebar-text); box-shadow: none; }
     .channel-item.is-drop-hover, #chat-header.is-drop-hover, #dm-section-label.is-drop-hover { background: rgba(37, 99, 235, 0.22) !important; box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.75); }
     .channel-item.is-channel-dragging { opacity: 0.45; }
     .channel-item.is-channel-drop-target { box-shadow: inset 0 -2px 0 #60a5fa; background: rgba(37, 99, 235, 0.15) !important; }
@@ -625,12 +625,12 @@
       font-size: var(--sidebar-item-font-size);
       font-weight: var(--sidebar-item-font-weight);
     }
-    /* 파란 배경(선택된 대화)일 때만 흰 글씨 — 다중선택(옅은 하늘색 틴트, 밝은 배경)은 어두운 글씨 유지 */
+    /* 옅은 파란 배경(선택된 대화)에는 어두운 글씨 유지 — 참조 디자인처럼 */
     #sidebar-left .user-card-item.active:not(.is-multi-selected) .user-name-text {
-      color: #ffffff;
+      color: var(--sidebar-text);
     }
     #sidebar-left .user-card-item.active:not(.is-multi-selected) .user-sub-text {
-      color: rgba(255,255,255,0.75);
+      color: var(--sidebar-text-dim);
     }
     #sidebar-left .user-sub-text { font-size: var(--sidebar-meta-font-size); font-weight: 400; color: var(--text-secondary); margin-top: 1px; line-height: 1.3; }
     #sidebar-left .user-sub-text .user-status-offline { color: var(--text-muted); font-weight: 600; }
@@ -1255,7 +1255,7 @@
     .bubble-stack .msg-pending-notice { margin-top: 4px; text-align: right; }
     .msg-text { font-size: var(--chat-font-size); line-height: 1.55; color: #1d1c1d; word-break: break-word; display: inline-block; max-width: 100%; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #f1f5f9; border: none; box-shadow: none; }
     .msg-row.is-other .msg-text { background: #f1f5f9; color: var(--text-primary); }
-    .msg-row.is-me .msg-text { background: var(--accent); color: #fff; border: none; border-radius: 18px 18px 6px 18px; box-shadow: none; }
+    .msg-row.is-me .msg-text { background: #dbeafe; color: #0f172a; border: none; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .msg-text:has(.chat-img-preview), .msg-text:has(.chat-file-box) { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0; }
     .msg-text[draggable="true"], .chat-bubble[draggable="true"] { cursor: grab; }
     .msg-row.is-message-dragging .msg-text, .msg-row-bubble.is-message-dragging .chat-bubble { cursor: grabbing; opacity: 0.88; }
@@ -1324,15 +1324,15 @@
     .msg-row.is-me .reply-quote-block,
     .is-me .chat-bubble .reply-quote-block,
     .is-me .msg-text .reply-quote-block {
-      border-left-color: rgba(255, 255, 255, 0.75);
-      background: rgba(255, 255, 255, 0.14);
+      border-left-color: #3b82f6;
+      background: rgba(37, 99, 235, 0.1);
       border-radius: 8px;
       padding: 7px 10px 7px 11px;
       box-shadow: none;
     }
     .msg-row.is-me .reply-quote-block:hover,
     .is-me .reply-quote-block:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(37, 99, 235, 0.16);
       box-shadow: none;
       opacity: 1;
     }
@@ -1351,7 +1351,7 @@
     }
     .msg-row.is-me .reply-quote-label,
     .is-me .reply-quote-label {
-      color: rgba(255, 255, 255, 0.92); opacity: 1;
+      color: #1d4ed8; opacity: 1;
     }
     .msg-row.is-other .reply-quote-label,
     .is-other .reply-quote-label { color: #1d4ed8; }
@@ -1362,7 +1362,7 @@
     }
     .msg-row.is-me .reply-quote-snippet,
     .is-me .reply-quote-snippet {
-      color: rgba(255, 255, 255, 0.78);
+      color: #475569;
       white-space: nowrap; display: block; -webkit-line-clamp: unset;
     }
     .msg-row.is-other .reply-quote-snippet,
@@ -2158,11 +2158,11 @@
     body.compact-mode .btn-capture {
       width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: 9px;
     }
-    body.compact-mode .btn-send { width: 34px; height: 34px; padding: 0; border-radius: 50%; background: #1d75d3; border: none; color: #fff; box-shadow: none; }
+    body.compact-mode .btn-send { width: 34px; height: 34px; padding: 0; border-radius: 50%; background: var(--accent); border: none; color: #fff; box-shadow: none; }
     body.compact-mode #scheduled-indicator,
     body.compact-mode #scheduled-list-box { padding-left: 12px; padding-right: 12px; }
-    body.compact-mode .is-other .chat-bubble { background: #ffffff; border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
-    body.compact-mode .is-me .chat-bubble { background: #fee500; color: #191919; border: none; border-radius: 18px 18px 4px 18px; box-shadow: none; }
+    body.compact-mode .is-other .chat-bubble { background: #f1f5f9; border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: none; }
+    body.compact-mode .is-me .chat-bubble { background: #dbeafe; color: #0f172a; border: none; border-radius: 18px 18px 4px 18px; box-shadow: none; }
     body.compact-mode .bubble-sender { color: #475569; font-size: 11px; font-weight: 600; margin: 0 6px 4px 2px; }
     body.compact-mode .bubble-sender::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; }
     body.compact-mode .msg-row-bubble.is-me { padding-right: 2px; }
@@ -2171,7 +2171,7 @@
     body.compact-mode .msg-avatar { width: 32px; height: 32px; font-size: 12px; border-radius: 50%; }
     body.compact-mode .msg-sender-name { font-size: 11px; }
     body.compact-mode .msg-text { font-size: 14px; padding: 10px 14px; }
-    body.compact-mode .msg-row.is-me .msg-text { border-radius: 18px 18px 4px 18px; background: #fee500; color: #191919; border: none; }
+    body.compact-mode .msg-row.is-me .msg-text { border-radius: 18px 18px 4px 18px; background: #dbeafe; color: #0f172a; border: none; }
     body.compact-mode .msg-row.is-other .msg-text { border-radius: 18px 18px 18px 4px; }
 
     #compact-back-btn { display: none; width: 36px; height: 36px; font-size: 0; color: #191919; background: transparent; border: none; border-radius: 8px; cursor: pointer; }
@@ -2333,7 +2333,7 @@
     .bubble-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 100%; }
     .msg-row-bubble.is-other .bubble-stack { align-items: flex-start; }
     .bubble-line .chat-bubble { max-width: min(280px, 100%); padding: 10px 14px; font-size: 13px; line-height: 1.5; word-break: break-word; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
-    .is-me .chat-bubble { background: var(--accent); color: #fff; border-radius: 18px 18px 6px 18px; box-shadow: none; }
+    .is-me .chat-bubble { background: #dbeafe; color: #0f172a; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .is-other .chat-bubble { background: #f1f5f9; color: var(--text-primary); border: none; border-radius: 18px 18px 18px 6px; box-shadow: none; }
     .bubble-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
     .bubble-line .msg-unread-count { align-self: center; }
@@ -4417,7 +4417,7 @@
     }
     .settings-card {
       background: #f8fafc;
-      border: 1px solid #e8edf2;
+      border: none;
       border-radius: 14px;
       padding: 14px 16px;
       display: flex;
@@ -4425,8 +4425,7 @@
       gap: 12px;
     }
     .settings-card.danger {
-      background: #fff7f7;
-      border-color: #fecaca;
+      background: #fef2f2;
     }
     .settings-profile-layout {
       display: grid;
@@ -4453,8 +4452,8 @@
       gap: 10px 12px;
     }
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
-    .settings-btn-secondary { padding: 8px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s, border-color 0.12s; white-space: nowrap; }
-    .settings-btn-secondary:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
+    .settings-btn-secondary:hover { background: #e2e8f0; }
     .settings-btn-primary { padding: 8px 16px; background: var(--accent); border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
     .settings-btn-primary:hover { filter: brightness(0.96); }
     .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
@@ -4463,27 +4462,28 @@
     .settings-btn-text:hover { color: #ef4444; }
     .settings-toast-dur { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; color: #64748b; font-weight: 600; }
     .settings-toast-dur input {
-      width: 64px; padding: 7px 8px; border: 1px solid #dbe3ec; border-radius: 9px;
-      font-size: 13px; text-align: center; font-family: inherit; background: #fff; color: #0f172a;
+      width: 64px; padding: 7px 8px; border: 1px solid transparent; border-radius: 9px;
+      font-size: 13px; text-align: center; font-family: inherit; background: #f1f5f9; color: #0f172a;
     }
     .settings-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .settings-version-line { font-size: 13px; color: #475569; }
     .net-status-list { display: flex; flex-direction: column; gap: 2px; }
     .settings-path-input {
-      flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid #dbe3ec; border-radius: 10px;
-      font-size: 12px; background: #fff; color: #64748b; font-family: inherit;
+      flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+      font-size: 12px; background: #f1f5f9; color: #64748b; font-family: inherit;
     }
     .settings-field { font-size: 12px; color: #475569; display: flex; flex-direction: column; gap: 4px; }
     .settings-field input,
     .settings-field select,
     .settings-select {
-      width: 100%; padding: 8px 10px; border: 1px solid #dbe3ec; border-radius: 10px;
-      font-size: 13px; font-family: inherit; background: #fff; color: #0f172a; box-sizing: border-box;
+      width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+      font-size: 13px; font-family: inherit; background: #f1f5f9; color: #0f172a; box-sizing: border-box;
+      transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
     }
     .settings-field input:focus,
     .settings-field select:focus,
     .settings-select:focus {
-      outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      outline: none; background: #fff; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
     }
     .settings-field-row { display: flex; gap: 8px; }
     .settings-field-row .settings-field { flex: 1; min-width: 0; }
@@ -5405,21 +5405,27 @@
 
   <!-- 🔒 메신저 사용 중지(잠금) 오버레이 — 마스터 아이디·비밀번호로만 해제 -->
   <div id="usage-lock-overlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(15,23,42,0.92); align-items:center; justify-content:center;">
-    <div style="width:min(440px,92vw); background:#fff; border-radius:20px; padding:28px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:14px;">
-      <div style="text-align:center;">
-        <div style="font-size:32px; margin-bottom:8px;">🔒</div>
-        <div style="font-size:18px; font-weight:800; color:#b91c1c;">메신저 사용이 중지되었습니다</div>
-        <div id="usage-lock-overlay-reason" style="margin-top:12px; padding:12px 14px; border-radius:14px; background:#fef2f2; border:1px solid #fecaca; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
+    <div style="width:min(440px,92vw); background:#fff; border-radius:24px; padding:32px 28px 26px; box-shadow:0 24px 60px rgba(0,0,0,0.35); display:flex; flex-direction:column; gap:16px;">
+      <div class="service-pause-brand" style="margin-bottom:2px;">
+        <div class="service-pause-logo" aria-hidden="true">미래</div>
+        <div class="service-pause-brand-text">
+          <div class="service-pause-product">미래병원 메신저</div>
+          <div class="service-pause-badge" style="color:#b91c1c; background:#fee2e2;">사용 중지</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:18px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">메신저 사용이 중지되었습니다</div>
+        <div id="usage-lock-overlay-reason" style="margin-top:12px; padding:12px 14px; border-radius:14px; background:#fef2f2; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
         <div id="usage-lock-overlay-desc" style="font-size:12.5px; color:#64748b; line-height:1.55; margin-top:10px;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
       </div>
-      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 아이디
-        <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; font-weight:600;">마스터 아이디
+        <input type="text" id="usage-lock-master-id" placeholder="마스터 아이디" autocomplete="username" style="padding:11px 14px; border:1px solid transparent; border-radius:12px; font-size:13px; background:#f1f5f9;">
       </label>
-      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">마스터 비밀번호
-        <input type="password" id="usage-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" style="padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;" onkeydown="if(event.key==='Enter') confirmUsageLockUnlock()">
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px; font-weight:600;">마스터 비밀번호
+        <input type="password" id="usage-lock-master-pwd" placeholder="마스터 비밀번호" autocomplete="current-password" style="padding:11px 14px; border:1px solid transparent; border-radius:12px; font-size:13px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') confirmUsageLockUnlock()">
       </label>
       <div id="usage-lock-unlock-error" style="font-size:12px; color:#dc2626; min-height:1.2em;"></div>
-      <button type="button" onclick="confirmUsageLockUnlock()" style="padding:12px; background:#2563eb; color:#fff; border:none; border-radius:14px; font-size:13px; font-weight:700; cursor:pointer;">사용 재개 (마스터 인증)</button>
+      <button type="button" onclick="confirmUsageLockUnlock()" style="padding:13px; background:#0f172a; color:#fff; border:none; border-radius:14px; font-size:13.5px; font-weight:700; cursor:pointer; letter-spacing:-0.01em;">사용 재개 (마스터 인증)</button>
     </div>
   </div>
 
@@ -6603,14 +6609,17 @@
 
   <!-- 🔒 마스터 인증 비밀번호 입력 모달 -->
   <div id="master-auth-modal" class="modal-overlay">
-    <div class="modal-card" style="width:320px;">
-      <div style="font-size:16px; font-weight:700; color:#1d4ed8;">🔒 마스터 관리자 인증</div>
-      <input type="text" id="master-id-input" placeholder="아이디 입력 (기본: admin)" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; margin-top:10px;" onkeydown="if(event.key==='Enter') document.getElementById('master-pwd-input').focus()">
-      <input type="password" id="master-pwd-input" placeholder="비밀번호 입력 (기본: admin1234)" style="padding:8px; border:1px solid #cbd5e1; border-radius: 12px; font-size:12px; margin-top:8px;" onkeydown="if(event.key==='Enter') submitMasterAuth()">
+    <div class="modal-card" style="width:320px; border-radius:20px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:34px; height:34px; border-radius:10px; background:linear-gradient(145deg,#1d4ed8,#1d4ed8); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">미래</div>
+        <div style="font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">마스터 관리자 인증</div>
+      </div>
+      <input type="text" id="master-id-input" placeholder="아이디 입력 (기본: admin)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:14px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') document.getElementById('master-pwd-input').focus()">
+      <input type="password" id="master-pwd-input" placeholder="비밀번호 입력 (기본: admin1234)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:8px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') submitMasterAuth()">
       <div id="master-auth-error" style="display:none; color:#ef4444; font-size:11.5px; margin-top:6px; font-weight:600;"></div>
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top: 8px;">
-        <button onclick="closeMasterAuthModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="submitMasterAuth()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">🔓 인증</button>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top: 12px;">
+        <button onclick="closeMasterAuthModal()" style="padding:9px 14px; background:#f1f5f9; border:none; border-radius: 12px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">취소</button>
+        <button onclick="submitMasterAuth()" style="padding:9px 18px; background:#0f172a; color:white; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">인증</button>
       </div>
     </div>
   </div>
