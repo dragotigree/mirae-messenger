@@ -469,7 +469,9 @@
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
-    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
+    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
+    #master-client-menu .ctx-menu-item.is-danger { color: #b91c1c; }
+    #master-client-menu .ctx-menu-item.is-good { color: #15803d; }
     @keyframes menu-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
     .ctx-menu-item { padding: 9px 12px; font-size: 12.5px; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-primary); font-weight: 600; transition: background var(--transition-fast); }
     .ctx-menu-item:hover { background: var(--surface-muted); }
@@ -1418,6 +1420,8 @@
     }
     .chat-tool-btn:hover { background: #f1f5f9; color: #0f172a; }
     label.chat-tool-btn { margin: 0; font-weight: 500; }
+    .chat-tool-btn .icon-glyph, .btn-schedule .icon-glyph, .btn-quickphrase .icon-glyph,
+    .btn-capture .icon-glyph, .btn-urgent .icon-glyph { width: 18px; height: 18px; pointer-events: none; }
     .btn-send {
       padding: 8px 16px; background: var(--accent); color: white; font-weight: 700; font-size: 13px;
       border: none; border-radius: 12px; cursor: pointer; flex-shrink: 0;
@@ -3952,6 +3956,7 @@
     html.ui-animations-off #chat-quick-switcher-overlay,
     html.ui-animations-off .chat-quick-switcher-panel,
     html.ui-animations-off #dm-context-menu,
+    html.ui-animations-off #master-client-menu,
     html.ui-animations-off #quick-phrase-popover,
     html.ui-animations-off #chat-slash-popover {
       animation: none !important;
@@ -4053,29 +4058,34 @@
       top: 0;
       z-index: 1;
     }
-    .master-clients-table col.c-name { width: 18%; }
-    .master-clients-table col.c-dept { width: 16%; }
-    .master-clients-table col.c-ip { width: 12%; }
-    .master-clients-table col.c-ver { width: 9%; }
-    .master-clients-table col.c-status { width: 11%; }
-    .master-clients-table col.c-last { width: 10%; }
-    .master-clients-table col.c-actions { width: 24%; }
-    .master-clients-table .master-client-actions {
-      display: inline-flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
-      justify-content: flex-end;
-      max-width: 100%;
+    .master-clients-table col.c-name { width: 22%; }
+    .master-clients-table col.c-dept { width: 20%; }
+    .master-clients-table col.c-ip { width: 15%; }
+    .master-clients-table col.c-ver { width: 11%; }
+    .master-clients-table col.c-status { width: 14%; }
+    .master-clients-table col.c-last { width: 13%; }
+    .master-clients-table col.c-actions { width: 44px; }
+    .master-client-menu-btn {
+      width: 26px; height: 26px; border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+      border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
     }
-    .master-clients-table .master-client-actions button {
-      padding: 4px 8px;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: 8px;
-      cursor: pointer;
-      white-space: nowrap;
+    .master-client-menu-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
+    .master-clients-table tbody tr { border-top: 1px solid #f1f5f9; transition: background var(--transition-fast); }
+    .master-clients-table tbody tr:hover { background: #f8fafc; }
+    .master-clients-table tbody tr.is-dim { opacity: .6; }
+    .master-pill {
+      display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; white-space: nowrap; background: #f1f5f9; color: #475569;
     }
+    .master-pill.is-online { background: #ecfdf5; color: #15803d; }
+    .master-pill.is-treatment { background: #fffbeb; color: #b45309; }
+    .master-pill.is-offline { background: #f1f5f9; color: #64748b; }
+    .master-pill.is-locked { background: #fef2f2; color: #b91c1c; }
+    .master-pill.is-wipe { background: #ffedd5; color: #c2410c; margin-left: 4px; }
+    .master-pill.is-uptodate { background: #ecfdf5; color: #15803d; }
+    .master-pill.is-outdated { background: #fef2f2; color: #dc2626; }
     .master-loadsim-btn {
       padding: 6px 10px;
       border-radius: 8px;
@@ -4904,19 +4914,19 @@
           </div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
               <label class="chat-tool-btn" title="파일 첨부">
-                📎
+                <span data-ui-icon="paperclip"></span>
                 <input type="file" id="chat-file-input" style="display:none;" onchange="handleFileSelect(event)">
               </label>
-              <button class="btn-capture chat-tool-btn" type="button" onclick="toggleScreenCapturePopover(event)" title="화면 캡처">📷</button>
-              <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)">✏️</button>
-              <button class="btn-schedule chat-tool-btn" onclick="openScheduleMessageModal()" title="예약 전송">⏰</button>
-              <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구">💬</button>
-              <button class="btn-urgent chat-tool-btn" id="urgent-toggle-btn" onclick="toggleUrgentMode()" title="긴급 메시지로 표시">🚨</button>
+              <button class="btn-capture chat-tool-btn" type="button" onclick="toggleScreenCapturePopover(event)" title="화면 캡처" data-ui-icon="camera"></button>
+              <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)" data-ui-icon="pencil"></button>
+              <button class="btn-schedule chat-tool-btn" onclick="openScheduleMessageModal()" title="예약 전송" data-ui-icon="alarmClock"></button>
+              <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구" data-ui-icon="chatBubble"></button>
+              <button class="btn-urgent chat-tool-btn" id="urgent-toggle-btn" onclick="toggleUrgentMode()" title="긴급 메시지로 표시" data-ui-icon="alertTriangle"></button>
             </div>
             <button class="btn-send" onclick="sendChatMessage()">전송</button>
           </div>
@@ -6162,6 +6172,9 @@
     <div class="ctx-menu-item" id="ctx-dept-floor-reset-emoji" style="display:none;" onclick="ctxDeptFloorClearTitleEmoji()">↩️ 이모티콘 제거</div>
   </div>
 
+  <!-- 🖱 마스터 「접속 PC」 행 관리 메뉴 -->
+  <div id="master-client-menu"></div>
+
   <div id="channel-context-menu">
     <div class="ctx-menu-item" onclick="ctxChannelViewInfo()">ℹ️ 정보보기</div>
     <div class="ctx-menu-item" onclick="ctxChannelRenameDisplay()">✏️ 표시 이름 변경 (나만)</div>
@@ -6751,7 +6764,13 @@
       chatBubble: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
       moreDots: _uiSvg('<circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/>'),
       calendar: _uiSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
-      question: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>')
+      question: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'),
+      /* 💬 채팅 입력창 도구모음: 이모지 대신 통일된 선(stroke) 아이콘 세트 사용 */
+      paperclip: _uiSvg('<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'),
+      camera: _uiSvg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'),
+      pencil: _uiSvg('<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'),
+      alarmClock: _uiSvg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/>'),
+      alertTriangle: _uiSvg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -12389,6 +12408,8 @@
       if (cmenu) cmenu.style.display = 'none';
       const dfmenu = document.getElementById('dept-floor-context-menu');
       if (dfmenu) dfmenu.style.display = 'none';
+      const mcmenu = document.getElementById('master-client-menu');
+      if (mcmenu) mcmenu.style.display = 'none';
     });
 
     let ctxMenuTargetGroup = null;
@@ -15375,72 +15396,71 @@
         const wipePending = pendingRemoteWipeIps.has(u.ip);
         const lockReason = String(u.usageLockReason || '').trim();
         const statusCell = usageDisabled
-          ? `<span style="color:#b91c1c; font-weight:700;"${lockReason ? ` title="${escAttr(lockReason)}"` : ''}>🔒 사용중지${lockReason ? `<div style="font-size:10px; font-weight:600; color:#9f1239; margin-top:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(lockReason)}</div>` : ''}</span>`
-          : (masterStatusLabel[statusKey] || statusKey);
+          ? `<span class="master-pill is-locked"${lockReason ? ` title="${escAttr(lockReason)}"` : ''}>🔒 사용중지</span>${lockReason ? `<div style="font-size:10px; font-weight:600; color:#9f1239; margin-top:3px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(lockReason)}</div>` : ''}`
+          : `<span class="master-pill is-${statusKey.toLowerCase()}">${masterStatusLabel[statusKey] || statusKey}</span>`;
         const wipePendingBadge = wipePending
-          ? ' <span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:999px; background:#ffedd5; color:#c2410c; font-size:10px; font-weight:800;">삭제예약</span>'
+          ? ' <span class="master-pill is-wipe">삭제예약</span>'
           : '';
-        return `<tr style="border-top:1px solid #f1f5f9; ${u.online && !usageDisabled ? '' : 'opacity:.65;'}">
+        return `<tr class="${u.online && !usageDisabled ? '' : 'is-dim'}">
           <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:#0284c7; font-size:10px;">(이 PC)</span>' : ''}${wipePendingBadge}</td>
           <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
-          <td style="font-weight:700; color:${verOutdated ? '#dc2626' : '#15803d'};">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</td>
+          <td><span class="master-pill ${verOutdated ? 'is-outdated' : 'is-uptodate'}">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</span></td>
           <td>${statusCell}</td>
           <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
           <td style="text-align:right;">
-            <div class="master-client-actions">
-              <button type="button" class="master-user-edit-btn" data-ip="${escAttr(u.ip)}" style="border:1px solid #cbd5e1; background:#fff; color:#2563eb;">정보 수정</button>
-              ${usageDisabled
-                ? `<button type="button" class="master-usage-enable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #86efac; background:#f0fdf4; color:#15803d;">사용 허용</button>`
-                : `<button type="button" class="master-usage-disable-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">사용 중지</button>`}
-              <button type="button" class="master-wipe-logs-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fdba74; background:#fff7ed; color:#c2410c;">${wipePending ? '삭제 재예약' : '로그 삭제'}</button>
-              ${wipePending ? `<button type="button" class="master-wipe-cancel-btn" data-ip="${escAttr(u.ip)}" style="border:1px solid #cbd5e1; background:#f8fafc; color:#475569;">예약 취소</button>` : ''}
-              ${u.online && !usageDisabled ? `<button type="button" class="master-force-update-btn" data-ip="${escAttr(u.ip)}" data-name="${escAttr(nameText)}" data-isme="${isMe ? '1' : '0'}" style="border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;">강제 업데이트</button>` : ''}
-            </div>
+            <button type="button" class="master-client-menu-btn" data-ip="${escAttr(u.ip)}" title="관리" aria-label="관리">⋮</button>
           </td>
         </tr>`;
       }).join('');
 
       box.innerHTML = tableHead + tableBody + '</tbody></table>';
-      box.querySelectorAll('.master-user-edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMasterUserEditModal(btn.getAttribute('data-ip')));
+      box.querySelectorAll('.master-client-menu-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openMasterClientMenu(btn.getAttribute('data-ip'), btn);
+        });
       });
-      box.querySelectorAll('.master-force-update-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMasterForceUpdateModal({
-          targetIp: btn.getAttribute('data-ip'),
-          name: btn.getAttribute('data-name') || '',
-          isMe: btn.getAttribute('data-isme') === '1'
-        }));
+    }
+
+    /** 「접속 PC」 행마다 5개까지 늘어서 있던 버튼을 하나의 「⋮ 관리」 드롭다운으로 정리 */
+    function openMasterClientMenu(ip, btnEl) {
+      const menu = document.getElementById('master-client-menu');
+      if (!menu || !ip) return;
+      const u = (allUsers || []).find((x) => x.ip === ip);
+      if (!u) return;
+      const isMe = !!u.isMe;
+      const usageDisabled = !!u.usageDisabled;
+      const wipePending = pendingRemoteWipeIps.has(ip);
+      const nameText = `${u.rank || ''} ${u.username || '-'}`.trim();
+
+      const items = [];
+      items.push({ icon: 'ℹ️', label: '정보 수정', run: () => openMasterUserEditModal(ip) });
+      items.push(usageDisabled
+        ? { icon: '🔓', label: '사용 허용', cls: 'is-good', run: () => openMasterUsageLockModal({ targetIp: ip, name: nameText, isMe, disabled: false, reason: u.usageLockReason || '' }) }
+        : { icon: '🔒', label: '사용 중지', cls: 'is-danger', run: () => openMasterUsageLockModal({ targetIp: ip, name: nameText, isMe, disabled: true }) });
+      items.push({ icon: '🗑️', label: wipePending ? '삭제 재예약' : '로그 삭제', cls: 'is-danger', run: () => openMasterWipeLogsModal({ targetIp: ip, name: nameText, isMe }) });
+      if (wipePending) items.push({ icon: '↩️', label: '삭제 예약 취소', run: () => cancelPendingRemoteWipeForIp(ip) });
+      if (u.online && !usageDisabled) items.push({ icon: '⚡', label: '강제 업데이트', cls: 'is-danger', run: () => openMasterForceUpdateModal({ targetIp: ip, name: nameText, isMe }) });
+
+      menu.innerHTML = `<div class="ctx-menu-item" style="font-weight:800; color:#94a3b8; font-size:11px; cursor:default;" onclick="event.stopPropagation()">${escapeHtml(nameText)} (${escapeHtml(ip)})</div>` +
+        items.map((it, i) => `<div class="ctx-menu-item${it.cls ? ' ' + it.cls : ''}" data-idx="${i}">${it.icon} ${escapeHtml(it.label)}</div>`).join('');
+      menu.querySelectorAll('.ctx-menu-item[data-idx]').forEach((el) => {
+        el.addEventListener('click', () => {
+          menu.style.display = 'none';
+          items[Number(el.getAttribute('data-idx'))].run();
+        });
       });
-      box.querySelectorAll('.master-usage-disable-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMasterUsageLockModal({
-          targetIp: btn.getAttribute('data-ip'),
-          name: btn.getAttribute('data-name') || '',
-          isMe: btn.getAttribute('data-isme') === '1',
-          disabled: true
-        }));
-      });
-      box.querySelectorAll('.master-usage-enable-btn').forEach(btn => {
-        const ip = btn.getAttribute('data-ip');
-        const u = (allUsers || []).find((x) => x.ip === ip);
-        btn.addEventListener('click', () => openMasterUsageLockModal({
-          targetIp: ip,
-          name: btn.getAttribute('data-name') || '',
-          isMe: btn.getAttribute('data-isme') === '1',
-          disabled: false,
-          reason: (u && u.usageLockReason) || ''
-        }));
-      });
-      box.querySelectorAll('.master-wipe-cancel-btn').forEach(btn => {
-        btn.addEventListener('click', () => cancelPendingRemoteWipeForIp(btn.getAttribute('data-ip')));
-      });
-      box.querySelectorAll('.master-wipe-logs-btn').forEach(btn => {
-        btn.addEventListener('click', () => openMasterWipeLogsModal({
-          targetIp: btn.getAttribute('data-ip'),
-          name: btn.getAttribute('data-name') || '',
-          isMe: btn.getAttribute('data-isme') === '1'
-        }));
-      });
+
+      const rect = btnEl.getBoundingClientRect();
+      const menuWidth = 200;
+      menu.style.display = 'block';
+      const menuHeight = menu.offsetHeight || (items.length * 36 + 40);
+      let x = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8);
+      let y = rect.bottom + 4;
+      if (y + menuHeight > window.innerHeight) y = Math.max(8, rect.top - menuHeight - 4);
+      menu.style.left = Math.max(8, x) + 'px';
+      menu.style.top = y + 'px';
     }
 
     function openMasterForceUpdateModal(opts) {
