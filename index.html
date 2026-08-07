@@ -267,6 +267,8 @@
     .notice-widget-area { margin: 6px 8px 2px 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-lg); padding: 5px 8px; cursor: pointer; transition: background var(--transition-normal), border-color var(--transition-normal); }
     .notice-widget-area:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.16); }
     .notice-widget-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; color: #ffffff; }
+    .notice-widget-header .icon-glyph, .sidebar-block-head .icon-glyph { width: 14px; height: 14px; flex-shrink: 0; }
+    .sidebar-quick-actions .icon-glyph { width: 15px; height: 15px; flex-shrink: 0; }
 
     #sidebar-left .section-label { padding: 5px 12px 3px 12px; font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); }
     .section-label { text-transform: uppercase; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.62); padding: 6px 12px 3px 12px; letter-spacing: 0.02em; }
@@ -4551,7 +4553,7 @@
 
     <div class="notice-widget-area" onclick="openBoardModal()">
       <div class="notice-widget-header">
-        <span>📢 원내 공지사항</span>
+        <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="notice"></span> 원내 공지사항</span>
         <span style="font-size:11px; color:#bae6fd; font-weight:700;">열기 →</span>
       </div>
     </div>
@@ -4561,13 +4563,13 @@
         <div class="section-label sidebar-block-head" id="dm-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
-            <span>💬 다이렉트 메시지</span>
+            <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="chatBubble"></span> 다이렉트 메시지</span>
           </span>
           <span class="unread-badge" id="dm-section-unread-badge" style="display:none;">0</span>
         </div>
         <div class="sidebar-quick-actions" role="group" aria-label="빠른 전송">
-          <button type="button" class="sidebar-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)">✉️ 쪽지</button>
-          <button type="button" class="sidebar-code-alert-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드 긴급 발령">🚨 코드</button>
+          <button type="button" class="sidebar-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)"><span data-ui-icon="ipmsg"></span> 쪽지</button>
+          <button type="button" class="sidebar-code-alert-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드 긴급 발령"><span data-ui-icon="alertTriangle"></span> 코드</button>
         </div>
       </div>
 
@@ -4575,7 +4577,7 @@
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
-            <span>👥 사용자</span>
+            <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span class="sidebar-users-hint">Ctrl+클릭</span>
         </div>
