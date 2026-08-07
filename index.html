@@ -4904,7 +4904,7 @@
           </div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
@@ -23172,8 +23172,27 @@
       ta.style.height = `${next}px`;
     }
 
+    // 한글(IME) 입력 중 마지막 글자를 확정하려고 누른 Enter가, 확정과 거의 동시에 "진짜" Enter
+    // keydown으로 한 번 더 들어오는 경우가 있다(크로미움 IME 처리 특성) — 이때 슬래시 명령어의
+    // 마지막 글자가 아직 조합 중인 상태로 보내지거나(예: "/도"까지만), 반대로 커맨드가 완성되기도
+    // 전에 그대로 채팅으로 전송돼 "명령어가 안 먹힌다"는 증상으로 보였다. 조합 종료 직후 한 틱은
+    // Enter를 무시해 확정과 전송이 같은 키 입력에 겹치지 않게 한다.
+    let chatComposing = false;
+    let chatComposingJustEnded = false;
+    function onChatComposingStart() { chatComposing = true; }
+    function onChatComposingEnd() {
+      chatComposing = false;
+      chatComposingJustEnded = true;
+      setTimeout(() => { chatComposingJustEnded = false; }, 0);
+    }
+
     function onChatKeyDown(e) {
-      if (e.isComposing || e.keyCode === 229) return;
+      if (e.isComposing || e.keyCode === 229 || chatComposing) return;
+      if (e.key === 'Enter' && chatComposingJustEnded) {
+        chatComposingJustEnded = false;
+        e.preventDefault();
+        return;
+      }
       const pop = document.getElementById('chat-slash-popover');
       const popOpen = pop && pop.style.display === 'block';
       if (popOpen) {
