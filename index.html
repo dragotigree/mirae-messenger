@@ -827,17 +827,17 @@
       filter: none;
     }
     .left-footer-btn .icon-btn .icon-glyph { width: 15px; height: 15px; opacity: 1; }
-    .left-footer-btn #master-lock-btn.is-master-authed {
-      color: #86efac;
-      background: rgba(74, 222, 128, 0.14);
+    #master-lock-btn.is-master-authed {
+      color: #16a34a;
+      background: rgba(74, 222, 128, 0.16);
       box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.35);
     }
-    .left-footer-btn #master-lock-btn.is-master-authed:hover {
-      color: #bbf7d0;
-      background: rgba(74, 222, 128, 0.22);
+    #master-lock-btn.is-master-authed:hover {
+      color: #15803d;
+      background: rgba(74, 222, 128, 0.26);
     }
-    .left-footer-btn #privacy-lock-btn.is-privacy-ready {
-      color: #93c5fd;
+    #privacy-lock-btn.is-privacy-ready {
+      color: #2563eb;
       background: rgba(59, 130, 246, 0.14);
       box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.3);
     }
@@ -4636,6 +4636,8 @@
     </div>
     <div id="icon-rail-bottom">
       <button type="button" class="icon-rail-btn" id="icon-rail-fav-btn" onclick="scrollSidebarToFavorites()" title="즐겨찾기" data-ui-icon="star"></button>
+      <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
+      <button type="button" class="icon-rail-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-settings-btn" onclick="openSettingsModal()" title="환경 설정" data-ui-icon="settings"></button>
       <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="내 프로필" data-ui-icon="users"></button>
     </div>
@@ -4711,9 +4713,6 @@
 
     <div class="left-footer-btn">
       <div class="brand-icons footer-toolbar">
-        <button class="icon-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
-        <button class="icon-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
-        <button class="icon-btn" id="toolbar-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)"></button>
         <button class="icon-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
         <button class="icon-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
         <button class="icon-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
