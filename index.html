@@ -592,7 +592,7 @@
     /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트 */
     .sidebar-list-prefs {
       display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
-      padding: 0 10px 10px 10px; flex-shrink: 0;
+      padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-pref-seg-solo { flex: 0 0 auto; margin-left: auto; }
     .sidebar-pref-seg-solo .sidebar-pref-chip { padding-left: 10px; padding-right: 10px; }
@@ -4648,18 +4648,6 @@
            (dm-section-unread-badge)는 각 사용자 카드의 개별 배지로 충분히 대체된다. -->
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
-          <span style="display:flex; align-items:center; gap:4px; min-width:0;">
-            <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
-            <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
-          </span>
-          <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="ipmsg"></span>
-          </span>
-        </div>
-        <div class="user-search-box" id="user-search-box">
-          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
-        </div>
         <div class="sidebar-list-prefs" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
           <div class="sidebar-pref-seg" role="group" aria-label="분류">
             <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
@@ -4676,6 +4664,18 @@
           <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
             <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">안읽음</button>
           </div>
+        </div>
+        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
+          <span style="display:flex; align-items:center; gap:4px; min-width:0;">
+            <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
+            <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
+          </span>
+          <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="ipmsg"></span>
+          </span>
+        </div>
+        <div class="user-search-box" id="user-search-box">
+          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
         </div>
         <div class="sidebar-inbox-bar" id="sidebar-inbox-bar" hidden>
           <span class="sidebar-inbox-count" id="sidebar-inbox-count">미읽음 0</span>
