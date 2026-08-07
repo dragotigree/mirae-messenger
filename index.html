@@ -5555,6 +5555,7 @@
               <option value="TREATMENT">자리비움</option>
             </select>
           </label>
+          <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">다른 직원들의 목록에 내 상태가 이렇게 표시됩니다. 「자리비움」으로 해도 메시지는 그대로 받습니다 — 단지 지금 바로 응대하기 어렵다는 표시입니다.</p>
         </div>
         <div class="settings-card">
           <div class="settings-form-grid">
@@ -5564,12 +5565,14 @@
                 <option value="dept">부서별</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">왼쪽 직원 목록을 「층」끼리 묶어 보여줄지, 「부서」끼리 묶어 보여줄지 정합니다. 검색·대화 자체에는 영향 없습니다.</p>
             <label class="settings-field">표시할 직원
               <select id="setting-show-offline-users" class="settings-select">
                 <option value="all">온라인 + 오프라인</option>
                 <option value="online">온라인만</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">「온라인만」을 고르면 지금 메신저를 켜둔 사람만 목록에 남고, 접속 안 한 직원은 안 보입니다.</p>
             <label class="settings-field">공용 컴퓨터
               <select id="setting-show-shared-pcs" class="settings-select">
                 <option value="show">목록에 표시</option>
@@ -5677,12 +5680,14 @@
                 <option value="compact">미니 모드</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">「기본 화면」은 직원목록·대화목록·채팅창이 한 창에 나란히 보이는 넓은 화면, 「미니 모드」는 자리를 적게 차지하는 작은 창입니다. 다음 실행부터 적용됩니다.</p>
             <label class="settings-field">미니 모드에서 직원 클릭
               <select id="setting-compact-person-click" class="settings-select">
                 <option value="ipmsg">쪽지 보내기</option>
                 <option value="chat">채팅창 열기</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">미니 모드 목록에서 직원 이름을 클릭했을 때 「쪽지 보내기」 창을 열지, 그 사람과의 「채팅창」을 열지 정합니다.</p>
             <label class="settings-field">시스템 폰트
               <select id="setting-font-family" class="settings-select">
                 <option value="suit">수트 (SUIT)</option>
@@ -5691,6 +5696,7 @@
                 <option value="spoqa">스포카</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">메뉴·버튼·직원 목록 등 화면 전체 글꼴입니다. (채팅 말풍선 안 글씨는 아래 「채팅방 폰트」가 따로 적용됩니다)</p>
             <label class="settings-field">채팅방 폰트
               <select id="setting-chat-font-family" class="settings-select">
                 <option value="ridiBatang">리디바탕</option>
@@ -5699,6 +5705,7 @@
                 <option value="pretendard">프리텐다드</option>
               </select>
             </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">주고받는 메시지 말풍선 안의 글꼴만 바꿉니다. 나만 다르게 보이며, 상대방 화면에는 영향이 없습니다.</p>
             <label class="settings-field">대화창 글씨 크기
               <select id="setting-font-size" class="settings-select">
                 <option value="12px">작게 (12)</option>
@@ -5730,9 +5737,10 @@
         <h3 class="settings-panel-title">파일</h3>
         <p class="settings-panel-desc">받은 파일 저장 방식을 정합니다.</p>
         <div class="settings-card">
+          <p class="settings-field-hint" style="margin:0 0 4px;font-size:12px;opacity:.72;line-height:1.45;">다른 사람이 채팅으로 보낸 사진·문서 같은 파일을 이 PC에 받을 때, 매번 저장 위치를 고를지 자동으로 아래 폴더에 저장할지 정합니다.</p>
           <div class="settings-radio-stack">
-            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="auto" id="recv-auto"> <span><b>자동 저장</b><small>지정 폴더에 저장</small></span></label>
-            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="ask" id="recv-ask"> <span><b>매번 묻기</b><small>저장 위치를 매번 선택</small></span></label>
+            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="auto" id="recv-auto"> <span><b>자동 저장</b><small>아래 지정한 폴더에 바로 저장 (편함)</small></span></label>
+            <label class="settings-radio-row"><input type="radio" name="file-recv-mode" value="ask" id="recv-ask"> <span><b>매번 묻기</b><small>파일이 올 때마다 저장 위치를 직접 선택</small></span></label>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <input type="text" id="setting-download-folder" class="settings-path-input" readonly>
@@ -5823,27 +5831,29 @@
         <p class="settings-panel-desc">연결 상태를 확인하고 프로그램 업데이트를 관리합니다.</p>
         <div class="settings-card">
           <div class="settings-section-title">병원 안정성 모드</div>
+          <p class="settings-field-hint" style="margin:0 0 8px;font-size:12px;opacity:.72;line-height:1.5;">화면이 갑자기 멈추거나(응답없음) 예고 없이 재시작되는 상황을 최대한 줄이기 위해, 부담을 주는 기능 3가지를 한꺼번에 꺼주는 스위치입니다. 진료·업무 중 컴퓨터에는 켜두는 것을 권장합니다.</p>
           <label class="settings-toggle-row" for="setting-stability-mode">
             <input type="checkbox" id="setting-stability-mode" onchange="syncStabilityModeSettingsUi()">
             <span class="settings-toggle-text">
               <span class="settings-toggle-title">안정성 모드 (권장)</span>
-              <span class="settings-toggle-desc">수동 업데이트 · UI 애니메이션 Off · 일정 알람 Off를 한 번에 적용</span>
+              <span class="settings-toggle-desc">업데이트를 수동으로만 · 화면 전환 애니메이션 끔 · 일정 알람 끔 — 세 가지를 한 번에 적용</span>
             </span>
           </label>
           <p id="setting-stability-mode-hint" class="settings-field-hint" style="display:none;margin:8px 0 0;font-size:12px;line-height:1.5;">
-            안정성 모드가 켜져 있으면 위 세 가지가 고정됩니다. 해제 후 개별 설정을 바꿀 수 있습니다.
+            안정성 모드가 켜져 있는 동안은 위 세 가지 설정이 고정되어 개별로 바꿀 수 없습니다. 이 스위치를 다시 끄면 세 가지를 각자 원하는 대로 조정할 수 있습니다.
           </p>
         </div>
         <div class="settings-card">
           <div class="settings-section-title">네트워크</div>
+          <p class="settings-field-hint" style="margin:0 0 8px;font-size:12px;opacity:.72;line-height:1.5;">이 메신저는 인터넷이 아니라 <b>병원 내부망(같은 Wi-Fi·랜)</b>으로 동작합니다. 아래 두 줄이 모두 「정상」이어야 다른 PC와 대화·검색이 됩니다.</p>
           <div class="net-status-list">
             <div class="net-status-row"><span>이 PC의 IP</span><span id="net-my-ip">-</span></div>
             <div class="net-status-row"><span>사용자 검색(UDP)</span><span id="net-udp-status">-</span></div>
             <div class="net-status-row"><span>메시지 연결(TCP)</span><span id="net-tcp-status">-</span></div>
             <div class="net-status-row"><span>현재 온라인 인원</span><span id="net-online-count">-</span></div>
-            <p class="settings-field-hint" style="margin:6px 0 0;font-size:11.5px;opacity:.7;line-height:1.4;">동일 직원은 1명으로 세고, 공용 컴퓨터(직급 없음)는 제외합니다.</p>
+            <p class="settings-field-hint" style="margin:6px 0 0;font-size:11.5px;opacity:.7;line-height:1.4;">「사용자 검색」은 같은 네트워크의 다른 직원을 찾아 목록에 띄우는 기능, 「메시지 연결」은 실제로 채팅·파일을 주고받는 연결입니다. 동일 직원은 1명으로 세고, 공용 컴퓨터(직급 없음)는 제외합니다.</p>
           </div>
-          <p class="settings-hint">상태가 오류면 Windows 방화벽에서 이 프로그램 접근을 허용해 보세요.</p>
+          <p class="settings-hint">상태가 「오류」로 뜨면 Windows 방화벽(보안 프로그램)에서 이 프로그램의 네트워크 접근을 허용해 보세요 — 사내 IT 담당자에게 문의하셔도 됩니다.</p>
         </div>
         <div class="settings-card">
           <div class="settings-section-title">업데이트</div>
@@ -5851,16 +5861,17 @@
           <div class="settings-radio-stack">
             <label class="settings-radio-row">
               <input type="radio" name="update-mode" value="auto" id="update-mode-auto" onchange="onUpdateModeChange('auto')">
-              <span><b>자동</b><small>새 버전이 있으면 받아 재시작</small></span>
+              <span><b>자동</b><small>새 버전이 있으면 알아서 받아서 프로그램을 껐다 켭니다</small></span>
             </label>
             <label class="settings-radio-row">
               <input type="radio" name="update-mode" value="manual" id="update-mode-manual" checked onchange="onUpdateModeChange('manual')">
-              <span><b>수동</b><small>「지금 확인」할 때만 업데이트</small></span>
+              <span><b>수동 (기본값·권장)</b><small>내가 아래 「지금 확인」 버튼을 눌렀을 때만 업데이트합니다 — 진료·업무 중 갑자기 꺼졌다 켜지는 일이 없습니다</small></span>
             </label>
           </div>
           <label class="settings-field">업데이트 소스
             <input type="text" id="update-source-path-input" placeholder="https://github.com/dragotigree/mirae-messenger 또는 Z:\...\messenger" disabled>
           </label>
+          <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">새 버전 파일을 어디서 받아올지 나타내는 주소입니다(개발자용). 보통 손댈 필요 없고, 그냥 「지금 확인」만 누르면 됩니다.</p>
           <div class="settings-btn-row">
             <button type="button" class="settings-btn-secondary" onclick="checkUpdateNow()">지금 확인</button>
             <button type="button" class="settings-btn-secondary" id="update-save-path-btn" onclick="saveUpdateSourcePath()" style="display:none;">GitHub 주소 저장</button>
