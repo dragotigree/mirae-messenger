@@ -6619,6 +6619,43 @@ let noticesSchemaEnsuring = null; // callback queue
 /** 삭제된 공지 UID 즉시 기억 (DB 기록 전 레이스 방지) — 아래 const 재선언 없이 여기만 사용 */
 let noticeTombstoneMemory = new Set();
 
+let noticesUidUniqueEnsured = false;
+/**
+ * ⚠️ 실사고: uid에 UNIQUE 제약이 없어 upsertNoticeFromSync의 "SELECT로 확인 후 INSERT" 가
+ * 레이스에 취약했고(sqlite3는 콜백 기반이라 원자적이지 않음), 공지 2건이 91,668번 중복
+ * 삽입되며 DB가 328MB까지 불어난 걸 확인함. INSERT 쪽은 이미 UNIQUE 충돌을 잡아 UPDATE로
+ * 전환하는 코드가 있었지만(제약이 없어 발동한 적이 없었을 뿐) — 그래서 새 upsert 로직을
+ * 짜는 대신 누락됐던 인덱스만 채워서 그 기존 안전장치를 실제로 작동시킨다.
+ * 인덱스 생성 전 기존 중복은 uid당 최신 행 하나만 남기고 정리(구버전 설치본 자동 치유).
+ */
+function ensureNoticesUidUnique(done) {
+  const finish = typeof done === 'function' ? done : () => {};
+  if (noticesUidUniqueEnsured) {
+    finish();
+    return;
+  }
+  noticesUidUniqueEnsured = true;
+  db.run(
+    `DELETE FROM notices WHERE uid IS NOT NULL AND uid != '' AND id NOT IN (
+       SELECT MAX(id) FROM notices WHERE uid IS NOT NULL AND uid != '' GROUP BY uid
+     )`,
+    function onDedup(dedupErr) {
+      if (dedupErr) {
+        console.error('notices uid 중복 정리 실패:', dedupErr.message);
+      } else if (this && this.changes) {
+        console.warn(`[notices] uid 중복 ${this.changes}건 정리`);
+      }
+      db.run(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_notices_uid_unique ON notices(uid) WHERE uid IS NOT NULL AND uid != ''`,
+        (idxErr) => {
+          if (idxErr) console.error('notices uid UNIQUE 인덱스 생성 실패:', idxErr.message);
+          finish();
+        }
+      );
+    }
+  );
+}
+
 function ensureNoticesTableSchema(done) {
   const finish = typeof done === 'function' ? done : () => {};
   if (!db) {
@@ -6685,7 +6722,7 @@ function ensureNoticesTableSchema(done) {
           if (idx >= missing.length) {
             db.run(
               `UPDATE notices SET category = '전체' WHERE category IS NULL OR TRIM(COALESCE(category, '')) = ''`,
-              () => complete(true)
+              () => ensureNoticesUidUnique(() => complete(true))
             );
             return;
           }
@@ -12351,19 +12388,28 @@ async function performAutoBackupIfNeeded() {
     let alreadyExists = true;
     try { await fs.promises.access(todayFile); } catch (e) { alreadyExists = false; }
     if (!alreadyExists) {
-      // 손상된 DB를 백업으로 남기지 않음
+      // ⚠️ 실사고: quick_check는 chat_pins류의 스키마 카탈로그 손상을 못 잡아서, 이미 깨진
+      // DB가 "정상"으로 백업된 적이 있었다(나중에 복구 시점에야 그 백업도 깨진 걸 발견).
+      // 원본·백업 둘 다 부팅 시 검사와 동일한 (더 엄격한) integrity_check로 통일한다.
       const healthy = await new Promise((resolve) => {
-        db.get('PRAGMA quick_check', (err, row) => {
+        db.get('PRAGMA integrity_check', (err, row) => {
           resolve(!err && sqliteCheckRowOk(row));
         });
       });
       if (!healthy) {
-        console.error('[DB] skip auto backup — current DB failed quick_check');
-        scheduleDbCorruptRecovery('backup-quick-check');
+        console.error('[DB] skip auto backup — current DB failed integrity_check');
+        scheduleDbCorruptRecovery('backup-integrity-check');
         return;
       }
       await checkpointWal();
       await fs.promises.copyFile(dbPath, todayFile);
+      // 복사 자체가 손상을 일으킬 수 있으므로(OneDrive 등) 백업 파일도 별도로 검증 —
+      // 손상된 백업이 "정상 백업"인 척 쌓이는 걸 막는다.
+      const backupHealthy = await probeSqliteFileHealthy(todayFile);
+      if (!backupHealthy) {
+        console.error(`[DB] 백업 파일 무결성 실패 — 삭제: ${todayFile}`);
+        await fs.promises.unlink(todayFile).catch(() => {});
+      }
     }
     const cutoff = Date.now() - AUTO_BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const names = await fs.promises.readdir(dir);
