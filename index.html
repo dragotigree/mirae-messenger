@@ -508,7 +508,7 @@
     #sidebar-left .user-search-box input { padding: 6px 10px; font-size: 12px; }
 
     .user-search-box { padding: 0 10px 4px 10px; }
-    .user-search-box input { width: 100%; padding: 7px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface-muted); color: var(--text-primary); font-size: 12px; outline: none; transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast); }
+    .user-search-box input { width: 100%; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-muted); color: var(--text-primary); font-size: 12px; outline: none; transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast); }
     .user-search-box input:focus { border-color: rgba(37, 99, 235, 0.45); background: #ffffff; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12); }
     .user-search-box input::placeholder { color: var(--text-muted); }
 
@@ -1452,10 +1452,12 @@
     .chat-tool-btn .icon-glyph, .btn-schedule .icon-glyph, .btn-quickphrase .icon-glyph,
     .btn-capture .icon-glyph, .btn-urgent .icon-glyph { width: 18px; height: 18px; pointer-events: none; }
     .btn-send {
-      padding: 8px 16px; background: var(--accent); color: white; font-weight: 700; font-size: 13px;
-      border: none; border-radius: 12px; cursor: pointer; flex-shrink: 0;
+      width: 38px; height: 38px; padding: 0; background: var(--accent); color: white;
+      border: none; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
       box-shadow: none; transition: background 0.12s, filter 0.12s;
     }
+    .btn-send .icon-glyph { width: 18px; height: 18px; }
     .btn-send:hover { background: var(--accent-dark); filter: none; transform: none; box-shadow: none; }
     .btn-send:active { filter: brightness(0.96); }
 
@@ -1936,7 +1938,7 @@
 
     /* 🔍 대화 내용 검색 */
     #chat-search-bar { display: none; padding: 8px 24px; border-bottom: 1px solid var(--border-soft); gap: 8px; align-items: center; background: var(--surface-muted); flex-shrink: 0; }
-    #chat-search-bar input { flex: 1; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 12px; outline: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+    #chat-search-bar input { flex: 1; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; outline: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
     #chat-search-bar input:focus { border-color: rgba(37, 99, 235, 0.45); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
     mark.search-kw-hit {
       background: #fde047;
@@ -1976,8 +1978,8 @@
     }
     .chat-file-box .chat-file-icon,
     .chat-file-box > span:first-child {
-      flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
-      background: #eef2f7; display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+      background: var(--accent-soft); display: inline-flex; align-items: center; justify-content: center;
       font-size: 15px; line-height: 1;
     }
     .chat-file-box .chat-file-meta { min-width: 0; flex: 1; }
@@ -2156,7 +2158,7 @@
     body.compact-mode .btn-capture {
       width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: 9px;
     }
-    body.compact-mode .btn-send { padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-radius: 11px; background: #1d75d3; border: none; color: #fff; box-shadow: none; }
+    body.compact-mode .btn-send { width: 34px; height: 34px; padding: 0; border-radius: 50%; background: #1d75d3; border: none; color: #fff; box-shadow: none; }
     body.compact-mode #scheduled-indicator,
     body.compact-mode #scheduled-list-box { padding-left: 12px; padding-right: 12px; }
     body.compact-mode .is-other .chat-bubble { background: #ffffff; border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
@@ -2245,7 +2247,7 @@
     .sidebar-inbox-btn.is-danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
 
     .compact-search { padding: 8px 14px 6px; flex-shrink: 0; position: relative; background: #fff; }
-    .compact-search input { width: 100%; padding: 9px 36px 9px 36px; border-radius: 8px; border: none; background: #f5f5f5; font-size: 13px; outline: none; color: #191919; }
+    .compact-search input { width: 100%; padding: 9px 36px 9px 36px; border-radius: 999px; border: none; background: #f5f5f5; font-size: 13px; outline: none; color: #191919; }
     .compact-search input::placeholder { color: #999; }
     .compact-search input:focus { background: #efefef; }
     .compact-search-icon { position: absolute; left: 26px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.45; pointer-events: none; display: flex; }
@@ -3567,7 +3569,7 @@
     }
     .all-logs-search-wrap input {
       width: 100%; padding: 11px 14px 11px 36px;
-      border: 1px solid #e2e8f0; border-radius: 13px; font-size: 13px;
+      border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px;
       outline: none; background: #f8fafc; font-family: inherit;
       transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
       box-sizing: border-box; color: #0f172a;
@@ -4950,7 +4952,7 @@
               <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구" data-ui-icon="chatBubble"></button>
               <button class="btn-urgent chat-tool-btn" id="urgent-toggle-btn" onclick="toggleUrgentMode()" title="긴급 메시지로 표시" data-ui-icon="alertTriangle"></button>
             </div>
-            <button class="btn-send" onclick="sendChatMessage()">전송</button>
+            <button class="btn-send" onclick="sendChatMessage()" title="전송" aria-label="전송" data-ui-icon="sendArrow"></button>
           </div>
         </div>
       </div>
@@ -6792,7 +6794,8 @@
       camera: _uiSvg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'),
       pencil: _uiSvg('<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'),
       alarmClock: _uiSvg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/>'),
-      alertTriangle: _uiSvg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>')
+      alertTriangle: _uiSvg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
+      sendArrow: _uiSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
