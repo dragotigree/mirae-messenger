@@ -2070,6 +2070,14 @@
     .quick-phrase-item { padding: 9px 10px; font-size: 12px; border-radius: var(--radius-md); cursor: pointer; color: var(--text-primary); transition: background var(--transition-fast); }
     .quick-phrase-item:hover { background: var(--surface-muted); }
     .quick-phrase-manage-row { border-top: 1px solid #f1f5f9; margin-top: 6px; padding-top: 6px; font-size: 11px; color: var(--accent); cursor: pointer; text-align: center; font-weight: 700; }
+    .quick-phrase-popover-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 6px; }
+    .quick-phrase-popover-title { font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .quick-phrase-close-btn {
+      width: 20px; height: 20px; border: none; background: transparent; border-radius: 50%;
+      font-size: 12px; line-height: 1; color: #94a3b8; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .quick-phrase-close-btn:hover { background: var(--surface-muted); color: #475569; }
     .quick-phrase-manage-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12px; background: #f8fafc; }
 
     /* ⌨️ 채팅 슬래시(/) 명령어 제안 */
@@ -3653,9 +3661,15 @@
       overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; width: 100%;
     }
+    /* 2줄로 잘린 내용을 클릭하면 전체를 펼쳐서 보여줌 */
+    .log-card-body.is-expanded {
+      display: block; -webkit-line-clamp: unset; overflow: visible; white-space: pre-wrap;
+    }
     .log-card-item.is-sent .log-card-body { color: #334155; }
     .log-card-item.is-clickable { cursor: pointer; }
     .log-card-item.is-clickable:hover { border-color: #bae6fd; }
+    .log-card-item.is-expandable { cursor: pointer; }
+    .log-card-item.is-expandable:hover .log-card-body { color: #0f172a; }
 
     /* 💬 앱 공통 알림/확인 다이얼로그 */
     #app-dialog-overlay {
@@ -14129,6 +14143,14 @@
             if (typeof openImageLightbox === 'function') openImageLightbox(media.thumbSrc);
             else window.open(media.thumbSrc, '_blank');
           });
+        } else {
+          // 내용이 길어 2줄로 잘린 카드는 클릭하면 전체 내용을 펼쳐서 보여준다
+          card.classList.add('is-expandable');
+          card.title = '클릭하면 전체 내용 보기';
+          card.addEventListener('click', () => {
+            const bodyEl = card.querySelector('.log-card-body');
+            if (bodyEl) bodyEl.classList.toggle('is-expanded');
+          });
         }
 
         container.appendChild(card);
@@ -18305,9 +18327,20 @@
         await window.api.setMainWindowHidden(false);
       }
     }
+    function closeQuickPhrasePopover() {
+      const pop = document.getElementById('quick-phrase-popover');
+      if (pop) pop.style.display = 'none';
+    }
     function renderQuickPhrasePopover() {
       const pop = document.getElementById('quick-phrase-popover');
       pop.innerHTML = '';
+      const header = document.createElement('div');
+      header.className = 'quick-phrase-popover-header';
+      header.innerHTML = `
+        <span class="quick-phrase-popover-title">빠른 문구</span>
+        <button type="button" class="quick-phrase-close-btn" onclick="closeQuickPhrasePopover()" title="닫기" aria-label="닫기">✕</button>
+      `;
+      pop.appendChild(header);
       quickPhrases.forEach((phrase) => {
         const item = document.createElement('div');
         item.className = 'quick-phrase-item';

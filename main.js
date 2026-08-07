@@ -3783,21 +3783,24 @@ function openMainWindowWithViewMode(mode) {
   safeWebContentsSend('apply-tray-view-mode', resolved);
 }
 
+// ⚠️ 이모지를 메뉴 라벨에 넣으면 Windows 네이티브 트레이 메뉴 폰트에서 깨진 사각형(□)으로
+// 나오거나 다른 항목과 정렬이 흐트러져 "아이콘이 깨져 보인다"는 지적을 받음 — 순수 텍스트만 사용.
+// 트레이·단축키 기본 화면 선택은 흐름을 끊는 비활성 라벨 대신 하위 메뉴로 묶어 정리했다.
 function buildTrayContextMenu() {
   return Menu.buildFromTemplate([
     {
-      label: '💬 메시지 보내기 (Ctrl+Alt+S)',
+      label: '메시지 보내기 (Ctrl+Alt+S)',
       click: () => openMainWindowWithViewMode(trayLaunchViewMode)
     },
     {
-      label: '📜 전체 주고받은 메시지 열기 (Ctrl+Alt+E)',
+      label: '전체 대화 기록 열기 (Ctrl+Alt+E)',
       click: () => {
         openMainWindowWithViewMode(trayLaunchViewMode);
         safeWebContentsSend('trigger-open-all-logs');
       }
     },
     {
-      label: '⚙️ 환경 설정',
+      label: '환경 설정',
       click: () => {
         openMainWindowWithViewMode(trayLaunchViewMode);
         safeWebContentsSend('trigger-open-settings');
@@ -3805,30 +3808,33 @@ function buildTrayContextMenu() {
     },
     { type: 'separator' },
     {
-      label: '🖥️ 기본 화면으로 열기',
+      label: '기본 화면으로 열기',
       click: () => openMainWindowWithViewMode('normal')
     },
     {
-      label: '📱 미니 화면으로 열기',
+      label: '미니 화면으로 열기',
       click: () => openMainWindowWithViewMode('compact')
     },
-    { type: 'separator' },
-    { label: '트레이·단축키로 열 때', enabled: false },
     {
-      label: '기본 화면',
-      type: 'radio',
-      checked: trayLaunchViewMode === 'normal',
-      click: () => setTrayLaunchViewMode('normal')
+      label: '트레이·단축키로 열 때 기본 화면',
+      submenu: [
+        {
+          label: '기본 화면',
+          type: 'radio',
+          checked: trayLaunchViewMode === 'normal',
+          click: () => setTrayLaunchViewMode('normal')
+        },
+        {
+          label: '미니 화면',
+          type: 'radio',
+          checked: trayLaunchViewMode === 'compact',
+          click: () => setTrayLaunchViewMode('compact')
+        }
+      ]
     },
-    {
-      label: '미니 화면',
-      type: 'radio',
-      checked: trayLaunchViewMode === 'compact',
-      click: () => setTrayLaunchViewMode('compact')
-    },
     { type: 'separator' },
     {
-      label: '🛠️ 문제 진단 화면 열기',
+      label: '문제 진단 화면 열기',
       click: () => {
         openMainWindowWithViewMode(trayLaunchViewMode);
         if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
