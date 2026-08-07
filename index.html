@@ -269,6 +269,14 @@
     .notice-widget-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; color: #ffffff; }
     .notice-widget-header .icon-glyph, .sidebar-block-head .icon-glyph { width: 14px; height: 14px; flex-shrink: 0; }
     .sidebar-quick-actions .icon-glyph { width: 15px; height: 15px; flex-shrink: 0; }
+    .sidebar-header-icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; border-radius: 6px; cursor: pointer;
+      color: var(--sidebar-text-dim); flex-shrink: 0;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .sidebar-header-icon-btn:hover { background: rgba(255,255,255,0.1); color: #ffffff; }
+    .sidebar-header-icon-btn .icon-glyph { width: 14px; height: 14px; }
 
     #sidebar-left .section-label { padding: 5px 12px 3px 12px; font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); }
     .section-label { text-transform: uppercase; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.62); padding: 6px 12px 3px 12px; letter-spacing: 0.02em; }
@@ -4567,10 +4575,6 @@
           </span>
           <span class="unread-badge" id="dm-section-unread-badge" style="display:none;">0</span>
         </div>
-        <div class="sidebar-quick-actions" role="group" aria-label="빠른 전송">
-          <button type="button" class="sidebar-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)"><span data-ui-icon="ipmsg"></span> 쪽지</button>
-          <button type="button" class="sidebar-code-alert-btn" onclick="openCodeAlertModal()" title="코드블루·코드레드 긴급 발령"><span data-ui-icon="alertTriangle"></span> 코드</button>
-        </div>
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
@@ -4579,7 +4583,10 @@
             <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
-          <span class="sidebar-users-hint">Ctrl+클릭</span>
+          <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="ipmsg"></span>
+            <span class="sidebar-users-hint">Ctrl+클릭</span>
+          </span>
         </div>
         <div class="user-search-box" id="user-search-box">
           <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
