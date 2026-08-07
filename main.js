@@ -588,7 +588,7 @@ let spellCheckerEnabled = false;
 // 🔄 쉬운 업데이트 기능: package.json의 version 값을 단일 기준으로 사용한다.
 // (예전에는 이 줄에 버전을 직접 문자열로 적어야 했는데, package.json 값과 따로 놀면서
 //  실제로는 새 버전이 배포됐는데도 이 앱은 구버전이라고 착각하는 문제가 있었다.)
-const APP_VERSION = require('./package.json').version;
+let APP_VERSION = require('./package.json').version;
 // 마스터가 지정한 공유 폴더(예: 병원 공유 드라이브) 경로. 여기 최신 파일을 올려두면
 // 전 직원 PC가 자동으로 새 버전이 있는지 확인하고, 원할 때 한 번에 업데이트할 수 있다.
 let updateSourcePath = '';
@@ -4379,6 +4379,16 @@ app.whenReady().then(async () => {
     const pendingApplied = await withTimeout(applyPendingUpdatesOnStartup(), 8000, 'pending-update');
     if (pendingApplied > 0) {
       console.log(`[업데이트] 보류 파일 ${pendingApplied}개 적용됨`);
+      // ⚠️ APP_VERSION은 파일 맨 위 require() 시점(=이 보류 적용보다 먼저)에 캐시된 값이라,
+      // 방금 새 package.json을 디스크에 반영해도 이 값은 여전히 구버전을 가리킨다.
+      // 갱신하지 않으면 자동 업데이트 검사가 "아직도 구버전"이라고 착각해 재적용→재시작을
+      // 끝없이 반복하는 켜짐/꺼짐 루프가 생긴다.
+      try {
+        delete require.cache[require.resolve('./package.json')];
+        APP_VERSION = require('./package.json').version;
+      } catch (e) {
+        console.warn('[업데이트] APP_VERSION 갱신 실패:', e && e.message ? e.message : e);
+      }
     }
   } catch (e) {
     console.warn('[업데이트] 보류 적용 스킵:', e && e.message ? e.message : e);
