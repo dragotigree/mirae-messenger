@@ -186,6 +186,40 @@
     body { font-size: var(--chat-font-size); }
 
     /* ========== 1단 사이드바 (Slack 스타일) ========== */
+    /* 🧭 좌측 아이콘 레일 — 참조 디자인의 얇은 내비게이션 바 */
+    #app-icon-rail {
+      width: 60px; flex-shrink: 0; z-index: 11; position: relative;
+      display: flex; flex-direction: column; align-items: center;
+      background: #ffffff; border-right: 1px solid var(--border);
+      padding: 14px 0 12px;
+    }
+    #icon-rail-brand {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: linear-gradient(145deg, #1d4ed8, #0f172a);
+      color: #fff; font-size: 11px; font-weight: 800; letter-spacing: -0.04em;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 18px; cursor: default;
+    }
+    #icon-rail-nav { display: flex; flex-direction: column; gap: 8px; }
+    #icon-rail-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .icon-rail-btn {
+      width: 40px; height: 40px; border-radius: 13px; border: none; background: transparent;
+      color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+      flex-shrink: 0;
+    }
+    .icon-rail-btn .icon-glyph { width: 20px; height: 20px; }
+    .icon-rail-btn:hover { background: var(--surface-muted); color: var(--text-primary); }
+    .icon-rail-btn.is-active { background: #dbeafe; color: #1d4ed8; }
+    #icon-rail-account-btn {
+      width: 34px; height: 34px; border-radius: 50%; border: none;
+      background: var(--accent-soft); color: var(--accent);
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: filter var(--transition-fast);
+    }
+    #icon-rail-account-btn .icon-glyph { width: 17px; height: 17px; }
+    #icon-rail-account-btn:hover { filter: brightness(0.94); }
+
     #sidebar-left {
       width: var(--sidebar-width, 300px);
       background: var(--sidebar-bg);
@@ -557,7 +591,7 @@
     }
     .sidebar-pref-chip:hover { color: var(--text-primary); background: #e9edf3; }
     .sidebar-pref-chip.is-active {
-      color: #ffffff; background: var(--accent);
+      color: #1d4ed8; background: #dbeafe;
     }
 
     /* 👥 그룹 대화방 체크리스트 */
@@ -1475,10 +1509,10 @@
     .empty-hint-icon { font-size: 12px; opacity: 0.85; }
     .empty-ipmsg-cta {
       margin-top: 18px; padding: 10px 18px; border: none; border-radius: 99px; cursor: pointer;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-size: 12px; font-weight: 700;
-      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.28); transition: transform 0.15s, box-shadow 0.15s;
+      background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; font-size: 12px; font-weight: 700;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.24); transition: transform 0.15s, box-shadow 0.15s;
     }
-    .empty-ipmsg-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35); }
+    .empty-ipmsg-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15, 23, 42, 0.3); }
 
     /* ⏰ 예약 메시지 */
     #scheduled-indicator { display: none; padding: 0 20px; flex-shrink: 0; background: linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.98)); border-top: 1px solid rgba(37, 99, 235, 0.12); }
@@ -2133,6 +2167,7 @@
 
     /* ========== 🗨 미니 모드 (모바일 메신저 스타일) ========== */
     body.compact-mode #sidebar-left,
+    body.compact-mode #app-icon-rail,
     body.compact-mode #sidebar-right { display: none; }
     body.compact-mode #main-chat-panel { border-right: none; width: 100%; background: #fff; min-width: 480px; }
     body.compact-mode #chat-header {
@@ -2452,7 +2487,7 @@
       background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
     }
     .sidebar-cal-actions #add-sch-btn {
-      display: inline-flex; justify-content: center; background: var(--accent); color: #fff; border: none; font-size: 13px;
+      display: inline-flex; justify-content: center; background: #0f172a; color: #fff; border: none; font-size: 13px;
     }
     .schedule-box {
       background: linear-gradient(180deg, #eff6ff 0%, #f8fcff 100%);
@@ -2647,15 +2682,15 @@
     }
     .mini-cal-day.today:hover { background: #dbeafe; }
     .mini-cal-day.selected {
-      background: var(--accent);
+      background: #0f172a;
       color: #fff;
       font-weight: var(--font-weight-bold);
       box-shadow: none;
     }
     .mini-cal-day.today.selected {
-      background: var(--accent);
+      background: #0f172a;
       color: #fff;
-      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), 0 0 0 1.5px var(--accent);
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), 0 0 0 1.5px #0f172a;
     }
     .mini-cal-day .cal-marks {
       position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
@@ -4454,8 +4489,8 @@
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
     .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
     .settings-btn-secondary:hover { background: #e2e8f0; }
-    .settings-btn-primary { padding: 8px 16px; background: var(--accent); border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
-    .settings-btn-primary:hover { filter: brightness(0.96); }
+    .settings-btn-primary { padding: 8px 16px; background: #0f172a; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
+    .settings-btn-primary:hover { filter: brightness(1.15); }
     .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
     .settings-btn-danger:hover { background: #b91c1c; }
     .settings-btn-text { padding: 7px 4px; background: none; border: none; font-size: 11.5px; font-weight: 500; color: #94a3b8; cursor: pointer; transition: color 0.12s; }
@@ -4577,6 +4612,19 @@
   </div>
 
   <div id="app-body-row">
+  <div id="app-icon-rail">
+    <div id="icon-rail-brand" title="미래병원 메신저">미래</div>
+    <div id="icon-rail-nav">
+      <button type="button" class="icon-rail-btn is-active" id="icon-rail-chat-btn" title="대화" onclick="scrollSidebarToBlock('channels')" data-ui-icon="chatBubble"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" onclick="scrollSidebarToBlock('users')" title="직원 목록" data-ui-icon="users"></button>
+    </div>
+    <div id="icon-rail-bottom">
+      <button type="button" class="icon-rail-btn" id="icon-rail-fav-btn" onclick="scrollSidebarToFavorites()" title="즐겨찾기" data-ui-icon="star"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-settings-btn" onclick="openSettingsModal()" title="환경 설정" data-ui-icon="settings"></button>
+      <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="내 프로필" data-ui-icon="users"></button>
+    </div>
+  </div>
   <div id="sidebar-left">
     <div id="sidebar-resize-handle" title="너비 조절"></div>
 
@@ -6804,7 +6852,8 @@
       pencil: _uiSvg('<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'),
       alarmClock: _uiSvg('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/>'),
       alertTriangle: _uiSvg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
-      sendArrow: _uiSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>')
+      sendArrow: _uiSvg('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>'),
+      star: _uiSvg('<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -8956,6 +9005,21 @@
       });
       updateMasterAuthUi();
       updateCompactModeButtonUi();
+    }
+
+    /* 🧭 좌측 아이콘 레일: 채널/사용자 섹션으로 스크롤 이동 */
+    function scrollSidebarToBlock(kind) {
+      const id = kind === 'users' ? 'sidebar-block-users' : 'sidebar-block-channels';
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
+      const btn = document.getElementById(kind === 'users' ? 'icon-rail-users-btn' : 'icon-rail-chat-btn');
+      if (btn) btn.classList.add('is-active');
+    }
+    function scrollSidebarToFavorites() {
+      const favLabel = Array.from(document.querySelectorAll('#sidebar-left .subsection-label')).find((el) => el.textContent.includes('즐겨찾기'));
+      if (favLabel) favLabel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else document.getElementById('sidebar-main-sections')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function updateCompactModeButtonUi() {
