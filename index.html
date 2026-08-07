@@ -584,7 +584,8 @@
     #sidebar-left .user-search-box { padding: 2px 10px 5px 10px; }
     #sidebar-left .user-search-box input { padding: 6px 10px; font-size: 12.5px; }
 
-    .user-search-box { padding: 0 10px 4px 10px; }
+    .user-search-box { padding: 0 10px 4px 10px; display: none; }
+    .user-search-box.is-visible { display: block; }
     .user-search-box input { width: 100%; padding: 8px 14px; border-radius: 999px; border: 1px solid transparent; background: var(--surface-muted); color: var(--text-primary); font-size: 12px; outline: none; transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast); }
     .user-search-box input:focus { border-color: rgba(37, 99, 235, 0.45); background: #ffffff; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12); }
     .user-search-box input::placeholder { color: var(--text-muted); }
@@ -4671,11 +4672,12 @@
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="ipmsg"></span>
           </span>
         </div>
         <div class="user-search-box" id="user-search-box">
-          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" title="사람 검색 (Ctrl+Shift+F)">
+          <input type="text" id="user-search-input" placeholder="이름, 부서 또는 층 검색 (Ctrl+Shift+F)" oninput="filterUserList(this.value)" onkeydown="onUserSearchKeyDown(event)" onblur="onUserSearchBlur()" title="사람 검색 (Ctrl+Shift+F)">
         </div>
         <div class="sidebar-inbox-bar" id="sidebar-inbox-bar" hidden>
           <span class="sidebar-inbox-count" id="sidebar-inbox-count">미읽음 0</span>
@@ -11183,7 +11185,36 @@
         e.preventDefault();
         filterUserList('');
         e.target.blur();
+        hideUserSearchBox();
       }
+    }
+
+    /* 🔍 사용자 검색창 — 평소엔 숨기고 돋보기 클릭 또는 Ctrl+Shift+F 로만 노출 */
+    function showUserSearchBox() {
+      const box = document.getElementById('user-search-box');
+      if (box) box.classList.add('is-visible');
+    }
+    function hideUserSearchBox() {
+      const box = document.getElementById('user-search-box');
+      const input = document.getElementById('user-search-input');
+      if (input && input.value) return;
+      if (box) box.classList.remove('is-visible');
+    }
+    function toggleUserSearchBox() {
+      const box = document.getElementById('user-search-box');
+      if (!box) return;
+      if (box.classList.contains('is-visible')) {
+        filterUserList('');
+        const input = document.getElementById('user-search-input');
+        if (input) input.value = '';
+        box.classList.remove('is-visible');
+      } else {
+        box.classList.add('is-visible');
+        requestAnimationFrame(() => document.getElementById('user-search-input')?.focus());
+      }
+    }
+    function onUserSearchBlur() {
+      setTimeout(hideUserSearchBox, 150);
     }
 
     function getDeptList() {
@@ -17587,6 +17618,7 @@
       }
       const input = document.getElementById('user-search-input');
       if (!input) return false;
+      showUserSearchBox();
       input.focus();
       input.select();
       requestAnimationFrame(() => {
