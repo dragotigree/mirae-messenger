@@ -4567,15 +4567,9 @@
     </div>
 
     <div id="sidebar-main-sections" class="sidebar-main-sections">
-      <div id="sidebar-block-dm" class="sidebar-main-block" data-sidebar-block="dm">
-        <div class="section-label sidebar-block-head" id="dm-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;">
-          <span style="display:flex; align-items:center; gap:4px; min-width:0;">
-            <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
-            <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="chatBubble"></span> 다이렉트 메시지</span>
-          </span>
-          <span class="unread-badge" id="dm-section-unread-badge" style="display:none;">0</span>
-        </div>
-      </div>
+      <!-- 「다이렉트 메시지」 헤더(빠른 전송 버튼이 빠지며 빈 줄만 남음)는 제거 — DM은
+           아래 사용자 목록에서 바로 열리고, 드롭존(dm-section-label)·집계 배지
+           (dm-section-unread-badge)는 각 사용자 카드의 개별 배지로 충분히 대체된다. -->
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
