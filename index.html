@@ -16,7 +16,7 @@
       --font-weight-bold: 700;
       --chat-font-size: 14px;
       --sidebar-bg: #ffffff;
-      --sidebar-hover: #f1f5f9;
+      --sidebar-hover: var(--border-soft);
       --sidebar-active: #E3F2FD;
       --sidebar-text: #0f172a;
       --sidebar-text-dim: rgba(15,23,42,0.48);
@@ -260,7 +260,7 @@
     .compact-tool-btn .icon-glyph { width: 14px; height: 14px; opacity: 0.88; }
 
 
-    .net-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+    .net-status-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
     .net-status-row:last-child { border-bottom: none; }
     .net-status-ok { color: #16a34a; font-weight: 700; }
     .net-status-bad { color: #dc2626; font-weight: 700; }
@@ -507,7 +507,7 @@
     .lock-input-wrap .lock-input-icon .icon-glyph { width: 16px; height: 16px; display: block; }
     .lock-input-wrap input {
       width: 100%; box-sizing: border-box; padding: 12px 14px 12px 40px;
-      border: 1px solid transparent; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-family: inherit; color: #0f172a;
+      border: 1px solid transparent; border-radius: 12px; background: var(--border-soft); font-size: 13px; font-family: inherit; color: #0f172a;
       transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
     }
     .lock-input-wrap input:focus { outline: none; background: #fff; border-color: #90CAF9; box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.12); }
@@ -557,7 +557,7 @@
     .title-emoji-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
     .title-emoji-pick-btn { border: 1px solid var(--border); background: #f8fafc; border-radius: var(--radius-md); font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
-    .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
+    .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: var(--border-soft); border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
     #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
@@ -638,7 +638,7 @@
     .group-bulk-row {
       display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px;
       margin-top: 6px; padding: 8px 10px;
-      background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px;
+      background: #f8fafc; border: 1px solid var(--border-soft); border-radius: 12px;
     }
     .group-bulk-field {
       display: flex; flex-direction: column; gap: 3px;
@@ -747,7 +747,7 @@
       box-shadow: inset 3px 0 0 var(--accent);
     }
     body.has-sidebar-user-selection .compact-list-item-user.is-active:not(.is-multi-selected) {
-      background: #f1f5f9 !important;
+      background: var(--border-soft) !important;
       box-shadow: inset 3px 0 0 #94a3b8;
     }
     /* 검색 포커스는 다중선택과 헷갈리지 않게 다른 스타일 */
@@ -934,7 +934,7 @@
     }
     .privacy-lock-unlock-btn { background: #4f46e5; color: #fff; }
     .privacy-lock-unlock-btn:hover { background: #4338ca; }
-    .privacy-lock-master-btn { background: #f1f5f9; color: #475569; }
+    .privacy-lock-master-btn { background: var(--border-soft); color: #475569; }
     .privacy-lock-master-btn:hover { background: var(--border); }
     .privacy-lock-master-box { display: none; margin-top: 12px; text-align: left; gap: 8px; flex-direction: column; }
     .privacy-lock-master-box.is-open { display: flex; }
@@ -994,13 +994,13 @@
       box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
     }
     .chat-header-tool-btn--archive {
-      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      background: linear-gradient(180deg, #f8fafc 0%, var(--border-soft) 100%);
       border-color: rgba(148, 163, 184, 0.45);
       color: #334155;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
     }
     .chat-header-tool-btn--archive:hover {
-      background: linear-gradient(180deg, #f1f5f9 0%, var(--border) 100%);
+      background: linear-gradient(180deg, var(--border-soft) 0%, var(--border) 100%);
       border-color: rgba(100, 116, 139, 0.5);
       box-shadow: 0 4px 14px rgba(100, 116, 139, 0.12);
     }
@@ -1165,14 +1165,14 @@
     }
     .chat-shared-back {
       width: 36px; height: 36px; border: none; border-radius: var(--radius-md);
-      background: #f1f5f9; color: #334155; cursor: pointer;
+      background: var(--border-soft); color: #334155; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
     }
     .chat-shared-back:hover { background: var(--border); }
     .chat-shared-head-title { font-size: 15px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .chat-shared-tabbar {
       display: flex; align-items: center; gap: 0; padding: 0 12px 0 8px;
-      border-top: 1px solid #f1f5f9;
+      border-top: 1px solid var(--border-soft);
     }
     .chat-shared-tab {
       flex: 1; border: none; background: transparent; cursor: pointer;
@@ -1193,7 +1193,7 @@
     @media (max-width: 720px) { .chat-shared-photo-grid { grid-template-columns: repeat(4, 1fr); } }
     .chat-shared-photo-cell {
       aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; cursor: zoom-in;
-      background: #f1f5f9; border: none; padding: 0;
+      background: var(--border-soft); border: none; padding: 0;
     }
     .chat-shared-photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .chat-shared-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1202,7 +1202,7 @@
       border-radius: var(--radius-lg); border: 1px solid var(--border); background: #fafbfc;
       text-align: left; cursor: pointer; width: 100%;
     }
-    .chat-shared-file-row:hover, .chat-shared-link-row:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .chat-shared-file-row:hover, .chat-shared-link-row:hover { background: var(--border-soft); border-color: #cbd5e1; }
     .chat-shared-file-icon { font-size: 26px; flex-shrink: 0; }
     .chat-shared-file-meta, .chat-shared-link-meta { flex: 1; min-width: 0; }
     .chat-shared-file-name, .chat-shared-link-url {
@@ -1307,7 +1307,7 @@
     }
     /* ✉️ 쪽지(여러 명에게 개별 발송)에 함께 실어 보내는 받는사람 목록 — 메시지 본문과 구분되게 */
     .ipmsg-recipients-tag {
-      font-size: 11px; color: #64748b; background: #f1f5f9; border-radius: var(--radius-md);
+      font-size: 11px; color: #64748b; background: var(--border-soft); border-radius: var(--radius-md);
       padding: 4px 8px; margin-bottom: 6px; display: inline-block; font-weight: 600;
     }
     .msg-content-line {
@@ -1326,8 +1326,8 @@
       max-width: 100%;
     }
     .bubble-stack .msg-pending-notice { margin-top: 4px; text-align: right; }
-    .msg-text { font-size: var(--chat-font-size); line-height: 1.55; color: #1d1c1d; word-break: break-word; display: inline-block; max-width: 100%; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #f1f5f9; border: none; box-shadow: none; }
-    .msg-row.is-other .msg-text { background: #f1f5f9; color: var(--text-primary); }
+    .msg-text { font-size: var(--chat-font-size); line-height: 1.55; color: #1d1c1d; word-break: break-word; display: inline-block; max-width: 100%; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: var(--border-soft); border: none; box-shadow: none; }
+    .msg-row.is-other .msg-text { background: var(--border-soft); color: var(--text-primary); }
     .msg-row.is-me .msg-text { background: var(--sidebar-active); color: #0f172a; border: none; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .msg-text:has(.chat-img-preview), .msg-text:has(.chat-file-box) { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0; }
     .msg-text[draggable="true"], .chat-bubble[draggable="true"] { cursor: grab; }
@@ -1495,7 +1495,7 @@
     .bubble-block { display: flex; flex-direction: column; max-width: 100%; }
     #reaction-picker-popover { display: none; position: fixed; z-index: 2500; width: 320px; max-height: 380px; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,0.18); border: 1px solid var(--border); flex-direction: column; overflow: hidden; -webkit-app-region: no-drag; animation: menu-pop 0.16s var(--ease-spring); }
     #reaction-picker-popover.is-open { display: flex; }
-    .reaction-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; border-bottom: 1px solid #f1f5f9; }
+    .reaction-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; border-bottom: 1px solid var(--border-soft); }
     .reaction-picker-head span { font-size: 12px; font-weight: 700; color: #64748b; }
     .reaction-picker-close { border: none; background: transparent; font-size: 16px; color: #94a3b8; cursor: pointer; padding: 2px 6px; line-height: 1; }
     .reaction-picker-search-wrap { padding: 8px 12px; position: relative; }
@@ -1506,10 +1506,10 @@
     .reaction-picker-section-label { font-size: 10.5px; font-weight: 700; color: #94a3b8; padding: 8px 4px 4px; letter-spacing: 0.02em; }
     .reaction-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
     .reaction-picker-item { border: none; background: transparent; font-size: 22px; line-height: 1; padding: 6px 2px; border-radius: var(--radius-md); cursor: pointer; transition: background 0.1s; }
-    .reaction-picker-item:hover { background: #f1f5f9; }
+    .reaction-picker-item:hover { background: var(--border-soft); }
 
     #chat-input-wrapper { position: relative; padding: 12px 20px 18px; background: linear-gradient(180deg, transparent, rgba(248,250,252,0.55)); flex-shrink: 0; }
-    .input-box-inner { position: relative; background: #f1f5f9; border: 1px solid transparent; border-radius: 20px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast); }
+    .input-box-inner { position: relative; background: var(--border-soft); border: 1px solid transparent; border-radius: 20px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: none; transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast); }
     .input-box-inner:focus-within { background: #ffffff; border-color: rgba(33, 150, 243, 0.4); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.08); }
     .input-box-inner textarea { width: 100%; height: 44px; min-height: 44px; max-height: 160px; border: none; background: transparent; outline: none; resize: none; font-size: var(--chat-font-size); color: var(--text-primary); line-height: 1.5; overflow-y: auto; }
     .input-bottom-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px; }
@@ -1521,7 +1521,7 @@
       cursor: pointer; transition: background 0.12s, color 0.12s;
       flex-shrink: 0;
     }
-    .chat-tool-btn:hover { background: #f1f5f9; color: #0f172a; }
+    .chat-tool-btn:hover { background: var(--border-soft); color: #0f172a; }
     label.chat-tool-btn { margin: 0; font-weight: 500; }
     .chat-tool-btn .icon-glyph, .btn-schedule .icon-glyph, .btn-quickphrase .icon-glyph,
     .btn-capture .icon-glyph, .btn-urgent .icon-glyph { width: 18px; height: 18px; pointer-events: none; }
@@ -1652,9 +1652,9 @@
     .schedule-time-colon { font-size: 16px; font-weight: 700; color: #94a3b8; }
     .schedule-msg-footer {
       display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px 12px;
-      border-top: 1px solid #f1f5f9; background: #fafbfc; flex-shrink: 0;
+      border-top: 1px solid var(--border-soft); background: #fafbfc; flex-shrink: 0;
     }
-    .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: var(--radius-md); background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: var(--radius-md); background: var(--border-soft); color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
     .schedule-btn-ghost:hover { background: var(--border); }
     .schedule-btn-primary {
       padding: 8px 16px; border: none; border-radius: var(--radius-md);
@@ -1702,7 +1702,7 @@
       background: rgba(255,255,255,0.85); color: #64748b; font-size: 18px; line-height: 1;
       transition: background 0.12s, color 0.12s;
     }
-    .ipmsg-close-btn:hover { background: #f1f5f9; color: #0f172a; }
+    .ipmsg-close-btn:hover { background: var(--border-soft); color: #0f172a; }
     .ipmsg-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; }
     .ipmsg-controls-strip {
       flex-shrink: 0;
@@ -1781,7 +1781,7 @@
       text-align: left; padding: 6px 8px; font-weight: 700; font-size: 10.5px;
       color: #64748b; border-bottom: 1px solid #e8edf2; white-space: nowrap; letter-spacing: -0.02em;
     }
-    .ipmsg-user-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+    .ipmsg-user-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-soft); color: #334155; vertical-align: middle; }
     .ipmsg-user-table tbody tr { cursor: pointer; transition: background 0.1s; }
     .ipmsg-user-table tbody tr:hover { background: #f8fafc; }
     .ipmsg-user-table tbody tr.is-selected { background: linear-gradient(90deg, var(--sidebar-active), #f8fafc); }
@@ -1940,7 +1940,7 @@
     .chat-quick-switcher-icon {
       width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px; background: #f1f5f9; color: #334155; overflow: hidden;
+      font-size: 17px; background: var(--border-soft); color: #334155; overflow: hidden;
       box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
     }
     .chat-quick-switcher-icon.avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
@@ -2006,7 +2006,7 @@
       transition: background 0.12s, color 0.12s;
     }
     .btn-schedule:hover, .btn-quickphrase:hover, .btn-capture:hover, .btn-urgent:hover {
-      background: #f1f5f9; color: #0f172a;
+      background: var(--border-soft); color: #0f172a;
     }
     .btn-urgent.active { background: #fef2f2; color: #dc2626; font-weight: 700; }
 
@@ -2137,10 +2137,10 @@
     .code-alert-preview.is-red { border-color: #ef4444; background: #fef2f2; color: #7f1d1d; }
     .code-alert-footer {
       display: flex; justify-content: flex-end; gap: 8px;
-      padding: 12px 18px 16px; border-top: 1px solid #f1f5f9;
+      padding: 12px 18px 16px; border-top: 1px solid var(--border-soft);
     }
     .code-alert-btn-ghost {
-      padding: 9px 14px; border: none; border-radius: var(--radius-md); background: #f1f5f9;
+      padding: 9px 14px; border: none; border-radius: var(--radius-md); background: var(--border-soft);
       color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
     }
     .code-alert-btn-send {
@@ -2173,11 +2173,11 @@
     #screen-capture-source-modal .capture-source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; max-height: 55vh; overflow-y: auto; padding: 4px 0; }
     .capture-source-card { border: 2px solid var(--border); border-radius: 12px; padding: 8px; cursor: pointer; background: #fff; transition: border-color 0.12s, box-shadow 0.12s; }
     .capture-source-card:hover { border-color: #90CAF9; box-shadow: var(--shadow-sm); }
-    .capture-source-card img { width: 100%; height: 90px; object-fit: contain; background: #f1f5f9; border-radius: 8px; display: block; }
+    .capture-source-card img { width: 100%; height: 90px; object-fit: contain; background: var(--border-soft); border-radius: 8px; display: block; }
     .capture-source-card .capture-source-name { font-size: 11px; font-weight: 600; color: #334155; margin-top: 6px; line-height: 1.35; word-break: break-all; }
     .quick-phrase-item { padding: 9px 10px; font-size: 12px; border-radius: var(--radius-md); cursor: pointer; color: var(--text-primary); transition: background var(--transition-fast); }
     .quick-phrase-item:hover { background: var(--surface-muted); }
-    .quick-phrase-manage-row { border-top: 1px solid #f1f5f9; margin-top: 6px; padding-top: 6px; font-size: 11px; color: var(--accent); cursor: pointer; text-align: center; font-weight: 700; }
+    .quick-phrase-manage-row { border-top: 1px solid var(--border-soft); margin-top: 6px; padding-top: 6px; font-size: 11px; color: var(--accent); cursor: pointer; text-align: center; font-weight: 700; }
     .quick-phrase-popover-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 6px; }
     .quick-phrase-popover-title { font-size: 11px; font-weight: 700; color: #94a3b8; }
     .quick-phrase-close-btn {
@@ -2235,7 +2235,7 @@
     body.compact-mode .btn-send { width: 34px; height: 34px; padding: 0; border-radius: 50%; background: var(--accent); border: none; color: #fff; box-shadow: none; }
     body.compact-mode #scheduled-indicator,
     body.compact-mode #scheduled-list-box { padding-left: 12px; padding-right: 12px; }
-    body.compact-mode .is-other .chat-bubble { background: #f1f5f9; border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: none; }
+    body.compact-mode .is-other .chat-bubble { background: var(--border-soft); border: none; color: #1e293b; border-radius: 18px 18px 18px 4px; box-shadow: none; }
     body.compact-mode .is-me .chat-bubble { background: var(--sidebar-active); color: #0f172a; border: none; border-radius: 18px 18px 4px 18px; box-shadow: none; }
     body.compact-mode .bubble-sender { color: #475569; font-size: 11px; font-weight: 600; margin: 0 6px 4px 2px; }
     body.compact-mode .bubble-sender::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; margin-right: 5px; vertical-align: middle; }
@@ -2299,7 +2299,7 @@
       border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 700;
       cursor: pointer; letter-spacing: -0.02em;
     }
-    .compact-inbox-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .compact-inbox-btn:hover { background: var(--border-soft); border-color: #cbd5e1; }
     .compact-inbox-btn.is-danger { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
     .compact-inbox-btn.is-danger:hover { background: #ffe4e6; }
 
@@ -2397,7 +2397,7 @@
       font-family: inherit;
       cursor: pointer;
     }
-    .compact-window-tools-row button:hover { background: #f1f5f9; color: #0f172a; }
+    .compact-window-tools-row button:hover { background: var(--border-soft); color: #0f172a; }
 
     .msg-row-bubble { display: flex; flex-direction: column; max-width: 78%; margin: 4px 0; }
     .msg-row-bubble.is-me { align-items: flex-end; align-self: flex-end; margin-left: auto; }
@@ -2408,7 +2408,7 @@
     .msg-row-bubble.is-other .bubble-stack { align-items: flex-start; }
     .bubble-line .chat-bubble { max-width: min(280px, 100%); padding: 10px 14px; font-size: 13px; line-height: 1.5; word-break: break-word; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
     .is-me .chat-bubble { background: var(--sidebar-active); color: #0f172a; border-radius: 18px 18px 6px 18px; box-shadow: none; }
-    .is-other .chat-bubble { background: #f1f5f9; color: var(--text-primary); border: none; border-radius: 18px 18px 18px 6px; box-shadow: none; }
+    .is-other .chat-bubble { background: var(--border-soft); color: var(--text-primary); border: none; border-radius: 18px 18px 18px 6px; box-shadow: none; }
     .bubble-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
     .bubble-line .msg-unread-count { align-self: center; }
     .is-me .bubble-time .read-status { color: var(--accent-dark); }
@@ -2433,7 +2433,7 @@
       flex-shrink: 0;
     }
     .user-info-modal-close {
-      border: none; background: #f1f5f9; color: #475569; width: 32px; height: 32px;
+      border: none; background: var(--border-soft); color: #475569; width: 32px; height: 32px;
       border-radius: var(--radius-md); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
     }
     .user-info-modal-close:hover { background: var(--border); }
@@ -2645,7 +2645,7 @@
       cursor: pointer; line-height: 1.3; letter-spacing: -0.03em;
       -webkit-app-region: no-drag;
     }
-    .sidebar-cal-other-sort-btn:hover { background: #f1f5f9; color: #334155; }
+    .sidebar-cal-other-sort-btn:hover { background: var(--border-soft); color: #334155; }
     .sidebar-cal-other-sort-btn.active {
       background: var(--sidebar-active); border-color: #90CAF9; color: var(--accent-dark);
     }
@@ -2811,12 +2811,12 @@
     }
     .sb-board-side {
       width: 300px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
-      padding: 10px 8px 12px; background: #f1f5f9; border-right: 1px solid var(--border);
+      padding: 10px 8px 12px; background: var(--border-soft); border-right: 1px solid var(--border);
       display: flex; flex-direction: column; gap: 10px;
     }
     .sb-board-content {
       flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column;
-      background: #eef2f7;
+      background: var(--border-soft);
     }
     .sb-board-side-hint {
       font-size: 10px; color: #64748b; line-height: 1.4; padding: 0 1px;
@@ -3034,8 +3034,8 @@
       background: #e11d48; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.2);
     }
     .sb-recent-change-item b { font-weight: 800; color: #be123c; }
-    .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; background: #eef2f7; }
-    .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: #eef2f7; }
+    .sb-board-content .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; background: var(--border-soft); }
+    .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: var(--border-soft); }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
     .schedule-board-section {
       border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1;
@@ -3067,7 +3067,7 @@
     .schedule-board-table thead th.sb-col-btns { text-align: center; }
     .schedule-board-table tbody td {
       padding: 12px 8px; font-size: 14px; vertical-align: middle; text-align: center;
-      border-top: 1px solid #f1f5f9; min-width: 0;
+      border-top: 1px solid var(--border-soft); min-width: 0;
     }
     .schedule-board-table tbody td.schedule-board-room,
     .schedule-board-table tbody td.schedule-board-name,
@@ -3099,7 +3099,7 @@
       grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12px; font-weight: 800; color: #64748b;
-      position: sticky; top: 0; z-index: 2; background: #eef2f7;
+      position: sticky; top: 0; z-index: 2; background: var(--border-soft);
       border-bottom: 1px solid var(--border); margin-bottom: 2px;
     }
     .schedule-board-modal-card.sb-mode-referral .schedule-board-subtitle { color: var(--accent-dark); font-weight: 600; }
@@ -3108,7 +3108,7 @@
       display: grid;
       grid-template-columns: 48px 48px 68px 56px minmax(0, 1fr) 52px 52px 110px 100px;
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
-      align-items: center; gap: 8px; font-size: 14px; padding: 13px 14px; border-top: 1px solid #f1f5f9;
+      align-items: center; gap: 8px; font-size: 14px; padding: 13px 14px; border-top: 1px solid var(--border-soft);
     }
     .schedule-board-row.sb-referral-row > * { min-width: 0; }
     .sb-col-ward { grid-area: sb-ward; }
@@ -3166,7 +3166,7 @@
     .sb-main-grid tr th:last-child, .sb-main-grid tr td:last-child { border-right: none; }
     .sb-main-grid tbody tr:last-child td { border-bottom: none; }
     .sb-main-grid thead th {
-      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      background: linear-gradient(180deg, #f8fafc 0%, var(--border-soft) 100%);
       font-weight: 600; text-align: center; font-size: 11px; color: #475569;
       padding: 10px 6px; border-bottom: 1px solid #dde3ea;
     }
@@ -3292,7 +3292,7 @@
     }
     .schedule-board-row-btns { display: flex; gap: 4px; flex-shrink: 0; justify-content: center; align-items: center; }
     .schedule-board-row-btns button {
-      border: none; background: #f1f5f9; padding: 0; border-radius: 8px;
+      border: none; background: var(--border-soft); padding: 0; border-radius: 8px;
       width: 30px; height: 30px; font-size: 14px; line-height: 1;
       cursor: pointer; color: #475569;
       display: inline-flex; align-items: center; justify-content: center;
@@ -3345,7 +3345,7 @@
     .sb-board-content .schedule-board-quick-add { margin: 8px 12px 0; }
     .sb-quick-add-toolbar { display: flex; justify-content: flex-end; margin: -2px 0 6px; }
     .sb-quick-close-btn {
-      border: none; background: #f1f5f9; color: #64748b; font-size: 10.5px; font-weight: 600;
+      border: none; background: var(--border-soft); color: #64748b; font-size: 10.5px; font-weight: 600;
       padding: 3px 8px; border-radius: var(--radius-sm); cursor: pointer;
     }
     .sb-quick-close-btn:hover { background: var(--border); color: #334155; }
@@ -3413,7 +3413,7 @@
     }
     .sb-quick-time-row input[type="time"] { flex: 1 1 auto; min-width: 78px; width: auto; }
     .sb-quick-time-row input[type="time"]:disabled {
-      background: #f1f5f9; color: #94a3b8; cursor: not-allowed;
+      background: var(--border-soft); color: #94a3b8; cursor: not-allowed;
     }
     .sb-quick-undecided {
       display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0;
@@ -3436,7 +3436,7 @@
     }
     .sb-quick-save-btn:hover { background: var(--accent-dark); }
     .sb-quick-cancel-edit-btn {
-      margin-left: 0; border: none; background: #f1f5f9; color: #475569; padding: 5px 8px;
+      margin-left: 0; border: none; background: var(--border-soft); color: #475569; padding: 5px 8px;
       border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; min-height: 26px;
     }
     .sb-quick-cancel-edit-btn:hover { background: var(--border); }
@@ -3542,15 +3542,15 @@
     .sb-board-side .mini-cal-weekdays { font-size: 11px; }
 
     .calendar-day-modal-card { width: 400px; max-height: 70vh; padding: 0; overflow: hidden; gap: 0; }
-    .calendar-day-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; background: #fff; }
+    .calendar-day-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0; background: #fff; }
     .calendar-day-header-main { min-width: 0; flex: 1; }
     .calendar-day-title { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3; }
     .calendar-day-subtitle { font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 400; }
     .calendar-day-close-btn { width: 30px; height: 30px; border: none; background: transparent; border-radius: 8px; font-size: 16px; color: #94a3b8; cursor: pointer; flex-shrink: 0; transition: background 0.12s, color 0.12s; }
-    .calendar-day-close-btn:hover { background: #f1f5f9; color: #475569; }
+    .calendar-day-close-btn:hover { background: var(--border-soft); color: #475569; }
     .calendar-day-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0; background: #fff; }
     .calendar-day-group { padding: 0 18px; }
-    .calendar-day-group + .calendar-day-group { margin-top: 4px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+    .calendar-day-group + .calendar-day-group { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
     .calendar-day-group-label { font-size: 11px; font-weight: 600; color: #64748b; padding: 10px 0 6px; letter-spacing: 0.01em; }
     .calendar-day-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; }
     .calendar-day-row + .calendar-day-row { border-top: 1px solid #f8fafc; }
@@ -3563,9 +3563,9 @@
     .calendar-day-row-actions button { border: none; background: none; font-size: 11px; font-weight: 500; cursor: pointer; padding: 2px 4px; color: #94a3b8; }
     .calendar-day-row-actions button:hover { color: var(--accent-dark); }
     .calendar-day-row-actions .btn-delete:hover { color: #ef4444; }
-    .calendar-day-footer { padding: 10px 18px 14px; border-top: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; }
+    .calendar-day-footer { padding: 10px 18px 14px; border-top: 1px solid var(--border-soft); background: #fff; flex-shrink: 0; }
     .calendar-day-add-btn { width: 100%; padding: 9px; background: #f8fafc; color: #475569; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
-    .calendar-day-add-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
+    .calendar-day-add-btn:hover { background: var(--border-soft); border-color: #cbd5e1; color: #334155; }
     .calendar-day-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
     /* 📜 전체 대화 기록 모달 */
@@ -3609,7 +3609,7 @@
     }
     .all-logs-folder-btn:hover { background: #fff; border-color: #cbd5e1; color: #0f172a; }
     .all-logs-close-btn {
-      width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: var(--radius-md);
+      width: 34px; height: 34px; border: none; background: var(--border-soft); border-radius: var(--radius-md);
       font-size: 14px; color: #64748b; cursor: pointer;
       transition: background 0.12s, color 0.12s; flex-shrink: 0;
     }
@@ -3627,7 +3627,7 @@
     .all-logs-search-wrap input {
       width: 100%; padding: 11px 14px 11px 36px;
       border: 1px solid transparent; border-radius: 999px; font-size: 13px;
-      outline: none; background: #f1f5f9; font-family: inherit;
+      outline: none; background: var(--border-soft); font-family: inherit;
       transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
       box-sizing: border-box; color: #0f172a;
     }
@@ -3638,7 +3638,7 @@
     }
     .all-logs-filterbar {
       display: flex; align-items: center; gap: 4px;
-      padding: 3px; background: #f1f5f9; border-radius: 12px;
+      padding: 3px; background: var(--border-soft); border-radius: 12px;
     }
     .all-logs-filter-tab {
       flex: 1; min-width: 0; padding: 8px 10px; border: none; background: transparent;
@@ -3734,13 +3734,13 @@
       flex-shrink: 0; letter-spacing: -0.02em;
     }
     .log-card-direction.is-sent { background: rgba(33, 150, 243, 0.12); color: var(--accent-dark); }
-    .log-card-direction.is-received { background: #f1f5f9; color: #64748b; }
+    .log-card-direction.is-received { background: var(--border-soft); color: #64748b; }
     .log-card-type {
       font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-sm);
       line-height: 1.25; flex-shrink: 0; white-space: nowrap; max-width: 120px;
       overflow: hidden; text-overflow: ellipsis;
     }
-    .log-card-type.is-dm { background: #f1f5f9; color: #475569; }
+    .log-card-type.is-dm { background: var(--border-soft); color: #475569; }
     .log-card-type.is-broadcast { background: #eef2ff; color: #4338ca; }
     .log-card-type.is-dept, .log-card-type.is-floor { background: #ecfdf5; color: #059669; }
     .log-card-type.is-group { background: #fff7ed; color: #c2410c; }
@@ -3806,7 +3806,7 @@
     .app-dialog-message { font-size: 13.5px; color: #334155; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; }
     .app-dialog-detail {
       font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 12px; white-space: pre-wrap;
-      background: #f1f5f9; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
+      background: var(--border-soft); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
     }
     .app-dialog-actions {
       display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px 18px;
@@ -3818,7 +3818,7 @@
     }
     .app-dialog-btn:hover { transform: translateY(-1px); }
     .app-dialog-btn--ghost { background: #fff; border-color: var(--border); color: #475569; }
-    .app-dialog-btn--ghost:hover { background: #f1f5f9; }
+    .app-dialog-btn--ghost:hover { background: var(--border-soft); }
     .app-dialog-btn--primary {
       background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff;
       box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
@@ -3838,7 +3838,7 @@
     .board-notice-photo-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--accent-dark); background: var(--sidebar-active); border-radius: 999px; padding: 2px 7px; }
     .board-notice-cat-badge {
       flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
-      color: #334155; background: #f1f5f9; border: 1px solid var(--border);
+      color: #334155; background: var(--border-soft); border: 1px solid var(--border);
     }
     .board-notice-cat-badge.is-all { color: var(--accent-dark); background: var(--sidebar-active); border-color: var(--sidebar-active); }
     .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }
@@ -3851,7 +3851,7 @@
       flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
       background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer;
     }
-    .board-category-chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .board-category-chip:hover { background: var(--border-soft); border-color: #cbd5e1; }
     .board-category-chip.is-active { background: var(--accent-dark); color: #fff; border-color: var(--accent-dark); }
     .board-write-category-row {
       display: flex; flex-direction: column; gap: 6px; margin-top: 2px;
@@ -3872,12 +3872,12 @@
       display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid #cbd5e1;
       border-radius: 12px; background: #f8fafc; color: #334155; font-size: 12px; font-weight: 700; cursor: pointer;
     }
-    .board-photo-attach-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+    .board-photo-attach-btn:hover { background: var(--border-soft); border-color: #94a3b8; }
     .board-photo-hint { font-size: 11px; color: #94a3b8; }
     .board-photo-preview-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .board-photo-thumb {
       position: relative; width: 88px; height: 88px; border-radius: 12px; overflow: hidden;
-      border: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0;
+      border: 1px solid var(--border); background: var(--border-soft); flex-shrink: 0;
     }
     .board-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .board-photo-thumb-remove {
@@ -4138,7 +4138,7 @@
       text-overflow: ellipsis;
     }
     .master-clients-table th {
-      background: #f1f5f9;
+      background: var(--border-soft);
       color: #475569;
       font-weight: 700;
       text-align: left;
@@ -4159,17 +4159,17 @@
       display: inline-flex; align-items: center; justify-content: center;
       transition: background var(--transition-fast), border-color var(--transition-fast);
     }
-    .master-client-menu-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #1e293b; }
-    .master-clients-table tbody tr { border-top: 1px solid #f1f5f9; transition: background var(--transition-fast); }
+    .master-client-menu-btn:hover { background: var(--border-soft); border-color: #cbd5e1; color: #1e293b; }
+    .master-clients-table tbody tr { border-top: 1px solid var(--border-soft); transition: background var(--transition-fast); }
     .master-clients-table tbody tr:hover { background: #f8fafc; }
     .master-clients-table tbody tr.is-dim { opacity: .6; }
     .master-pill {
       display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px;
-      font-size: 11px; font-weight: 700; white-space: nowrap; background: #f1f5f9; color: #475569;
+      font-size: 11px; font-weight: 700; white-space: nowrap; background: var(--border-soft); color: #475569;
     }
     .master-pill.is-online { background: #ecfdf5; color: #15803d; }
     .master-pill.is-treatment { background: #fffbeb; color: #b45309; }
-    .master-pill.is-offline { background: #f1f5f9; color: #64748b; }
+    .master-pill.is-offline { background: var(--border-soft); color: #64748b; }
     .master-pill.is-locked { background: #fef2f2; color: #b91c1c; }
     .master-pill.is-wipe { background: #ffedd5; color: #c2410c; margin-left: 4px; }
     .master-pill.is-uptodate { background: #ecfdf5; color: #15803d; }
@@ -4221,7 +4221,7 @@
       justify-content: flex-end;
     }
     #transport-request-modal .transport-history-section {
-      border-top: 1px solid #f1f5f9;
+      border-top: 1px solid var(--border-soft);
       padding-top: 10px;
     }
     #transport-request-modal #transport-history-list {
@@ -4280,7 +4280,7 @@
       box-sizing: border-box;
     }
     body.schedule-board-standalone {
-      margin: 0; overflow: hidden; background: #eef2f7;
+      margin: 0; overflow: hidden; background: var(--border-soft);
       display: flex; flex-direction: column; height: 100vh;
     }
     body.schedule-board-standalone #custom-titlebar {
@@ -4314,7 +4314,7 @@
       min-height: 0;
       width: 100%;
       z-index: 1;
-      background: #eef2f7;
+      background: var(--border-soft);
       padding: 0;
     }
     body.schedule-board-standalone #schedule-board-modal .schedule-board-modal-card {
@@ -4404,7 +4404,7 @@
       font-family: inherit;
       transition: background 0.12s, color 0.12s;
     }
-    .settings-nav-btn:hover { background: #eef2f7; color: #0f172a; }
+    .settings-nav-btn:hover { background: var(--border-soft); color: #0f172a; }
     .settings-nav-btn.active {
       background: var(--sidebar-active);
       color: var(--accent-dark);
@@ -4509,7 +4509,7 @@
       gap: 10px 12px;
     }
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
-    .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
+    .settings-btn-secondary { padding: 8px 14px; background: var(--border-soft); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
     .settings-btn-secondary:hover { background: var(--border); }
     .settings-btn-primary { padding: 8px 16px; background: var(--accent-dark); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
     .settings-btn-primary:hover { filter: brightness(1.15); }
@@ -4520,21 +4520,21 @@
     .settings-toast-dur { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; color: #64748b; font-weight: 600; }
     .settings-toast-dur input {
       width: 64px; padding: 7px 8px; border: 1px solid transparent; border-radius: var(--radius-md);
-      font-size: 13px; text-align: center; font-family: inherit; background: #f1f5f9; color: #0f172a;
+      font-size: 13px; text-align: center; font-family: inherit; background: var(--border-soft); color: #0f172a;
     }
     .settings-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .settings-version-line { font-size: 13px; color: #475569; }
     .net-status-list { display: flex; flex-direction: column; gap: 2px; }
     .settings-path-input {
       flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
-      font-size: 12px; background: #f1f5f9; color: #64748b; font-family: inherit;
+      font-size: 12px; background: var(--border-soft); color: #64748b; font-family: inherit;
     }
     .settings-field { font-size: 12px; color: #475569; display: flex; flex-direction: column; gap: 4px; }
     .settings-field input,
     .settings-field select,
     .settings-select {
       width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
-      font-size: 13px; font-family: inherit; background: #f1f5f9; color: #0f172a; box-sizing: border-box;
+      font-size: 13px; font-family: inherit; background: var(--border-soft); color: #0f172a; box-sizing: border-box;
       transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
     }
     .settings-field input:focus,
@@ -4585,7 +4585,7 @@
       background: transparent; border-radius: 0; border-left: none;
     }
     .settings-divider {
-      height: 1px; background: #eef2f7; margin: 4px 0;
+      height: 1px; background: var(--border-soft); margin: 4px 0;
     }
     @media (max-width: 720px) {
       .settings-profile-layout { grid-template-columns: 1fr; }
@@ -5123,7 +5123,7 @@
           <div id="duty-roster-date-label" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
           <div id="duty-roster-auth-status" style="font-size:11px; color:#64748b; margin-top:4px;"></div>
         </div>
-        <button type="button" style="padding:6px 10px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;" onclick="closeDutyRosterModal()">✖ 닫기</button>
+        <button type="button" style="padding:6px 10px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; font-weight:600; cursor:pointer; color:#475569;" onclick="closeDutyRosterModal()">✖ 닫기</button>
       </div>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:6px;">
         주치의 OFF (쉼표로 여러 명)
@@ -5135,7 +5135,7 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">우측 달력에서 선택한 날짜에 반영되며, 외진·외출 등 일정보다 위에 표시됩니다. 비워 두고 저장하면 해당 날짜 기록이 삭제됩니다.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeDutyRosterModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="closeDutyRosterModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="saveDutyRosterModal()" style="padding:8px 18px; background:#4f46e5; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">저장</button>
       </div>
     </div>
@@ -5148,7 +5148,7 @@
         <h2>마스터 관리자</h2>
         <div class="master-admin-header-actions">
           <button type="button" style="background:#fee2e2; color:#dc2626;" onclick="logoutMasterAuth()">🔓 로그아웃</button>
-          <button type="button" style="background:#f1f5f9; color:#475569;" onclick="closeMasterAdminModal()">✖ 닫기</button>
+          <button type="button" style="background:var(--border-soft); color:#475569;" onclick="closeMasterAdminModal()">✖ 닫기</button>
         </div>
       </div>
       <div class="settings-modal-shell">
@@ -5332,7 +5332,7 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">대상 PC의 마스터 비밀번호가 이 PC와 같아야 적용됩니다. 업데이트 후 대상 메신저가 자동 재시작됩니다.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeMasterForceUpdateModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="closeMasterForceUpdateModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="confirmMasterForceUpdate()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">강제 업데이트 실행</button>
       </div>
     </div>
@@ -5354,7 +5354,7 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">대상 PC의 마스터 비밀번호가 이 PC와 같아야 적용됩니다. 되돌릴 수 없으니 퇴사자 PC 정리 등에만 사용하세요.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeMasterWipeLogsModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="closeMasterWipeLogsModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="confirmMasterWipeLogs()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">영구 삭제 실행</button>
       </div>
     </div>
@@ -5511,7 +5511,7 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">대상 PC의 마스터 비밀번호가 이 PC와 같아야 적용됩니다. 중지된 PC는 네트워크에 접속되지 않으며, 마스터 인증 또는 이 화면에서 해제할 수 있습니다.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeMasterUsageLockModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="closeMasterUsageLockModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" id="master-usage-lock-confirm-btn" onclick="confirmMasterUsageLock()" style="padding:8px 16px; background:#dc2626; color:#fff; border:none; border-radius:12px; font-size:12px; font-weight:700; cursor:pointer;">사용 중지</button>
       </div>
     </div>
@@ -5544,7 +5544,7 @@
         </label>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-        <button type="button" onclick="closeMasterUserEditModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" onclick="closeMasterUserEditModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: 12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="saveMasterUserProfile()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">저장</button>
       </div>
     </div>
@@ -5562,7 +5562,7 @@
           <div style="display:flex; gap:8px;" id="board-header-actions">
             <button style="padding:8px 14px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;" id="board-write-btn" onclick="openNoticeAddModal()">✍️ 글쓰기</button>
           </div>
-          <button type="button" id="board-close-btn" style="padding:8px 12px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:600; cursor:pointer; color:#475569; flex-shrink:0;" onclick="closeBoardModal()">✖ 닫기</button>
+          <button type="button" id="board-close-btn" style="padding:8px 12px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:600; cursor:pointer; color:#475569; flex-shrink:0;" onclick="closeBoardModal()">✖ 닫기</button>
         </div>
       </div>
 
@@ -5589,7 +5589,7 @@
         </div>
         <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
-          <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+          <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
           <button type="button" id="board-write-submit-btn" onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
         </div>
       </div>
@@ -5600,7 +5600,7 @@
           <span style="cursor:pointer; color:var(--accent); font-weight:700; font-size:12px;" onclick="backToBoardList()">← 목록으로</span>
         </div>
         <div id="board-detail-title" style="font-size:17px; font-weight:700; color:#0f172a; margin-bottom:6px;"></div>
-        <div id="board-detail-meta" style="font-size:11px; color:#94a3b8; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid #f1f5f9;"></div>
+        <div id="board-detail-meta" style="font-size:11px; color:#94a3b8; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border-soft);"></div>
         <div id="board-detail-content" style="font-size:14px; color:#334155; line-height:1.7; white-space:pre-wrap;"></div>
         <div id="board-detail-images" class="board-detail-images"></div>
         <div id="board-detail-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;"></div>
@@ -6195,7 +6195,7 @@
       <input type="text" id="operator-login-id" placeholder="아이디">
       <input type="password" id="operator-login-pwd" placeholder="비밀번호" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button onclick="closeOperatorLoginModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="closeOperatorLoginModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button onclick="submitOperatorLogin()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">로그인</button>
       </div>
     </div>
@@ -6206,7 +6206,7 @@
     <div class="modal-card">
       <div style="font-size:16px; font-weight:700; color:var(--accent);">👥 그룹 대화방</div>
 
-      <div class="sidebar-tabs" style="display:flex; background:#f1f5f9; margin:0; border-radius: var(--radius-lg); padding:3px; gap:3px;">
+      <div class="sidebar-tabs" style="display:flex; background:var(--border-soft); margin:0; border-radius: var(--radius-lg); padding:3px; gap:3px;">
         <div class="sidebar-tab-item active" id="group-mode-new-tab" onclick="switchGroupModalMode('new')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: var(--radius-md); color:#475569;">새로 만들기</div>
         <div class="sidebar-tab-item" id="group-mode-existing-tab" onclick="switchGroupModalMode('existing')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: var(--radius-md); color:#475569;">기존 그룹에 초대</div>
       </div>
@@ -6226,7 +6226,7 @@
           </label>
           <button type="button" class="group-bulk-btn" onclick="groupToggleSelectByDept()" title="해당 부서 전체 선택/해제">이 부서</button>
         </div>
-        <div id="group-member-checklist" style="max-height:200px; overflow-y:auto; border:1px solid #f1f5f9; border-radius: var(--radius-lg); padding:6px 10px; margin-top:4px;"></div>
+        <div id="group-member-checklist" style="max-height:200px; overflow-y:auto; border:1px solid var(--border-soft); border-radius: var(--radius-lg); padding:6px 10px; margin-top:4px;"></div>
       </div>
 
       <div id="group-existing-section" style="display:none;">
@@ -6236,7 +6236,7 @@
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-        <button onclick="closeGroupChatModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="closeGroupChatModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button onclick="submitGroupChatModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 확인</button>
       </div>
     </div>
@@ -6290,7 +6290,7 @@
       <div style="font-size:11.5px; color:#64748b; line-height:1.5;">목록·채팅 헤더에 <b>내 PC에서만</b> 보이는 이름입니다. 다른 직원 화면에는 바뀌지 않습니다.</div>
       <input type="text" id="channel-display-name-input" placeholder="표시할 이름" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitChannelDisplayName()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeChannelDisplayNameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="closeChannelDisplayNameModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitChannelDisplayName()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
       </div>
     </div>
@@ -6306,7 +6306,7 @@
       <div id="channel-title-emoji-grid" class="title-emoji-picker-grid"></div>
       <div id="channel-title-emoji-preview" class="title-emoji-preview"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeChannelTitleEmojiModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="closeChannelTitleEmojiModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitChannelTitleEmoji()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
       </div>
     </div>
@@ -6318,7 +6318,7 @@
       <div style="font-size:16px; font-weight:700; color:#1d1c1d;">✏️ 대화방 이름 변경</div>
       <input type="text" id="group-rename-input" placeholder="새 대화방 이름을 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitGroupRename()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button onclick="closeGroupRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="closeGroupRenameModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button onclick="submitGroupRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
     </div>
@@ -6335,7 +6335,7 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:8px 0 0; line-height:1.45;">깨진 글자가 보이면 성까지 포함해 전체 이름을 다시 입력해 주세요.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
-        <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitOperatorRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 저장</button>
       </div>
     </div>
@@ -6360,7 +6360,7 @@
       </label>
       <div id="password-change-error" style="display:none; color:#ef4444; font-size:11.5px; font-weight:600;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
-        <button type="button" onclick="closePasswordChangeModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="closePasswordChangeModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" id="password-change-submit-btn" onclick="submitPasswordChange()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
     </div>
@@ -6442,11 +6442,11 @@
       <div id="share-message-preview"></div>
       <input type="text" id="share-recipient-filter" placeholder="이름·부서·층으로 검색..." style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:12px;" oninput="renderShareRecipientLists(this.value)">
       <div style="font-size:12px; font-weight:700; color:#475569; margin-top:4px;">1:1 대화 상대</div>
-      <div id="share-dm-checklist" style="max-height:160px; overflow-y:auto; border:1px solid #f1f5f9; border-radius:12px; padding:4px 8px;"></div>
+      <div id="share-dm-checklist" style="max-height:160px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:12px; padding:4px 8px;"></div>
       <div style="font-size:12px; font-weight:700; color:#475569; margin-top:6px;">그룹 대화방</div>
-      <div id="share-group-checklist" style="max-height:100px; overflow-y:auto; border:1px solid #f1f5f9; border-radius:12px; padding:4px 8px;"></div>
+      <div id="share-group-checklist" style="max-height:100px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:12px; padding:4px 8px;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-        <button type="button" onclick="closeShareMessageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="closeShareMessageModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitShareMessageModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">전달</button>
       </div>
     </div>
@@ -6503,7 +6503,7 @@
       <div style="font-size:12px; color:#64748b; margin-bottom:10px;">항목을 클릭하면 바로 캡처해 대화에 첨부합니다.</div>
       <div id="screen-capture-source-grid" class="capture-source-grid"></div>
       <div style="display:flex; justify-content:flex-end; margin-top:12px;">
-        <button type="button" onclick="closeScreenCaptureSourceModal()" style="padding:8px 16px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:600;">취소</button>
+        <button type="button" onclick="closeScreenCaptureSourceModal()" style="padding:8px 16px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:600;">취소</button>
       </div>
     </div>
   </div>
@@ -6518,7 +6518,7 @@
         <div id="screen-capture-crop-rect"></div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="cancelScreenCrop()" style="padding:8px 16px; background:#f1f5f9; border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:600;">취소</button>
+        <button type="button" onclick="cancelScreenCrop()" style="padding:8px 16px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:600;">취소</button>
         <button type="button" id="screen-capture-crop-send-btn" onclick="confirmScreenCrop()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:700;">선택 영역 보내기</button>
       </div>
     </div>
@@ -6591,7 +6591,7 @@
       </div>
       </div>
       <div class="transport-modal-footer">
-        <button onclick="closeTransportRequestModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
+        <button onclick="closeTransportRequestModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
       </div>
     </div>
   </div>
@@ -6678,11 +6678,11 @@
         <div style="width:34px; height:34px; border-radius: var(--radius-md); background:linear-gradient(145deg,var(--accent-dark),var(--accent-dark)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">미래</div>
         <div style="font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">마스터 관리자 인증</div>
       </div>
-      <input type="text" id="master-id-input" placeholder="아이디 입력 (기본: admin)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:14px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') document.getElementById('master-pwd-input').focus()">
-      <input type="password" id="master-pwd-input" placeholder="비밀번호 입력 (기본: admin1234)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:8px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') submitMasterAuth()">
+      <input type="text" id="master-id-input" placeholder="아이디 입력 (기본: admin)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:14px; background:var(--border-soft);" onkeydown="if(event.key==='Enter') document.getElementById('master-pwd-input').focus()">
+      <input type="password" id="master-pwd-input" placeholder="비밀번호 입력 (기본: admin1234)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:8px; background:var(--border-soft);" onkeydown="if(event.key==='Enter') submitMasterAuth()">
       <div id="master-auth-error" style="display:none; color:#ef4444; font-size:11.5px; margin-top:6px; font-weight:600;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top: 12px;">
-        <button onclick="closeMasterAuthModal()" style="padding:9px 14px; background:#f1f5f9; border:none; border-radius: 12px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">취소</button>
+        <button onclick="closeMasterAuthModal()" style="padding:9px 14px; background:var(--border-soft); border:none; border-radius: 12px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">취소</button>
         <button onclick="submitMasterAuth()" style="padding:9px 18px; background:var(--accent); color:white; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">인증</button>
       </div>
     </div>
@@ -6698,7 +6698,7 @@
         <button onclick="addQuickPhraseFromModal()" style="padding:8px 14px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">➕ 추가</button>
       </div>
       <div style="display:flex; justify-content:flex-end;">
-        <button onclick="closeQuickPhraseManageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
+        <button onclick="closeQuickPhraseManageModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
       </div>
     </div>
   </div>
@@ -14767,7 +14767,7 @@
       if (canModifyNotice(n)) {
         const editBtn = document.createElement('button');
         editBtn.textContent = '수정';
-        editBtn.style.cssText = 'padding:8px 16px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer; color:#475569;';
+        editBtn.style.cssText = 'padding:8px 16px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer; color:#475569;';
         editBtn.onclick = () => openBoardWriteView(n.uid);
         const delBtn = document.createElement('button');
         delBtn.textContent = '삭제';
@@ -15326,7 +15326,7 @@
       const body = rows.map((r) => {
         const name = (r.username || '').trim() || '-';
         const rowBg = r.level === 'hot' ? 'background:#fef2f2;' : (r.level === 'warn' ? 'background:#fff7ed;' : '');
-        return `<tr style="border-top:1px solid #f1f5f9; ${rowBg}">
+        return `<tr style="border-top:1px solid var(--border-soft); ${rowBg}">
           <td>${levelLabel[r.level] || r.level}</td>
           <td style="font-weight:700; color:#0f172a;" title="${escapeHtml(name)}">${escapeHtml(name)}${r.online ? '' : ' <span style="color:#94a3b8; font-size:10px;">(오프)</span>'}</td>
           <td style="font-family:monospace; font-size:11.5px;">${escapeHtml(r.ip || '-')}</td>
@@ -18324,7 +18324,7 @@
         card.className = 'capture-source-card';
         const thumb = src.thumbnail
           ? `<img src="${src.thumbnail}" alt="">`
-          : '<div style="height:90px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;">🖥️</div>';
+          : '<div style="height:90px;background:var(--border-soft);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;">🖥️</div>';
         card.innerHTML = `${thumb}<div class="capture-source-name">${escapeHtmlText(src.name || '알 수 없음')}</div>`;
         card.onclick = async () => {
           closeScreenCaptureSourceModal();
@@ -19351,7 +19351,7 @@
         const noticeRow = document.createElement('div');
         noticeRow.setAttribute('data-chat-date-key', dateKey);
         noticeRow.style.cssText = 'text-align:center; margin:10px 0;';
-        noticeRow.innerHTML = `<span style="display:inline-block; background:#eef2f7; color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: var(--radius-xl);">${noticeText}</span>`;
+        noticeRow.innerHTML = `<span style="display:inline-block; background:var(--border-soft); color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: var(--radius-xl);">${noticeText}</span>`;
         container.appendChild(noticeRow);
         if (wasNearBottom) scrollChatToBottom(false);
         return;
