@@ -2927,83 +2927,78 @@ const RECREATABLE_SCHEMA_SQL = {
     cleared_at TEXT NOT NULL
   )`
 };
-const schemaConflictRepairedThisSession = new Set();
 const schemaHardRepairInProgress = new Set();
 
 /**
- * sqlite_master에 같은 이름의 행이 중복으로 남아있는 손상을 저수준으로 직접 정리한다.
- * DROP TABLE도 결국 손상된 스키마 카탈로그를 먼저 읽어야 하므로, 얕은 재생성(DROP→CREATE)이
- * 조용히 실패하고 같은 오류가 계속 재발하는 경우가 있다 — 이때 쓰는 마지막 수단.
- * PRAGMA writable_schema로 sqlite_master를 직접 열어 중복 행만 지우고, 새 연결로 재검증한다.
+ * sqlite_master의 손상된 스키마 행을 저수준으로 직접 정리한다.
+ * 일반 DROP TABLE은 실행 전에 손상된 카탈로그 행 자체를 먼저 읽어야 하므로, 그 손상 때문에
+ * DROP도 같이 조용히 실패하는 경우가 있다(재생성 안 되고 같은 오류만 매 부팅 재발).
+ * 손상이 "중복 행"인지 "행 내용 자체 손상"인지 구분하지 않고, 이름이 일치하는 스키마 행을
+ * PRAGMA writable_schema로 통째로 지운 뒤, 새 연결로 다시 열어 알려진 정상 SQL로 재생성한다.
+ * (writable_schema로 바꾼 스키마는 같은 연결에 바로 반영되지 않을 수 있어 연결을 새로 연다.)
  */
-function hardRepairDuplicateSchemaRow(table) {
+function hardRepairSchemaRow(table) {
   return new Promise((resolve) => {
-    let repairDb;
-    try {
-      repairDb = new sqlite3.Database(dbPath, (openErr) => {
-        if (openErr) { resolve(false); return; }
-        repairDb.serialize(() => {
-          repairDb.run(`PRAGMA writable_schema = ON`);
-          repairDb.run(
-            `DELETE FROM sqlite_master WHERE type IN ('table','index') AND name = ? AND rowid NOT IN (
-               SELECT MIN(rowid) FROM sqlite_master WHERE type IN ('table','index') AND name = ?
-             )`,
-            [table, table],
-            (delErr) => {
-              if (delErr) console.error(`[DB] "${table}" writable_schema 정리 실패:`, delErr.message);
-            }
-          );
-          repairDb.run(`PRAGMA writable_schema = OFF`);
-          repairDb.get(`PRAGMA integrity_check`, (checkErr, row) => {
-            const ok = !checkErr && sqliteCheckRowOk(row);
-            repairDb.close(() => resolve(ok));
+    // 원래 연결이 열려 있으면 WAL 락 경합으로 저수준 복구용 연결이 SQLITE_BUSY로 조용히
+    // 실패할 수 있다 — 먼저 닫고 단독으로 접근한다(어차피 성공/실패와 무관하게 곧 재시작함).
+    db.close(() => {
+      try {
+        const repairDb = new sqlite3.Database(dbPath, (openErr) => {
+          if (openErr) { resolve(false); return; }
+          repairDb.run(`PRAGMA busy_timeout = 5000`);
+          repairDb.serialize(() => {
+            repairDb.run(`PRAGMA writable_schema = ON`);
+            repairDb.run(`DELETE FROM sqlite_master WHERE type IN ('table','index') AND name = ?`, [table], (delErr) => {
+              if (delErr) console.error(`[DB] "${table}" writable_schema 삭제 실패:`, delErr.message);
+            });
+            repairDb.run(`PRAGMA writable_schema = OFF`);
+            repairDb.close(() => {
+              const finalDb = new sqlite3.Database(dbPath, (reopenErr) => {
+                if (reopenErr) { resolve(false); return; }
+                finalDb.run(`PRAGMA busy_timeout = 5000`);
+                finalDb.run(RECREATABLE_SCHEMA_SQL[table], (createErr) => {
+                  if (createErr) {
+                    console.error(`[DB] "${table}" 저수준 재생성 실패:`, createErr.message);
+                    finalDb.close(() => resolve(false));
+                    return;
+                  }
+                  finalDb.get(`PRAGMA integrity_check`, (checkErr, row) => {
+                    const ok = !checkErr && sqliteCheckRowOk(row);
+                    finalDb.close(() => resolve(ok));
+                  });
+                });
+              });
+            });
           });
         });
-      });
-    } catch (e) {
-      resolve(false);
-    }
+      } catch (e) {
+        resolve(false);
+      }
+    });
   });
 }
 
 function tryRepairBenignSchemaConflict(err) {
   const table = parseBenignSchemaConflict(err);
   if (!table || !RECREATABLE_SCHEMA_SQL[table]) return false;
-  if (schemaConflictRepairedThisSession.has(table)) {
-    // 얕은 재생성(DROP→CREATE)을 이미 시도했는데도 같은 손상이 재발 — sqlite_master에 중복 행이
-    // 그대로 남아있다는 뜻(DROP 자체가 손상된 카탈로그 때문에 조용히 실패했을 가능성). 저수준 복구로 승격.
-    if (!schemaHardRepairInProgress.has(table)) {
-      schemaHardRepairInProgress.add(table);
-      const attempt = bumpDbRecoveryAttemptCount();
-      if (attempt > DB_RECOVERY_MAX_ATTEMPTS) {
-        console.error(`[DB] "${table}" 저수준 복구 ${attempt}회째 반복 — 백업 복구로 전환`);
-        scheduleDbCorruptRecovery(`hard-repair-loop:${table}`);
-        return true;
-      }
-      console.error(`[DB] "${table}" 재생성 후에도 손상 재발 — writable_schema 저수준 복구 시도`);
-      hardRepairDuplicateSchemaRow(table).then((ok) => {
-        console.error(`[DB] "${table}" 저수준 복구 ${ok ? '성공' : '실패'}`);
-        if (!ok) {
-          scheduleDbCorruptRecovery(`hard-repair-failed:${table}`);
-          return;
-        }
-        resetDbRecoveryAttemptCount();
-        app.relaunch();
-        app.exit(0);
-      });
-    }
+  if (schemaHardRepairInProgress.has(table)) return true; // 이미 진행 중 — 재시도 폭주 방지
+  schemaHardRepairInProgress.add(table);
+  const attempt = bumpDbRecoveryAttemptCount();
+  if (attempt > DB_RECOVERY_MAX_ATTEMPTS) {
+    console.error(`[DB] "${table}" 복구 ${attempt}회째 반복 — 백업 복구로 전환`);
+    scheduleDbCorruptRecovery(`schema-repair-loop:${table}`);
     return true;
   }
-  schemaConflictRepairedThisSession.add(table);
-  console.error(`[DB] "${table}" 스키마 국소 충돌 감지 — 전체 복구 대신 이 테이블만 재생성:`, err && err.message);
-  db.run(`DROP TABLE IF EXISTS ${table}`, () => {
-    db.run(RECREATABLE_SCHEMA_SQL[table], (recreateErr) => {
-      if (recreateErr) {
-        console.error(`[DB] "${table}" 재생성 실패:`, recreateErr.message);
-      } else {
-        console.log(`[DB] "${table}" 재생성 완료 (기존 데이터는 비워짐)`);
-      }
-    });
+  console.error(`[DB] "${table}" 스키마 손상 감지 — writable_schema 저수준 재생성 시도:`, err && err.message);
+  hardRepairSchemaRow(table).then((ok) => {
+    console.error(`[DB] "${table}" 저수준 재생성 ${ok ? '성공' : '실패'}`);
+    if (!ok) {
+      scheduleDbCorruptRecovery(`hard-repair-failed:${table}`);
+      return;
+    }
+    resetDbRecoveryAttemptCount();
+    app.relaunch();
+    app.exit(0);
   });
   return true;
 }
