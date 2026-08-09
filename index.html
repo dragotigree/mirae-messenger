@@ -147,7 +147,7 @@
       flex-shrink: 0;
       margin: 5px 10px 5px 8px;
       padding: 3px;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
       background: var(--surface-muted);
       border: 1px solid var(--border);
       -webkit-app-region: no-drag;
@@ -157,7 +157,7 @@
       width: 36px;
       height: 22px;
       border: none;
-      border-radius: 7px;
+      border-radius: var(--radius-sm);
       background: transparent;
       color: var(--text-secondary);
       display: flex;
@@ -246,7 +246,7 @@
     .brand-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; white-space: nowrap; }
     .brand-subtitle { font-size: 9.5px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.12em; white-space: nowrap; }
     .brand-icons { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
-    .icon-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--surface-muted); border: none; border-radius: 10px; cursor: pointer; font-size: 0; color: var(--text-secondary); transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); flex-shrink: 0; position: relative; box-shadow: inset 0 0 0 1px var(--border); }
+    .icon-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--surface-muted); border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0; color: var(--text-secondary); transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); flex-shrink: 0; position: relative; box-shadow: inset 0 0 0 1px var(--border); }
     .icon-btn:hover { background: var(--border); transform: translateY(-1px); color: var(--text-primary); }
     .icon-btn:active { transform: translateY(0); }
     .icon-btn.is-master-authed { background: rgba(22, 163, 74, 0.12); box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.35); color: #15803d; }
@@ -254,7 +254,7 @@
     .icon-glyph { width: 16px; height: 16px; display: block; flex-shrink: 0; pointer-events: none; }
     .icon-btn .icon-glyph, .icon-btn-compact .icon-glyph { opacity: 0.95; }
     .icon-btn svg:not(.icon-glyph), .icon-btn-compact svg:not(.icon-glyph) { display: block; opacity: 0.95; flex-shrink: 0; }
-    .icon-btn-compact { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 10px; cursor: pointer; font-size: 0; color: inherit; flex-shrink: 0; transition: background 0.12s ease; }
+    .icon-btn-compact { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0; color: inherit; flex-shrink: 0; transition: background 0.12s ease; }
     .icon-btn-compact:hover { background: rgba(0,0,0,0.06); }
     .icon-btn-compact.is-master-authed { background: rgba(74, 222, 128, 0.2); }
     .compact-tool-btn .icon-glyph { width: 14px; height: 14px; opacity: 0.88; }
@@ -306,7 +306,7 @@
     .sidebar-quick-actions .icon-glyph { width: 15px; height: 15px; flex-shrink: 0; }
     .sidebar-header-icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 20px; height: 20px; border-radius: 6px; cursor: pointer;
+      width: 20px; height: 20px; border-radius: var(--radius-sm); cursor: pointer;
       color: var(--sidebar-text-dim); flex-shrink: 0;
       transition: background var(--transition-fast), color var(--transition-fast);
     }
@@ -327,7 +327,7 @@
     .sidebar-quick-actions .sidebar-code-alert-btn {
       flex: 1 1 0; min-width: 0;
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 7px 8px; border-radius: 9px;
+      padding: 7px 8px; border-radius: var(--radius-md);
       font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
       white-space: nowrap; cursor: pointer;
       transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
@@ -390,7 +390,7 @@
       position: relative;
       width: min(440px, 94vw);
       background: rgba(255,255,255,0.97);
-      border-radius: 22px;
+      border-radius: var(--radius-xl);
       padding: 28px 26px 24px;
       box-shadow: 0 28px 80px rgba(2, 16, 36, 0.45), 0 0 0 1px rgba(255,255,255,0.35);
       display: flex; flex-direction: column; gap: 12px;
@@ -404,7 +404,7 @@
       display: flex; align-items: center; gap: 12px; margin-bottom: 4px;
     }
     .service-pause-logo {
-      width: 48px; height: 48px; border-radius: 14px;
+      width: 48px; height: 48px; border-radius: var(--radius-lg);
       display: flex; align-items: center; justify-content: center;
       font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.04em;
       background: linear-gradient(145deg, var(--accent-dark), var(--accent-dark));
@@ -428,7 +428,7 @@
     .service-pause-body strong { color: var(--accent-dark); font-weight: 800; }
     .service-pause-date-pill {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 12px 14px; border-radius: 14px;
+      padding: 12px 14px; border-radius: var(--radius-lg);
       background: linear-gradient(120deg, var(--sidebar-active), var(--sidebar-active));
       border: 1px solid var(--sidebar-active);
     }
@@ -441,7 +441,7 @@
     }
     .service-pause-contact {
       margin: 0; font-size: 13px; line-height: 1.6; color: #64748b;
-      padding: 12px 14px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+      padding: 12px 14px; border-radius: var(--radius-lg); background: #f8fafc; border: 1px solid #e2e8f0;
     }
     .service-pause-contact strong { color: #0f172a; font-weight: 800; }
     .service-pause-divider {
@@ -467,7 +467,7 @@
       font-size: 12px; color: #dc2626; min-height: 1.2em; font-weight: 600;
     }
     .service-pause-unlock-btn {
-      margin-top: 2px; padding: 13px 16px; border: none; border-radius: 14px;
+      margin-top: 2px; padding: 13px 16px; border: none; border-radius: var(--radius-lg);
       background: linear-gradient(135deg, var(--accent-dark), var(--accent-dark));
       color: #fff; font-size: 13.5px; font-weight: 800; cursor: pointer;
       font-family: inherit; letter-spacing: -0.01em;
@@ -480,7 +480,7 @@
     /* 🔒 사용중지 잠금화면 — 좌/우 분할 로그인 카드 (색상은 은은하게) */
     .lock-split-card {
       width: min(880px, 94vw); max-height: min(560px, 88vh);
-      border-radius: 28px; overflow: hidden; display: flex;
+      border-radius: var(--radius-2xl); overflow: hidden; display: flex;
       background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
     }
     .lock-split-left {
@@ -527,7 +527,7 @@
       font-size: var(--sidebar-item-font-size);
       font-weight: var(--sidebar-item-font-weight);
       letter-spacing: -0.02em;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
     }
     #sidebar-left .channel-item .channel-label {
       font-size: var(--sidebar-item-font-size);
@@ -555,7 +555,7 @@
     .channel-hash { opacity: 0.92; font-weight: var(--font-weight-regular); font-size: 12.5px; min-width: 1.15em; text-align: center; flex-shrink: 0; }
     .channel-hash.is-custom-emoji { opacity: 1; font-size: 12.5px; }
     .title-emoji-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
-    .title-emoji-pick-btn { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
+    .title-emoji-pick-btn { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: var(--radius-md); font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
@@ -646,10 +646,10 @@
     }
     .group-bulk-field select {
       min-width: 100px; max-width: 150px; padding: 6px 8px;
-      border: 1px solid #dbe3ec; border-radius: 9px; font-size: 12px; font-family: inherit; background: #fff;
+      border: 1px solid #dbe3ec; border-radius: var(--radius-md); font-size: 12px; font-family: inherit; background: #fff;
     }
     .group-bulk-btn {
-      padding: 6px 10px; border-radius: 9px; border: 1px solid var(--sidebar-active);
+      padding: 6px 10px; border-radius: var(--radius-md); border: 1px solid var(--sidebar-active);
       background: #fff; color: var(--accent-dark); font-size: 11.5px; font-weight: 700; cursor: pointer;
     }
     .group-bulk-btn:hover { background: var(--sidebar-active); }
@@ -682,7 +682,7 @@
 
     #sidebar-left .user-card-item {
       gap: 8px; padding: 7px 8px; margin: 0 2px 2px 2px; align-items: center; min-height: 0;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
     }
     #sidebar-left .user-card-item.is-offline { opacity: 0.52; }
     #sidebar-left .user-card-item.is-offline:hover { opacity: 0.82; }
@@ -816,7 +816,7 @@
     .left-footer-btn { padding: 6px 8px 8px; display: flex; align-items: center; justify-content: center; border: none; box-shadow: none; background: transparent; flex-shrink: 0; }
     .left-footer-btn .footer-toolbar { justify-content: center; gap: 4px; }
     .left-footer-btn .icon-btn {
-      width: 30px; height: 30px; border-radius: 9px;
+      width: 30px; height: 30px; border-radius: var(--radius-md);
       color: rgba(226, 232, 240, 0.88);
       background: rgba(255,255,255,0.06);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
@@ -912,18 +912,18 @@
     #privacy-lock-overlay.is-open { display: flex; }
     .privacy-lock-card {
       width: min(360px, calc(100vw - 40px)); padding: 28px 24px 22px;
-      border-radius: 22px; background: rgba(255,255,255,0.96);
+      border-radius: var(--radius-xl); background: rgba(255,255,255,0.96);
       box-shadow: 0 24px 60px rgba(0,0,0,0.35); text-align: center;
     }
     .privacy-lock-icon {
-      width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 18px;
+      width: 56px; height: 56px; margin: 0 auto 12px; border-radius: var(--radius-xl);
       background: #eef2ff; color: #4338ca; display: flex; align-items: center; justify-content: center;
     }
     .privacy-lock-icon .icon-glyph { width: 26px; height: 26px; }
     .privacy-lock-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
     .privacy-lock-sub { font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.5; }
     .privacy-lock-pin {
-      width: 100%; margin-top: 16px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 14px;
+      width: 100%; margin-top: 16px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: var(--radius-lg);
       font-size: 20px; letter-spacing: 0.28em; text-align: center; font-weight: 700; color: #0f172a;
     }
     .privacy-lock-pin:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.18); }
@@ -1060,7 +1060,7 @@
       display: flex; align-items: center; gap: 4px;
     }
     .chat-cal-nav-btn {
-      width: 30px; height: 30px; border: none; border-radius: 10px;
+      width: 30px; height: 30px; border: none; border-radius: var(--radius-md);
       background: rgba(255,255,255,0.18); color: #fff; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
       transition: background 0.15s;
@@ -1164,7 +1164,7 @@
       padding: 12px 16px 10px; min-height: 52px;
     }
     .chat-shared-back {
-      width: 36px; height: 36px; border: none; border-radius: 11px;
+      width: 36px; height: 36px; border: none; border-radius: var(--radius-md);
       background: #f1f5f9; color: #334155; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
     }
@@ -1192,14 +1192,14 @@
     }
     @media (max-width: 720px) { .chat-shared-photo-grid { grid-template-columns: repeat(4, 1fr); } }
     .chat-shared-photo-cell {
-      aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: zoom-in;
+      aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; cursor: zoom-in;
       background: #f1f5f9; border: none; padding: 0;
     }
     .chat-shared-photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .chat-shared-list { display: flex; flex-direction: column; gap: 8px; }
     .chat-shared-file-row, .chat-shared-link-row {
       display: flex; align-items: center; gap: 12px; padding: 12px 14px;
-      border-radius: 14px; border: 1px solid #e2e8f0; background: #fafbfc;
+      border-radius: var(--radius-lg); border: 1px solid #e2e8f0; background: #fafbfc;
       text-align: left; cursor: pointer; width: 100%;
     }
     .chat-shared-file-row:hover, .chat-shared-link-row:hover { background: #f1f5f9; border-color: #cbd5e1; }
@@ -1307,7 +1307,7 @@
     }
     /* ✉️ 쪽지(여러 명에게 개별 발송)에 함께 실어 보내는 받는사람 목록 — 메시지 본문과 구분되게 */
     .ipmsg-recipients-tag {
-      font-size: 11px; color: #64748b; background: #f1f5f9; border-radius: 10px;
+      font-size: 11px; color: #64748b; background: #f1f5f9; border-radius: var(--radius-md);
       padding: 4px 8px; margin-bottom: 6px; display: inline-block; font-weight: 600;
     }
     .msg-content-line {
@@ -1359,7 +1359,7 @@
     .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn {
       position: static; flex-shrink: 0;
       background: rgba(255, 255, 255, 0.96); color: var(--text-primary);
-      border: 1px solid rgba(226, 232, 240, 0.95); border-radius: 10px;
+      border: 1px solid rgba(226, 232, 240, 0.95); border-radius: var(--radius-md);
       width: 28px; height: 28px; font-size: 13px; line-height: 1;
       cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
@@ -1505,7 +1505,7 @@
     .reaction-picker-body { flex: 1; overflow-y: auto; padding: 0 10px 12px; }
     .reaction-picker-section-label { font-size: 10.5px; font-weight: 700; color: #94a3b8; padding: 8px 4px 4px; letter-spacing: 0.02em; }
     .reaction-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
-    .reaction-picker-item { border: none; background: transparent; font-size: 22px; line-height: 1; padding: 6px 2px; border-radius: 10px; cursor: pointer; transition: background 0.1s; }
+    .reaction-picker-item { border: none; background: transparent; font-size: 22px; line-height: 1; padding: 6px 2px; border-radius: var(--radius-md); cursor: pointer; transition: background 0.1s; }
     .reaction-picker-item:hover { background: #f1f5f9; }
 
     #chat-input-wrapper { position: relative; padding: 12px 20px 18px; background: linear-gradient(180deg, transparent, rgba(248,250,252,0.55)); flex-shrink: 0; }
@@ -1516,7 +1516,7 @@
     .input-bottom-actions > .chat-tool-row { display: flex; flex-wrap: nowrap; gap: 4px; min-width: 0; align-items: center; }
     .chat-tool-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; padding: 0; border: none; border-radius: 10px;
+      width: 34px; height: 34px; padding: 0; border: none; border-radius: var(--radius-md);
       background: transparent; color: #64748b; font-size: 16px; line-height: 1;
       cursor: pointer; transition: background 0.12s, color 0.12s;
       flex-shrink: 0;
@@ -1555,15 +1555,15 @@
 
     /* ⏰ 예약 메시지 */
     #scheduled-indicator { display: none; padding: 0 20px; flex-shrink: 0; background: linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.98)); border-top: 1px solid rgba(33, 150, 243, 0.12); }
-    .scheduled-bar-inner { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 10px 14px; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(33, 150, 243, 0.2); border-radius: 14px; box-shadow: 0 4px 16px rgba(33, 150, 243, 0.08); font-size: 12px; color: var(--accent-dark); }
-    .scheduled-bar-icon { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(145deg, var(--sidebar-active), var(--sidebar-active)); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .scheduled-bar-inner { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 10px 14px; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(33, 150, 243, 0.2); border-radius: var(--radius-lg); box-shadow: 0 4px 16px rgba(33, 150, 243, 0.08); font-size: 12px; color: var(--accent-dark); }
+    .scheduled-bar-icon { width: 32px; height: 32px; border-radius: var(--radius-md); background: linear-gradient(145deg, var(--sidebar-active), var(--sidebar-active)); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
     #scheduled-count-text { flex: 1; font-weight: 600; letter-spacing: -0.02em; }
     .scheduled-bar-toggle { padding: 6px 12px; border: none; border-radius: 99px; background: var(--sidebar-active); color: var(--accent-dark); font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s, color 0.15s; }
     .scheduled-bar-toggle:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     #scheduled-list-box { display: none; padding: 0 20px 12px; flex-shrink: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), #f8fafc); border-top: 1px solid rgba(33, 150, 243, 0.08); }
-    .schedule-list-item { display: flex; align-items: stretch; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); transition: border-color 0.15s, box-shadow 0.15s; }
+    .schedule-list-item { display: flex; align-items: stretch; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius-lg); margin-bottom: 8px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); transition: border-color 0.15s, box-shadow 0.15s; }
     .schedule-list-item:hover { border-color: var(--sidebar-active); box-shadow: 0 4px 14px rgba(33, 150, 243, 0.1); }
-    .schedule-list-time { flex-shrink: 0; min-width: 72px; padding: 6px 8px; border-radius: 10px; background: linear-gradient(135deg, var(--sidebar-active), var(--sidebar-active)); text-align: center; font-size: 11px; font-weight: 700; color: var(--accent-dark); line-height: 1.35; }
+    .schedule-list-time { flex-shrink: 0; min-width: 72px; padding: 6px 8px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--sidebar-active), var(--sidebar-active)); text-align: center; font-size: 11px; font-weight: 700; color: var(--accent-dark); line-height: 1.35; }
     .schedule-list-time .schedule-list-date { display: block; font-size: 10px; font-weight: 600; color: #64748b; }
     .schedule-list-body { flex: 1; min-width: 0; font-size: 12px; color: #334155; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .schedule-list-cancel { align-self: center; padding: 6px 10px; border: none; border-radius: 99px; background: #fef2f2; color: #dc2626; font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
@@ -1580,7 +1580,7 @@
       color: #fff; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
     }
     .schedule-msg-hero-icon {
-      width: 34px; height: 34px; border-radius: 11px; background: rgba(255, 255, 255, 0.2);
+      width: 34px; height: 34px; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.2);
       display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
     }
     .schedule-msg-hero h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.03em; }
@@ -1591,7 +1591,7 @@
     }
     .schedule-msg-target {
       font-size: 11px; font-weight: 600; color: #64748b; padding: 6px 10px;
-      background: #f8fafc; border-radius: 10px; border: 1px dashed #e2e8f0; flex-shrink: 0;
+      background: #f8fafc; border-radius: var(--radius-md); border: 1px dashed #e2e8f0; flex-shrink: 0;
     }
     .schedule-msg-target strong { color: #0f172a; font-weight: 700; }
     .schedule-field-label {
@@ -1600,13 +1600,13 @@
     }
     .schedule-textarea {
       width: 100%; min-height: 52px; max-height: 72px; padding: 8px 10px;
-      border: 1px solid #e2e8f0; border-radius: 11px; font-size: 12.5px; font-family: inherit;
+      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12.5px; font-family: inherit;
       line-height: 1.45; resize: none; background: #fff;
       transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box;
     }
     .schedule-textarea:focus { border-color: rgba(33, 150, 243, 0.5); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.12); outline: none; }
     .schedule-preview-pill {
-      padding: 8px 10px; border-radius: 11px; background: linear-gradient(135deg, var(--sidebar-active), #fff);
+      padding: 8px 10px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--sidebar-active), #fff);
       border: 1px solid var(--sidebar-active); font-size: 13px; font-weight: 700; color: var(--accent-dark);
       letter-spacing: -0.02em; text-align: center; flex-shrink: 0;
     }
@@ -1645,7 +1645,7 @@
     }
     .schedule-time-row label { font-size: 10.5px; font-weight: 700; color: #64748b; }
     .schedule-time-select {
-      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px;
+      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: var(--radius-md); font-size: 13px;
       font-weight: 700; color: #0f172a; background: #fff; min-width: 60px; cursor: pointer;
     }
     .schedule-time-select:focus { border-color: rgba(33, 150, 243, 0.5); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1); outline: none; }
@@ -1654,10 +1654,10 @@
       display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px 12px;
       border-top: 1px solid #f1f5f9; background: #fafbfc; flex-shrink: 0;
     }
-    .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: 11px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: var(--radius-md); background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
     .schedule-btn-ghost:hover { background: #e2e8f0; }
     .schedule-btn-primary {
-      padding: 8px 16px; border: none; border-radius: 11px;
+      padding: 8px 16px; border: none; border-radius: var(--radius-md);
       background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff;
       font-size: 12px; font-weight: 700; cursor: pointer;
       box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
@@ -1698,7 +1698,7 @@
     .ipmsg-modal-header h2 { margin: 0; font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: -0.04em; }
     .ipmsg-modal-header p { margin: 2px 0 0; font-size: 11px; color: #64748b; line-height: 1.4; max-width: 480px; }
     .ipmsg-close-btn {
-      width: 36px; height: 36px; border: none; border-radius: 11px; cursor: pointer; flex-shrink: 0;
+      width: 36px; height: 36px; border: none; border-radius: var(--radius-md); cursor: pointer; flex-shrink: 0;
       background: rgba(255,255,255,0.85); color: #64748b; font-size: 18px; line-height: 1;
       transition: background 0.12s, color 0.12s;
     }
@@ -1733,7 +1733,7 @@
     }
     .ipmsg-recipient-toolbar input {
       width: 100%; box-sizing: border-box; padding: 6px 10px 6px 30px;
-      border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; outline: none; background: #fff;
+      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; outline: none; background: #fff;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .ipmsg-search-wrap::before { left: 10px; font-size: 11px; }
@@ -1813,7 +1813,7 @@
     }
     .ipmsg-urgent-label:has(input:checked) { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
     .ipmsg-send-btn {
-      padding: 11px 26px; border: none; border-radius: 14px; font-size: 13px; font-weight: 800; color: #fff; cursor: pointer;
+      padding: 11px 26px; border: none; border-radius: var(--radius-lg); font-size: 13px; font-weight: 800; color: #fff; cursor: pointer;
       background: linear-gradient(135deg, var(--accent), var(--accent-dark)); box-shadow: 0 6px 20px rgba(33, 150, 243, 0.38);
       transition: transform 0.15s, box-shadow 0.15s;
     }
@@ -1867,7 +1867,7 @@
       letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px;
     }
     .chat-quick-switcher-title-mark {
-      width: 18px; height: 18px; border-radius: 6px;
+      width: 18px; height: 18px; border-radius: var(--radius-sm);
       background: linear-gradient(145deg, var(--accent), var(--accent-dark));
       color: #fff; font-size: 10px; font-weight: 900;
       display: inline-flex; align-items: center; justify-content: center;
@@ -1879,7 +1879,7 @@
     .chat-quick-switcher-kbd {
       display: inline-flex; align-items: center; gap: 3px;
       font-size: 10px; font-weight: 700; color: #64748b;
-      padding: 3px 6px; border-radius: 7px;
+      padding: 3px 6px; border-radius: var(--radius-sm);
       background: rgba(241, 245, 249, 0.95);
       border: 1px solid #e2e8f0;
       letter-spacing: -0.02em;
@@ -1897,7 +1897,7 @@
     .chat-quick-switcher-search {
       width: 100%; box-sizing: border-box;
       padding: 14px 14px 14px 42px;
-      border: 1px solid #e2e8f0; border-radius: 14px;
+      border: 1px solid #e2e8f0; border-radius: var(--radius-lg);
       font-size: 16px; font-weight: 600; letter-spacing: -0.03em;
       outline: none; background: #fff; color: #0f172a;
       font-family: inherit;
@@ -1925,7 +1925,7 @@
     }
     .chat-quick-switcher-item {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 12px; border-radius: 14px;
+      padding: 10px 12px; border-radius: var(--radius-lg);
       cursor: pointer; border: 1px solid transparent;
       transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
     }
@@ -1976,7 +1976,7 @@
     }
     .chat-quick-switcher-enter {
       opacity: 0; font-size: 10px; font-weight: 800; color: var(--accent-dark);
-      padding: 3px 7px; border-radius: 7px;
+      padding: 3px 7px; border-radius: var(--radius-sm);
       background: rgba(224, 242, 254, 0.9); border: 1px solid var(--sidebar-active);
       transition: opacity 0.12s;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1986,7 +1986,7 @@
       text-align: center; color: #94a3b8; font-size: 13px; padding: 40px 16px; line-height: 1.6;
     }
     .chat-quick-switcher-empty-icon {
-      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 14px;
+      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: var(--radius-lg);
       display: flex; align-items: center; justify-content: center; font-size: 22px;
       background: #fff; border: 1px solid #e8edf2;
       box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
@@ -2001,7 +2001,7 @@
 
     .btn-schedule, .btn-quickphrase, .btn-capture, .btn-urgent {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; padding: 0; background: transparent; border: none; border-radius: 10px;
+      width: 34px; height: 34px; padding: 0; background: transparent; border: none; border-radius: var(--radius-md);
       font-size: 16px; cursor: pointer; color: #64748b;
       transition: background 0.12s, color 0.12s;
     }
@@ -2034,7 +2034,7 @@
       color: #713f12;
     }
 
-    .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: 14px; display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; }
+    .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: var(--radius-lg); display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; }
     .chat-img-preview:hover { opacity: 0.94; transform: none; }
     .chat-file-box {
       display: flex; align-items: center; gap: 10px;
@@ -2071,7 +2071,7 @@
     .compact-list-item { position: relative; }
 
     /* 🚨 긴급 메시지 표시 */
-    .urgent-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #dc2626; font-size: 11px; font-weight: var(--font-weight-bold); padding: 2px 8px; border-radius: 9px; margin-bottom: 4px; }
+    .urgent-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #dc2626; font-size: 11px; font-weight: var(--font-weight-bold); padding: 2px 8px; border-radius: var(--radius-md); margin-bottom: 4px; }
     .urgent-badge.code-blue-badge { background: var(--sidebar-active); color: var(--accent-dark); }
     .urgent-badge.code-red-badge { background: #fee2e2; color: #b91c1c; }
     .msg-row.is-urgent .msg-text, .is-urgent .chat-bubble { background: #fff1f2 !important; border: 1px solid #fecdd3 !important; }
@@ -2124,7 +2124,7 @@
     }
     .code-type-btn.is-red.is-active .code-type-name { color: #b91c1c; }
     .code-alert-select, .code-alert-input {
-      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 11px;
+      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: var(--radius-md);
       font-size: 13px; font-family: inherit; background: #fff; box-sizing: border-box;
     }
     .code-alert-input { margin-top: 8px; }
@@ -2140,11 +2140,11 @@
       padding: 12px 18px 16px; border-top: 1px solid #f1f5f9;
     }
     .code-alert-btn-ghost {
-      padding: 9px 14px; border: none; border-radius: 11px; background: #f1f5f9;
+      padding: 9px 14px; border: none; border-radius: var(--radius-md); background: #f1f5f9;
       color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
     }
     .code-alert-btn-send {
-      padding: 9px 18px; border: none; border-radius: 11px; background: var(--accent-dark);
+      padding: 9px 18px; border: none; border-radius: var(--radius-md); background: var(--accent-dark);
       color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; font-family: inherit;
     }
     .code-alert-btn-send.is-red { background: #dc2626; }
@@ -2216,12 +2216,12 @@
     }
     body.compact-mode .chat-header-actions { justify-content: flex-end; gap: 6px; }
     body.compact-mode .chat-header-tool-label { display: none; }
-    body.compact-mode .chat-header-tool-btn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 11px; }
+    body.compact-mode .chat-header-tool-btn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: var(--radius-md); }
     body.compact-mode .header-user-name { font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
     body.compact-mode #chat-header-status-text { font-size: 11.5px; color: #64748b; }
     body.compact-mode #chat-messages-area { padding: 14px 12px; gap: 8px; background: #b2c7d9; }
     body.compact-mode #chat-input-wrapper { padding: 10px 12px 12px; background: #fff; border-top: 1px solid #e4e9f0; }
-    body.compact-mode .input-box-inner { border-radius: 18px; padding: 8px 12px 10px; border: 1px solid #e2e8f0; background: #fff; box-shadow: none; }
+    body.compact-mode .input-box-inner { border-radius: var(--radius-xl); padding: 8px 12px 10px; border: 1px solid #e2e8f0; background: #fff; box-shadow: none; }
     body.compact-mode .input-box-inner textarea { height: 22px; min-height: 22px; max-height: 120px; font-size: 14px; }
     body.compact-mode .input-bottom-actions { gap: 8px; }
     body.compact-mode .input-bottom-actions .btn-send { flex-shrink: 0; margin-left: auto; }
@@ -2230,7 +2230,7 @@
     body.compact-mode .btn-quickphrase,
     body.compact-mode .btn-urgent,
     body.compact-mode .btn-capture {
-      width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: 9px;
+      width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: var(--radius-md);
     }
     body.compact-mode .btn-send { width: 34px; height: 34px; padding: 0; border-radius: 50%; background: var(--accent); border: none; color: #fff; box-shadow: none; }
     body.compact-mode #scheduled-indicator,
@@ -2314,7 +2314,7 @@
     }
     .sidebar-inbox-btn {
       flex-shrink: 0; border: 1px solid var(--border); background: var(--surface-muted);
-      color: var(--text-secondary); border-radius: 7px; padding: 4px 7px;
+      color: var(--text-secondary); border-radius: var(--radius-sm); padding: 4px 7px;
       font-size: 10.5px; font-weight: 700; cursor: pointer; letter-spacing: -0.03em;
     }
     .sidebar-inbox-btn:hover { background: var(--border); }
@@ -2357,7 +2357,7 @@
     .compact-empty-hint { text-align: center; padding: 48px 24px; color: #888; font-size: 13px; line-height: 1.65; white-space: pre-line; background: #fff; margin: 0; }
 
     .compact-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; }
-    .compact-more-profile { margin-top: 12px; border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; background: #fff; }
+    .compact-more-profile { margin-top: 12px; border: 1px solid #e8e8e8; border-radius: var(--radius-md); overflow: hidden; background: #fff; }
     .compact-more-profile-top { padding: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
     .compact-more-profile-name { font-size: 16px; font-weight: 700; color: #191919; letter-spacing: -0.02em; }
     .compact-more-profile-sub { font-size: 12px; color: #888; margin-top: 4px; }
@@ -2389,7 +2389,7 @@
       min-width: 0;
       padding: 8px 6px;
       border: 1px solid #e2e8e0;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
       background: #f8fafc;
       color: #334155;
       font-size: 11px;
@@ -2434,7 +2434,7 @@
     }
     .user-info-modal-close {
       border: none; background: #f1f5f9; color: #475569; width: 32px; height: 32px;
-      border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+      border-radius: var(--radius-md); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
     }
     .user-info-modal-close:hover { background: #e2e8f0; }
     .user-info-modal-card .detail-profile-card {
@@ -2462,7 +2462,7 @@
     .detail-name { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--text-primary); line-height: 1.3; word-break: keep-all; }
     .detail-dept-line { font-size: 10.5px; color: var(--text-secondary); line-height: 1.3; }
     .detail-info-group { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
-    .detail-info-row { background: var(--surface-muted); padding: 5px 8px; border-radius: 10px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; gap: 6px; }
+    .detail-info-row { background: var(--surface-muted); padding: 5px 8px; border-radius: var(--radius-md); font-size: 11px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; gap: 6px; }
     .detail-info-row .detail-info-label { color: var(--text-secondary); font-size: 10px; flex-shrink: 0; }
     .detail-info-row .detail-info-value { font-weight: 700; color: var(--text-primary); font-size: 11px; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .detail-self-edit-btn {
@@ -2496,7 +2496,7 @@
       min-width: 0; flex: 1;
     }
     .sidebar-cal-title-icon {
-      width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: var(--radius-md); flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
       background: linear-gradient(160deg, var(--sidebar-active) 0%, var(--sidebar-active) 100%);
       color: var(--accent-dark);
@@ -2516,7 +2516,7 @@
     }
     .sidebar-cal-actions button {
       flex: 1 1 auto; white-space: nowrap; line-height: 1.3;
-      padding: 9px 10px; border-radius: 11px; font-size: 13px; font-weight: 700;
+      padding: 9px 10px; border-radius: var(--radius-md); font-size: 13px; font-weight: 700;
       cursor: pointer; box-sizing: border-box; min-width: 0;
     }
     .sidebar-cal-actions #sidebar-cal-refresh-btn {
@@ -2535,7 +2535,7 @@
       min-height: 0; flex: 1;
     }
     .sidebar-calendar-day {
-      background: #fff; border-radius: 18px; border: none;
+      background: #fff; border-radius: var(--radius-xl); border: none;
       box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
       display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1 1 auto;
     }
@@ -2564,7 +2564,7 @@
     }
     .sidebar-ward-badge {
       flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-      width: 18px; height: 18px; border-radius: 6px; font-size: 11px; font-weight: 800;
+      width: 18px; height: 18px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 800;
       line-height: 1; color: #fff; letter-spacing: -0.04em;
       box-shadow: none;
     }
@@ -2748,16 +2748,16 @@
     .sidebar-cal-day-line.is-room-change:hover { background: #cffafe; }
     .schedule-item { background: #ffffff; padding: 8px 10px; border-radius: 12px; font-size: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 
-    .badge-admission { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-discharge { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-outpatient { background: #ffedd5; color: #9a3412; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-outing { background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-overnight { background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-transfer { background: var(--sidebar-active); color: #1e40af; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-room-change { background: #cffafe; color: #0e7490; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-general { background: var(--sidebar-active); color: var(--accent-dark); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-leave { background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-exam { background: #ccfbf1; color: #0f766e; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+    .badge-admission { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-discharge { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-outpatient { background: #ffedd5; color: #9a3412; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-outing { background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-overnight { background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-transfer { background: var(--sidebar-active); color: #1e40af; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-room-change { background: #cffafe; color: #0e7490; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-general { background: var(--sidebar-active); color: var(--accent-dark); padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-leave { background: #ede9fe; color: #5b21b6; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
+    .badge-exam { background: #ccfbf1; color: #0f766e; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
 
     /* 📋 병동·RM 일정 현황판 */
     .schedule-board-modal-card {
@@ -2843,10 +2843,10 @@
     }
     #schedule-board-ward-chips::-webkit-scrollbar { display: none; }
     #schedule-board-ward-chips .schedule-board-chip.sb-ward-chip {
-      width: 28px; height: 28px; border-radius: 10px; flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: var(--radius-md); flex-shrink: 0;
     }
     #schedule-board-ward-chips .schedule-board-chip.sb-ward-chip .sb-ward-icon {
-      width: 20px; height: 20px; border-radius: 7px; font-size: 12px;
+      width: 20px; height: 20px; border-radius: var(--radius-sm); font-size: 12px;
     }
     #schedule-board-ward-chips .schedule-board-chip:not(.sb-ward-chip) {
       padding: 5px 8px; flex-shrink: 0; white-space: nowrap;
@@ -2856,7 +2856,7 @@
     .sb-board-side .schedule-board-mini-cal { padding: 8px; border-radius: 12px; }
     .sb-board-side .mini-cal-header { font-size: 11.5px; margin-bottom: 4px; }
     .sb-board-side .mini-cal-weekdays { font-size: 10px; }
-    .sb-board-side .mini-cal-day { font-size: 11px; padding: 5px 0; border-radius: 7px; }
+    .sb-board-side .mini-cal-day { font-size: 11px; padding: 5px 0; border-radius: var(--radius-sm); }
     .schedule-board-export-row.sb-side-export {
       flex-direction: column; align-items: stretch; padding: 0; background: transparent; border: none; gap: 6px;
     }
@@ -2881,7 +2881,7 @@
     .schedule-board-header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
     .schedule-board-add-btn {
       padding: 7px 14px; background: var(--sidebar-active); color: var(--accent-dark); border: 1px solid var(--sidebar-active);
-      border-radius: 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      border-radius: var(--radius-md); font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
     .schedule-board-add-btn:hover { background: var(--sidebar-active); border-color: #90CAF9; color: var(--accent-dark); }
@@ -2922,7 +2922,7 @@
     .sb-toolbar-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
     .sb-toolbar-calendar { min-width: 0; }
     .schedule-board-mini-cal {
-      background: #fff; border: 1px solid var(--sidebar-active); border-radius: 14px; padding: 10px;
+      background: #fff; border: 1px solid var(--sidebar-active); border-radius: var(--radius-lg); padding: 10px;
       box-shadow: 0 1px 3px rgba(33, 150, 243, 0.12);
     }
     .schedule-board-mini-cal .mini-cal-header { margin-bottom: 6px; }
@@ -2936,11 +2936,11 @@
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
     }
     .schedule-board-view-tabs {
-      display: flex; gap: 2px; background: #e2e8f0; padding: 3px; border-radius: 11px; width: fit-content;
+      display: flex; gap: 2px; background: #e2e8f0; padding: 3px; border-radius: var(--radius-md); width: fit-content;
     }
     .schedule-board-view-tab {
       border: none; background: transparent; padding: 7px 16px; font-size: 12px; font-weight: 700;
-      color: #64748b; border-radius: 9px; cursor: pointer; transition: background 0.15s, color 0.15s;
+      color: #64748b; border-radius: var(--radius-md); cursor: pointer; transition: background 0.15s, color 0.15s;
     }
     .schedule-board-view-tab.active { background: #fff; color: var(--accent-dark); box-shadow: 0 1px 3px rgba(15,23,42,.1); }
     .sb-date-field { display: flex; align-items: center; gap: 8px; }
@@ -2948,11 +2948,11 @@
       font-size: 10.5px; font-weight: 700; color: #94a3b8; letter-spacing: 0.02em; flex-shrink: 0;
     }
     .schedule-board-date {
-      padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 12px;
+      padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: var(--radius-md); font-size: 12px;
       background: #fff; color: #0f172a; min-width: 140px;
     }
     .sb-filter-panel {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 14px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius-lg); padding: 12px 14px;
       display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04);
     }
     .sb-filter-block { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
@@ -3007,12 +3007,12 @@
     .schedule-board-chip.w9.active { border-color: #ec4899; background: #fce7f3; color: #be185d; }
     .schedule-board-search {
       padding: 8px 11px;
-      border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; background: #f8fafc;
+      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; background: #f8fafc;
       box-sizing: border-box;
     }
     .schedule-board-search:focus { outline: none; border-color: #90CAF9; background: #fff; }
     .schedule-board-select {
-      width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px;
+      width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: var(--radius-md);
       font-size: 12px; background: #f8fafc; max-width: none;
     }
     .sb-board-content .schedule-board-login-hint { margin: 10px 14px 0; flex-shrink: 0; }
@@ -3036,7 +3036,7 @@
     .schedule-board-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 18px; background: #eef2f7; }
     .sb-board-content .schedule-board-section-head { position: sticky; top: 0; z-index: 3; }
     .schedule-board-section {
-      border-radius: 14px; overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1;
+      border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; border: 2px solid #cbd5e1;
       background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.06);
     }
     .schedule-board-section-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 14.5px; font-weight: 700; }
@@ -3130,7 +3130,7 @@
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
     .sb-main-board-wrap {
       margin: 4px 2px 12px; padding: 18px 16px 14px; overflow-x: auto;
-      background: #fff; border-radius: 14px; border: 1px solid #e2e8f0;
+      background: #fff; border-radius: var(--radius-lg); border: 1px solid #e2e8f0;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.05);
     }
     .sb-main-board-wrap + .sb-main-board-wrap { margin-top: 14px; }
@@ -3155,7 +3155,7 @@
     .sb-main-grid {
       width: 100%; min-width: 880px; border-collapse: separate; border-spacing: 0;
       table-layout: fixed; background: #fff; border: none; font-size: 12px; line-height: 1.45;
-      border-radius: 10px; overflow: visible; outline: 1px solid #e8ecf1;
+      border-radius: var(--radius-md); overflow: visible; outline: 1px solid #e8ecf1;
     }
     .sb-main-grid th, .sb-main-grid td {
       border-right: 1px solid #e8ecf1; border-bottom: 1px solid #e8ecf1;
@@ -3304,7 +3304,7 @@
     .sb-mod-tip {
       position: fixed; z-index: 10050; pointer-events: none;
       max-width: min(420px, 92vw); max-height: min(50vh, 360px); overflow: auto;
-      padding: 8px 11px; border-radius: 10px;
+      padding: 8px 11px; border-radius: var(--radius-md);
       background: #0f172a; color: #f8fafc; font-size: 12px; font-weight: 600;
       line-height: 1.45; white-space: pre-wrap; word-break: keep-all;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
@@ -3314,7 +3314,7 @@
     .sb-mod-tip.is-remark { font-weight: 500; }
     .schedule-board-empty {
       text-align: center; padding: 56px 24px; color: #94a3b8; font-size: 13px; line-height: 1.65;
-      background: #fff; border-radius: 14px; border: 1px dashed #cbd5e1; margin: 4px 0;
+      background: #fff; border-radius: var(--radius-lg); border: 1px dashed #cbd5e1; margin: 4px 0;
     }
     .schedule-board-empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.85; }
     .schedule-board-section.w4 { border-color: var(--accent); } .schedule-board-section.w4 .schedule-board-section-head { background: var(--sidebar-active); color: #1e40af; }
@@ -3327,7 +3327,7 @@
       display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
       padding: 10px 20px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
     }
-    .schedule-board-export-btn { padding: 8px 14px; border: none; border-radius: 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; background: #16a34a; color: #fff; }
+    .schedule-board-export-btn { padding: 8px 14px; border: none; border-radius: var(--radius-md); font-size: 11.5px; font-weight: 700; cursor: pointer; background: #16a34a; color: #fff; }
     .schedule-board-export-btn:hover { background: #15803d; }
     .schedule-board-export-btn.secondary { background: var(--sidebar-active); color: var(--accent-dark); border: 1px solid var(--sidebar-active); }
     .schedule-board-export-btn.secondary:hover { background: var(--sidebar-active); }
@@ -3344,7 +3344,7 @@
     .sb-quick-add-toolbar { display: flex; justify-content: flex-end; margin: -2px 0 6px; }
     .sb-quick-close-btn {
       border: none; background: #f1f5f9; color: #64748b; font-size: 10.5px; font-weight: 600;
-      padding: 3px 8px; border-radius: 7px; cursor: pointer;
+      padding: 3px 8px; border-radius: var(--radius-sm); cursor: pointer;
     }
     .sb-quick-close-btn:hover { background: #e2e8f0; color: #334155; }
     /* 좁은 창: 필드 압착 대신 가로 스크롤 */
@@ -3374,7 +3374,7 @@
     .sb-quick-field label { font-size: 10.5px; font-weight: 700; color: #64748b; white-space: nowrap; line-height: 1.2; }
     .sb-quick-field input, .sb-quick-field select, .sb-quick-field textarea {
       width: 100%; box-sizing: border-box; padding: 4px 6px; border: 1px solid #cbd5e1;
-      border-radius: 7px; font-size: 12px; background: #fff; font-family: inherit;
+      border-radius: var(--radius-sm); font-size: 12px; background: #fff; font-family: inherit;
       min-height: 28px;
     }
     .sb-quick-field select {
@@ -3429,13 +3429,13 @@
     .sb-quick-guardian input { accent-color: #7c3aed; }
     .sb-quick-field input:focus, .sb-quick-field select:focus, .sb-quick-field textarea:focus { outline: none; border-color: #90CAF9; }
     .sb-quick-save-btn {
-      border: none; background: var(--accent-dark); color: #fff; padding: 5px 12px; border-radius: 7px;
+      border: none; background: var(--accent-dark); color: #fff; padding: 5px 12px; border-radius: var(--radius-sm);
       font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; min-height: 26px;
     }
     .sb-quick-save-btn:hover { background: var(--accent-dark); }
     .sb-quick-cancel-edit-btn {
       margin-left: 0; border: none; background: #f1f5f9; color: #475569; padding: 5px 8px;
-      border-radius: 7px; font-size: 11px; font-weight: 600; cursor: pointer; min-height: 26px;
+      border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; min-height: 26px;
     }
     .sb-quick-cancel-edit-btn:hover { background: #e2e8f0; }
     .schedule-board-quick-feedback { margin-top: 4px; font-size: 11px; font-weight: 700; color: #16a34a; display: none; }
@@ -3562,7 +3562,7 @@
     .calendar-day-row-actions button:hover { color: var(--accent-dark); }
     .calendar-day-row-actions .btn-delete:hover { color: #ef4444; }
     .calendar-day-footer { padding: 10px 18px 14px; border-top: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; }
-    .calendar-day-add-btn { width: 100%; padding: 9px; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+    .calendar-day-add-btn { width: 100%; padding: 9px; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
     .calendar-day-add-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
     .calendar-day-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
@@ -3570,7 +3570,7 @@
     .modal-card.all-logs-modal-card {
       width: min(720px, 94vw); height: min(720px, 90vh); max-height: 90vh;
       padding: 0; gap: 0; overflow: hidden;
-      border-radius: 18px;
+      border-radius: var(--radius-xl);
       box-shadow: 0 28px 64px rgba(15, 23, 42, 0.18);
       background: #fff;
       display: flex; flex-direction: column;
@@ -3586,7 +3586,7 @@
     }
     .all-logs-header-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .all-logs-header-icon {
-      width: 42px; height: 42px; border-radius: 14px;
+      width: 42px; height: 42px; border-radius: var(--radius-lg);
       background: linear-gradient(145deg, var(--accent), var(--accent-dark));
       color: #fff;
       display: flex; align-items: center; justify-content: center;
@@ -3600,14 +3600,14 @@
     .all-logs-folder-btn {
       display: inline-flex; align-items: center; gap: 6px;
       height: 34px; padding: 0 12px;
-      background: rgba(255,255,255,0.85); border: 1px solid #e2e8f0; border-radius: 11px;
+      background: rgba(255,255,255,0.85); border: 1px solid #e2e8f0; border-radius: var(--radius-md);
       font-size: 11.5px; font-weight: 700; cursor: pointer; color: #475569;
       white-space: nowrap; transition: background 0.15s, border-color 0.15s, color 0.15s;
       font-family: inherit;
     }
     .all-logs-folder-btn:hover { background: #fff; border-color: #cbd5e1; color: #0f172a; }
     .all-logs-close-btn {
-      width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: 11px;
+      width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: var(--radius-md);
       font-size: 14px; color: #64748b; cursor: pointer;
       transition: background 0.12s, color 0.12s; flex-shrink: 0;
     }
@@ -3641,7 +3641,7 @@
     .all-logs-filter-tab {
       flex: 1; min-width: 0; padding: 8px 10px; border: none; background: transparent;
       font-size: 12.5px; font-weight: 700; color: #64748b; cursor: pointer;
-      border-radius: 9px; font-family: inherit; letter-spacing: -0.02em;
+      border-radius: var(--radius-md); font-family: inherit; letter-spacing: -0.02em;
       transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     }
     .all-logs-filter-tab:hover { color: #334155; }
@@ -3676,7 +3676,7 @@
       font-size: 13px; line-height: 1.7; margin: auto 0;
     }
     .all-logs-empty-icon {
-      width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 18px;
+      width: 56px; height: 56px; margin: 0 auto 14px; border-radius: var(--radius-xl);
       display: flex; align-items: center; justify-content: center;
       font-size: 26px; background: #fff; border: 1px solid #e8edf2;
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
@@ -3710,12 +3710,12 @@
     /* 채팅창과 동일: 전체 대화 기록에서도 이름 이니셜 아바타 숨김 */
     .log-card-avatar { display: none !important; }
     .log-card-thumb {
-      width: 52px; height: 52px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+      width: 52px; height: 52px; border-radius: var(--radius-md); overflow: hidden; flex-shrink: 0;
       background: #e2e8f0; border: 1px solid #e8edf2;
     }
     .log-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .log-card-file-icon {
-      width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+      width: 40px; height: 40px; border-radius: var(--radius-md); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; font-size: 18px;
       background: #f8fafc; border: 1px solid #e8edf2; color: #64748b;
     }
@@ -3728,13 +3728,13 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.02em;
     }
     .log-card-direction {
-      font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; line-height: 1.25;
+      font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: var(--radius-sm); line-height: 1.25;
       flex-shrink: 0; letter-spacing: -0.02em;
     }
     .log-card-direction.is-sent { background: rgba(33, 150, 243, 0.12); color: var(--accent-dark); }
     .log-card-direction.is-received { background: #f1f5f9; color: #64748b; }
     .log-card-type {
-      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: var(--radius-sm);
       line-height: 1.25; flex-shrink: 0; white-space: nowrap; max-width: 120px;
       overflow: hidden; text-overflow: ellipsis;
     }
@@ -3784,7 +3784,7 @@
       border-bottom: 1px solid #eef2f6;
     }
     .app-dialog-icon {
-      width: 48px; height: 48px; border-radius: 15px; margin-bottom: 12px;
+      width: 48px; height: 48px; border-radius: var(--radius-lg); margin-bottom: 12px;
       display: flex; align-items: center; justify-content: center; font-size: 22px;
       background: linear-gradient(145deg, var(--accent), var(--accent-dark));
       box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
@@ -3804,7 +3804,7 @@
     .app-dialog-message { font-size: 13.5px; color: #334155; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; }
     .app-dialog-detail {
       font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 12px; white-space: pre-wrap;
-      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px;
+      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 10px 12px;
     }
     .app-dialog-actions {
       display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px 18px;
@@ -3885,7 +3885,7 @@
     .board-detail-images { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
     .board-detail-images img {
       max-width: 100%; width: 100%; height: auto; max-height: min(72vh, 720px);
-      object-fit: contain; border-radius: 14px; border: 1px solid #e2e8f0;
+      object-fit: contain; border-radius: var(--radius-lg); border: 1px solid #e2e8f0;
       cursor: zoom-in; background: #f8fafc;
     }
     .modal-card.board-modal-card {
@@ -3897,7 +3897,7 @@
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); /* backdrop-filter removed (Win CPU) */ z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
-    .modal-card { background: var(--surface); border-radius: 28px; width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
+    .modal-card { background: var(--surface); border-radius: var(--radius-2xl); width: 400px; padding: 26px; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-soft); max-height: 90vh; overflow-y: auto; -webkit-app-region: no-drag; animation: modal-in 0.32s var(--ease-spring); }
 
     /* ✨ 가벼운 UI 모션 */
     @keyframes ui-float {
@@ -4103,7 +4103,7 @@
     .master-admin-header-actions button {
       padding: 7px 12px;
       border: none;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
@@ -4116,7 +4116,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       border: 1px solid #e2e8f0;
-      border-radius: 14px;
+      border-radius: var(--radius-lg);
       background: #fff;
       min-width: 0;
       width: 100%;
@@ -4394,7 +4394,7 @@
       background: transparent;
       text-align: left;
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
       font-size: 13px;
       font-weight: 600;
       color: #475569;
@@ -4473,7 +4473,7 @@
     .settings-card {
       background: #f8fafc;
       border: none;
-      border-radius: 14px;
+      border-radius: var(--radius-lg);
       padding: 14px 16px;
       display: flex;
       flex-direction: column;
@@ -4507,31 +4507,31 @@
       gap: 10px 12px;
     }
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
-    .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
+    .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
     .settings-btn-secondary:hover { background: #e2e8f0; }
-    .settings-btn-primary { padding: 8px 16px; background: var(--accent-dark); border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
+    .settings-btn-primary { padding: 8px 16px; background: var(--accent-dark); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
     .settings-btn-primary:hover { filter: brightness(1.15); }
-    .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
+    .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
     .settings-btn-danger:hover { background: #b91c1c; }
     .settings-btn-text { padding: 7px 4px; background: none; border: none; font-size: 11.5px; font-weight: 500; color: #94a3b8; cursor: pointer; transition: color 0.12s; }
     .settings-btn-text:hover { color: #ef4444; }
     .settings-toast-dur { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12px; color: #64748b; font-weight: 600; }
     .settings-toast-dur input {
-      width: 64px; padding: 7px 8px; border: 1px solid transparent; border-radius: 9px;
+      width: 64px; padding: 7px 8px; border: 1px solid transparent; border-radius: var(--radius-md);
       font-size: 13px; text-align: center; font-family: inherit; background: #f1f5f9; color: #0f172a;
     }
     .settings-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .settings-version-line { font-size: 13px; color: #475569; }
     .net-status-list { display: flex; flex-direction: column; gap: 2px; }
     .settings-path-input {
-      flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+      flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
       font-size: 12px; background: #f1f5f9; color: #64748b; font-family: inherit;
     }
     .settings-field { font-size: 12px; color: #475569; display: flex; flex-direction: column; gap: 4px; }
     .settings-field input,
     .settings-field select,
     .settings-select {
-      width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+      width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
       font-size: 13px; font-family: inherit; background: #f1f5f9; color: #0f172a; box-sizing: border-box;
       transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
     }
@@ -5196,8 +5196,8 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div style="font-size:12px; color:#64748b;">기준 버전: <strong id="master-ref-version" style="color:#0f172a;">-</strong></div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
-                <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+                <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
+                <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
@@ -5210,8 +5210,8 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div id="master-traffic-meta" style="font-size:12px; color:#64748b;">집계 중…</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" onclick="resetMasterPeerTrafficStats()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">집계 초기화</button>
-                <button type="button" onclick="renderMasterPeerTraffic()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+                <button type="button" onclick="resetMasterPeerTrafficStats()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">집계 초기화</button>
+                <button type="button" onclick="renderMasterPeerTraffic()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
             <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
@@ -5266,8 +5266,8 @@
               </div>
 
               <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                <button type="button" onclick="runMasterLoadSimAction('suite')" style="padding:8px 14px; background:#0f172a; color:#fff; border:none; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;">전체 검사 실행</button>
-                <button type="button" onclick="clearMasterLoadSimLog()" style="padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer; color:#475569;">결과 지우기</button>
+                <button type="button" onclick="runMasterLoadSimAction('suite')" style="padding:8px 14px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:12px; font-weight:700; cursor:pointer;">전체 검사 실행</button>
+                <button type="button" onclick="clearMasterLoadSimLog()" style="padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:12px; font-weight:700; cursor:pointer; color:#475569;">결과 지우기</button>
               </div>
               <pre id="master-loadsim-log" style="margin:0; max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:#0f172a; color:#e2e8f0; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">검사를 실행하면 결과가 여기에 쌓입니다.</pre>
               <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">CLI: <code>node scripts/load-sim.js presence --users=200</code> · UDP 패킷: <code>node scripts/load-sim.js udp --target=&lt;IP&gt;</code></p>
@@ -5475,7 +5475,7 @@
       <div class="lock-split-right">
         <h2>메신저 사용이 중지되었습니다</h2>
         <p class="sub">마스터 계정으로 로그인하면 다시 사용할 수 있어요</p>
-        <div id="usage-lock-overlay-reason" style="margin-top:2px; padding:12px 14px; border-radius:14px; background:#fef2f2; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
+        <div id="usage-lock-overlay-reason" style="margin-top:2px; padding:12px 14px; border-radius: var(--radius-lg); background:#fef2f2; font-size:13px; color:#7f1d1d; line-height:1.55; font-weight:600; text-align:left; white-space:pre-wrap; display:none;"></div>
         <div id="usage-lock-overlay-desc" style="font-size:12px; color:#94a3b8; line-height:1.55;">마스터 관리자가 이 PC의 메신저 접속을 막아 두었습니다. 마스터 아이디와 비밀번호를 입력하거나, 마스터가 관리자 화면에서 해제해야 다시 사용할 수 있습니다.</div>
         <div class="lock-input-wrap" style="margin-top:8px;">
           <span class="lock-input-icon" data-ui-icon="shieldUser"></span>
@@ -5522,23 +5522,23 @@
       <div id="master-user-edit-subtitle" style="font-size:11px; color:#64748b; margin-top:-6px;"></div>
       <input type="hidden" id="master-user-edit-ip">
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">이름
-        <input type="text" id="master-user-edit-username" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+        <input type="text" id="master-user-edit-username" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">직급
-        <input type="text" id="master-user-edit-rank" placeholder="없으면 비워 두세요 (이름만 표시)" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+        <input type="text" id="master-user-edit-rank" placeholder="없으면 비워 두세요 (이름만 표시)" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">부서
-        <input type="text" id="master-user-edit-dept" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+        <input type="text" id="master-user-edit-dept" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">층
-        <input type="text" id="master-user-edit-floor" placeholder="예: 10층" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+        <input type="text" id="master-user-edit-floor" placeholder="예: 10층" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
       <div style="display:flex; gap:10px;">
         <label style="font-size:12px; color:#475569; flex:1; display:flex; flex-direction:column; gap:4px;">내선
-          <input type="text" id="master-user-edit-ext" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+          <input type="text" id="master-user-edit-ext" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
         </label>
         <label style="font-size:12px; color:#475569; flex:1; display:flex; flex-direction:column; gap:4px;">전화
-          <input type="text" id="master-user-edit-phone" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: 10px; font-size:13px;">
+          <input type="text" id="master-user-edit-phone" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
         </label>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
@@ -5558,9 +5558,9 @@
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
           <div style="display:flex; gap:8px;" id="board-header-actions">
-            <button style="padding:8px 14px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;" id="board-write-btn" onclick="openNoticeAddModal()">✍️ 글쓰기</button>
+            <button style="padding:8px 14px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;" id="board-write-btn" onclick="openNoticeAddModal()">✍️ 글쓰기</button>
           </div>
-          <button type="button" id="board-close-btn" style="padding:8px 12px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; font-weight:600; cursor:pointer; color:#475569; flex-shrink:0;" onclick="closeBoardModal()">✖ 닫기</button>
+          <button type="button" id="board-close-btn" style="padding:8px 12px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:600; cursor:pointer; color:#475569; flex-shrink:0;" onclick="closeBoardModal()">✖ 닫기</button>
         </div>
       </div>
 
@@ -5587,8 +5587,8 @@
         </div>
         <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
-          <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-          <button type="button" id="board-write-submit-btn" onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
+          <button onclick="cancelBoardWrite()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+          <button type="button" id="board-write-submit-btn" onclick="submitBoardWrite()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 등록</button>
         </div>
       </div>
 
@@ -6193,8 +6193,8 @@
       <input type="text" id="operator-login-id" placeholder="아이디">
       <input type="password" id="operator-login-pwd" placeholder="비밀번호" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button onclick="closeOperatorLoginModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="submitOperatorLogin()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">로그인</button>
+        <button onclick="closeOperatorLoginModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="submitOperatorLogin()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">로그인</button>
       </div>
     </div>
   </div>
@@ -6204,9 +6204,9 @@
     <div class="modal-card">
       <div style="font-size:16px; font-weight:700; color:var(--accent);">👥 그룹 대화방</div>
 
-      <div class="sidebar-tabs" style="display:flex; background:#f1f5f9; margin:0; border-radius: 15px; padding:3px; gap:3px;">
-        <div class="sidebar-tab-item active" id="group-mode-new-tab" onclick="switchGroupModalMode('new')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: 10px; color:#475569;">새로 만들기</div>
-        <div class="sidebar-tab-item" id="group-mode-existing-tab" onclick="switchGroupModalMode('existing')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: 10px; color:#475569;">기존 그룹에 초대</div>
+      <div class="sidebar-tabs" style="display:flex; background:#f1f5f9; margin:0; border-radius: var(--radius-lg); padding:3px; gap:3px;">
+        <div class="sidebar-tab-item active" id="group-mode-new-tab" onclick="switchGroupModalMode('new')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: var(--radius-md); color:#475569;">새로 만들기</div>
+        <div class="sidebar-tab-item" id="group-mode-existing-tab" onclick="switchGroupModalMode('existing')" style="flex:1; text-align:center; padding:7px 0; font-size:11px; font-weight:700; cursor:pointer; border-radius: var(--radius-md); color:#475569;">기존 그룹에 초대</div>
       </div>
 
       <div id="group-new-section">
@@ -6224,7 +6224,7 @@
           </label>
           <button type="button" class="group-bulk-btn" onclick="groupToggleSelectByDept()" title="해당 부서 전체 선택/해제">이 부서</button>
         </div>
-        <div id="group-member-checklist" style="max-height:200px; overflow-y:auto; border:1px solid #f1f5f9; border-radius: 15px; padding:6px 10px; margin-top:4px;"></div>
+        <div id="group-member-checklist" style="max-height:200px; overflow-y:auto; border:1px solid #f1f5f9; border-radius: var(--radius-lg); padding:6px 10px; margin-top:4px;"></div>
       </div>
 
       <div id="group-existing-section" style="display:none;">
@@ -6234,8 +6234,8 @@
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-        <button onclick="closeGroupChatModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="submitGroupChatModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 확인</button>
+        <button onclick="closeGroupChatModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="submitGroupChatModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 확인</button>
       </div>
     </div>
   </div>
@@ -6288,8 +6288,8 @@
       <div style="font-size:11.5px; color:#64748b; line-height:1.5;">목록·채팅 헤더에 <b>내 PC에서만</b> 보이는 이름입니다. 다른 직원 화면에는 바뀌지 않습니다.</div>
       <input type="text" id="channel-display-name-input" placeholder="표시할 이름" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitChannelDisplayName()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeChannelDisplayNameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button type="button" onclick="submitChannelDisplayName()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
+        <button type="button" onclick="closeChannelDisplayNameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="submitChannelDisplayName()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
       </div>
     </div>
   </div>
@@ -6304,8 +6304,8 @@
       <div id="channel-title-emoji-grid" class="title-emoji-picker-grid"></div>
       <div id="channel-title-emoji-preview" class="title-emoji-preview"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" onclick="closeChannelTitleEmojiModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button type="button" onclick="submitChannelTitleEmoji()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
+        <button type="button" onclick="closeChannelTitleEmojiModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="submitChannelTitleEmoji()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 적용</button>
       </div>
     </div>
   </div>
@@ -6316,8 +6316,8 @@
       <div style="font-size:16px; font-weight:700; color:#1d1c1d;">✏️ 대화방 이름 변경</div>
       <input type="text" id="group-rename-input" placeholder="새 대화방 이름을 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px;" onkeydown="if(event.key==='Enter') submitGroupRename()">
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button onclick="closeGroupRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="submitGroupRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
+        <button onclick="closeGroupRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button onclick="submitGroupRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
     </div>
   </div>
@@ -6333,8 +6333,8 @@
       </label>
       <p style="font-size:11px; color:#94a3b8; margin:8px 0 0; line-height:1.45;">깨진 글자가 보이면 성까지 포함해 전체 이름을 다시 입력해 주세요.</p>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
-        <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button type="button" onclick="submitOperatorRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 저장</button>
+        <button type="button" onclick="closeOperatorRenameModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="submitOperatorRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 저장</button>
       </div>
     </div>
   </div>
@@ -6358,8 +6358,8 @@
       </label>
       <div id="password-change-error" style="display:none; color:#ef4444; font-size:11.5px; font-weight:600;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
-        <button type="button" onclick="closePasswordChangeModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button type="button" id="password-change-submit-btn" onclick="submitPasswordChange()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
+        <button type="button" onclick="closePasswordChangeModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" id="password-change-submit-btn" onclick="submitPasswordChange()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
     </div>
   </div>
@@ -6444,8 +6444,8 @@
       <div style="font-size:12px; font-weight:700; color:#475569; margin-top:6px;">그룹 대화방</div>
       <div id="share-group-checklist" style="max-height:100px; overflow-y:auto; border:1px solid #f1f5f9; border-radius:12px; padding:4px 8px;"></div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-        <button type="button" onclick="closeShareMessageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius:15px; font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button type="button" onclick="submitShareMessageModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius:15px; font-size:12px; font-weight:700; cursor:pointer;">전달</button>
+        <button type="button" onclick="closeShareMessageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
+        <button type="button" onclick="submitShareMessageModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">전달</button>
       </div>
     </div>
   </div>
@@ -6575,21 +6575,21 @@
         <input type="text" id="transport-remarks" placeholder="전달할 참고 사항이 있으면 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius: 12px; font-size:13px;">
       </label>
       <div id="transport-status-toast" style="display:none; font-size:12px; font-weight:600; padding:8px 12px; border-radius: 12px; text-align:center;"></div>
-      <button onclick="submitTransportRequest()" id="transport-submit-btn" style="padding:11px; background:var(--accent); color:#fff; border:none; border-radius: 15px; font-size:13px; font-weight:700; cursor:pointer;">📨 요청 보내기</button>
+      <button onclick="submitTransportRequest()" id="transport-submit-btn" style="padding:11px; background:var(--accent); color:#fff; border:none; border-radius: var(--radius-lg); font-size:13px; font-weight:700; cursor:pointer;">📨 요청 보내기</button>
 
       <div class="transport-history-section">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
           <div style="font-size:12.5px; font-weight:700; color:#475569;">🕒 최근 보낸 요청</div>
           <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-          <input type="text" id="transport-search-input" placeholder="🔍 환자명/치료명/위치 검색" oninput="renderTransportHistory(this.value)" style="width:150px; padding:5px 8px; border:1px solid #e2e8f0; border-radius: 10px; font-size:11px;">
-          <button type="button" onclick="renderTransportHistory(document.getElementById('transport-search-input').value)" title="기사 처리 상태 새로고침" style="padding:5px 10px; border:1px solid #e2e8f0; border-radius: 10px; font-size:11px; background:#fff; cursor:pointer; color:#475569; font-weight:600;">↻</button>
+          <input type="text" id="transport-search-input" placeholder="🔍 환자명/치료명/위치 검색" oninput="renderTransportHistory(this.value)" style="width:150px; padding:5px 8px; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px;">
+          <button type="button" onclick="renderTransportHistory(document.getElementById('transport-search-input').value)" title="기사 처리 상태 새로고침" style="padding:5px 10px; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; background:#fff; cursor:pointer; color:#475569; font-weight:600;">↻</button>
           </div>
         </div>
         <div id="transport-history-list"></div>
       </div>
       </div>
       <div class="transport-modal-footer">
-        <button onclick="closeTransportRequestModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 닫기</button>
+        <button onclick="closeTransportRequestModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
       </div>
     </div>
   </div>
@@ -6673,7 +6673,7 @@
   <div id="master-auth-modal" class="modal-overlay">
     <div class="modal-card" style="width:320px; border-radius:20px;">
       <div style="display:flex; align-items:center; gap:10px;">
-        <div style="width:34px; height:34px; border-radius:10px; background:linear-gradient(145deg,var(--accent-dark),var(--accent-dark)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">미래</div>
+        <div style="width:34px; height:34px; border-radius: var(--radius-md); background:linear-gradient(145deg,var(--accent-dark),var(--accent-dark)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0;">미래</div>
         <div style="font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.02em;">마스터 관리자 인증</div>
       </div>
       <input type="text" id="master-id-input" placeholder="아이디 입력 (기본: admin)" style="padding:10px 12px; border:1px solid transparent; border-radius: 12px; font-size:12.5px; margin-top:14px; background:#f1f5f9;" onkeydown="if(event.key==='Enter') document.getElementById('master-pwd-input').focus()">
@@ -6696,13 +6696,13 @@
         <button onclick="addQuickPhraseFromModal()" style="padding:8px 14px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">➕ 추가</button>
       </div>
       <div style="display:flex; justify-content:flex-end;">
-        <button onclick="closeQuickPhraseManageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; cursor:pointer;">✕ 닫기</button>
+        <button onclick="closeQuickPhraseManageModal()" style="padding:8px 14px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 닫기</button>
       </div>
     </div>
   </div>
 
   <!-- 🔄 자동 업데이트 준비 완료 배너 -->
-  <div id="auto-update-banner" style="display:none; position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:3000; background:#1e293b; color:#fff; border-radius: 21px; box-shadow:0 12px 30px rgba(0,0,0,0.3); padding:14px 18px; align-items:center; gap:14px; max-width:520px;">
+  <div id="auto-update-banner" style="display:none; position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:3000; background:#1e293b; color:#fff; border-radius: var(--radius-xl); box-shadow:0 12px 30px rgba(0,0,0,0.3); padding:14px 18px; align-items:center; gap:14px; max-width:520px;">
     <div style="font-size:20px;">🔄</div>
     <div style="flex:1; font-size:12.5px; line-height:1.5;">
       <div style="font-weight:700; font-size:13px;">새 버전(<span id="auto-update-version"></span>)이 준비되었습니다</div>
@@ -6712,12 +6712,12 @@
     <button onclick="snoozeAutoUpdate()" style="padding:8px 12px; background:#334155; color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">30분 후 알림</button>
   </div>
 
-  <div id="onedrive-path-banner" style="display:none; position:fixed; left:50%; top:12px; transform:translateX(-50%); z-index:2900; background:#7c2d12; color:#fff; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.25); padding:10px 14px; align-items:flex-start; gap:12px; max-width:560px; font-size:12.5px; line-height:1.45;">
+  <div id="onedrive-path-banner" style="display:none; position:fixed; left:50%; top:12px; transform:translateX(-50%); z-index:2900; background:#7c2d12; color:#fff; border-radius: var(--radius-lg); box-shadow:0 8px 24px rgba(0,0,0,0.25); padding:10px 14px; align-items:flex-start; gap:12px; max-width:560px; font-size:12.5px; line-height:1.45;">
     <div style="flex:1;">
       <div style="font-weight:700; margin-bottom:2px;">OneDrive/클라우드 설치 경로 감지</div>
       <div id="onedrive-path-banner-text" style="opacity:0.92;">파일 동기화 잠금으로 응답 없음이 발생할 수 있습니다. 로컬 폴더(예: C:\Apps\Mirae Messenger)로 옮겨 주세요.</div>
     </div>
-    <button type="button" onclick="document.getElementById('onedrive-path-banner').style.display='none'" style="padding:6px 10px; background:rgba(255,255,255,0.18); color:#fff; border:none; border-radius:10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">닫기</button>
+    <button type="button" onclick="document.getElementById('onedrive-path-banner').style.display='none'" style="padding:6px 10px; background:rgba(255,255,255,0.18); color:#fff; border:none; border-radius: var(--radius-md); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">닫기</button>
   </div>
 
   </div>
@@ -14564,7 +14564,7 @@
               preview.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:8px;';
               msgEl.parentElement.appendChild(preview);
             }
-            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius:10px;border:1px solid #e2e8f0;" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
+            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius: var(--radius-md);border:1px solid #e2e8f0;" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
           }
         } catch (err) {
           console.error('쪽지 그림 처리 실패', err);
@@ -14765,11 +14765,11 @@
       if (canModifyNotice(n)) {
         const editBtn = document.createElement('button');
         editBtn.textContent = '수정';
-        editBtn.style.cssText = 'padding:8px 16px; background:#f1f5f9; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer; color:#475569;';
+        editBtn.style.cssText = 'padding:8px 16px; background:#f1f5f9; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer; color:#475569;';
         editBtn.onclick = () => openBoardWriteView(n.uid);
         const delBtn = document.createElement('button');
         delBtn.textContent = '삭제';
-        delBtn.style.cssText = 'padding:8px 16px; background:#fee2e2; border:none; border-radius: 15px; font-size:12px; font-weight:700; cursor:pointer; color:#dc2626;';
+        delBtn.style.cssText = 'padding:8px 16px; background:#fee2e2; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer; color:#dc2626;';
         delBtn.onclick = () => deleteNoticeItem(n.uid);
         actionsEl.appendChild(editBtn);
         actionsEl.appendChild(delBtn);
@@ -16276,7 +16276,7 @@
       container.innerHTML = '';
       list.forEach(o => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: 15px; border:1px solid #e2e8f0;';
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: var(--radius-lg); border:1px solid #e2e8f0;';
         const uname = String(o.username || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const rawName = String(o.display_name || '');
         const looksBroken = !rawName || hangulCharCount(rawName) < 2;
@@ -16286,9 +16286,9 @@
             <div style="margin-top:6px; font-size:11px; font-weight:700; color:#15803d;">✓ 공지 · 병원일정 · 당직의·OFF(일정등록) 가능</div>
           </div>
           <div style="display:flex; gap:6px; flex-shrink:0;">
-            <span style="color:var(--accent-dark); cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); renameMasterNoticeOperator('${uname}')">이름수정</span>
-            <span style="color:#7c3aed; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); openPasswordChangeModal({ mode: 'operator-reset', username: '${uname}' })">비밀번호</span>
-            <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: 9px; user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); removeMasterNoticeOperator('${uname}')">삭제</span>
+            <span style="color:var(--accent-dark); cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: var(--radius-md); user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); renameMasterNoticeOperator('${uname}')">이름수정</span>
+            <span style="color:#7c3aed; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: var(--radius-md); user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); openPasswordChangeModal({ mode: 'operator-reset', username: '${uname}' })">비밀번호</span>
+            <span style="color:#ef4444; cursor:pointer; font-weight:700; font-size:12px; padding:4px 8px; border-radius: var(--radius-md); user-select:none;" role="button" tabindex="0" onclick="event.stopPropagation(); removeMasterNoticeOperator('${uname}')">삭제</span>
           </div>
         `;
         container.appendChild(row);
@@ -19349,7 +19349,7 @@
         const noticeRow = document.createElement('div');
         noticeRow.setAttribute('data-chat-date-key', dateKey);
         noticeRow.style.cssText = 'text-align:center; margin:10px 0;';
-        noticeRow.innerHTML = `<span style="display:inline-block; background:#eef2f7; color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: 18px;">${noticeText}</span>`;
+        noticeRow.innerHTML = `<span style="display:inline-block; background:#eef2f7; color:#64748b; font-size:11.5px; padding:5px 12px; border-radius: var(--radius-xl);">${noticeText}</span>`;
         container.appendChild(noticeRow);
         if (wasNearBottom) scrollChatToBottom(false);
         return;
