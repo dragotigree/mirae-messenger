@@ -1548,10 +1548,10 @@
     .empty-hint-icon { font-size: 12px; opacity: 0.85; }
     .empty-ipmsg-cta {
       margin-top: 18px; padding: 10px 18px; border: none; border-radius: 99px; cursor: pointer;
-      background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; font-size: 12px; font-weight: 700;
-      box-shadow: 0 4px 16px rgba(33, 150, 243, 0.28); transition: transform 0.15s, box-shadow 0.15s;
+      background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.22); transition: transform 0.15s, box-shadow 0.15s;
     }
-    .empty-ipmsg-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15, 23, 42, 0.3); }
+    .empty-ipmsg-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(33, 150, 243, 0.26); }
 
     /* ⏰ 예약 메시지 */
     #scheduled-indicator { display: none; padding: 0 20px; flex-shrink: 0; background: linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.98)); border-top: 1px solid rgba(33, 150, 243, 0.12); }
@@ -2527,7 +2527,7 @@
     }
     .sidebar-cal-actions #add-sch-btn {
       display: inline-flex; justify-content: center;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      background: var(--accent);
       color: #fff; border: none; font-size: 13px;
     }
     .schedule-box {
