@@ -267,7 +267,7 @@
 
     .avatar-wrapper { position: relative; flex-shrink: 0; }
     .avatar-circle { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 14px rgba(33, 150, 243, 0.28); transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
-    .avatar-circle.avatar-photo, .compact-avatar.avatar-photo, .detail-avatar.avatar-photo, #chat-header-avatar.avatar-photo, .msg-avatar.avatar-photo { padding: 0; background: #e2e8f0; overflow: hidden; }
+    .avatar-circle.avatar-photo, .compact-avatar.avatar-photo, .detail-avatar.avatar-photo, #chat-header-avatar.avatar-photo, .msg-avatar.avatar-photo { padding: 0; background: var(--border); overflow: hidden; }
     .avatar-circle.avatar-photo img, .compact-avatar.avatar-photo img, .detail-avatar.avatar-photo img, #chat-header-avatar.avatar-photo img, .msg-avatar.avatar-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
     .avatar-circle, .compact-avatar, .detail-avatar, #chat-header-avatar, .msg-avatar { overflow: hidden; }
     .avatar-emoji { font-size: 16px; line-height: 1; user-select: none; pointer-events: none; }
@@ -441,7 +441,7 @@
     }
     .service-pause-contact {
       margin: 0; font-size: 13px; line-height: 1.6; color: #64748b;
-      padding: 12px 14px; border-radius: var(--radius-lg); background: #f8fafc; border: 1px solid #e2e8f0;
+      padding: 12px 14px; border-radius: var(--radius-lg); background: #f8fafc; border: 1px solid var(--border);
     }
     .service-pause-contact strong { color: #0f172a; font-weight: 800; }
     .service-pause-divider {
@@ -450,7 +450,7 @@
     }
     .service-pause-divider::before,
     .service-pause-divider::after {
-      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+      content: ''; flex: 1; height: 1px; background: var(--border);
     }
     .service-pause-field {
       display: flex; flex-direction: column; gap: 5px;
@@ -555,7 +555,7 @@
     .channel-hash { opacity: 0.92; font-weight: var(--font-weight-regular); font-size: 12.5px; min-width: 1.15em; text-align: center; flex-shrink: 0; }
     .channel-hash.is-custom-emoji { opacity: 1; font-size: 12.5px; }
     .title-emoji-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
-    .title-emoji-pick-btn { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: var(--radius-md); font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
+    .title-emoji-pick-btn { border: 1px solid var(--border); background: #f8fafc; border-radius: var(--radius-md); font-size: 20px; line-height: 1; padding: 8px 0; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast); }
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
@@ -881,7 +881,7 @@
       display: block; height: 0.7em;
     }
     .app-update-progress-bar {
-      height: 4px; border-radius: 999px; background: #e2e8f0; overflow: hidden;
+      height: 4px; border-radius: 999px; background: var(--border); overflow: hidden;
     }
     .app-update-progress-bar span {
       display: block; height: 100%; width: 40%; border-radius: inherit;
@@ -935,7 +935,7 @@
     .privacy-lock-unlock-btn { background: #4f46e5; color: #fff; }
     .privacy-lock-unlock-btn:hover { background: #4338ca; }
     .privacy-lock-master-btn { background: #f1f5f9; color: #475569; }
-    .privacy-lock-master-btn:hover { background: #e2e8f0; }
+    .privacy-lock-master-btn:hover { background: var(--border); }
     .privacy-lock-master-box { display: none; margin-top: 12px; text-align: left; gap: 8px; flex-direction: column; }
     .privacy-lock-master-box.is-open { display: flex; }
     .privacy-lock-master-box input {
@@ -1000,7 +1000,7 @@
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
     }
     .chat-header-tool-btn--archive:hover {
-      background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+      background: linear-gradient(180deg, #f1f5f9 0%, var(--border) 100%);
       border-color: rgba(100, 116, 139, 0.5);
       box-shadow: 0 4px 14px rgba(100, 116, 139, 0.12);
     }
@@ -1168,7 +1168,7 @@
       background: #f1f5f9; color: #334155; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    .chat-shared-back:hover { background: #e2e8f0; }
+    .chat-shared-back:hover { background: var(--border); }
     .chat-shared-head-title { font-size: 15px; font-weight: 700; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .chat-shared-tabbar {
       display: flex; align-items: center; gap: 0; padding: 0 12px 0 8px;
@@ -1199,7 +1199,7 @@
     .chat-shared-list { display: flex; flex-direction: column; gap: 8px; }
     .chat-shared-file-row, .chat-shared-link-row {
       display: flex; align-items: center; gap: 12px; padding: 12px 14px;
-      border-radius: var(--radius-lg); border: 1px solid #e2e8f0; background: #fafbfc;
+      border-radius: var(--radius-lg); border: 1px solid var(--border); background: #fafbfc;
       text-align: left; cursor: pointer; width: 100%;
     }
     .chat-shared-file-row:hover, .chat-shared-link-row:hover { background: #f1f5f9; border-color: #cbd5e1; }
@@ -1371,12 +1371,12 @@
       transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1); background: #fff;
     }
     .msg-delete-btn, .bubble-delete-btn { color: #dc2626; }
-    #share-message-preview { max-height: 120px; overflow: hidden; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12px; color: #475569; line-height: 1.45; word-break: break-word; }
+    #share-message-preview { max-height: 120px; overflow: hidden; padding: 10px 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; font-size: 12px; color: #475569; line-height: 1.45; word-break: break-word; }
     #share-message-preview img { max-width: 100%; max-height: 80px; border-radius: 8px; }
     #share-dm-checklist label, #share-group-checklist label { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 12.5px; cursor: pointer; }
 
     /* ↩ 답장 */
-    #reply-compose-bar { display: none; padding: 0 0 8px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 6px; }
+    #reply-compose-bar { display: none; padding: 0 0 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
     #reply-compose-bar.is-active { display: block; }
     .reply-compose-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
     #reply-compose-label { font-size: 12px; font-weight: 700; color: var(--accent-dark); }
@@ -1493,13 +1493,13 @@
     .reaction-people-emoji { font-size: 16px; line-height: 1.2; flex-shrink: 0; }
     .reaction-people-names { color: #555; line-height: 1.4; word-break: break-word; }
     .bubble-block { display: flex; flex-direction: column; max-width: 100%; }
-    #reaction-picker-popover { display: none; position: fixed; z-index: 2500; width: 320px; max-height: 380px; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,0.18); border: 1px solid #e2e8f0; flex-direction: column; overflow: hidden; -webkit-app-region: no-drag; animation: menu-pop 0.16s var(--ease-spring); }
+    #reaction-picker-popover { display: none; position: fixed; z-index: 2500; width: 320px; max-height: 380px; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,0.18); border: 1px solid var(--border); flex-direction: column; overflow: hidden; -webkit-app-region: no-drag; animation: menu-pop 0.16s var(--ease-spring); }
     #reaction-picker-popover.is-open { display: flex; }
     .reaction-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; border-bottom: 1px solid #f1f5f9; }
     .reaction-picker-head span { font-size: 12px; font-weight: 700; color: #64748b; }
     .reaction-picker-close { border: none; background: transparent; font-size: 16px; color: #94a3b8; cursor: pointer; padding: 2px 6px; line-height: 1; }
     .reaction-picker-search-wrap { padding: 8px 12px; position: relative; }
-    .reaction-picker-search { width: 100%; padding: 8px 12px 8px 32px; border-radius: 99px; border: 1px solid #e2e8f0; font-size: 12px; outline: none; background: #f8fafc; }
+    .reaction-picker-search { width: 100%; padding: 8px 12px 8px 32px; border-radius: 99px; border: 1px solid var(--border); font-size: 12px; outline: none; background: #f8fafc; }
     .reaction-picker-search:focus { border-color: #90CAF9; box-shadow: 0 0 0 2px rgba(144, 202, 249,0.35); }
     .reaction-picker-search-icon { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); font-size: 12px; opacity: 0.45; pointer-events: none; }
     .reaction-picker-body { flex: 1; overflow-y: auto; padding: 0 10px 12px; }
@@ -1561,7 +1561,7 @@
     .scheduled-bar-toggle { padding: 6px 12px; border: none; border-radius: 99px; background: var(--sidebar-active); color: var(--accent-dark); font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s, color 0.15s; }
     .scheduled-bar-toggle:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     #scheduled-list-box { display: none; padding: 0 20px 12px; flex-shrink: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), #f8fafc); border-top: 1px solid rgba(33, 150, 243, 0.08); }
-    .schedule-list-item { display: flex; align-items: stretch; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius-lg); margin-bottom: 8px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); transition: border-color 0.15s, box-shadow 0.15s; }
+    .schedule-list-item { display: flex; align-items: stretch; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); transition: border-color 0.15s, box-shadow 0.15s; }
     .schedule-list-item:hover { border-color: var(--sidebar-active); box-shadow: 0 4px 14px rgba(33, 150, 243, 0.1); }
     .schedule-list-time { flex-shrink: 0; min-width: 72px; padding: 6px 8px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--sidebar-active), var(--sidebar-active)); text-align: center; font-size: 11px; font-weight: 700; color: var(--accent-dark); line-height: 1.35; }
     .schedule-list-time .schedule-list-date { display: block; font-size: 10px; font-weight: 600; color: #64748b; }
@@ -1591,7 +1591,7 @@
     }
     .schedule-msg-target {
       font-size: 11px; font-weight: 600; color: #64748b; padding: 6px 10px;
-      background: #f8fafc; border-radius: var(--radius-md); border: 1px dashed #e2e8f0; flex-shrink: 0;
+      background: #f8fafc; border-radius: var(--radius-md); border: 1px dashed var(--border); flex-shrink: 0;
     }
     .schedule-msg-target strong { color: #0f172a; font-weight: 700; }
     .schedule-field-label {
@@ -1600,7 +1600,7 @@
     }
     .schedule-textarea {
       width: 100%; min-height: 52px; max-height: 72px; padding: 8px 10px;
-      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12.5px; font-family: inherit;
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; font-family: inherit;
       line-height: 1.45; resize: none; background: #fff;
       transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box;
     }
@@ -1612,7 +1612,7 @@
     }
     .schedule-quick-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
     .schedule-quick-chip {
-      padding: 4px 9px; border-radius: 99px; border: 1px solid #e2e8f0; background: #fff;
+      padding: 4px 9px; border-radius: 99px; border: 1px solid var(--border); background: #fff;
       font-size: 10.5px; font-weight: 700; color: #475569; cursor: pointer;
       transition: border-color 0.15s, background 0.15s, color 0.15s;
     }
@@ -1626,10 +1626,10 @@
     }
     .schedule-picker-wrap {
       margin-top: 0; padding: 8px; background: #f8fafc; border-radius: 12px;
-      border: 1px solid #e2e8f0; display: flex; flex-direction: column; min-height: 0; flex: 1;
+      border: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; flex: 1;
     }
     .schedule-picker-wrap .mini-calendar {
-      border-color: #e2e8f0; box-shadow: none; padding: 4px 5px; flex: 1; min-height: 0;
+      border-color: var(--border); box-shadow: none; padding: 4px 5px; flex: 1; min-height: 0;
       display: flex; flex-direction: column;
     }
     .schedule-picker-wrap .mini-cal-header { font-size: 11px; margin-bottom: 2px; }
@@ -1640,7 +1640,7 @@
     }
     .schedule-time-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      margin-top: auto; padding: 8px; border: 1px solid #e2e8f0; border-radius: 12px;
+      margin-top: auto; padding: 8px; border: 1px solid var(--border); border-radius: 12px;
       background: #f8fafc; flex-shrink: 0;
     }
     .schedule-time-row label { font-size: 10.5px; font-weight: 700; color: #64748b; }
@@ -1655,7 +1655,7 @@
       border-top: 1px solid #f1f5f9; background: #fafbfc; flex-shrink: 0;
     }
     .schedule-btn-ghost { padding: 8px 14px; border: none; border-radius: var(--radius-md); background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .schedule-btn-ghost:hover { background: #e2e8f0; }
+    .schedule-btn-ghost:hover { background: var(--border); }
     .schedule-btn-primary {
       padding: 8px 16px; border: none; border-radius: var(--radius-md);
       background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff;
@@ -1733,7 +1733,7 @@
     }
     .ipmsg-recipient-toolbar input {
       width: 100%; box-sizing: border-box; padding: 6px 10px 6px 30px;
-      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; outline: none; background: #fff;
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; outline: none; background: #fff;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .ipmsg-search-wrap::before { left: 10px; font-size: 11px; }
@@ -1756,10 +1756,10 @@
     }
     .ipmsg-bulk-inline .ipmsg-bulk-apply { padding: 5px 8px !important; font-size: 10.5px !important; }
     .ipmsg-bulk-sep {
-      width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; flex-shrink: 0;
+      width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0;
     }
     .ipmsg-mini-btn {
-      padding: 5px 9px; border-radius: 99px; border: 1px solid #e2e8f0; background: #fff;
+      padding: 5px 9px; border-radius: 99px; border: 1px solid var(--border); background: #fff;
       font-size: 10.5px; font-weight: 600; color: #475569; cursor: pointer;
       transition: background 0.12s, border-color 0.12s, color 0.12s;
     }
@@ -1801,7 +1801,7 @@
     .ipmsg-compose-label { font-size: 10.5px; font-weight: 700; color: #64748b; margin-bottom: 4px; letter-spacing: -0.02em; flex-shrink: 0; }
     .ipmsg-compose-pane textarea {
       flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box; padding: 10px 12px;
-      border: 1px solid #e2e8f0; border-radius: 12px;
+      border: 1px solid var(--border); border-radius: 12px;
       font-size: 13px; font-family: inherit; line-height: 1.5; resize: none; background: #fff;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
@@ -1809,7 +1809,7 @@
     .ipmsg-compose-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap; flex-shrink: 0; }
     .ipmsg-urgent-label {
       display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #475569;
-      cursor: pointer; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0;
+      cursor: pointer; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--border);
     }
     .ipmsg-urgent-label:has(input:checked) { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
     .ipmsg-send-btn {
@@ -1881,7 +1881,7 @@
       font-size: 10px; font-weight: 700; color: #64748b;
       padding: 3px 6px; border-radius: var(--radius-sm);
       background: rgba(241, 245, 249, 0.95);
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--border);
       letter-spacing: -0.02em;
     }
     .chat-quick-switcher-kbd b {
@@ -1897,7 +1897,7 @@
     .chat-quick-switcher-search {
       width: 100%; box-sizing: border-box;
       padding: 14px 14px 14px 42px;
-      border: 1px solid #e2e8f0; border-radius: var(--radius-lg);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
       font-size: 16px; font-weight: 600; letter-spacing: -0.03em;
       outline: none; background: #fff; color: #0f172a;
       font-family: inherit;
@@ -2109,7 +2109,7 @@
     .code-alert-field-label { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.02em; margin-bottom: 6px; }
     .code-type-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .code-type-btn {
-      border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 12px;
+      border: 2px solid var(--border); background: #f8fafc; border-radius: 12px;
       padding: 12px 10px; cursor: pointer; font-family: inherit; text-align: center;
       transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
     }
@@ -2130,7 +2130,7 @@
     .code-alert-input { margin-top: 8px; }
     .code-alert-preview {
       border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.55;
-      border: 2px solid #e2e8f0; background: #f8fafc; color: #334155; white-space: pre-wrap;
+      border: 2px solid var(--border); background: #f8fafc; color: #334155; white-space: pre-wrap;
       min-height: 64px; font-weight: 600;
     }
     .code-alert-preview.is-blue { border-color: var(--accent); background: var(--sidebar-active); color: var(--accent-dark); }
@@ -2186,7 +2186,7 @@
       display: flex; align-items: center; justify-content: center; transition: background var(--transition-fast), color var(--transition-fast);
     }
     .quick-phrase-close-btn:hover { background: var(--surface-muted); color: #475569; }
-    .quick-phrase-manage-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 12px; background: #f8fafc; }
+    .quick-phrase-manage-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; font-size: 12px; background: #f8fafc; }
 
     /* ⌨️ 채팅 슬래시(/) 명령어 제안 */
     #chat-slash-popover {
@@ -2221,7 +2221,7 @@
     body.compact-mode #chat-header-status-text { font-size: 11.5px; color: #64748b; }
     body.compact-mode #chat-messages-area { padding: 14px 12px; gap: 8px; background: #b2c7d9; }
     body.compact-mode #chat-input-wrapper { padding: 10px 12px 12px; background: #fff; border-top: 1px solid #e4e9f0; }
-    body.compact-mode .input-box-inner { border-radius: var(--radius-xl); padding: 8px 12px 10px; border: 1px solid #e2e8f0; background: #fff; box-shadow: none; }
+    body.compact-mode .input-box-inner { border-radius: var(--radius-xl); padding: 8px 12px 10px; border: 1px solid var(--border); background: #fff; box-shadow: none; }
     body.compact-mode .input-box-inner textarea { height: 22px; min-height: 22px; max-height: 120px; font-size: 14px; }
     body.compact-mode .input-bottom-actions { gap: 8px; }
     body.compact-mode .input-bottom-actions .btn-send { flex-shrink: 0; margin-left: auto; }
@@ -2271,7 +2271,7 @@
     .compact-header-actions .icon-btn-compact.is-master-authed { color: #059669; }
     .compact-mode-exit-btn {
       height: 32px; padding: 0 11px; font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
-      border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; cursor: pointer;
+      border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #334155; cursor: pointer;
       flex-shrink: 0; transition: background 0.12s ease, border-color 0.12s ease;
     }
     .compact-mode-exit-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
@@ -2295,7 +2295,7 @@
       letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .compact-inbox-btn {
-      flex-shrink: 0; border: 1px solid #e2e8f0; background: #f8fafc; color: #334155;
+      flex-shrink: 0; border: 1px solid var(--border); background: #f8fafc; color: #334155;
       border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 700;
       cursor: pointer; letter-spacing: -0.02em;
     }
@@ -2436,7 +2436,7 @@
       border: none; background: #f1f5f9; color: #475569; width: 32px; height: 32px;
       border-radius: var(--radius-md); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
     }
-    .user-info-modal-close:hover { background: #e2e8f0; }
+    .user-info-modal-close:hover { background: var(--border); }
     .user-info-modal-card .detail-profile-card {
       border-bottom: none; padding-bottom: 0; align-items: center; gap: 6px;
     }
@@ -2520,7 +2520,7 @@
       cursor: pointer; box-sizing: border-box; min-width: 0;
     }
     .sidebar-cal-actions #sidebar-cal-refresh-btn {
-      background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 9px 10px; flex: 0 0 auto; font-size: 14px;
+      background: #f8fafc; color: #475569; border: 1px solid var(--border); padding: 9px 10px; flex: 0 0 auto; font-size: 14px;
     }
     .sidebar-cal-actions #sidebar-cal-board-btn {
       background: var(--sidebar-active); color: var(--accent-dark); border: 1px solid var(--sidebar-active);
@@ -2626,7 +2626,7 @@
     }
     .sidebar-cal-other-list {
       display: flex; flex-direction: column; gap: 2px; min-width: 0;
-      border-top: 1px dashed #e2e8f0; padding-top: 6px;
+      border-top: 1px dashed var(--border); padding-top: 6px;
     }
     .sidebar-cal-other-sort {
       display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
@@ -2640,7 +2640,7 @@
       display: inline-flex; gap: 3px; flex-wrap: wrap; min-width: 0;
     }
     .sidebar-cal-other-sort-btn {
-      border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b;
+      border: 1px solid var(--border); background: #f8fafc; color: #64748b;
       font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 8px;
       cursor: pointer; line-height: 1.3; letter-spacing: -0.03em;
       -webkit-app-region: no-drag;
@@ -2650,7 +2650,7 @@
       background: var(--sidebar-active); border-color: #90CAF9; color: var(--accent-dark);
     }
     .sidebar-duty-block {
-      padding: 10px 12px; margin: 0; border-bottom: 1px solid #e2e8f0;
+      padding: 10px 12px; margin: 0; border-bottom: 1px solid var(--border);
       display: flex; flex-direction: column; gap: 5px; background: #f8fafc;
       border-radius: 11px 11px 0 0; box-sizing: border-box;
     }
@@ -2748,7 +2748,7 @@
     .sidebar-cal-day-line.is-discharge:hover { background: #fee2e2; }
     .sidebar-cal-day-line.is-transfer:hover { background: var(--sidebar-active); }
     .sidebar-cal-day-line.is-room-change:hover { background: #cffafe; }
-    .schedule-item { background: #ffffff; padding: 8px 10px; border-radius: 12px; font-size: 12px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .schedule-item { background: #ffffff; padding: 8px 10px; border-radius: 12px; font-size: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 
     .badge-admission { background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
     .badge-discharge { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 700; }
@@ -2773,7 +2773,7 @@
       display: flex; align-items: center; justify-content: space-between; gap: 14px;
       flex-shrink: 0; padding: 14px 18px;
       background: #fff;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--border);
     }
     .schedule-board-top-bar-main {
       display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 0;
@@ -2811,7 +2811,7 @@
     }
     .sb-board-side {
       width: 300px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden;
-      padding: 10px 8px 12px; background: #f1f5f9; border-right: 1px solid #e2e8f0;
+      padding: 10px 8px 12px; background: #f1f5f9; border-right: 1px solid var(--border);
       display: flex; flex-direction: column; gap: 10px;
     }
     .sb-board-content {
@@ -2866,7 +2866,7 @@
     .schedule-board-export-row.sb-side-export .schedule-board-export-hint { font-size: 10.5px; line-height: 1.4; min-width: 0; }
     @media (max-width: 880px) {
       .schedule-board-main { flex-direction: column; }
-      .sb-board-side { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid #e2e8f0; }
+      .sb-board-side { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--border); }
     }
     .schedule-board-top-summary .sb-summary-title {
       font-size: 15px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; line-height: 1.3;
@@ -2913,7 +2913,7 @@
     body.compact-mode .schedule-board-refresh-btn .sb-refresh-label { display: none; }
     .schedule-board-toolbar {
       padding: 12px 20px 14px; flex-shrink: 0;
-      background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc; border-bottom: 1px solid var(--border);
     }
     .sb-toolbar-layout {
       display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: 14px; align-items: start;
@@ -2938,7 +2938,7 @@
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
     }
     .schedule-board-view-tabs {
-      display: flex; gap: 2px; background: #e2e8f0; padding: 3px; border-radius: var(--radius-md); width: fit-content;
+      display: flex; gap: 2px; background: var(--border); padding: 3px; border-radius: var(--radius-md); width: fit-content;
     }
     .schedule-board-view-tab {
       border: none; background: transparent; padding: 7px 16px; font-size: 12px; font-weight: 700;
@@ -2954,7 +2954,7 @@
       background: #fff; color: #0f172a; min-width: 140px;
     }
     .sb-filter-panel {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: var(--radius-lg); padding: 12px 14px;
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px;
       display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04);
     }
     .sb-filter-block { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
@@ -2974,7 +2974,7 @@
     .schedule-board-doctor-select { flex: 1; min-width: 160px; max-width: 360px; }
     .schedule-board-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .schedule-board-chip {
-      border: 1px solid #e2e8f0; background: #f8fafc; padding: 6px 12px; border-radius: 999px;
+      border: 1px solid var(--border); background: #f8fafc; padding: 6px 12px; border-radius: 999px;
       font-size: 11.5px; font-weight: 600; color: #475569; cursor: pointer;
       transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.12s, box-shadow 0.12s;
     }
@@ -2983,7 +2983,7 @@
     .schedule-board-chip.sb-ward-chip {
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; height: 34px; padding: 0; border-radius: 12px;
-      background: #fff; border-color: #e2e8f0;
+      background: #fff; border-color: var(--border);
     }
     .schedule-board-chip.sb-ward-chip .sb-ward-icon {
       display: inline-flex; align-items: center; justify-content: center;
@@ -3009,12 +3009,12 @@
     .schedule-board-chip.w9.active { border-color: #ec4899; background: #fce7f3; color: #be185d; }
     .schedule-board-search {
       padding: 8px 11px;
-      border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; background: #f8fafc;
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; background: #f8fafc;
       box-sizing: border-box;
     }
     .schedule-board-search:focus { outline: none; border-color: #90CAF9; background: #fff; }
     .schedule-board-select {
-      width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: var(--radius-md);
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md);
       font-size: 12px; background: #f8fafc; max-width: none;
     }
     .sb-board-content .schedule-board-login-hint { margin: 10px 14px 0; flex-shrink: 0; }
@@ -3062,7 +3062,7 @@
     .schedule-board-table thead th {
       padding: 10px 8px 8px; font-size: 12.5px; font-weight: 800; color: #64748b;
       text-align: center; vertical-align: middle; letter-spacing: -0.02em;
-      border-bottom: 1px solid #e2e8f0; background: #fff; white-space: nowrap;
+      border-bottom: 1px solid var(--border); background: #fff; white-space: nowrap;
     }
     .schedule-board-table thead th.sb-col-btns { text-align: center; }
     .schedule-board-table tbody td {
@@ -3100,7 +3100,7 @@
       grid-template-areas: "sb-ward sb-room sb-name sb-type sb-detail sb-tstart sb-tend sb-doctor sb-btns";
       align-items: center; gap: 8px; padding: 10px 14px 8px; font-size: 12px; font-weight: 800; color: #64748b;
       position: sticky; top: 0; z-index: 2; background: #eef2f7;
-      border-bottom: 1px solid #e2e8f0; margin-bottom: 2px;
+      border-bottom: 1px solid var(--border); margin-bottom: 2px;
     }
     .schedule-board-modal-card.sb-mode-referral .schedule-board-subtitle { color: var(--accent-dark); font-weight: 600; }
     .sb-board-side .schedule-board-subtitle { margin: 0; max-width: none; font-size: 10.5px; }
@@ -3132,7 +3132,7 @@
     #schedule-board-doctor-chips .schedule-board-chip { font-size: 10.5px; padding: 5px 8px; }
     .sb-main-board-wrap {
       margin: 4px 2px 12px; padding: 18px 16px 14px; overflow-x: auto;
-      background: #fff; border-radius: var(--radius-lg); border: 1px solid #e2e8f0;
+      background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--border);
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.05);
     }
     .sb-main-board-wrap + .sb-main-board-wrap { margin-top: 14px; }
@@ -3140,7 +3140,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 28px; height: 22px; padding: 0 8px; margin-right: 8px;
       border-radius: 8px; font-size: 12px; font-weight: 800; color: #0f172a;
-      background: #e2e8f0; vertical-align: middle;
+      background: var(--border); vertical-align: middle;
     }
     .sb-main-board-wrap.w4 .sb-main-board-ward-tag { background: var(--sidebar-active); color: var(--accent-dark); }
     .sb-main-board-wrap.w5 .sb-main-board-ward-tag { background: #bbf7d0; color: #14532d; }
@@ -3297,7 +3297,7 @@
       cursor: pointer; color: #475569;
       display: inline-flex; align-items: center; justify-content: center;
     }
-    .schedule-board-row-btns button:hover { background: #e2e8f0; }
+    .schedule-board-row-btns button:hover { background: var(--border); }
     .schedule-board-row-btns .sb-del { color: #dc2626; background: #fef2f2; }
     .schedule-board-row-btns .sb-del:hover { background: #fee2e2; }
     .schedule-board-row.is-editing { background: var(--sidebar-active); box-shadow: inset 0 0 0 1px #90CAF9; }
@@ -3324,10 +3324,10 @@
     .schedule-board-section.w7 { border-color: #f97316; } .schedule-board-section.w7 .schedule-board-section-head { background: #ffedd5; color: #9a3412; }
     .schedule-board-section.w8 { border-color: #a855f7; } .schedule-board-section.w8 .schedule-board-section-head { background: #f3e8ff; color: #6b21a8; }
     .schedule-board-section.w9 { border-color: #ec4899; } .schedule-board-section.w9 .schedule-board-section-head { background: #fce7f3; color: #9d174d; }
-    .schedule-board-section.w-other { border-color: #94a3b8; } .schedule-board-section.w-other .schedule-board-section-head { background: #e2e8f0; color: #334155; }
+    .schedule-board-section.w-other { border-color: #94a3b8; } .schedule-board-section.w-other .schedule-board-section-head { background: var(--border); color: #334155; }
     .schedule-board-export-row {
       display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-      padding: 10px 20px 12px; background: #fff; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+      padding: 10px 20px 12px; background: #fff; border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
     .schedule-board-export-btn { padding: 8px 14px; border: none; border-radius: var(--radius-md); font-size: 11.5px; font-weight: 700; cursor: pointer; background: #16a34a; color: #fff; }
     .schedule-board-export-btn:hover { background: #15803d; }
@@ -3348,7 +3348,7 @@
       border: none; background: #f1f5f9; color: #64748b; font-size: 10.5px; font-weight: 600;
       padding: 3px 8px; border-radius: var(--radius-sm); cursor: pointer;
     }
-    .sb-quick-close-btn:hover { background: #e2e8f0; color: #334155; }
+    .sb-quick-close-btn:hover { background: var(--border); color: #334155; }
     /* 좁은 창: 필드 압착 대신 가로 스크롤 */
     .sb-board-content .sb-quick-grid-wrap,
     .schedule-board-quick-add .sb-quick-grid-wrap {
@@ -3439,7 +3439,7 @@
       margin-left: 0; border: none; background: #f1f5f9; color: #475569; padding: 5px 8px;
       border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; min-height: 26px;
     }
-    .sb-quick-cancel-edit-btn:hover { background: #e2e8f0; }
+    .sb-quick-cancel-edit-btn:hover { background: var(--border); }
     .schedule-board-quick-feedback { margin-top: 4px; font-size: 11px; font-weight: 700; color: #16a34a; display: none; }
     .sb-type-cell {
       display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px;
@@ -3564,7 +3564,7 @@
     .calendar-day-row-actions button:hover { color: var(--accent-dark); }
     .calendar-day-row-actions .btn-delete:hover { color: #ef4444; }
     .calendar-day-footer { padding: 10px 18px 14px; border-top: 1px solid #f1f5f9; background: #fff; flex-shrink: 0; }
-    .calendar-day-add-btn { width: 100%; padding: 9px; background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+    .calendar-day-add-btn { width: 100%; padding: 9px; background: #f8fafc; color: #475569; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
     .calendar-day-add-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
     .calendar-day-empty { text-align: center; padding: 48px 24px; color: #94a3b8; font-size: 13px; line-height: 1.6; }
 
@@ -3602,7 +3602,7 @@
     .all-logs-folder-btn {
       display: inline-flex; align-items: center; gap: 6px;
       height: 34px; padding: 0 12px;
-      background: rgba(255,255,255,0.85); border: 1px solid #e2e8f0; border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.85); border: 1px solid var(--border); border-radius: var(--radius-md);
       font-size: 11.5px; font-weight: 700; cursor: pointer; color: #475569;
       white-space: nowrap; transition: background 0.15s, border-color 0.15s, color 0.15s;
       font-family: inherit;
@@ -3613,7 +3613,7 @@
       font-size: 14px; color: #64748b; cursor: pointer;
       transition: background 0.12s, color 0.12s; flex-shrink: 0;
     }
-    .all-logs-close-btn:hover { background: #e2e8f0; color: #334155; }
+    .all-logs-close-btn:hover { background: var(--border); color: #334155; }
     .all-logs-controls {
       display: flex; flex-direction: column; gap: 10px;
       padding: 12px 20px 12px; background: #fff;
@@ -3667,7 +3667,7 @@
     }
     .all-logs-date-sep::before,
     .all-logs-date-sep::after {
-      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+      content: ''; flex: 1; height: 1px; background: var(--border);
     }
     .all-logs-date-sep span {
       padding: 3px 10px; border-radius: 99px; background: #fff;
@@ -3697,7 +3697,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
     .log-card-item:hover {
-      border-color: #e2e8f0;
+      border-color: var(--border);
       box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
       transform: translateY(-1px);
     }
@@ -3713,7 +3713,7 @@
     .log-card-avatar { display: none !important; }
     .log-card-thumb {
       width: 52px; height: 52px; border-radius: var(--radius-md); overflow: hidden; flex-shrink: 0;
-      background: #e2e8f0; border: 1px solid #e8edf2;
+      background: var(--border); border: 1px solid #e8edf2;
     }
     .log-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .log-card-file-icon {
@@ -3806,7 +3806,7 @@
     .app-dialog-message { font-size: 13.5px; color: #334155; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin: 0; }
     .app-dialog-detail {
       font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 12px; white-space: pre-wrap;
-      background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 10px 12px;
+      background: #f1f5f9; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
     }
     .app-dialog-actions {
       display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px 18px;
@@ -3817,7 +3817,7 @@
       cursor: pointer; border: 1px solid transparent; transition: transform 0.12s, box-shadow 0.12s;
     }
     .app-dialog-btn:hover { transform: translateY(-1px); }
-    .app-dialog-btn--ghost { background: #fff; border-color: #e2e8f0; color: #475569; }
+    .app-dialog-btn--ghost { background: #fff; border-color: var(--border); color: #475569; }
     .app-dialog-btn--ghost:hover { background: #f1f5f9; }
     .app-dialog-btn--primary {
       background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff;
@@ -3838,7 +3838,7 @@
     .board-notice-photo-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--accent-dark); background: var(--sidebar-active); border-radius: 999px; padding: 2px 7px; }
     .board-notice-cat-badge {
       flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
-      color: #334155; background: #f1f5f9; border: 1px solid #e2e8f0;
+      color: #334155; background: #f1f5f9; border: 1px solid var(--border);
     }
     .board-notice-cat-badge.is-all { color: var(--accent-dark); background: var(--sidebar-active); border-color: var(--sidebar-active); }
     .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }
@@ -3848,7 +3848,7 @@
       display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; flex-shrink: 0;
     }
     .board-category-chip {
-      flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid #e2e8f0;
+      flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
       background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .board-category-chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
@@ -3877,7 +3877,7 @@
     .board-photo-preview-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .board-photo-thumb {
       position: relative; width: 88px; height: 88px; border-radius: 12px; overflow: hidden;
-      border: 1px solid #e2e8f0; background: #f1f5f9; flex-shrink: 0;
+      border: 1px solid var(--border); background: #f1f5f9; flex-shrink: 0;
     }
     .board-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .board-photo-thumb-remove {
@@ -3887,7 +3887,7 @@
     .board-detail-images { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
     .board-detail-images img {
       max-width: 100%; width: 100%; height: auto; max-height: min(72vh, 720px);
-      object-fit: contain; border-radius: var(--radius-lg); border: 1px solid #e2e8f0;
+      object-fit: contain; border-radius: var(--radius-lg); border: 1px solid var(--border);
       cursor: zoom-in; background: #f8fafc;
     }
     .modal-card.board-modal-card {
@@ -4117,7 +4117,7 @@
       min-height: 220px;
       overflow-x: hidden;
       overflow-y: auto;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       background: #fff;
       min-width: 0;
@@ -4154,7 +4154,7 @@
     .master-clients-table col.c-last { width: 13%; }
     .master-clients-table col.c-actions { width: 44px; }
     .master-client-menu-btn {
-      width: 26px; height: 26px; border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+      width: 26px; height: 26px; border: 1px solid var(--border); background: #fff; color: #64748b;
       border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; line-height: 1;
       display: inline-flex; align-items: center; justify-content: center;
       transition: background var(--transition-fast), border-color var(--transition-fast);
@@ -4177,7 +4177,7 @@
     .master-loadsim-btn {
       padding: 6px 10px;
       border-radius: 8px;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--border);
       background: #fff;
       font-size: 11px;
       font-weight: 700;
@@ -4497,7 +4497,7 @@
     .settings-profile-avatar-wrap { position: relative; flex-shrink: 0; }
     .settings-profile-avatar { width: 72px; height: 72px; font-size: 26px; border-radius: 50%; box-shadow: 0 4px 14px rgba(33, 150, 243, 0.18); cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
     .settings-profile-avatar:hover { transform: scale(1.03); box-shadow: 0 6px 18px rgba(33, 150, 243, 0.24); }
-    .settings-profile-avatar-edit { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); pointer-events: none; }
+    .settings-profile-avatar-edit { position: absolute; right: -4px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); pointer-events: none; }
     .settings-profile-actions { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
     .settings-profile-label { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.3; }
     .settings-profile-hint { font-size: 11px; color: #94a3b8; line-height: 1.4; }
@@ -4510,7 +4510,7 @@
     }
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
     .settings-btn-secondary { padding: 8px 14px; background: #f1f5f9; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
-    .settings-btn-secondary:hover { background: #e2e8f0; }
+    .settings-btn-secondary:hover { background: var(--border); }
     .settings-btn-primary { padding: 8px 16px; background: var(--accent-dark); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
     .settings-btn-primary:hover { filter: brightness(1.15); }
     .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
@@ -5199,7 +5199,7 @@
               <div style="font-size:12px; color:#64748b;">기준 버전: <strong id="master-ref-version" style="color:#0f172a;">-</strong></div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
-                <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+                <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
@@ -5212,14 +5212,14 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div id="master-traffic-meta" style="font-size:12px; color:#64748b;">집계 중…</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" onclick="resetMasterPeerTrafficStats()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">집계 초기화</button>
-                <button type="button" onclick="renderMasterPeerTraffic()" style="padding:6px 10px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+                <button type="button" onclick="resetMasterPeerTrafficStats()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">집계 초기화</button>
+                <button type="button" onclick="renderMasterPeerTraffic()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
             <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
 
-            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:#e2e8f0;">
+            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:var(--border);">
               <div style="font-size:13px; font-weight:800; color:#0f172a;">🧪 부하 검사 스위트</div>
               <p style="font-size:12px; color:#64748b; margin:0; line-height:1.55;">이 PC에서 접속 폭주·목록 렌더·UDP 제한·TCP 연결·DB·이벤트루프 등을 모의합니다. 테스트망 IP를 쓰며 실제 LAN 동료에게 패킷을 보내지 않습니다.</p>
               <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
@@ -5230,7 +5230,7 @@
               </div>
 
               <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px;">
-                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
                   <div style="font-size:12px; font-weight:800; color:#0f172a;">접속 폭주</div>
                   <div style="font-size:11px; color:#64748b; line-height:1.45;">가상 직원이 한꺼번에 온라인으로 붙는 상황</div>
                   <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -5240,7 +5240,7 @@
                     <button type="button" class="master-loadsim-btn is-danger" onclick="runMasterLoadSimAction('clear')">지우기</button>
                   </div>
                 </div>
-                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
                   <div style="font-size:12px; font-weight:800; color:#0f172a;">목록 · UI</div>
                   <div style="font-size:11px; color:#64748b; line-height:1.45;">직원 목록 재렌더 · 미읽음 배지 폭주</div>
                   <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -5249,7 +5249,7 @@
                     <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('profile_churn')">프로필 변경 폭주</button>
                   </div>
                 </div>
-                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
                   <div style="font-size:12px; font-weight:800; color:#0f172a;">네트워크 보호</div>
                   <div style="font-size:11px; color:#64748b; line-height:1.45;">UDP 수신 제한 · TCP 동시연결 상한</div>
                   <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -5257,7 +5257,7 @@
                     <button type="button" class="master-loadsim-btn" onclick="runMasterLoadSimAction('tcp_connect_burst')">TCP 연결 폭주</button>
                   </div>
                 </div>
-                <div style="border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
+                <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:#fff; display:flex; flex-direction:column; gap:8px;">
                   <div style="font-size:12px; font-weight:800; color:#0f172a;">DB · 이벤트루프</div>
                   <div style="font-size:11px; color:#64748b; line-height:1.45;">SQLite persist · 메인루프 지연</div>
                   <div style="display:flex; flex-wrap:wrap; gap:6px;">
@@ -5269,9 +5269,9 @@
 
               <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                 <button type="button" onclick="runMasterLoadSimAction('suite')" style="padding:8px 14px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:12px; font-weight:700; cursor:pointer;">전체 검사 실행</button>
-                <button type="button" onclick="clearMasterLoadSimLog()" style="padding:8px 12px; background:#fff; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:12px; font-weight:700; cursor:pointer; color:#475569;">결과 지우기</button>
+                <button type="button" onclick="clearMasterLoadSimLog()" style="padding:8px 12px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px; font-weight:700; cursor:pointer; color:#475569;">결과 지우기</button>
               </div>
-              <pre id="master-loadsim-log" style="margin:0; max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:#0f172a; color:#e2e8f0; font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">검사를 실행하면 결과가 여기에 쌓입니다.</pre>
+              <pre id="master-loadsim-log" style="margin:0; max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:#0f172a; color:var(--border); font-size:11px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">검사를 실행하면 결과가 여기에 쌓입니다.</pre>
               <p style="font-size:11px; color:#94a3b8; margin:0; line-height:1.5;">CLI: <code>node scripts/load-sim.js presence --users=200</code> · UDP 패킷: <code>node scripts/load-sim.js udp --target=&lt;IP&gt;</code></p>
             </div>
           </div>
@@ -6275,7 +6275,7 @@
     <div class="ctx-menu-item" id="ctx-channel-reset-name" style="display:none;" onclick="ctxChannelResetDisplayName()">↩️ 기본 이름으로</div>
     <div class="ctx-menu-item" onclick="ctxChannelSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
     <div class="ctx-menu-item" id="ctx-channel-reset-emoji" style="display:none;" onclick="ctxChannelClearTitleEmoji()">↩️ 이모티콘 제거</div>
-    <div id="channel-ctx-group-extra" style="display:none; border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 4px;">
+    <div id="channel-ctx-group-extra" style="display:none; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px;">
       <div class="ctx-menu-item" onclick="ctxRenameGroup()">🌐 대화방 이름 변경 (전체)</div>
       <div class="ctx-menu-item" style="color:#ef4444;" onclick="ctxLeaveGroup()">🚪 나가기</div>
     </div>
@@ -6583,8 +6583,8 @@
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; gap:6px; flex-wrap:wrap;">
           <div style="font-size:12.5px; font-weight:700; color:#475569;">🕒 최근 보낸 요청</div>
           <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-          <input type="text" id="transport-search-input" placeholder="🔍 환자명/치료명/위치 검색" oninput="renderTransportHistory(this.value)" style="width:150px; padding:5px 8px; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px;">
-          <button type="button" onclick="renderTransportHistory(document.getElementById('transport-search-input').value)" title="기사 처리 상태 새로고침" style="padding:5px 10px; border:1px solid #e2e8f0; border-radius: var(--radius-md); font-size:11px; background:#fff; cursor:pointer; color:#475569; font-weight:600;">↻</button>
+          <input type="text" id="transport-search-input" placeholder="🔍 환자명/치료명/위치 검색" oninput="renderTransportHistory(this.value)" style="width:150px; padding:5px 8px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px;">
+          <button type="button" onclick="renderTransportHistory(document.getElementById('transport-search-input').value)" title="기사 처리 상태 새로고침" style="padding:5px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; background:#fff; cursor:pointer; color:#475569; font-weight:600;">↻</button>
           </div>
         </div>
         <div id="transport-history-list"></div>
@@ -12830,7 +12830,7 @@
              <span onclick="deleteTransportRequestRow(${r.id}, '${r.remote_id || ''}')" style="cursor:pointer; color:#ef4444; font-weight:700;">삭제</span>`
           : `<span style="color:#94a3b8; font-size:11px;">처리됨</span>`;
         return `
-        <div style="font-size:11.5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius: 12px; padding:7px 10px;">
+        <div style="font-size:11.5px; background:#f8fafc; border:1px solid var(--border); border-radius: 12px; padding:7px 10px;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <span style="font-weight:700;">${escapeHtml(r.patient_name || '(환자명 없음)')}${r.treatment_name ? ` · ${escapeHtml(r.treatment_name)}` : ''}</span>
             <span style="color:${badge.color}; font-weight:700; white-space:nowrap; flex-shrink:0;">${badge.text}</span>
@@ -14566,7 +14566,7 @@
               preview.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:8px;';
               msgEl.parentElement.appendChild(preview);
             }
-            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius: var(--radius-md);border:1px solid #e2e8f0;" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
+            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius: var(--radius-md);border:1px solid var(--border);" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
           }
         } catch (err) {
           console.error('쪽지 그림 처리 실패', err);
@@ -16278,7 +16278,7 @@
       container.innerHTML = '';
       list.forEach(o => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: var(--radius-lg); border:1px solid #e2e8f0;';
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; background:#fff; padding:10px 14px; border-radius: var(--radius-lg); border:1px solid var(--border);';
         const uname = String(o.username || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const rawName = String(o.display_name || '');
         const looksBroken = !rawName || hangulCharCount(rawName) < 2;
@@ -19716,7 +19716,7 @@
     function buildForwardMessageHtml(originalHtml, senderName, sourceChatLabel) {
       const from = escapeHtmlText(senderName || '알 수 없음');
       const src = escapeHtmlText(sourceChatLabel || '대화');
-      return `<span class="forward-msg-flag" style="display:none"></span><div style="font-size:11.5px;color:#64748b;margin-bottom:8px;padding-bottom:6px;border-bottom:1px dashed #e2e8f0;">↪️ <strong>${from}</strong> · ${src}</div>${originalHtml}`;
+      return `<span class="forward-msg-flag" style="display:none"></span><div style="font-size:11.5px;color:#64748b;margin-bottom:8px;padding-bottom:6px;border-bottom:1px dashed var(--border);">↪️ <strong>${from}</strong> · ${src}</div>${originalHtml}`;
     }
 
     async function shareThisMessage(btn) {
