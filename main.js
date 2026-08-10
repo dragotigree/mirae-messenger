@@ -3008,13 +3008,34 @@ function hardRepairSchemaRow(table) {
   });
 }
 
+// 메시지 고정(chat_pins) 관련 테이블은 핵심 기능(메시지 송수신)과 무관한 부가 기능이다.
+// 예전에는 이 테이블 하나가 깨지면 "복구 실패"로 판정해 며칠 전 백업으로 전체 DB를
+// 통째로 덮어쓰는 scheduleDbCorruptRecovery까지 확대됐고, 그 과정에서 그 사이 주고받은
+// 메시지가 통째로 사라지는 사고가 실제로 있었다. 이제 이 테이블은 그 파괴적인 경로
+// (백업으로 전체 DB 교체)를 절대 타지 않는다 — 재시작은 하되(db가 const라 재연결하려면
+// 불가피함), 백업으로 되돌리지는 않는다.
+const NON_FATAL_SCHEMA_TABLES = new Set(['chat_pins', 'deleted_chat_pins']);
+
+/** 백업 복구 없이 지금 이 DB 파일 그대로 다시 여는 가벼운 재시작 — 메시지는 그대로 둔 채
+ * db 연결만 새로 맺기 위해서다(db가 const라 재할당 불가 → 새 프로세스로 재연결). */
+function relaunchWithoutBackupRestore() {
+  app.relaunch();
+  app.exit(0);
+}
+
 function tryRepairBenignSchemaConflict(err) {
   const table = parseBenignSchemaConflict(err);
   if (!table || !RECREATABLE_SCHEMA_SQL[table]) return false;
   if (schemaHardRepairInProgress.has(table)) return true; // 이미 진행 중 — 재시도 폭주 방지
   schemaHardRepairInProgress.add(table);
+  const nonFatal = NON_FATAL_SCHEMA_TABLES.has(table);
   const attempt = bumpDbRecoveryAttemptCount();
   if (attempt > DB_RECOVERY_MAX_ATTEMPTS) {
+    if (nonFatal) {
+      console.error(`[DB] "${table}" 복구 ${attempt}회째 반복 — 부가 기능이라 백업 복구 없이 그대로 재연결만 시도`);
+      relaunchWithoutBackupRestore();
+      return true;
+    }
     console.error(`[DB] "${table}" 복구 ${attempt}회째 반복 — 백업 복구로 전환`);
     scheduleDbCorruptRecovery(`schema-repair-loop:${table}`);
     return true;
@@ -3023,6 +3044,11 @@ function tryRepairBenignSchemaConflict(err) {
   hardRepairSchemaRow(table).then((ok) => {
     console.error(`[DB] "${table}" 저수준 재생성 ${ok ? '성공' : '실패'}`);
     if (!ok) {
+      if (nonFatal) {
+        console.error(`[DB] "${table}" 저수준 재생성 실패 — 부가 기능이라 백업 복구 없이 그대로 재연결만 시도`);
+        relaunchWithoutBackupRestore();
+        return;
+      }
       scheduleDbCorruptRecovery(`hard-repair-failed:${table}`);
       return;
     }
