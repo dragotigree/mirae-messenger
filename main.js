@@ -3850,6 +3850,10 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
+  // 대화를 몇 년이고 안 지우는 정책이라, created_at으로 최근 N일만 훑는 조회(최근 대화
+  // 상대 추출 등)가 인덱스 없이 매번 테이블 전체를 스캔하면 데이터가 쌓일수록 계속
+  // 느려진다. 새로고침·부팅마다 실행되는 조회라 인덱스로 미리 막아둔다.
+  db.run(`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)`, logDbErr);
   // 동일 msg_uid 중복 INSERT 방지. unique index가 이미 있으면 매 부팅 DELETE GROUP BY 생략(대형 DB 프리즈 방지).
   db.get(
     `SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_messages_msg_uid_unique'`,
@@ -5473,13 +5477,13 @@ function supplementKnownUsersFromMessagePeers(callback) {
          WHERE sender_ip != ? AND sender_ip != 'BROADCAST'
            AND sender_ip NOT LIKE 'DEPT:%' AND sender_ip NOT LIKE 'FLOOR:%' AND sender_ip NOT LIKE 'GROUP:%'
            AND sender_ip NOT LIKE 'BCAST:%' AND sender_ip NOT LIKE 'DEPTPEER:%' AND sender_ip NOT LIKE 'FLOORPEER:%'
-           AND datetime(created_at) >= datetime('now', '-180 days')
+           AND created_at >= datetime('now', '-180 days')
          UNION ALL
          SELECT receiver_ip AS ip, strftime('%s', created_at) AS last_ts FROM messages
          WHERE receiver_ip != ? AND receiver_ip != 'BROADCAST'
            AND receiver_ip NOT LIKE 'DEPT:%' AND receiver_ip NOT LIKE 'FLOOR:%' AND receiver_ip NOT LIKE 'GROUP:%'
            AND receiver_ip NOT LIKE 'BCAST:%' AND receiver_ip NOT LIKE 'DEPTPEER:%' AND receiver_ip NOT LIKE 'FLOORPEER:%'
-           AND datetime(created_at) >= datetime('now', '-180 days')
+           AND created_at >= datetime('now', '-180 days')
        ) GROUP BY ip
      ) m`,
     [MY_IP, MY_IP],
