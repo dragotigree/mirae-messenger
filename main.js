@@ -3112,6 +3112,28 @@ async function findHealthyAutoBackup() {
   return null;
 }
 
+/** corrupted_ 안전 사본은 최근 N개만 남기고 지운다 — 복구가 반복될 때마다
+ * 300MB대 사본이 무한정 쌓여 디스크를 채우는 것을 막는다(실사고: 하루 만에 11개, 3.5GB). */
+const CORRUPTED_STASH_KEEP = 2;
+async function pruneCorruptedStashCopies() {
+  try {
+    const dir = path.dirname(dbPath);
+    const base = path.basename(dbPath);
+    const names = (await fs.promises.readdir(dir).catch(() => []))
+      .filter((n) => n.startsWith(`${base}.corrupted_`) && !n.endsWith('-wal') && !n.endsWith('-shm'))
+      .sort()
+      .reverse();
+    const stale = names.slice(CORRUPTED_STASH_KEEP);
+    for (const name of stale) {
+      const p = path.join(dir, name);
+      await fs.promises.unlink(p).catch(() => {});
+      await fs.promises.unlink(`${p}-wal`).catch(() => {});
+      await fs.promises.unlink(`${p}-shm`).catch(() => {});
+    }
+    if (stale.length) console.error(`[DB] 오래된 손상 사본 ${stale.length}개 정리`);
+  } catch (e) { /* ignore */ }
+}
+
 async function stashAndReplaceMessengerDb(sourcePathOrNull) {
   const stamp = Date.now();
   const corruptedCopy = `${dbPath}.corrupted_${stamp}`;
@@ -3125,6 +3147,7 @@ async function stashAndReplaceMessengerDb(sourcePathOrNull) {
   }
   await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
   await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+  await pruneCorruptedStashCopies();
   return corruptedCopy;
 }
 
