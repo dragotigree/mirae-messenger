@@ -3318,6 +3318,12 @@ setTimeout(() => {
       resetDbRecoveryAttemptCount();
       return;
     }
+    // ⚠️ 실사고: chat_pins류의 국소 스키마 카탈로그 손상이면 integrity_check 자체도 스키마를
+    // 읽다가 똑같은 "malformed database schema (chat_pins)..." 오류로 실패한다. 여기서는 그걸
+    // 구분하지 않고 바로 백업 복구로 넘어가고 있었는데, 복원한 백업에도 같은 손상이 있으면
+    // 다음 부팅에 또 실패해서 반복 재시작(오늘 실제로 겪은 문제)이 된다. logDbErr와 똑같이
+    // 먼저 국소 수리를 시도하고, 그걸로 해결 안 되는 진짜 손상일 때만 백업 복구로 넘어간다.
+    if (err && tryRepairBenignSchemaConflict(err)) return;
     console.error('⚠️ 데이터베이스 손상 감지 — 백업 복구를 시작합니다:', err ? err.message : row);
     scheduleDbCorruptRecovery('startup-integrity');
   });
