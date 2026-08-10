@@ -4919,19 +4919,6 @@
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
               <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
             </div>
-            <div class="compact-window-tools">
-              <div class="compact-window-tools-title">미니 창 배치</div>
-              <div class="compact-window-tools-row">
-                <button type="button" onclick="snapCompactWindowEdge('left')">← 좌측</button>
-                <button type="button" onclick="snapCompactWindowEdge('right')">우측 →</button>
-                <button type="button" onclick="snapCompactWindowEdge('top-right')">↗ 우상</button>
-              </div>
-              <div class="compact-window-tools-row">
-                <button type="button" onclick="applyCompactSizePreset('narrow')">좁게</button>
-                <button type="button" onclick="applyCompactSizePreset('normal')">보통</button>
-                <button type="button" onclick="applyCompactSizePreset('wide')">넓게</button>
-              </div>
-            </div>
             <div class="compact-more-footer">
               <span>Mirae Messenger</span>
               <span id="compact-more-version"></span>
@@ -10625,9 +10612,9 @@
       document.querySelectorAll('.compact-pane').forEach((pane) => {
         pane.hidden = pane.dataset.compactPane !== tab;
       });
-      const titles = { chat: '채팅', friends: '직원', more: '더보기' };
+      const titles = { chat: '대화기록', friends: '', more: '더보기' };
       const titleEl = document.getElementById('compact-header-title');
-      if (titleEl) titleEl.textContent = titles[tab] || '채팅';
+      if (titleEl) titleEl.textContent = titles[tab] ?? '대화기록';
       const subEl = document.getElementById('compact-online-count');
       if (subEl) subEl.style.display = tab === 'more' ? 'none' : '';
       if (tab === 'more') updateCompactMoreProfile();

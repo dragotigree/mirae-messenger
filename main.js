@@ -3193,6 +3193,13 @@ function scheduleDbCorruptRecovery(reason) {
     } catch (_) { /* ignore */ }
   }
   setTimeout(() => {
+    // db.close() 전에 마지막으로 한 번 체크포인트를 시도한다 — 아직 -wal에만 있고
+    // 본 파일에 합쳐지지 않은 최신 메시지가, 뒤이은 "백업 없음 → WAL/SHM 삭제" 경로에서
+    // 그대로 날아가는 사고(실제 발생)를 막기 위함. 진짜로 손상됐으면 이 체크포인트도
+    // 실패하거나 의미가 없을 뿐, 더 나빠지지는 않는다.
+    new Promise((resolve) => {
+      db.run(`PRAGMA wal_checkpoint(TRUNCATE)`, () => resolve());
+    }).finally(() => {
     db.close(async () => {
       try {
         // 백업을 복원해도 다음 부팅에서 다시 "손상"으로 판정되면 복원↔재감염이 끝없이
@@ -3223,6 +3230,7 @@ function scheduleDbCorruptRecovery(reason) {
         console.error('[DB] automatic recovery failed:', e && e.message);
         app.exit(1);
       }
+    });
     });
   }, 500);
 }
@@ -4681,6 +4689,11 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   broadcastGoodbye();
+  // 종료 시 WAL을 본 파일에 합쳐둔다 — 안 해도 다음 실행 시 WAL을 이어서 읽어 데이터
+  // 자체는 안전하지만, DB 손상 복구 절차가 "백업 없음" 상황에서 WAL을 통째로 지우는
+  // 경로를 타면 그 사이 방금 보낸 메시지가 사라질 수 있었다(실제 발생). 매번 종료 시
+  // 체크포인트해두면 그 위험 구간을 최소화할 수 있다.
+  try { db.run(`PRAGMA wal_checkpoint(TRUNCATE)`); } catch (e) { /* ignore */ }
 });
 
 app.on('will-quit', () => {
@@ -12589,6 +12602,11 @@ function startAutoBackup() {
   setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldPreUpdateBackups, 6 * 60 * 60 * 1000);
+  // 방금 보낸 메시지가 -wal 파일에만 있다가, 앱이 비정상 종료되거나 DB 손상 복구
+  // 절차가 WAL을 통째로 지우는 경로를 타면서 사라지는 사고가 있었다(실제 발생).
+  // 2분마다 체크포인트해 본 파일에 합쳐두면, 데이터가 노출되는 구간을 최대 2분
+  // 정도로 좁혀 이런 사고를 사실상 막을 수 있다.
+  setInterval(() => { checkpointWal().catch(() => {}); }, 2 * 60 * 1000);
 }
 
 ipcMain.handle('get-network-status', async () => ({
