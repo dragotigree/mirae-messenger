@@ -1044,21 +1044,21 @@
       color: #fff;
     }
     .chat-header-tool-btn--calendar {
-      background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
-      border-color: rgba(129, 140, 248, 0.4);
-      color: #4338ca;
-      box-shadow: 0 1px 2px rgba(67, 56, 202, 0.06);
+      background: linear-gradient(180deg, #eaf4fe 0%, var(--sidebar-active) 100%);
+      border-color: rgba(33, 150, 243, 0.35);
+      color: var(--accent-dark);
+      box-shadow: 0 1px 2px rgba(33, 150, 243, 0.06);
     }
     .chat-header-tool-btn--calendar:hover {
-      background: linear-gradient(180deg, #e0e7ff 0%, #c7d2fe 100%);
-      border-color: rgba(99, 102, 241, 0.5);
-      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.18);
+      background: linear-gradient(180deg, var(--sidebar-active) 0%, #bbdefb 100%);
+      border-color: rgba(33, 150, 243, 0.5);
+      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.18);
     }
     .chat-header-tool-btn--calendar.is-active {
-      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      background: linear-gradient(135deg, #42a5f5 0%, var(--accent) 100%);
       border-color: transparent;
       color: #fff;
-      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
     }
     #chat-calendar-popover {
       display: none;
@@ -1071,9 +1071,9 @@
       border-radius: 20px;
       overflow: hidden;
       background: #fff;
-      border: 1px solid rgba(199, 210, 254, 0.8);
+      border: 1px solid rgba(144, 202, 249, 0.8);
       box-shadow:
-        0 18px 40px rgba(67, 56, 202, 0.16),
+        0 18px 40px rgba(33, 150, 243, 0.16),
         0 4px 12px rgba(15, 23, 42, 0.06);
       animation: chat-cal-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     }
@@ -1084,7 +1084,7 @@
     }
     .chat-cal-hero {
       padding: 16px 16px 14px;
-      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 48%, #4338ca 100%);
+      background: linear-gradient(135deg, #42a5f5 0%, var(--accent) 55%, var(--accent-dark) 100%);
       color: #fff;
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
     }
@@ -1112,7 +1112,7 @@
       color: #94a3b8; margin-bottom: 6px; letter-spacing: -0.02em;
     }
     .chat-cal-weekdays span:first-child { color: #f87171; }
-    .chat-cal-weekdays span:last-child { color: #90CAF9; }
+    .chat-cal-weekdays span:last-child { color: var(--accent); }
     .chat-cal-grid {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
     }
@@ -1127,23 +1127,23 @@
       transition: background 0.14s, color 0.14s, transform 0.14s, box-shadow 0.14s;
     }
     .chat-cal-day:hover:not(:disabled) {
-      background: #eef2ff; transform: translateY(-1px);
+      background: var(--sidebar-active); transform: translateY(-1px);
     }
     .chat-cal-day.other-month { color: #cbd5e1; }
     .chat-cal-day.other-month:hover:not(:disabled) { background: #f8fafc; }
     .chat-cal-day.is-today {
-      box-shadow: inset 0 0 0 1.5px #a5b4fc;
-      color: #4338ca; font-weight: 800;
+      box-shadow: inset 0 0 0 1.5px #90CAF9;
+      color: var(--accent-dark); font-weight: 800;
     }
     .chat-cal-day.is-selected {
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      background: linear-gradient(135deg, #42a5f5, var(--accent));
       color: #fff; font-weight: 800;
-      box-shadow: 0 6px 14px rgba(79, 70, 229, 0.28);
+      box-shadow: 0 6px 14px rgba(33, 150, 243, 0.28);
     }
-    .chat-cal-day.is-selected.is-today { box-shadow: 0 6px 14px rgba(79, 70, 229, 0.28); }
+    .chat-cal-day.is-selected.is-today { box-shadow: 0 6px 14px rgba(33, 150, 243, 0.28); }
     .chat-cal-day.has-msg .chat-cal-dot {
       width: 4px; height: 4px; border-radius: 50%;
-      background: #6366f1;
+      background: var(--accent);
     }
     .chat-cal-day.is-selected .chat-cal-dot { background: rgba(255,255,255,0.9); }
     .chat-cal-day:disabled {
@@ -1159,26 +1159,26 @@
     }
     .chat-cal-today-btn {
       flex-shrink: 0; padding: 6px 10px; border-radius: 99px;
-      border: 1px solid #e0e7ff; background: #eef2ff; color: #4338ca;
+      border: 1px solid var(--sidebar-active); background: var(--sidebar-active); color: var(--accent-dark);
       font-size: 11px; font-weight: 700; cursor: pointer;
     }
-    .chat-cal-today-btn:hover { background: #e0e7ff; }
+    .chat-cal-today-btn:hover { background: #bbdefb; }
     #chat-date-jump-banner {
       display: none;
       flex-shrink: 0;
       align-items: center; justify-content: space-between; gap: 10px;
       padding: 8px 16px;
-      background: linear-gradient(90deg, #eef2ff, #f8fafc);
-      border-bottom: 1px solid #e0e7ff;
-      font-size: 12px; color: #4338ca; font-weight: 650;
+      background: linear-gradient(90deg, var(--sidebar-active), #f8fafc);
+      border-bottom: 1px solid var(--sidebar-active);
+      font-size: 12px; color: var(--accent-dark); font-weight: 650;
     }
     #chat-date-jump-banner.is-visible { display: flex; }
     #chat-date-jump-banner button {
       padding: 5px 10px; border-radius: 99px; border: none;
-      background: #4f46e5; color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+      background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
       white-space: nowrap;
     }
-    #chat-date-jump-banner button:hover { background: #4338ca; }
+    #chat-date-jump-banner button:hover { background: var(--accent-dark); }
     body.compact-mode #chat-calendar-popover {
       right: 10px; top: 54px; width: min(300px, calc(100% - 20px));
     }
@@ -1286,7 +1286,7 @@
     }
     @keyframes chat-date-flash {
       0%, 100% { background: rgba(255, 255, 255, 0.92); border-color: #e8edf2; }
-      30% { background: #e0e7ff; border-color: #a5b4fc; color: #4338ca; }
+      30% { background: var(--sidebar-active); border-color: #90CAF9; color: var(--accent-dark); }
     }
     body.compact-mode .chat-date-sep { margin: 10px 2px 6px; }
     body.compact-mode .chat-date-sep::before,
