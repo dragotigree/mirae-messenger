@@ -12488,7 +12488,32 @@ ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
   return { success: true };
 });
 
-const AUTO_BACKUP_RETENTION_DAYS = 14;
+const AUTO_BACKUP_RETENTION_DAYS = 5;
+const PRE_UPDATE_BACKUP_RETENTION_DAYS = 7;
+
+/** 업데이트할 때마다 pre_update_backup_<timestamp> 폴더가 새로 생기는데 지금까지
+ * 이를 지우는 코드가 없어 업데이트를 반복할수록 userData 용량이 무한정 쌓였다.
+ * 오래된 것부터 정리한다. */
+async function cleanupOldPreUpdateBackups() {
+  try {
+    const base = app.getPath('userData');
+    const cutoff = Date.now() - PRE_UPDATE_BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const names = await fs.promises.readdir(base);
+    for (const name of names) {
+      if (!name.startsWith('pre_update_backup_')) continue;
+      const dirPath = path.join(base, name);
+      try {
+        const stat = await fs.promises.stat(dirPath);
+        if (!stat.isDirectory()) continue;
+        if (stat.mtimeMs < cutoff) {
+          await fs.promises.rm(dirPath, { recursive: true, force: true });
+        }
+      } catch (e) { /* ignore individual failures */ }
+    }
+  } catch (e) {
+    console.error('pre_update_backup 정리 오류:', e.message);
+  }
+}
 
 async function getAutoBackupDir() {
   const dir = path.join(app.getPath('userData'), 'backups');
@@ -12547,8 +12572,10 @@ async function performAutoBackupIfNeeded() {
 function startAutoBackup() {
   performAutoBackupIfNeeded();
   cleanupOldLogFiles();
+  cleanupOldPreUpdateBackups();
   setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
+  setInterval(cleanupOldPreUpdateBackups, 6 * 60 * 60 * 1000);
 }
 
 ipcMain.handle('get-network-status', async () => ({
