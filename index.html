@@ -4627,6 +4627,9 @@
       gap: 12px 16px;
     }
     .settings-form-grid .span-2 { grid-column: 1 / -1; }
+    /* 필드+설명 쌍이 2단 그리드에서 서로 다른 칸으로 갈라져 높이가 안 맞아 보이던 것을
+       막기 위해, 필드 바로 아래에 설명이 붙는 1단 스택으로 고정한다. */
+    .settings-form-stack { grid-template-columns: 1fr; }
     .settings-hint { font-size: 11.5px; color: #94a3b8; line-height: 1.45; margin: 0; }
     .settings-inline-check {
       display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; cursor: pointer;
@@ -5108,12 +5111,6 @@
   <div id="sidebar-right">
     <div id="sidebar-right-resize-handle" title="너비 조절"></div>
     <div class="sidebar-cal-header">
-      <div class="sidebar-section-title">
-        <div class="sidebar-cal-title">
-          <span class="sidebar-cal-title-icon" data-ui-icon="calendar" aria-hidden="true"></span>
-          <span class="sidebar-cal-title-text">병원 달력</span>
-        </div>
-      </div>
       <div class="sidebar-cal-actions">
         <button type="button" id="sidebar-cal-board-btn" onclick="openScheduleBoardModal()" title="병동 일정 현황판 (Ctrl+3)"><span data-ui-icon="clipboardList"></span> 현황판</button>
         <button type="button" id="add-sch-btn" onclick="openDutyRosterModal()" title="주치의 OFF · 당직의 등록"><span data-ui-icon="calendarPlus"></span> 일정등록</button>
@@ -5875,7 +5872,7 @@
         <h3 class="settings-panel-title">화면·글꼴</h3>
         <p class="settings-panel-desc">화면 모드와 글꼴을 조정합니다.</p>
         <div class="settings-card">
-          <div class="settings-form-grid">
+          <div class="settings-form-grid settings-form-stack">
             <label class="settings-field">화면 모드
               <select id="setting-default-view" class="settings-select">
                 <option value="normal">기본 화면 (3단)</option>
