@@ -3847,6 +3847,22 @@ db.serialize(() => {
       }
     );
   }
+  // 마이그레이션: 메시지 고정(chat_pins) 기능은 1.0.566에서 완전히 제거했지만, 이미 설치된
+  // PC들의 DB 파일에는 그 이전에 만들어진 chat_pins/deleted_chat_pins 테이블이 그대로 남아
+  // 있다. 이 테이블의 스키마 카탈로그가 손상되면 tryRepairBenignSchemaConflict가 감지해서
+  // 고친 뒤 앱을 재시작하는데, 손상이 계속 재발하는 PC에서는 이게 "껐다 켜졌다 하는" 반복
+  // 재시작처럼 보인다(실제 사용자 보고, 1.0.571에서도 재발). 기능 자체가 없어졌으니 이
+  // 테이블들을 아예 지워서 손상 감지가 다시는 발동하지 않게 한다. 한 번만 실행.
+  const chatPinDropMarker = path.join(app.getPath('userData'), 'chat-pins-dropped.txt');
+  if (!fs.existsSync(chatPinDropMarker)) {
+    db.run(`DROP TABLE IF EXISTS chat_pins`, [], (err1) => {
+      logDbErr(err1);
+      db.run(`DROP TABLE IF EXISTS deleted_chat_pins`, [], (err2) => {
+        logDbErr(err2);
+        if (!err1 && !err2) { try { fs.writeFileSync(chatPinDropMarker, '1', 'utf8'); } catch (e) { /* ignore */ } }
+      });
+    });
+  }
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
