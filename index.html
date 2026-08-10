@@ -129,8 +129,9 @@
     #titlebar-drag-region { flex: 1; height: 100%; min-width: 0; display: flex; align-items: center; padding: 0 14px; -webkit-app-region: drag; }
     #titlebar-app-label {
       display: block;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
       font-size: 11.5px;
-      font-weight: var(--font-weight-bold);
+      font-weight: 800;
       color: var(--text-primary);
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -175,8 +176,9 @@
     body.compact-mode #titlebar-app-label { display: none; }
     body.compact-mode #titlebar-drag-region .titlebar-app-label-compact {
       display: block;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
       font-size: 10.5px;
-      font-weight: var(--font-weight-bold);
+      font-weight: 800;
       color: var(--text-secondary);
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -3806,8 +3808,8 @@
     .app-dialog-icon {
       width: 48px; height: 48px; border-radius: var(--radius-lg); margin-bottom: 12px;
       display: flex; align-items: center; justify-content: center; font-size: 22px;
-      background: linear-gradient(145deg, var(--accent), var(--accent-dark));
-      box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
+      background: var(--accent);
+      box-shadow: 0 6px 16px rgba(33, 150, 243, 0.22);
       color: #fff;
     }
     .app-dialog-icon svg,
@@ -3815,9 +3817,9 @@
     .app-dialog-icon.is-danger { background: linear-gradient(145deg, #f87171, #dc2626); box-shadow: 0 6px 16px rgba(220, 38, 38, 0.28); }
     .app-dialog-icon.is-success { background: linear-gradient(145deg, #4ade80, #16a34a); box-shadow: 0 6px 16px rgba(22, 163, 74, 0.28); }
     .app-dialog-icon.is-question {
-      background: linear-gradient(160deg, #818cf8 0%, #6366f1 55%, #4f46e5 100%);
-      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.32);
-      color: #eef2ff;
+      background: var(--sidebar-active);
+      box-shadow: 0 8px 20px rgba(33, 150, 243, 0.18);
+      color: var(--accent-dark);
     }
     .app-dialog-title { font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; margin: 0; }
     .app-dialog-body-wrap { padding: 8px 22px 20px; background: #fff; }
@@ -3838,8 +3840,8 @@
     .app-dialog-btn--ghost { background: #fff; border-color: var(--border); color: #475569; }
     .app-dialog-btn--ghost:hover { background: var(--border-soft); }
     .app-dialog-btn--primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff;
-      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
+      background: var(--accent); color: #fff;
+      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.25);
     }
     .app-dialog-btn--danger {
       background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;
@@ -4537,7 +4539,7 @@
     .settings-profile-hint-note { font-size: 11px; color: #94a3b8; line-height: 1.45; }
     .settings-btn-secondary { padding: 8px 14px; background: var(--border-soft); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; color: #475569; transition: background 0.12s; white-space: nowrap; }
     .settings-btn-secondary:hover { background: var(--border); }
-    .settings-btn-primary { padding: 8px 16px; background: var(--accent-dark); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
+    .settings-btn-primary { padding: 8px 16px; background: var(--accent); border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; white-space: nowrap; }
     .settings-btn-primary:hover { filter: brightness(1.15); }
     .settings-btn-danger { align-self: flex-start; padding: 8px 14px; background: #dc2626; border: none; border-radius: var(--radius-md); font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
     .settings-btn-danger:hover { background: #b91c1c; }
