@@ -2922,10 +2922,17 @@ const db = new sqlite3.Database(dbPath);
 // 전이라 처리되지 않거나, 등록된 뒤라도 이 시점의 오류를 "진짜 손상"으로 오판해 파괴적인
 // 백업 복구(scheduleDbCorruptRecovery)를 곧바로 트리거할 수 있다. 이 정리 작업 자체의 실패는
 // 절대 그 경로를 타면 안 되므로, 여기서는 그냥 조용히 기록만 하고 넘어간다.
+// chat_pins/deleted_chat_pins 테이블뿐 아니라, 그 테이블의 PRIMARY KEY가 자동으로 만든
+// 인덱스(sqlite_autoindex_chat_pins_1 같은 이름)도 카탈로그에 별도 행으로 남아있다.
+// 테이블 행만 지우고 이 인덱스 행을 안 지우면 "orphan index" 손상이 새로 생긴다(실제로 발생함) —
+// 그래서 이름이 완전히 같은 것뿐 아니라 이 두 테이블에서 비롯된 자동 인덱스까지 전부 지운다.
 db.serialize(() => {
   db.run('PRAGMA writable_schema = ON', () => {});
   db.run(
-    `DELETE FROM sqlite_master WHERE type IN ('table','index') AND name IN ('chat_pins','deleted_chat_pins')`,
+    `DELETE FROM sqlite_master WHERE
+       name IN ('chat_pins','deleted_chat_pins')
+       OR name LIKE 'sqlite_autoindex_chat_pins%'
+       OR name LIKE 'sqlite_autoindex_deleted_chat_pins%'`,
     (err) => { if (err) console.error('[DB] 부팅 시 chat_pins 카탈로그 정리 실패(무시):', err.message); }
   );
   db.run('PRAGMA writable_schema = OFF', () => {});
@@ -2943,10 +2950,27 @@ let dbCorruptRecoveryScheduled = false;
  * 같은 X가 이미 있으니 또 같은 에러가 나서 몇 시간 동안 재시작만 반복하며 디스크를 19GB 채운 사고.
  * 이런 국소 스키마 충돌은 해당 테이블만 지우고 다시 만들면 끝나므로 전체 DB를 버릴 필요가 없다.
  */
+/** chat_pins/deleted_chat_pins 테이블 자체이거나, 거기서 비롯된 자동 인덱스인지 확인 */
+function isChatPinRelatedSchemaName(name) {
+  if (!name) return false;
+  return (
+    name === 'chat_pins' ||
+    name === 'deleted_chat_pins' ||
+    name.startsWith('sqlite_autoindex_chat_pins') ||
+    name.startsWith('sqlite_autoindex_deleted_chat_pins')
+  );
+}
+
 function parseBenignSchemaConflict(err) {
   const msg = String((err && err.message) || err || '');
-  const m = msg.match(/malformed database schema \((\w+)\)\s*-\s*(?:table|index)\s+\1\s+already exists/i);
-  return m ? m[1] : null;
+  // "table X already exists" / "index X already exists" 형태
+  const m1 = msg.match(/malformed database schema \((\S+)\)\s*-\s*(?:table|index)\s+\S+\s+already exists/i);
+  if (m1) return m1[1];
+  // "orphan index" 형태 — 테이블 행은 지워졌는데 그 테이블의 자동 인덱스 카탈로그 행이 남은 경우
+  // (실제로 chat_pins 정리 과정에서 발생) — 이름 자체(예: sqlite_autoindex_chat_pins_1)로 판단한다.
+  const m2 = msg.match(/malformed database schema \((\S+)\)\s*-\s*orphan index/i);
+  if (m2 && isChatPinRelatedSchemaName(m2[1])) return m2[1];
+  return null;
 }
 
 function isSqliteCorruptError(err) {
@@ -3044,9 +3068,64 @@ function relaunchWithoutBackupRestore() {
   app.exit(0);
 }
 
+/**
+ * chat_pins/deleted_chat_pins 기능은 완전히 제거됐으므로, 이 테이블이나 그 자동 인덱스와
+ * 관련된 스키마 손상은 "다시 만들" 필요가 없다 — 카탈로그에서 관련 행을 전부 지우기만 하면
+ * 된다(테이블 행 자체 손상이든, 그 테이블의 orphan index 손상이든 동일하게 처리 가능).
+ * 이렇게 하면 hardRepairSchemaRow처럼 재생성 → 재생성한 인덱스가 다시 orphan이 되는 식의
+ * 반복을 원천적으로 피할 수 있다.
+ */
+function hardWipeChatPinArtifacts() {
+  return new Promise((resolve) => {
+    db.close(() => {
+      try {
+        const repairDb = new sqlite3.Database(dbPath, (openErr) => {
+          if (openErr) { resolve(false); return; }
+          repairDb.run(`PRAGMA busy_timeout = 5000`);
+          repairDb.serialize(() => {
+            repairDb.run(`PRAGMA writable_schema = ON`);
+            repairDb.run(
+              `DELETE FROM sqlite_master WHERE
+                 name IN ('chat_pins','deleted_chat_pins')
+                 OR name LIKE 'sqlite_autoindex_chat_pins%'
+                 OR name LIKE 'sqlite_autoindex_deleted_chat_pins%'`,
+              (delErr) => {
+                if (delErr) console.error('[DB] chat_pins 관련 카탈로그 정리 실패:', delErr.message);
+              }
+            );
+            repairDb.run(`PRAGMA writable_schema = OFF`);
+            repairDb.close((closeErr) => resolve(!closeErr));
+          });
+        });
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  });
+}
+
 function tryRepairBenignSchemaConflict(err) {
   const table = parseBenignSchemaConflict(err);
-  if (!table || !RECREATABLE_SCHEMA_SQL[table]) return false;
+  if (!table) return false;
+  if (isChatPinRelatedSchemaName(table)) {
+    if (schemaHardRepairInProgress.has('chat_pins_artifacts')) return true;
+    schemaHardRepairInProgress.add('chat_pins_artifacts');
+    const attempt = bumpDbRecoveryAttemptCount();
+    if (attempt > DB_RECOVERY_MAX_ATTEMPTS) {
+      console.error(`[DB] chat_pins 관련 복구 ${attempt}회째 반복 — 부가 기능이라 백업 복구 없이 그대로 재연결만 시도`);
+      relaunchWithoutBackupRestore();
+      return true;
+    }
+    console.error(`[DB] chat_pins 관련 스키마 손상 감지("${table}") — 관련 카탈로그 행 정리 시도:`, err && err.message);
+    hardWipeChatPinArtifacts().then(() => {
+      // 성공/실패와 무관하게 재연결이 필요하다(db가 위에서 close됨) — 부가 기능이라
+      // 정리가 설사 실패해도 백업 복구로 확대하지 않는다.
+      resetDbRecoveryAttemptCount();
+      relaunchWithoutBackupRestore();
+    });
+    return true;
+  }
+  if (!RECREATABLE_SCHEMA_SQL[table]) return false;
   if (schemaHardRepairInProgress.has(table)) return true; // 이미 진행 중 — 재시도 폭주 방지
   schemaHardRepairInProgress.add(table);
   const nonFatal = NON_FATAL_SCHEMA_TABLES.has(table);
