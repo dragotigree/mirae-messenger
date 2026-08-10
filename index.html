@@ -6960,6 +6960,15 @@
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
+    let sidebarCalDayFilter = 'all';
+    const SIDEBAR_CAL_DAY_FILTERS = [
+      { key: 'all', label: '전체' },
+      { key: 'ADMISSION', label: '입원' },
+      { key: 'DISCHARGE', label: '퇴원' },
+      { key: 'ROOM_CHANGE', label: '전실' },
+      { key: 'FLOW', label: '외진외출' }
+    ];
+
     let activeChatUser = null;
 
     function pushToastUiState() {
@@ -21351,15 +21360,6 @@
       card.appendChild(rows);
       return card;
     }
-
-    let sidebarCalDayFilter = 'all';
-    const SIDEBAR_CAL_DAY_FILTERS = [
-      { key: 'all', label: '전체' },
-      { key: 'ADMISSION', label: '입원' },
-      { key: 'DISCHARGE', label: '퇴원' },
-      { key: 'ROOM_CHANGE', label: '전실' },
-      { key: 'FLOW', label: '외진외출' }
-    ];
 
     function setSidebarCalDayFilter(key) {
       sidebarCalDayFilter = key;
