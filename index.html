@@ -13292,8 +13292,11 @@
       syncSidebarUserSelectionUi();
     }
 
-    function toggleSidebarUserSelection(ip, opts) {
-      const user = findUserByIp(ip);
+    function toggleSidebarUserSelection(ipOrUser, opts) {
+      // ip 문자열로만 다시 찾으면, 클릭 시점과 실제 클릭 처리 사이에 그 사람 IP가
+      // 막 바뀐 경우(재접속·DHCP 갱신 등) findUserByIp가 못 찾아서 선택이 조용히
+      // 무시되는 문제가 있었다 — 이미 갖고 있는 user 객체를 그대로 쓰면 이 문제가 없다.
+      const user = (ipOrUser && typeof ipOrUser === 'object') ? ipOrUser : findUserByIp(ipOrUser);
       if (!isSelectableSidebarUser(user)) return;
       const canon = user.ip;
       const selected = isSidebarIpSelected(canon);
@@ -13360,7 +13363,7 @@
       if (multi) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         clearSidebarSearchNavHighlight();
-        toggleSidebarUserSelection(user.ip);
+        toggleSidebarUserSelection(user);
         return;
       }
       if (range && sidebarSelectAnchorIp) {
@@ -13373,7 +13376,7 @@
       if (sidebarSelectedUserIps.size > 0) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         clearSidebarSearchNavHighlight();
-        toggleSidebarUserSelection(user.ip);
+        toggleSidebarUserSelection(user);
         return;
       }
       openCompactPersonOrChat(user);
