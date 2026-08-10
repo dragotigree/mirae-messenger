@@ -5780,7 +5780,7 @@
           <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">다른 직원들의 목록에 내 상태가 이렇게 표시됩니다. 「자리비움」으로 해도 메시지는 그대로 받습니다 — 단지 지금 바로 응대하기 어렵다는 표시입니다.</p>
         </div>
         <div class="settings-card">
-          <div class="settings-form-grid">
+          <div class="settings-form-grid settings-form-stack">
             <label class="settings-field">목록 분류
               <select id="setting-user-grouping" class="settings-select">
                 <option value="floor" selected>층별</option>
@@ -5788,6 +5788,13 @@
               </select>
             </label>
             <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">왼쪽 직원 목록을 「층」끼리 묶어 보여줄지, 「부서」끼리 묶어 보여줄지 정합니다. 검색·대화 자체에는 영향 없습니다.</p>
+            <label class="settings-field">이름 표시 방식
+              <select id="setting-name-order" class="settings-select">
+                <option value="rankFirst" selected>물리치료실장 정용범</option>
+                <option value="nameFirst">정용범(물리치료실장)</option>
+              </select>
+            </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">직급이 있는 직원의 이름을 목록·대화창 등 어디서나 이 순서로 표시합니다.</p>
             <label class="settings-field">표시할 직원
               <select id="setting-show-offline-users" class="settings-select">
                 <option value="all">온라인 + 오프라인</option>
@@ -7333,7 +7340,7 @@
           if (n === r) return r;
           n = n.slice(r.length).trim();
         }
-        return `${r} ${n}`;
+        return (appSettings.nameOrder === 'nameFirst') ? `${n}(${r})` : `${r} ${n}`;
       }
       if (n) return n;
       if (r) return r;
@@ -7726,7 +7733,8 @@
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
     let sidebarUnreadOnly = localStorage.getItem('sidebarUnreadOnly') === 'true';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "suit", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "suit", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0, "nameOrder": "rankFirst"}');
+    if (!appSettings.nameOrder) appSettings.nameOrder = 'rankFirst';
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -23905,6 +23913,8 @@
         const compactClickEl = document.getElementById('setting-compact-person-click');
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
         document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
+        const nameOrderEl = document.getElementById('setting-name-order');
+        if (nameOrderEl) nameOrderEl.value = appSettings.nameOrder || 'rankFirst';
         const showAvatarsEl = document.getElementById('setting-show-user-list-avatars');
         if (showAvatarsEl) showAvatarsEl.checked = appSettings.showUserListAvatars !== false;
         const showOfflineEl = document.getElementById('setting-show-offline-users');
@@ -23985,6 +23995,9 @@
     ? 'chat'
     : 'ipmsg';
   const userGrouping = document.getElementById('setting-user-grouping').value;
+  const nameOrder = document.getElementById('setting-name-order')
+    ? (document.getElementById('setting-name-order').value === 'nameFirst' ? 'nameFirst' : 'rankFirst')
+    : (appSettings.nameOrder || 'rankFirst');
   const autoLaunch = document.getElementById('setting-auto-launch').checked;
   const notificationPreview = document.getElementById('setting-notification-preview').checked;
   const notifyIncomingMessages = document.getElementById('setting-notify-incoming') ? document.getElementById('setting-notify-incoming').checked : true;
@@ -24064,7 +24077,7 @@
   const prevScheduleAlarmLeadMinutes = getScheduleAlarmLeadMinutes();
 
   appSettings = {
-    fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, autoLaunch, defaultViewMode,
+    fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, nameOrder, autoLaunch, defaultViewMode,
     spellcheck, uiAnimationsEnabled: uiAnimationsEnabledFinal, stabilityModeEnabled, showUserListAvatars,
     showOfflineUsers, showSharedPcs, compactPersonClickMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
@@ -24114,6 +24127,8 @@
   }
   closeSettingsModal();
   renderUserListTree(true);
+  renderChannelsSection();
+  syncActiveChannelHeaderTitle();
   if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
   window.api.focusMainWindow();
   await appAlert('설정이 저장되었습니다.');
