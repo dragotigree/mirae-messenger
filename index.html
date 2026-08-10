@@ -309,6 +309,17 @@
     .avatar-cute-5 { background: linear-gradient(120deg, #90CAF9 0%, #90CAF9 100%) !important; box-shadow: none !important; color: #fff; }
     .avatar-cute-6 { background: linear-gradient(160deg, #90CAF9 0%, var(--accent) 100%) !important; box-shadow: none !important; color: #fff; }
 
+    /* 직원 목록 전용: 부서/층별 파스텔 색상. avatar-cute-N(사람별 랜덤, 파란 단색 유지)과는
+       별개 팔레트 — 같은 부서/층이면 항상 같은 파스텔 색이 되어 목록에서 소속을 색으로도
+       구분할 수 있다. 연한 배경 + 같은 색조의 진한 글자로 대비를 확보한다. */
+    .avatar-dept-0 { background: #DCEEFB !important; box-shadow: none !important; color: #1565C0; }
+    .avatar-dept-1 { background: #DFF3E3 !important; box-shadow: none !important; color: #1B7A3D; }
+    .avatar-dept-2 { background: #EAE1FB !important; box-shadow: none !important; color: #6A3FC2; }
+    .avatar-dept-3 { background: #FDEFDA !important; box-shadow: none !important; color: #B4600A; }
+    .avatar-dept-4 { background: #FBE1EC !important; box-shadow: none !important; color: #C22B72; }
+    .avatar-dept-5 { background: #DAF3F0 !important; box-shadow: none !important; color: #0E7C74; }
+    .avatar-dept-6 { background: #E7EAF0 !important; box-shadow: none !important; color: #48566B; }
+
     .avatar-status-badge { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; position: absolute; bottom: -1px; right: -1px; }
     #sidebar-left .avatar-status-badge { border-color: var(--sidebar-bg); }
     .status-ONLINE { background: var(--online-green); }
@@ -10731,7 +10742,7 @@
       item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
       item.dataset.userIp = u.ip;
       item.innerHTML = `
-        <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
+        <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : deptAvatarClassFor(u, u.photo)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
         <div class="compact-item-body">
           <div class="compact-item-top">
             <span class="compact-item-name">${formatDmListDisplayName(u)}</span>
@@ -13541,6 +13552,19 @@
       return `avatar-cute-${hashSeedToIndex(key, CUTE_AVATAR_PALETTE_COUNT)}`;
     }
 
+    /** 직원 목록 아바타 색을 부서/층(현재 「목록 분류」 기준)별로 묶어서 배정하기 위한 키.
+     * 같은 부서(또는 층)면 항상 같은 파스텔 색이 되어, 목록에서 소속을 색으로도 구분할 수 있다. */
+    const DEPT_AVATAR_PALETTE_COUNT = 7;
+    function userDirectoryAvatarSeed(u) {
+      const groupingKey = appSettings.userGrouping || 'floor';
+      const val = groupingKey === 'floor' ? (u && u.floor) : (u && u.dept);
+      return String(val || (groupingKey === 'floor' ? '기타 층' : '기타 부서'));
+    }
+    function deptAvatarClassFor(u, photo) {
+      if (photo) return '';
+      return `avatar-dept-${hashSeedToIndex(userDirectoryAvatarSeed(u), DEPT_AVATAR_PALETTE_COUNT)}`;
+    }
+
     function looksLikeIpv4(value) {
       return /^\d{1,3}(\.\d{1,3}){3}$/.test(String(value || '').trim());
     }
@@ -13935,7 +13959,7 @@
         : `<div class="user-card-body"><div class="user-name-text" title="${tip}">${displayName}</div></div>`;
       card.innerHTML = `
         <div class="avatar-wrapper">
-          <div class="avatar-circle ${photoOk ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
+          <div class="avatar-circle ${photoOk ? 'avatar-photo' : deptAvatarClassFor(u, u.photo)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
           <div class="avatar-status-badge status-${userStatus}"></div>
         </div>
         ${bodyHtml}
