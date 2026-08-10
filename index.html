@@ -4671,7 +4671,6 @@
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
     </div>
     <div id="icon-rail-bottom">
-      <button type="button" class="icon-rail-btn" id="icon-rail-fav-btn" onclick="scrollSidebarToFavorites()" title="즐겨찾기" data-ui-icon="star"></button>
       <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
       <button type="button" class="icon-rail-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
       <button type="button" class="icon-rail-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
@@ -4686,6 +4685,19 @@
       <!-- 「다이렉트 메시지」 헤더(빠른 전송 버튼이 빠지며 빈 줄만 남음)는 제거 — DM은
            아래 사용자 목록에서 바로 열리고, 드롭존(dm-section-label)·집계 배지
            (dm-section-unread-badge)는 각 사용자 카드의 개별 배지로 충분히 대체된다. -->
+
+      <div id="sidebar-block-favorites" class="sidebar-main-block" data-sidebar-block="favorites" style="display:none;">
+        <div class="section-label sidebar-block-head" id="favorites-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px; cursor:pointer;">
+          <span style="display:flex; align-items:center; gap:6px; min-width:0;">
+            <span class="group-chevron" id="favorites-section-chevron">▾</span><span data-ui-icon="star"></span> 즐겨찾기
+          </span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span class="unread-badge" id="favorites-section-unread-badge" style="display:none;">0</span>
+            <span class="group-count-badge" id="favorites-section-count">0</span>
+          </span>
+        </div>
+        <div id="favorites-section-body"></div>
+      </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
         <div class="sidebar-list-prefs" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
@@ -9064,12 +9076,6 @@
       const btn = document.getElementById(kind === 'users' ? 'icon-rail-users-btn' : 'icon-rail-chat-btn');
       if (btn) btn.classList.add('is-active');
     }
-    function scrollSidebarToFavorites() {
-      const favLabel = Array.from(document.querySelectorAll('#sidebar-left .subsection-label')).find((el) => el.textContent.includes('즐겨찾기'));
-      if (favLabel) favLabel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else document.getElementById('sidebar-main-sections')?.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
     function updateCompactModeButtonUi() {
       const btn = document.getElementById('compact-mode-btn');
       if (btn) {
@@ -12106,6 +12112,47 @@
           toggleChannelsSectionCollapse();
         });
       }
+      const favoritesLabel = document.getElementById('favorites-section-label');
+      if (favoritesLabel && favoritesLabel.dataset.collapseBound !== '1') {
+        favoritesLabel.dataset.collapseBound = '1';
+        favoritesLabel.addEventListener('click', () => toggleFavoritesSectionCollapse());
+      }
+    }
+
+    function toggleFavoritesSectionCollapse() {
+      const isCollapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
+      localStorage.setItem('favoritesSectionCollapsed', isCollapsed ? '0' : '1');
+      applyFavoritesSectionCollapseState();
+    }
+    function applyFavoritesSectionCollapseState() {
+      const isCollapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
+      const body = document.getElementById('favorites-section-body');
+      const label = document.getElementById('favorites-section-label');
+      if (body) body.style.display = isCollapsed ? 'none' : 'block';
+      if (label) label.classList.toggle('is-collapsed', isCollapsed);
+    }
+
+    /** 즐겨찾기 — 「채널 및 대화방」·「사용자」와 같은 독립 섹션으로 표시 */
+    function renderFavoritesSection(favorites) {
+      const block = document.getElementById('sidebar-block-favorites');
+      const body = document.getElementById('favorites-section-body');
+      const countEl = document.getElementById('favorites-section-count');
+      const unreadEl = document.getElementById('favorites-section-unread-badge');
+      if (!block || !body) return;
+      if (!favorites || !favorites.length) {
+        block.style.display = 'none';
+        return;
+      }
+      block.style.display = '';
+      applyFavoritesSectionCollapseState();
+      if (countEl) countEl.textContent = String(favorites.length);
+      const favUnread = sumUnreadForUsers(favorites);
+      if (unreadEl) {
+        unreadEl.style.display = favUnread > 0 ? '' : 'none';
+        unreadEl.textContent = formatUnreadBadge(favUnread);
+      }
+      body.innerHTML = '';
+      favorites.forEach((u) => body.appendChild(buildUserCard(u)));
     }
 
     function appendCompactListPanelsInSidebarOrder(container, channelPanel, userPanels, emptyHintEl) {
@@ -13964,26 +14011,18 @@
       const restAll = (allUsers || []).filter((u) => !favoriteIps.has(u.ip));
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
-      const structureKey = buildUserListStructureKey(favorites, sortedGroupKeys, groups, groupingKey);
+      renderFavoritesSection(favorites);
 
-      if (!forceFull && structureKey === lastUserListStructureKey && patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey)) {
+      const structureKey = buildUserListStructureKey([], sortedGroupKeys, groups, groupingKey);
+
+      if (!forceFull && structureKey === lastUserListStructureKey && patchUserListTreeInPlace([], sortedGroupKeys, groups, groupingKey)) {
         return;
       }
 
       lastUserListStructureKey = structureKey;
       treeEl.innerHTML = '';
 
-      if (favorites.length > 0) {
-        const favUnread = sumUnreadForUsers(favorites);
-        const label = document.createElement('div');
-        label.className = 'subsection-label';
-        label.setAttribute('data-fav-section', '1');
-        label.innerHTML = `<span>⭐ 즐겨찾기</span><span style="display:flex; align-items:center; gap:6px;"><span class="group-count-badge">${favorites.length}</span>${favUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(favUnread)}</span>` : ''}</span>`;
-        treeEl.appendChild(label);
-        favorites.forEach(u => treeEl.appendChild(buildUserCard(u)));
-      }
-
-      if (sortedGroupKeys.length === 0 && favorites.length === 0) {
+      if (sortedGroupKeys.length === 0) {
         const emptyMsg = userFilterKeyword
           ? '검색 결과가 없습니다.'
           : sidebarUnreadOnly
