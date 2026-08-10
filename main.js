@@ -2765,7 +2765,7 @@ function queryAllMessagesForExport() {
               message_html: r.message,
               status: r.status,
               msg_uid: r.msg_uid,
-              is_me: r.sender_ip === MY_IP
+              is_me: r.sender_ip === MY_IP || r.sender_ip === 'SELF'
             };
           })
         );
@@ -3795,6 +3795,17 @@ db.serialize(() => {
   db.run(
     `UPDATE messages SET status = 'SENT' WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'`,
     [MY_IP, MY_IP],
+    logDbErr
+  );
+  // 마이그레이션: 예전에는 「나에게 보내기」를 그때그때의 현재 IP(sender_ip=receiver_ip=
+  // 같은 값)로 저장했다. IP가 DHCP 재할당 등으로 바뀌면 재시작 후 「나에게」 대화창을
+  // 열어도 예전 IP로 저장된 메시지를 못 찾아 사라진 것처럼 보였다(실제 사용자 보고).
+  // sender_ip와 receiver_ip가 서로 같은 값인 행은 정의상 셀프 메시지뿐이므로,
+  // IP가 바뀌어도 항상 찾을 수 있는 고정 키 'SELF'로 한 번만 옮겨준다.
+  db.run(
+    `UPDATE messages SET sender_ip = 'SELF', receiver_ip = 'SELF'
+     WHERE sender_ip = receiver_ip AND sender_ip IS NOT NULL AND sender_ip != '' AND sender_ip != 'SELF'`,
+    [],
     logDbErr
   );
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
@@ -8362,12 +8373,16 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
     }
 
     // 나에게 보내기: 수신측이 senderIP===MY_IP 를 무시하므로 TCP 불필요. 로컬 SENT로 보관.
+    // sender_ip/receiver_ip는 실제 현재 IP(MY_IP) 대신 고정 키 'SELF'로 저장한다 —
+    // MY_IP는 DHCP 재할당·재접속 등으로 재시작마다 바뀔 수 있는데, 그대로 쓰면 IP가
+    // 바뀐 다음 「나에게」 대화창을 열 때 예전 IP로 저장된 메시지들을 못 찾아 마치
+    // 사라진 것처럼 보이는 문제가 있었다(실제 발생).
     if (targetIP === MY_IP) {
       extractAndSaveAttachments(message, { msgUid });
-      appendChatLog(`DM_${targetIP}`, partnerName || senderLabelForMe(), myProfile.username, message);
+      appendChatLog(`DM_SELF`, partnerName || senderLabelForMe(), myProfile.username, message);
       db.run(
         `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-        [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
+        [senderLabelForMe(), 'SELF', 'SELF', message, msgUid],
         function (insertErr) {
           if (insertErr) {
             logDbErr(insertErr);
@@ -9296,6 +9311,12 @@ function chatHistoryScopeSql(targetIP) {
       params: [targetIP]
     };
   }
+  // 나에게 보내기: 메시지는 'SELF' 키로 저장되지만, 렌더러는 여전히 자기 자신의
+  // 현재 IP(myProfile.ip === MY_IP)를 targetIP로 보낸다 — 여기서 맞춰준다.
+  // (일부 호출부는 이미 'SELF'로 정규화해서 넘기므로 그 값도 그대로 받아준다.)
+  if (targetIP === MY_IP || targetIP === 'SELF') {
+    return { where: '(sender_ip = ? AND receiver_ip = ?)', params: ['SELF', 'SELF'] };
+  }
   return {
     where: '((sender_ip = ? AND receiver_ip = ?) OR (sender_ip = ? AND receiver_ip = ?))',
     params: [MY_IP, targetIP, targetIP, MY_IP]
@@ -9377,7 +9398,7 @@ ipcMain.handle('get-chat-shared-archive', async (event, targetIP) => {
         message: r.message,
         msg_uid: r.msg_uid,
         created_at_local: r.created_at_local,
-        isMe: r.sender_ip === MY_IP || (mineLabel && r.sender_name === mineLabel)
+        isMe: r.sender_ip === MY_IP || r.sender_ip === 'SELF' || (mineLabel && r.sender_name === mineLabel)
       })));
     });
   });
@@ -9412,7 +9433,7 @@ ipcMain.handle('get-recent-conversations', async () => {
         SELECT CASE WHEN sender_ip = ? THEN receiver_ip ELSE sender_ip END AS peer_key,
                MAX(id) AS last_id
         FROM messages
-        WHERE (sender_ip = ? OR receiver_ip = ?)
+        WHERE (sender_ip = ? OR receiver_ip = ? OR sender_ip = 'SELF')
           AND receiver_ip != 'BROADCAST'
           AND receiver_ip NOT LIKE 'DEPT:%'
           AND receiver_ip NOT LIKE 'FLOOR:%'
@@ -9442,7 +9463,7 @@ ipcMain.handle('get-recent-conversations', async () => {
         sender_ip: r.sender_ip,
         last_id: r.last_id,
         created_at_local: r.created_at_local,
-        isMe: r.sender_ip === myIp || (mineLabel && r.sender_name === mineLabel)
+        isMe: r.sender_ip === myIp || r.sender_ip === 'SELF' || (mineLabel && r.sender_name === mineLabel)
       })));
     });
   });
@@ -9455,14 +9476,14 @@ ipcMain.handle('get-chat-history', async (event, args) => {
   const dateStr = (typeof dateStrRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStrRaw.trim()))
     ? dateStrRaw.trim()
     : null;
-  const hideUpToId = await getChatViewHideUpToId(targetIP);
+  const hideUpToId = await getChatViewHideUpToId(targetIP === MY_IP ? 'SELF' : targetIP);
   const scope = chatHistoryScopeSql(targetIP);
 
   const mapRows = (rows) => {
     const mineLabel = senderLabelForMe();
     return (rows || []).map((r) => ({
       ...r,
-      isMe: r.sender_ip === MY_IP || (mineLabel && r.sender_name === mineLabel),
+      isMe: r.sender_ip === MY_IP || r.sender_ip === 'SELF' || (mineLabel && r.sender_name === mineLabel),
       sender_name: formatSenderDisplay(r.sender_name, r.sender_ip)
     }));
   };
@@ -9575,7 +9596,7 @@ ipcMain.handle('get-chat-message-dates', async (event, args) => {
   const targetIP = args && args.targetIP;
   const month = args && args.month; // YYYY-MM
   if (!targetIP || !month || !/^\d{4}-\d{2}$/.test(String(month))) return [];
-  const hideUpToId = await getChatViewHideUpToId(targetIP);
+  const hideUpToId = await getChatViewHideUpToId(targetIP === MY_IP ? 'SELF' : targetIP);
   const scope = chatHistoryScopeSql(targetIP);
   return new Promise((resolve) => {
     let sql = `SELECT DISTINCT strftime('%Y-%m-%d', created_at, 'localtime') AS date_key
@@ -9598,7 +9619,8 @@ ipcMain.handle('get-chat-message-dates', async (event, args) => {
 });
 
 ipcMain.handle('clear-chat-view', async (event, channelKey) => {
-  const key = String(channelKey || '').trim();
+  const rawKey = String(channelKey || '').trim();
+  const key = rawKey === MY_IP ? 'SELF' : rawKey;
   if (!key) return { success: false, msg: '대화방 정보가 없습니다.' };
   try {
     const maxId = await getMaxMessageIdForChannel(key);
@@ -9649,7 +9671,7 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
       let list = (rows || []).map(r => ({
         ...r,
         sender_name: formatSenderDisplay(r.sender_name, r.sender_ip),
-        isMe: r.sender_ip === MY_IP || r.sender_name === senderLabelForMe()
+        isMe: r.sender_ip === MY_IP || r.sender_ip === 'SELF' || r.sender_name === senderLabelForMe()
       }));
       // 링크 탭: 파일 첨부 박스 안의 다운로드 링크만 있는 항목은 제외
       if (kind === 'link') {

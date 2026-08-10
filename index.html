@@ -10964,6 +10964,19 @@
           searchText: `${floor} 층`
         };
       }
+      if (key === 'SELF' || key === (myProfile && myProfile.ip)) {
+        return {
+          kind: 'dm',
+          name: `${profileDisplayName(myProfile)} (나)`,
+          avatarClass: isUsableProfilePhoto(myProfile && myProfile.photo) ? 'avatar-photo' : cuteAvatarClassFor(myProfile && myProfile.username, myProfile && myProfile.photo, 'SELF'),
+          avatarHtml: avatarInnerHtml(myProfile && myProfile.username, myProfile && myProfile.photo, 'SELF'),
+          user: { ...myProfile, isMe: true },
+          onClick: () => selectUserChat({ ...myProfile, isMe: true }),
+          isOnline: true,
+          isFavorite: false,
+          searchText: `${(myProfile && myProfile.username) || ''} 나에게`
+        };
+      }
       const u = findUserByIp(key);
       if (!u) {
         return {
