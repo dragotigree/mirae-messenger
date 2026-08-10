@@ -11130,7 +11130,20 @@ async function applyUpdateFiles(opts = {}) {
   if (!soft) {
     filesToUpdate.push('lib/excalidraw-app.js', 'lib/excalidraw-app.css');
   }
-  const optionalAssets = soft ? [] : ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
+  const FONT_ASSETS = [
+    'assets/fonts/mirae-fonts.css',
+    'assets/fonts/Eulyoo1945-Regular.woff2',
+    'assets/fonts/Eulyoo1945-SemiBold.woff2',
+    'assets/fonts/MaruBuri-Regular.woff2',
+    'assets/fonts/MaruBuri-SemiBold.woff2',
+    'assets/fonts/Pretendard-Bold.woff2',
+    'assets/fonts/Pretendard-Regular.woff2',
+    'assets/fonts/RIDIBatang.woff',
+    'assets/fonts/SUIT-Bold.woff2',
+    'assets/fonts/SUIT-Medium.woff2',
+    'assets/fonts/SUIT-Regular.woff2'
+  ];
+  const optionalAssets = soft ? [...FONT_ASSETS] : ['assets/splash.png', 'vendor/excalidraw/asset-list.json', ...FONT_ASSETS];
   if (!soft) {
     try {
       const remoteListBuf = await readUpdateSourceBytes('vendor/excalidraw/asset-list.json');
