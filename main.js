@@ -3241,21 +3241,28 @@ db.serialize(() => {
   db.run(`PRAGMA journal_mode = WAL`);
   db.run(`PRAGMA synchronous = NORMAL`);
   db.run(`PRAGMA busy_timeout = 5000`);
+});
+
+// ⚠️ 실사고: integrity_check가 부팅 직후(창이 뜨자마자 렌더러가 보내는 사용자 목록·공지·일정
+// 조회와) 같은 DB 연결을 두고 경쟁하면, 대형 DB에서 몇 초~몇십 초 동안 그 조회들이 줄 서서
+// 기다리게 되어 "응답 없음"으로 보인다. 안전 점검 자체는 유지하되, 창이 다 그려지고 초기 데이터
+// 요청이 끝났을 시점(8초 뒤)으로 미뤄 시작 화면과 경쟁하지 않게 한다.
+setTimeout(() => {
   if (!shouldRunIntegrityCheck()) {
     console.log('[DB] integrity_check 생략 (최근 7일 이내 검사함)');
-  } else {
-    db.get(`PRAGMA integrity_check`, (err, row) => {
-      const ok = !err && sqliteCheckRowOk(row);
-      if (ok) {
-        markIntegrityCheckDone();
-        resetDbRecoveryAttemptCount();
-        return;
-      }
-      console.error('⚠️ 데이터베이스 손상 감지 — 백업 복구를 시작합니다:', err ? err.message : row);
-      scheduleDbCorruptRecovery('startup-integrity');
-    });
+    return;
   }
-});
+  db.get(`PRAGMA integrity_check`, (err, row) => {
+    const ok = !err && sqliteCheckRowOk(row);
+    if (ok) {
+      markIntegrityCheckDone();
+      resetDbRecoveryAttemptCount();
+      return;
+    }
+    console.error('⚠️ 데이터베이스 손상 감지 — 백업 복구를 시작합니다:', err ? err.message : row);
+    scheduleDbCorruptRecovery('startup-integrity');
+  });
+}, 8000);
 
 // 💾 journal_mode=WAL이면 최근 쓰기 내용이 mirae_messenger.db-wal 파일에 잠깐 남아있을 수 있다.
 // 그 상태에서 mirae_messenger.db 파일만 그대로 복사하면 최신 내용이 빠진 백업이 만들어질 수 있으므로,
