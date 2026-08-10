@@ -3622,36 +3622,6 @@ db.serialize(() => {
   db.run(`ALTER TABLE notice_operators ADD COLUMN can_manage_duty INTEGER DEFAULT 0`, () => {});
   // 신규 컬럼만 DEFAULT — 부팅마다 0→1로 덮지 않음 (마스터가 끈 권한 유지)
 
-  // 채널·1:1 대화 상단 공지 고정 (채널당 1개)
-  db.run(`CREATE TABLE IF NOT EXISTS chat_pins (
-    channel_key TEXT PRIMARY KEY,
-    msg_uid TEXT,
-    message_html TEXT,
-    preview_text TEXT,
-    sender_name TEXT,
-    pinned_at TEXT,
-    pinned_by_name TEXT,
-    pinned_by_ip TEXT
-  )`, logDbErr);
-
-  /** 해제된 채팅 공지 고정 — NOTICE_SYNC / 피어가 옛 pin 을 되살리는 것 방지 */
-  db.run(`CREATE TABLE IF NOT EXISTS deleted_chat_pins (
-    channel_key TEXT PRIMARY KEY,
-    cleared_at TEXT NOT NULL
-  )`, (err) => {
-    logDbErr(err);
-    db.all(`SELECT channel_key, cleared_at FROM deleted_chat_pins`, (loadErr, rows) => {
-      if (loadErr) {
-        logDbErr(loadErr);
-        return;
-      }
-      (rows || []).forEach((r) => {
-        if (r && r.channel_key) rememberChatPinTombstone(r.channel_key, r.cleared_at);
-      });
-    });
-  });
-  db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_chat_pins_at ON deleted_chat_pins(cleared_at)`, () => {});
-
   // 당직의 / 의료진 OFF (날짜별)
   db.run(`CREATE TABLE IF NOT EXISTS duty_roster (
     date_str TEXT NOT NULL,
@@ -6021,7 +5991,7 @@ function routeIncomingPayloadInner(payload, senderIP) {
     case 'NOTICE_UPDATE': handleNoticeUpdate(payload.notice); break;
     case 'NOTICE_DELETE': handleNoticeDelete(payload.uid); break;
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
-    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.chatPins, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids, payload.deletedChatPins); break;
+    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
     case 'OPERATOR_DELETE': handleOperatorDelete(payload.username); break;
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
@@ -6090,7 +6060,6 @@ function routeIncomingPayloadInner(payload, senderIP) {
       // 대상 PC가 방금 켜짐 → 예약된 삭제가 있으면 즉시 전달
       tryDeliverPendingWipe(senderIP);
       break;
-    case 'CHAT_PIN_SYNC': handleChatPinSync(payload); break;
     case 'DUTY_ROSTER_SYNC': handleDutyRosterSync(payload); break;
     case 'OPERATOR_DUTY_PERM': handleOperatorDutyPerm(payload); break;
     case 'PROFILE_PHOTO_SYNC': handleProfilePhotoSync(payload.ip || senderIP, payload.photo); break;
@@ -7304,71 +7273,46 @@ function handleNoticeSyncRequest(senderIP) {
     db.all(`SELECT * FROM notice_operators`, [], (err2, operators) => {
       db.all(`SELECT * FROM hospital_schedules`, [], (err3, schedules) => {
         db.all(`SELECT * FROM user_profile_overrides`, [], (err4, profileOverridesRows) => {
-          db.all(`SELECT * FROM chat_pins`, [], (err5, chatPins) => {
-            db.all(`SELECT * FROM duty_roster`, [], (err6, dutyRoster) => {
-              db.all(
-                `SELECT uid FROM deleted_schedules ORDER BY deleted_at DESC LIMIT 5000`,
-                [],
-                (err7, deletedRows) => {
-                  db.all(
-                    `SELECT uid FROM deleted_notices ORDER BY deleted_at DESC LIMIT 5000`,
-                    [],
-                    (err8, deletedNoticeRows) => {
-                      db.all(
-                        `SELECT channel_key, cleared_at FROM deleted_chat_pins ORDER BY cleared_at DESC LIMIT 5000`,
-                        [],
-                        (err9, deletedChatPinRows) => {
-                          try {
-                            const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
-                            const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
-                            const deletedChatPins = (deletedChatPinRows || []).filter((r) => r && r.channel_key);
-                            const chunks = buildNoticeSyncPayloadChunks(
-                              slimNotices,
-                              operators || [],
-                              schedules || [],
-                              profileOverridesRows || [],
-                              deletedScheduleUids,
-                              deletedNoticeUids
-                            );
-                            const pinChunk = {
-                              type: 'NOTICE_SYNC_RESPONSE',
-                              notices: [],
-                              operators: [],
-                              schedules: [],
-                              profileOverrides: [],
-                              deletedScheduleUids: [],
-                              deletedNoticeUids: [],
-                              chatPins: chatPins || [],
-                              deletedChatPins,
-                              dutyRoster: dutyRoster || [],
-                              updateSourcePath: updateSourcePath || ''
-                            };
-                            const pinChunkBytes = Buffer.byteLength(JSON.stringify(pinChunk) + '\n', 'utf8');
-                            if (pinChunkBytes <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                              chunks.unshift(pinChunk);
-                            } else {
-                              const dutyOnly = { ...pinChunk, chatPins: [], deletedChatPins: [] };
-                              const pinsOnly = { ...pinChunk, dutyRoster: [] };
-                              if (Buffer.byteLength(JSON.stringify(dutyOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                                chunks.unshift(dutyOnly);
-                              }
-                              if (Buffer.byteLength(JSON.stringify(pinsOnly) + '\n', 'utf8') <= NOTICE_SYNC_SAFE_LINE_BYTES) {
-                                chunks.unshift(pinsOnly);
-                              } else {
-                                console.error('chatPins/deletedChatPins 동기화 청크가 너무 큼 — 건너뜀');
-                              }
-                            }
-                            tcpWriteJsonLines(senderIP, chunks);
-                          } finally {
-                            finishSync();
-                          }
-                        }
+          db.all(`SELECT * FROM duty_roster`, [], (err6, dutyRoster) => {
+            db.all(
+              `SELECT uid FROM deleted_schedules ORDER BY deleted_at DESC LIMIT 5000`,
+              [],
+              (err7, deletedRows) => {
+                db.all(
+                  `SELECT uid FROM deleted_notices ORDER BY deleted_at DESC LIMIT 5000`,
+                  [],
+                  (err8, deletedNoticeRows) => {
+                    try {
+                      const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
+                      const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
+                      const chunks = buildNoticeSyncPayloadChunks(
+                        slimNotices,
+                        operators || [],
+                        schedules || [],
+                        profileOverridesRows || [],
+                        deletedScheduleUids,
+                        deletedNoticeUids
                       );
+                      const dutyChunk = {
+                        type: 'NOTICE_SYNC_RESPONSE',
+                        notices: [],
+                        operators: [],
+                        schedules: [],
+                        profileOverrides: [],
+                        deletedScheduleUids: [],
+                        deletedNoticeUids: [],
+                        dutyRoster: dutyRoster || [],
+                        updateSourcePath: updateSourcePath || ''
+                      };
+                      chunks.unshift(dutyChunk);
+                      tcpWriteJsonLines(senderIP, chunks);
+                    } finally {
+                      finishSync();
                     }
-                  );
-                }
-              );
-            });
+                  }
+                );
+              }
+            );
           });
         });
       });
@@ -7376,7 +7320,7 @@ function handleNoticeSyncRequest(senderIP) {
   });
 }
 
-function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, chatPins, dutyRoster, deletedScheduleUids, deletedNoticeUids, deletedChatPins) {
+function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, dutyRoster, deletedScheduleUids, deletedNoticeUids) {
   // 같은 응답에 공지 본문이 있는 UID는 삭제 목록보다 우선 (방금 작성·재동기화 건 보호)
   const incomingNoticeUids = new Set(
     (Array.isArray(notices) ? notices : []).map((n) => n && n.uid).filter(Boolean).map(String)
@@ -7447,19 +7391,6 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
       refreshUserAfterProfileOverride(ov.ip);
     });
   }
-  // 채팅 공지 해제 tombstone 을 pin INSERT보다 먼저 적용해 되살림 방지
-  if (Array.isArray(deletedChatPins) && deletedChatPins.length) {
-    deletedChatPins.forEach((row) => {
-      if (!row || !row.channel_key) return;
-      clearChatPinRow(row.channel_key, row.cleared_at, false, { force: false });
-    });
-  }
-  if (Array.isArray(chatPins)) {
-    chatPins.forEach((p) => upsertChatPinRow(p, false));
-    if (mainWindow) safeWebContentsSend('chat-pins-update');
-  } else if (Array.isArray(deletedChatPins) && deletedChatPins.length) {
-    if (mainWindow) safeWebContentsSend('chat-pins-update');
-  }
   if (Array.isArray(dutyRoster)) {
     dutyRoster.forEach((row) => upsertDutyRosterRow(row, false));
     if (mainWindow) safeWebContentsSend('duty-roster-update');
@@ -7505,141 +7436,6 @@ function handleOperatorDutyPerm(payload) {
   db.run(`UPDATE notice_operators SET can_manage_duty = ? WHERE username = ?`, [flag, payload.username], () => {
     if (mainWindow) safeWebContentsSend('notice-operators-update');
   });
-}
-
-/** 채팅 공지 고정 해제 tombstone (channel_key → cleared_at ISO) */
-const chatPinTombstoneMemory = new Map();
-const CHAT_PIN_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
-
-function rememberChatPinTombstone(channelKey, clearedAt) {
-  const key = String(channelKey || '').trim();
-  if (!key) return;
-  const at = String(clearedAt || new Date().toISOString());
-  const prev = chatPinTombstoneMemory.get(key);
-  if (!prev || at > prev) chatPinTombstoneMemory.set(key, at);
-}
-
-function pruneChatPinTombstones(done) {
-  const cutoff = new Date(Date.now() - CHAT_PIN_TOMBSTONE_KEEP_MS).toISOString();
-  db.run(`DELETE FROM deleted_chat_pins WHERE cleared_at < ?`, [cutoff], () => {
-    for (const [k, at] of chatPinTombstoneMemory.entries()) {
-      if (at < cutoff) chatPinTombstoneMemory.delete(k);
-    }
-    if (typeof done === 'function') done();
-  });
-}
-
-function persistChatPinTombstone(channelKey, clearedAt, done) {
-  const key = String(channelKey || '').trim();
-  if (!key) {
-    if (typeof done === 'function') done();
-    return;
-  }
-  rememberChatPinTombstone(key, clearedAt);
-  const at = chatPinTombstoneMemory.get(key);
-  db.run(
-    `INSERT OR REPLACE INTO deleted_chat_pins (channel_key, cleared_at) VALUES (?, ?)`,
-    [key, at],
-    () => pruneChatPinTombstones(done)
-  );
-}
-
-/**
- * 채팅 공지 고정 해제.
- * force=true: 사용자/실시간 해제 — 무조건 삭제.
- * force=false: sync tombstone — 로컬 pin 이 cleared_at 보다 최신이면 유지.
- */
-function clearChatPinRow(channelKey, clearedAt, broadcast, opts) {
-  const key = String(channelKey || '').trim();
-  if (!key) return Promise.resolve();
-  const force = !!(opts && opts.force);
-  const at = String(clearedAt || new Date().toISOString());
-  rememberChatPinTombstone(key, at);
-  if (broadcast) {
-    broadcastToOnlinePeers({
-      type: 'CHAT_PIN_SYNC',
-      pin: { channel_key: key, _clear: true, cleared_at: chatPinTombstoneMemory.get(key) || at }
-    });
-  }
-  return new Promise((resolve) => {
-    persistChatPinTombstone(key, at, () => {
-      const tombAt = chatPinTombstoneMemory.get(key) || at;
-      db.get(`SELECT pinned_at FROM chat_pins WHERE channel_key = ?`, [key], (err, row) => {
-        const pinnedAt = row && row.pinned_at ? String(row.pinned_at) : '';
-        const shouldDelete = force || !row || !pinnedAt || pinnedAt <= tombAt;
-        if (!shouldDelete) {
-          resolve();
-          return;
-        }
-        db.run(`DELETE FROM chat_pins WHERE channel_key = ?`, [key], () => {
-          if (mainWindow) safeWebContentsSend('chat-pins-update');
-          resolve();
-        });
-      });
-    });
-  });
-}
-
-function upsertChatPinRow(pin, broadcast) {
-  if (!pin || !pin.channel_key) return Promise.resolve();
-  const key = String(pin.channel_key).trim();
-  if (!key) return Promise.resolve();
-
-  if (pin._clear) {
-    // 피어 해제는 force:false — 로컬이 더 나중에 재고정한 경우 유지
-    // 로컬 사용자 해제는 clear-chat-pin → clearChatPinRow(..., force:true)
-    return clearChatPinRow(key, pin.cleared_at || new Date().toISOString(), !!broadcast, { force: false });
-  }
-
-  const pinnedAt = String(pin.pinned_at || new Date().toISOString());
-  const tombstoneAt = chatPinTombstoneMemory.get(key);
-  // 해제 시각 이하(같거나 이전)의 pin 은 되살리지 않음
-  if (tombstoneAt && pinnedAt <= tombstoneAt) {
-    return Promise.resolve();
-  }
-  // 해제 이후 다시 고정 — tombstone 제거
-  if (tombstoneAt && pinnedAt > tombstoneAt) {
-    chatPinTombstoneMemory.delete(key);
-    db.run(`DELETE FROM deleted_chat_pins WHERE channel_key = ?`, [key], () => {});
-  }
-
-  const row = {
-    channel_key: key,
-    msg_uid: pin.msg_uid || '',
-    message_html: pin.message_html || '',
-    preview_text: pin.preview_text || '',
-    sender_name: pin.sender_name || '',
-    pinned_at: pinnedAt,
-    pinned_by_name: pin.pinned_by_name || '',
-    pinned_by_ip: pin.pinned_by_ip || ''
-  };
-
-  return new Promise((resolve) => {
-    db.run(
-      `INSERT OR REPLACE INTO chat_pins (channel_key, msg_uid, message_html, preview_text, sender_name, pinned_at, pinned_by_name, pinned_by_ip)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        row.channel_key,
-        row.msg_uid,
-        row.message_html,
-        row.preview_text,
-        row.sender_name,
-        row.pinned_at,
-        row.pinned_by_name,
-        row.pinned_by_ip
-      ],
-      () => {
-        if (mainWindow) safeWebContentsSend('chat-pins-update');
-        resolve();
-      }
-    );
-    if (broadcast) broadcastToOnlinePeers({ type: 'CHAT_PIN_SYNC', pin: row });
-  });
-}
-
-function handleChatPinSync(payload) {
-  if (!payload || !payload.pin) return;
-  upsertChatPinRow(payload.pin, false);
 }
 
 function upsertDutyRosterRow(row, broadcast) {
@@ -10294,50 +10090,12 @@ ipcMain.handle('notice-operator-login', async (event, { username, password }) =>
   });
 });
 
-ipcMain.handle('get-chat-pin', async (event, channelKey) => {
-  const key = String(channelKey || '').trim();
-  if (!key) return null;
-  return new Promise((resolve) => {
-    db.get(`SELECT * FROM chat_pins WHERE channel_key = ?`, [key], (err, row) => {
-      if (!row) {
-        resolve(null);
-        return;
-      }
-      const tombAt = chatPinTombstoneMemory.get(key);
-      if (tombAt && String(row.pinned_at || '') <= tombAt) {
-        db.run(`DELETE FROM chat_pins WHERE channel_key = ?`, [key], () => {});
-        resolve(null);
-        return;
-      }
-      resolve(row);
-    });
-  });
-});
-
-ipcMain.handle('set-chat-pin', async (event, payload) => {
-  const pin = payload || {};
-  const channel_key = String(pin.channelKey || pin.channel_key || '').trim();
-  if (!channel_key) return { success: false, msg: '채널을 찾을 수 없습니다.' };
-  const row = {
-    channel_key,
-    msg_uid: String(pin.msgUid || pin.msg_uid || ''),
-    message_html: String(pin.messageHtml || pin.message_html || ''),
-    preview_text: String(pin.previewText || pin.preview_text || '').slice(0, 240),
-    sender_name: String(pin.senderName || pin.sender_name || ''),
-    pinned_at: new Date().toISOString(),
-    pinned_by_name: String(pin.pinnedByName || pin.pinned_by_name || myProfile.username || ''),
-    pinned_by_ip: MY_IP
-  };
-  await upsertChatPinRow(row, true);
-  return { success: true, pin: row };
-});
-
-ipcMain.handle('clear-chat-pin', async (event, channelKey) => {
-  const key = String(channelKey || '').trim();
-  if (!key) return { success: false };
-  await clearChatPinRow(key, new Date().toISOString(), true, { force: true });
-  return { success: true };
-});
+// 메시지 고정(pin) 기능은 반복되는 chat_pins 스키마 손상(1.0.527/528/564/565에서
+// 계속 재발)의 근본 원인을 못 찾아, 설치 대수가 적은 점을 고려해 기능 자체를
+// 제거했다. 렌더러가 혹시 옛 코드로 이 채널을 호출해도 조용히 빈 값을 반환한다.
+ipcMain.handle('get-chat-pin', async () => null);
+ipcMain.handle('set-chat-pin', async () => ({ success: false, msg: '메시지 고정 기능은 더 이상 지원하지 않습니다.' }));
+ipcMain.handle('clear-chat-pin', async () => ({ success: true }));
 
 ipcMain.handle('get-duty-roster', async (event, dateStr) => {
   const date = String(dateStr || '').trim();
@@ -12209,8 +11967,6 @@ async function performClearAllChatHistory(opts) {
     'message_reactions',
     'messages',
     'chat_view_clears',
-    'chat_pins',
-    'deleted_chat_pins',
     'scheduled_messages',
     'channel_read_cursors'
   ];
