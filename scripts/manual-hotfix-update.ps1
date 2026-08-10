@@ -29,7 +29,18 @@ $files = @(
   'toast.html',
   'toast-preload.js',
   'lib\minimal-xlsx.js',
-  'assets\splash.png'
+  'assets\splash.png',
+  'assets\fonts\mirae-fonts.css',
+  'assets\fonts\Eulyoo1945-Regular.woff2',
+  'assets\fonts\Eulyoo1945-SemiBold.woff2',
+  'assets\fonts\MaruBuri-Regular.woff2',
+  'assets\fonts\MaruBuri-SemiBold.woff2',
+  'assets\fonts\Pretendard-Bold.woff2',
+  'assets\fonts\Pretendard-Regular.woff2',
+  'assets\fonts\RIDIBatang.woff',
+  'assets\fonts\SUIT-Bold.woff2',
+  'assets\fonts\SUIT-Medium.woff2',
+  'assets\fonts\SUIT-Regular.woff2'
 )
 
 function Find-AppDirFromExe([string]$exePath) {

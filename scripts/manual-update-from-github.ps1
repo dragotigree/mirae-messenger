@@ -38,7 +38,18 @@ $files = @(
   'lib/excalidraw-app.css',
   'assets/compact/compact-overlay.css',
   'assets/compact/phosphor-paths.json',
-  'assets/splash.png'
+  'assets/splash.png',
+  'assets/fonts/mirae-fonts.css',
+  'assets/fonts/Eulyoo1945-Regular.woff2',
+  'assets/fonts/Eulyoo1945-SemiBold.woff2',
+  'assets/fonts/MaruBuri-Regular.woff2',
+  'assets/fonts/MaruBuri-SemiBold.woff2',
+  'assets/fonts/Pretendard-Bold.woff2',
+  'assets/fonts/Pretendard-Regular.woff2',
+  'assets/fonts/RIDIBatang.woff',
+  'assets/fonts/SUIT-Bold.woff2',
+  'assets/fonts/SUIT-Medium.woff2',
+  'assets/fonts/SUIT-Regular.woff2'
 )
 
 function Test-AppDir([string]$dir) {
@@ -114,7 +125,7 @@ function Update-OneAppDir([string]$appDir, [string]$repoBase, [long]$bust, $wc) 
       $wc.DownloadFile($url, $dst)
       $copied++
     } catch {
-      if ($rel -match 'splash\.png$|compact-overlay\.css$|phosphor-paths\.json$|excalidraw-app\.(js|css)$') {
+      if ($rel -match 'splash\.png$|compact-overlay\.css$|phosphor-paths\.json$|excalidraw-app\.(js|css)$|assets/fonts/') {
         Write-Host "  skip(optional): $rel" -ForegroundColor DarkGray
         continue
       }
