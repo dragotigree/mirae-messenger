@@ -2922,25 +2922,23 @@ const db = new sqlite3.Database(dbPath);
 // 그때마다 감지→복구→재시작을 반복해 "껐다 켜졌다"처럼 보인다. 그래서 다른 어떤 쿼리보다도
 // 먼저, DB를 연 직후 이 시점에 손상된 카탈로그 행을 지운다 — 아래에서 나중에 벌어질 수 있는
 // 오류를 기다렸다가 고치는 게 아니라, 애초에 그 오류가 날 기회 자체를 없앤다.
-// 콜백을 반드시 넘겨야 한다 — 콜백 없이 db.run이 실패하면 sqlite3 모듈이 이 오류를 db의
-// 'error' 이벤트로 흘려보내는데, 그 전역 핸들러(db.on('error', ...))는 아래에서 아직 등록되기
-// 전이라 처리되지 않거나, 등록된 뒤라도 이 시점의 오류를 "진짜 손상"으로 오판해 파괴적인
-// 백업 복구(scheduleDbCorruptRecovery)를 곧바로 트리거할 수 있다. 이 정리 작업 자체의 실패는
-// 절대 그 경로를 타면 안 되므로, 여기서는 그냥 조용히 기록만 하고 넘어간다.
-// chat_pins/deleted_chat_pins 테이블뿐 아니라, 그 테이블의 PRIMARY KEY가 자동으로 만든
-// 인덱스(sqlite_autoindex_chat_pins_1 같은 이름)도 카탈로그에 별도 행으로 남아있다.
-// 테이블 행만 지우고 이 인덱스 행을 안 지우면 "orphan index" 손상이 새로 생긴다(실제로 발생함) —
-// 그래서 이름이 완전히 같은 것뿐 아니라 이 두 테이블에서 비롯된 자동 인덱스까지 전부 지운다.
+//
+// ⚠️⚠️ 절대 여기서 `DELETE FROM sqlite_master`(writable_schema 수술)를 쓰지 말 것.
+// 실사고: 그 방식은 테이블의 "카탈로그 기록"만 지우고 실제 데이터가 들어있는 b-tree
+// 페이지는 파일 안에 그대로 남긴다. 주인이 사라진 그 페이지들을 PRAGMA integrity_check가
+// 곧바로 손상으로 판정하고 → 파괴적인 백업 복구가 돌고 → 복구된 백업에는 chat_pins가
+// 그대로 있으니 → 다음 부팅에 또 지우고 → 또 손상… 이렇게 자기 자신을 먹여살리는
+// 무한 재시작 루프가 됐다(사용자 PC에서 594회 반복, 결국 DB가 빈 파일로 초기화됨).
+// 평범한 DROP TABLE은 카탈로그와 데이터 페이지를 함께 정리하므로 이 문제가 없다.
+// 카탈로그 자체가 깨져서 DROP이 실패하는 경우는 아래 tryRepairBenignSchemaConflict가
+// 따로 처리한다.
 db.serialize(() => {
-  db.run('PRAGMA writable_schema = ON', () => {});
-  db.run(
-    `DELETE FROM sqlite_master WHERE
-       name IN ('chat_pins','deleted_chat_pins')
-       OR name LIKE 'sqlite_autoindex_chat_pins%'
-       OR name LIKE 'sqlite_autoindex_deleted_chat_pins%'`,
-    (err) => { if (err) console.error('[DB] 부팅 시 chat_pins 카탈로그 정리 실패(무시):', err.message); }
-  );
-  db.run('PRAGMA writable_schema = OFF', () => {});
+  db.run('DROP TABLE IF EXISTS chat_pins', (err) => {
+    if (err) console.error('[DB] chat_pins 정리 실패(무시):', err.message);
+  });
+  db.run('DROP TABLE IF EXISTS deleted_chat_pins', (err) => {
+    if (err) console.error('[DB] deleted_chat_pins 정리 실패(무시):', err.message);
+  });
 });
 
 const DB_CORRUPT_USER_MSG =
@@ -3088,18 +3086,36 @@ function hardWipeChatPinArtifacts() {
           if (openErr) { resolve(false); return; }
           repairDb.run(`PRAGMA busy_timeout = 5000`);
           repairDb.serialize(() => {
-            repairDb.run(`PRAGMA writable_schema = ON`);
-            repairDb.run(
-              `DELETE FROM sqlite_master WHERE
-                 name IN ('chat_pins','deleted_chat_pins')
-                 OR name LIKE 'sqlite_autoindex_chat_pins%'
-                 OR name LIKE 'sqlite_autoindex_deleted_chat_pins%'`,
-              (delErr) => {
-                if (delErr) console.error('[DB] chat_pins 관련 카탈로그 정리 실패:', delErr.message);
-              }
-            );
-            repairDb.run(`PRAGMA writable_schema = OFF`);
-            repairDb.close((closeErr) => resolve(!closeErr));
+            // 1순위는 언제나 평범한 DROP TABLE이다 — 카탈로그와 데이터 페이지를 함께
+            // 정리하므로 뒤탈이 없다.
+            repairDb.run(`DROP TABLE IF EXISTS chat_pins`, (e1) => {
+              repairDb.run(`DROP TABLE IF EXISTS deleted_chat_pins`, (e2) => {
+                if (!e1 && !e2) {
+                  repairDb.close((closeErr) => resolve(!closeErr));
+                  return;
+                }
+                // 카탈로그가 깨져서 DROP 자체가 실패한 경우에만 저수준 수술로 넘어간다.
+                // ⚠️ 이때는 반드시 VACUUM으로 파일을 통째로 재구성해야 한다. 안 그러면
+                // 주인 잃은 데이터 페이지가 남아 integrity_check가 곧바로 손상으로
+                // 판정하고, 그게 파괴적 복구 → 재시작 무한루프로 이어진다(실사고).
+                console.error('[DB] DROP 실패 — writable_schema 수술 + VACUUM으로 전환');
+                repairDb.run(`PRAGMA writable_schema = ON`);
+                repairDb.run(
+                  `DELETE FROM sqlite_master WHERE
+                     name IN ('chat_pins','deleted_chat_pins')
+                     OR name LIKE 'sqlite_autoindex_chat_pins%'
+                     OR name LIKE 'sqlite_autoindex_deleted_chat_pins%'`,
+                  (delErr) => {
+                    if (delErr) console.error('[DB] chat_pins 관련 카탈로그 정리 실패:', delErr.message);
+                  }
+                );
+                repairDb.run(`PRAGMA writable_schema = OFF`);
+                repairDb.run(`VACUUM`, (vacErr) => {
+                  if (vacErr) console.error('[DB] VACUUM 실패:', vacErr.message);
+                  repairDb.close((closeErr) => resolve(!closeErr && !vacErr));
+                });
+              });
+            });
           });
         });
       } catch (e) {
@@ -3117,15 +3133,19 @@ function tryRepairBenignSchemaConflict(err) {
     schemaHardRepairInProgress.add('chat_pins_artifacts');
     const attempt = bumpDbRecoveryAttemptCount();
     if (attempt > DB_RECOVERY_MAX_ATTEMPTS) {
-      console.error(`[DB] chat_pins 관련 복구 ${attempt}회째 반복 — 부가 기능이라 백업 복구 없이 그대로 재연결만 시도`);
-      relaunchWithoutBackupRestore();
+      // ⚠️ 여기서 또 재시작하면 그게 바로 무한 재시작 루프다(실사고). 재시작 횟수를
+      // 다 썼다면 더 이상 아무것도 하지 말고 그냥 계속 실행한다 — 없어진 부가 기능
+      // 하나 때문에 메신저 전체를 못 쓰게 만드는 것보다 낫다.
+      console.error(`[DB] chat_pins 관련 복구 ${attempt}회째 — 더 이상 재시작하지 않고 그대로 계속 실행`);
+      writeToLogFile('warn', `[DB] chat_pins 복구 ${attempt}회 초과 — 재시작 중단, 계속 실행`);
       return true;
     }
     console.error(`[DB] chat_pins 관련 스키마 손상 감지("${table}") — 관련 카탈로그 행 정리 시도:`, err && err.message);
     hardWipeChatPinArtifacts().then(() => {
       // 성공/실패와 무관하게 재연결이 필요하다(db가 위에서 close됨) — 부가 기능이라
       // 정리가 설사 실패해도 백업 복구로 확대하지 않는다.
-      resetDbRecoveryAttemptCount();
+      // ⚠️ 여기서 카운터를 리셋하면 안 된다. 리셋하면 "고쳤다고 믿고 재시작 → 또 같은
+      // 손상 → 또 고쳤다고 믿고 재시작"이 영원히 반복되어 위의 상한선이 무의미해진다.
       relaunchWithoutBackupRestore();
     });
     return true;
@@ -3316,11 +3336,36 @@ async function stashAndReplaceMessengerDb(sourcePathOrNull) {
  * SQLITE_CORRUPT 등 감지 시: 연결 종료 → 건전한 자동백업으로 교체 → 재시작.
  * 백업이 없으면 WAL 정리 후, 본파일이 여전히 나쁘면 빈 DB로 재시작.
  */
+/**
+ * ⚠️⚠️ 이 자동 복구는 기본적으로 꺼져 있다. 이유(오늘 실제로 벌어진 일):
+ *
+ *  이 절차는 "손상 감지 → 백업으로 전체 DB 교체 → 앱 재시작"인데, 복원한 백업 안에도
+ *  같은 손상 원인이 들어있으면 다음 부팅에 또 감지되어 똑같이 반복된다. 실제로 사용자
+ *  PC에서 594회 반복되며 하루 종일 앱이 꺼졌다 켜졌다 했고, 그 사이 며칠치 대화가
+ *  백업으로 덮어써져 사라졌으며, 마지막에는 "백업도 못 믿겠다"는 판정으로 DB가 빈
+ *  파일로 초기화됐다. 즉 이 기능이 막으려던 피해보다 이 기능이 낸 피해가 훨씬 컸다.
+ *
+ *  손상이 진짜로 있어도, 대개는 문제가 있는 일부만 못 읽을 뿐 나머지 대화·공지·일정은
+ *  멀쩡히 계속 쓸 수 있다. 그러니 앱을 죽이지 말고, 사용자에게 알린 뒤 그대로 계속
+ *  쓰게 하는 편이 병원 업무에 훨씬 안전하다. 복구가 정말 필요하면 관리자가 백업에서
+ *  수동으로 되돌리면 된다.
+ */
+const ENABLE_AUTO_DESTRUCTIVE_DB_RECOVERY = false;
+
 function scheduleDbCorruptRecovery(reason) {
   if (dbCorruptRecoveryScheduled) return;
   dbCorruptRecoveryScheduled = true;
-  clearIntegrityCheckMarker();
   console.error('[DB] corrupt recovery scheduled:', reason || '');
+  writeToLogFile('error', `[DB] 손상 감지: ${reason || ''}`);
+
+  if (!ENABLE_AUTO_DESTRUCTIVE_DB_RECOVERY) {
+    // 재시작하지 않는다. 백업으로 덮어쓰지도, 빈 DB로 만들지도 않는다.
+    console.error('[DB] 자동 백업 복구는 비활성화되어 있음 — 앱을 계속 실행합니다');
+    writeToLogFile('warn', '[DB] 자동 복구 비활성화 — 재시작/백업복원 없이 계속 실행');
+    return;
+  }
+
+  clearIntegrityCheckMarker();
   if (mainWindow) {
     try {
       safeWebContentsSend('db-corrupt-recovery', {
