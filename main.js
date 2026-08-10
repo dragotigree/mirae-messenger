@@ -514,6 +514,30 @@ function peerTrafficLevel(bytes1m, msgs1m, overflowCount) {
   return 'ok';
 }
 
+/** 부하 감시 화면에서 통신 유형 코드를 관리자가 바로 알아볼 수 있는 말로 바꿔 보여준다 */
+const TRAFFIC_TYPE_LABELS = {
+  CHAT: '1:1 채팅', GROUP_MESSAGE: '그룹 채팅', DEPT_MESSAGE: '부서 메시지', FLOOR_MESSAGE: '층 메시지',
+  BROADCAST: '전체 공지 메시지', MESSAGE_EDIT: '메시지 수정', MESSAGE_REACTION: '메시지 반응(이모지)',
+  MSG_ACK: '전송 확인', READ_RECEIPT: '읽음 확인', CHANNEL_READ: '채널 읽음',
+  NOTICE_ADD: '공지 등록', NOTICE_UPDATE: '공지 수정', NOTICE_DELETE: '공지 삭제',
+  NOTICE_SYNC_REQUEST: '공지 동기화 요청', NOTICE_SYNC_RESPONSE: '공지 동기화 응답',
+  CHAT_PIN_SYNC: '고정 공지 동기화', CONFIG_SYNC: '설정 동기화', GROUP_SYNC: '그룹방 동기화',
+  DUTY_ROSTER_SYNC: '당직표 동기화', PROFILE_OVERRIDE_SYNC: '프로필 동기화',
+  PROFILE_PHOTO_REQUEST: '프로필 사진 요청', PROFILE_PHOTO_SYNC: '프로필 사진 동기화',
+  SCHEDULE_ADD: '일정 등록', SCHEDULE_EDIT: '일정 수정', SCHEDULE_DELETE: '일정 삭제',
+  SERVICE_PAUSE_SYNC: '일시중지 동기화', USAGE_ENABLE: '사용 허용', USAGE_DISABLE: '사용 중지',
+  USAGE_LOCK_SYNC: '사용 잠금 동기화', USAGE_LOCK_RESULT: '사용 잠금 결과',
+  GROUP_JOIN_NOTICE: '그룹 참여 알림', GROUP_RENAME_NOTICE: '그룹 이름변경 알림',
+  OPERATOR_ADD: '운영자 추가', OPERATOR_DELETE: '운영자 삭제', OPERATOR_DUTY_PERM: '운영자 권한변경',
+  FILE_XFER_START: '파일 전송 시작', FILE_XFER_CHUNK: '파일 전송 중', FILE_XFER_END: '파일 전송 완료', FILE_XFER_ABORT: '파일 전송 취소',
+  FORCE_UPDATE: '강제 업데이트', FORCE_UPDATE_RESULT: '강제 업데이트 결과',
+  WIPE_CHAT_HISTORY: '대화 기록 삭제', WIPE_CHAT_HISTORY_RESULT: '대화 기록 삭제 결과',
+  WIPE_CLAIM: '삭제 작업 선점', WIPE_QUEUE_CLEAR: '삭제 대기열 정리', WIPE_QUEUE_SYNC: '삭제 대기열 동기화',
+  TCP_BUFFER_OVERFLOW: '수신 버퍼 초과', TCP_CHUNK_OVERSIZE: '수신 데이터 과대',
+  LOADTEST_CMD: '부하 테스트 명령', PING: '연결 확인', GOODBYE: '접속 종료'
+};
+function trafficTypeLabel(t) { return TRAFFIC_TYPE_LABELS[t] || t; }
+
 function listPeerTrafficStats() {
   const now = Date.now();
   const rows = [];
@@ -526,7 +550,7 @@ function listPeerTrafficStats() {
       msgs1m += s.msgs;
     }
     const typeEntries = Object.entries(e.byType || {}).sort((a, b) => b[1] - a[1]);
-    const topTypes = typeEntries.slice(0, 3).map(([t, n]) => `${t}×${n}`).join(', ');
+    const topTypes = typeEntries.slice(0, 3).map(([t, n]) => `${trafficTypeLabel(t)}×${n}`).join(', ');
     const known = allKnownUsers.get(e.ip) || onlineUsers.get(e.ip) || null;
     const level = peerTrafficLevel(bytes1m, msgs1m, e.overflowCount);
     rows.push({
