@@ -6875,8 +6875,12 @@ function insertNoticeRecord(record, callback, opts) {
         if (idx > 0) {
           noticesSchemaReady = false;
           ensureNoticesTableSchema(() => {
-            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, uid], () => {});
-            db.run(`UPDATE notices SET images = ? WHERE uid = ?`, [images, uid], () => {});
+            db.run(`UPDATE notices SET category = ? WHERE uid = ?`, [category, uid], (fixErr) => {
+              if (fixErr) console.error(`[공지] "${uid}" 카테고리 보정 실패(category="${category}"):`, fixErr.message);
+            });
+            db.run(`UPDATE notices SET images = ? WHERE uid = ?`, [images, uid], (fixErr) => {
+              if (fixErr) console.error(`[공지] "${uid}" 이미지 보정 실패:`, fixErr.message);
+            });
           });
         }
         cb(null, saved);
