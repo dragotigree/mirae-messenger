@@ -217,6 +217,23 @@
     /* 아이콘 레일로 이동한 채널들은 사이드바 목록에서 숨김 */
     #transport-channel-item, #code-alert-channel-item { display: none !important; }
 
+    /* 🏷️ 아이콘 레일 전용 말풍선 툴팁 — 브라우저 기본 title 툴팁 대신 사용.
+       paintUiIcons()에서 title을 data-tooltip으로 옮기고 title은 지운다. */
+    #app-icon-rail [data-tooltip] { position: relative; }
+    #app-icon-rail [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute; left: calc(100% + 10px); top: 50%; transform: translate(-4px, -50%);
+      white-space: nowrap; pointer-events: none;
+      background: #1e293b; color: #fff; font-size: 11.5px; font-weight: 600;
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      opacity: 0; visibility: hidden; z-index: 200;
+      transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out);
+    }
+    #app-icon-rail [data-tooltip]:hover::after {
+      opacity: 1; visibility: visible; transform: translate(0, -50%); transition-delay: 0.15s;
+    }
+
     #sidebar-left {
       width: var(--sidebar-width, 300px);
       background: var(--sidebar-bg);
@@ -9023,6 +9040,17 @@
       });
       updateMasterAuthUi();
       updateCompactModeButtonUi();
+      syncIconRailTooltips();
+    }
+
+    /* 아이콘 레일 버튼의 title을 커스텀 말풍선용 data-tooltip으로 옮기고 title은 지운다
+       (title을 남겨두면 브라우저 기본 툴팁이 커스텀 말풍선과 같이 겹쳐서 뜬다). */
+    function syncIconRailTooltips() {
+      document.querySelectorAll('#app-icon-rail [title]').forEach((el) => {
+        const t = el.getAttribute('title');
+        if (t) el.setAttribute('data-tooltip', t);
+        el.removeAttribute('title');
+      });
     }
 
     /* 🧭 좌측 아이콘 레일: 채널/사용자 섹션으로 스크롤 이동 */
@@ -9044,7 +9072,7 @@
       const btn = document.getElementById('compact-mode-btn');
       if (btn) {
         btn.innerHTML = COMPACT_MODE_ICON;
-        btn.title = isCompactMode ? '일반 모드로 전환' : '미니 모드로 전환';
+        btn.setAttribute('data-tooltip', isCompactMode ? '일반 모드로 전환' : '미니 모드로 전환');
       }
     }
 
