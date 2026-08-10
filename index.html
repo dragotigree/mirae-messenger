@@ -21288,7 +21288,7 @@
     function formatSidebarAdmitDischargeRmBadgeHtml(sch, norm) {
       const rm = formatSidebarAdmitDischargeRm(sch, norm);
       if (!rm) return '';
-      return `<span class="sidebar-ad-rm-badge" title="RM${escapeHtml(rm)}"><span data-ui-icon="userRound"></span>${escapeHtml(rm)}</span>`;
+      return `<span class="sidebar-ad-rm-badge" title="RM${escapeHtml(rm)}"><span data-ui-icon="userRound"></span>RM${escapeHtml(rm)}</span>`;
     }
 
     function formatSidebarAdmitDischargeTime(sch) {
