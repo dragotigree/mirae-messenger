@@ -3197,9 +3197,7 @@ function scheduleDbCorruptRecovery(reason) {
     // 본 파일에 합쳐지지 않은 최신 메시지가, 뒤이은 "백업 없음 → WAL/SHM 삭제" 경로에서
     // 그대로 날아가는 사고(실제 발생)를 막기 위함. 진짜로 손상됐으면 이 체크포인트도
     // 실패하거나 의미가 없을 뿐, 더 나빠지지는 않는다.
-    new Promise((resolve) => {
-      db.run(`PRAGMA wal_checkpoint(TRUNCATE)`, () => resolve());
-    }).finally(() => {
+    checkpointWalPassive().finally(() => {
     db.close(async () => {
       try {
         // 백업을 복원해도 다음 부팅에서 다시 "손상"으로 판정되면 복원↔재감염이 끝없이
@@ -3278,6 +3276,16 @@ setTimeout(() => {
 function checkpointWal() {
   return new Promise((resolve) => {
     db.run(`PRAGMA wal_checkpoint(TRUNCATE)`, () => resolve());
+  });
+}
+
+// TRUNCATE는 완전히 합쳐질 때까지 기다리는 무거운 방식이라, 디스크가 느린 PC에서는
+// 몇 초~몇십 초씩 이벤트 루프를 막을 수 있다(실제로 이 정황과 겹쳐 DB 손상이
+// 반복된 사례가 있었음). 주기적/종료 시 체크포인트처럼 "가능한 만큼만, 안 막고"
+// 합치면 충분한 경우에는 PASSIVE를 쓴다.
+function checkpointWalPassive() {
+  return new Promise((resolve) => {
+    db.run(`PRAGMA wal_checkpoint(PASSIVE)`, () => resolve());
   });
 }
 
@@ -3801,13 +3809,21 @@ db.serialize(() => {
   // 같은 값)로 저장했다. IP가 DHCP 재할당 등으로 바뀌면 재시작 후 「나에게」 대화창을
   // 열어도 예전 IP로 저장된 메시지를 못 찾아 사라진 것처럼 보였다(실제 사용자 보고).
   // sender_ip와 receiver_ip가 서로 같은 값인 행은 정의상 셀프 메시지뿐이므로,
-  // IP가 바뀌어도 항상 찾을 수 있는 고정 키 'SELF'로 한 번만 옮겨준다.
-  db.run(
-    `UPDATE messages SET sender_ip = 'SELF', receiver_ip = 'SELF'
-     WHERE sender_ip = receiver_ip AND sender_ip IS NOT NULL AND sender_ip != '' AND sender_ip != 'SELF'`,
-    [],
-    logDbErr
-  );
+  // IP가 바뀌어도 항상 찾을 수 있는 고정 키 'SELF'로 옮겨준다.
+  // 전체 테이블을 스캔하는 UPDATE라 디스크가 느린 PC에서 매 부팅 반복하면 부담이
+  // 될 수 있어, 마커 파일로 한 번만 실행한다.
+  const selfMigrationMarker = path.join(app.getPath('userData'), 'self-chat-migrated.txt');
+  if (!fs.existsSync(selfMigrationMarker)) {
+    db.run(
+      `UPDATE messages SET sender_ip = 'SELF', receiver_ip = 'SELF'
+       WHERE sender_ip = receiver_ip AND sender_ip IS NOT NULL AND sender_ip != '' AND sender_ip != 'SELF'`,
+      [],
+      (err) => {
+        logDbErr(err);
+        if (!err) { try { fs.writeFileSync(selfMigrationMarker, '1', 'utf8'); } catch (e) { /* ignore */ } }
+      }
+    );
+  }
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_ip, receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_ip)`, logDbErr);
   db.run(`CREATE INDEX IF NOT EXISTS idx_messages_msg_uid ON messages(msg_uid)`, logDbErr);
@@ -4704,7 +4720,7 @@ app.on('before-quit', () => {
   // 자체는 안전하지만, DB 손상 복구 절차가 "백업 없음" 상황에서 WAL을 통째로 지우는
   // 경로를 타면 그 사이 방금 보낸 메시지가 사라질 수 있었다(실제 발생). 매번 종료 시
   // 체크포인트해두면 그 위험 구간을 최소화할 수 있다.
-  try { db.run(`PRAGMA wal_checkpoint(TRUNCATE)`); } catch (e) { /* ignore */ }
+  try { db.run(`PRAGMA wal_checkpoint(PASSIVE)`); } catch (e) { /* ignore */ }
 });
 
 app.on('will-quit', () => {
@@ -12627,8 +12643,9 @@ function startAutoBackup() {
   // 방금 보낸 메시지가 -wal 파일에만 있다가, 앱이 비정상 종료되거나 DB 손상 복구
   // 절차가 WAL을 통째로 지우는 경로를 타면서 사라지는 사고가 있었다(실제 발생).
   // 2분마다 체크포인트해 본 파일에 합쳐두면, 데이터가 노출되는 구간을 최대 2분
-  // 정도로 좁혀 이런 사고를 사실상 막을 수 있다.
-  setInterval(() => { checkpointWal().catch(() => {}); }, 2 * 60 * 1000);
+  // 정도로 좁혀 이런 사고를 사실상 막을 수 있다. PASSIVE라 다른 작업을 막지 않는다
+  // (TRUNCATE는 디스크가 느린 PC에서 몇 초~몇십 초씩 이벤트 루프를 막을 수 있었음).
+  setInterval(() => { checkpointWalPassive().catch(() => {}); }, 2 * 60 * 1000);
 }
 
 ipcMain.handle('get-network-status', async () => ({
