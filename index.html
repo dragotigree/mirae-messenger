@@ -4406,6 +4406,14 @@
       transition: background 0.12s, color 0.12s;
     }
     .settings-nav-btn:hover { background: var(--border-soft); color: #0f172a; }
+    .settings-nav-btn-admin {
+      color: var(--accent-dark);
+      margin-bottom: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-soft);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+    .settings-nav-btn-admin:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     .settings-nav-btn.active {
       background: var(--sidebar-active);
       color: var(--accent-dark);
@@ -4647,9 +4655,7 @@
     <div id="icon-rail-bottom">
       <button type="button" class="icon-rail-btn" id="icon-rail-fav-btn" onclick="scrollSidebarToFavorites()" title="즐겨찾기" data-ui-icon="star"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
-      <button type="button" class="icon-rail-btn" id="master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span id="master-lock-icon"></span></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-settings-btn" onclick="openSettingsModal()" title="환경 설정" data-ui-icon="settings"></button>
-      <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="내 프로필" data-ui-icon="users"></button>
+      <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="users"></button>
     </div>
   </div>
   <div id="sidebar-left">
@@ -5617,6 +5623,7 @@
       </div>
       <div class="settings-modal-shell">
         <nav class="settings-nav" aria-label="설정 메뉴">
+          <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
           <button type="button" class="settings-nav-btn active" data-settings-tab="profile" onclick="setSettingsTab('profile')">프로필</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="list" onclick="setSettingsTab('list')">목록·상태</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="notify" onclick="setSettingsTab('notify')">알림</button>
