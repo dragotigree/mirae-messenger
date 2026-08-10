@@ -2986,8 +2986,14 @@ function hardRepairSchemaRow(table) {
                     finalDb.close(() => resolve(false));
                     return;
                   }
-                  finalDb.get(`PRAGMA integrity_check`, (checkErr, row) => {
-                    const ok = !checkErr && sqliteCheckRowOk(row);
+                  // chat_pins처럼 작고 지엽적인(메시지 고정 등) 테이블 하나를 고친 건데,
+                  // 성공 판정을 대형 DB 전체를 훑는 PRAGMA integrity_check로 하고 있었다.
+                  // 이 검사는 몇 초~몇십 초 걸릴 수 있고(실제로 이벤트 루프 지연과 시간대가
+                  // 겹쳐 나타남), DB의 다른 무관한 부분에 사소한 문제가 있어도 여기서
+                  // "실패"로 판정돼 훨씬 무거운 백업 복구·재시작 사이클로 확대됐다.
+                  // 방금 고친 그 테이블만 정상 조회되는지 확인하는 것으로 충분하다.
+                  finalDb.get(`SELECT COUNT(*) AS n FROM ${table}`, (checkErr) => {
+                    const ok = !checkErr;
                     finalDb.close(() => resolve(ok));
                   });
                 });
