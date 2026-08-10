@@ -66,11 +66,16 @@ app.on('second-instance', () => {
 
 // 🛡 마지막 안전장치: 여기서 잡지 못한 예외/Promise 거부가 있어도 병원 업무 중에
 // 프로그램이 통째로 멈추는 일은 없어야 한다. 로그만 남기고 계속 진행한다.
+// ⚠️ 실사고: 아래 두 핸들러가 console.error로만 남기고 있어서, 원인 모를 재시작이 실제로
+// 일어나도 로그 파일(messenger_*.log)에는 아무 흔적이 없었다 — 사용자가 보내준 로그를 봐도
+// 원인을 알 수 없었던 이유. writeToLogFile은 함수 선언(hoisting)이라 이 시점에 이미 호출 가능.
 process.on('uncaughtException', (err) => {
   console.error('❌ 처리되지 않은 예외(무시하고 계속 진행):', err);
+  try { writeToLogFile('error', '처리되지 않은 예외: ' + (err && err.stack ? err.stack : err)); } catch (e) { /* ignore */ }
 });
 process.on('unhandledRejection', (reason) => {
   console.error('❌ 처리되지 않은 Promise 거부(무시하고 계속 진행):', reason);
+  try { writeToLogFile('error', '처리되지 않은 Promise 거부: ' + (reason && reason.stack ? reason.stack : reason)); } catch (e) { /* ignore */ }
 });
 
 function hashPassword(pw) {
@@ -4270,6 +4275,9 @@ function createWindow() {
   // 🛡 화면(렌더러 프로세스)이 죽어도(예: 메모리 부족) 창을 새로 띄워 계속 쓸 수 있게 한다.
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('❌ 화면 프로세스가 종료됨(재생성 시도):', details.reason);
+    // 이것도 로그 파일에 안 남고 있었다 — 창이 꺼졌다 켜지는데 DB 오류가 없다면
+    // 이 경로(렌더러 크래시/응답없음/OOM 등)일 가능성이 높다.
+    try { writeToLogFile('error', `화면 프로세스 종료(재생성 시도) — reason: ${details.reason}, exitCode: ${details.exitCode}`); } catch (e) { /* ignore */ }
     if (mainWindow) { mainWindow.destroy(); mainWindow = null; }
     setTimeout(() => {
       createWindow();
@@ -4869,6 +4877,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  writeToLogFile('info', '[종료] before-quit');
   broadcastGoodbye();
   // 종료 시 WAL을 본 파일에 합쳐둔다 — 안 해도 다음 실행 시 WAL을 이어서 읽어 데이터
   // 자체는 안전하지만, DB 손상 복구 절차가 "백업 없음" 상황에서 WAL을 통째로 지우는
@@ -4879,6 +4888,13 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+});
+
+// GPU 프로세스 등 렌더러가 아닌 다른 하위 프로세스가 죽는 경우도 화면이 멈추거나
+// 꺼졌다 켜진 것처럼 보일 수 있다 — 이것도 로그에 남겨야 원인을 알 수 있다.
+app.on('child-process-gone', (event, details) => {
+  console.error('❌ 하위 프로세스 종료:', details.type, details.reason);
+  try { writeToLogFile('error', `하위 프로세스 종료 — type: ${details.type}, reason: ${details.reason}, exitCode: ${details.exitCode}`); } catch (e) { /* ignore */ }
 });
 
 /** 트레이/강제종료 등 — GOODBYE 전송 후 종료 */
