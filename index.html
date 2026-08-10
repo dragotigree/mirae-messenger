@@ -2479,19 +2479,14 @@
       position: relative;
     }
     body.sidebar-right-collapsed #sidebar-right { display: none; }
-    .sidebar-right-toggle-btn {
-      position: fixed; top: 46px; right: 12px; z-index: 25;
-      width: 22px; height: 22px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--surface); border: 1px solid var(--border-soft);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
-      color: var(--text-muted); cursor: pointer; padding: 0;
+    .titlebar-sidebar-right-toggle-btn {
+      -webkit-app-region: no-drag;
+      margin: 5px 0 5px 4px;
     }
-    .sidebar-right-toggle-btn:hover { background: var(--sidebar-active); color: var(--accent-dark); }
-    .sidebar-right-toggle-btn .icon-glyph { width: 12px; height: 12px; }
-    body.sidebar-right-collapsed .sidebar-right-toggle-btn .icon-glyph { transform: rotate(180deg); }
-    body.compact-mode .sidebar-right-toggle-btn,
-    body.schedule-board-standalone .sidebar-right-toggle-btn { display: none; }
+    .titlebar-sidebar-right-toggle-btn .icon-glyph { width: 12px; height: 12px; }
+    body.sidebar-right-collapsed .titlebar-sidebar-right-toggle-btn .icon-glyph { transform: rotate(180deg); }
+    body.compact-mode .titlebar-sidebar-right-toggle-btn,
+    body.schedule-board-standalone .titlebar-sidebar-right-toggle-btn { display: none; }
     .detail-heading { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.06em; }
     .user-info-modal-card {
       width: min(420px, 94vw); max-height: min(88vh, 760px); overflow-y: auto;
@@ -4724,6 +4719,9 @@
       <div id="titlebar-drag-region">
         <span class="titlebar-app-label-compact">MIRAE MESSENGER</span>
       </div>
+      <button type="button" class="titlebar-btn titlebar-sidebar-right-toggle-btn" id="sidebar-right-toggle-btn" onclick="toggleSidebarRightCollapsed()" title="병원 달력 패널 접기">
+        <span data-ui-icon="chevronRight"></span>
+      </button>
       <div id="titlebar-controls">
         <button class="titlebar-btn" id="titlebar-min-btn" onclick="window.api.windowMinimize()" title="최소화">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="4.5" width="8" height="1" fill="currentColor" rx="0.5"/></svg>
@@ -5161,9 +5159,6 @@
       </div>
     </div>
   </div>
-  <button type="button" id="sidebar-right-toggle-btn" class="sidebar-right-toggle-btn" onclick="toggleSidebarRightCollapsed()" title="병원 달력 패널 접기">
-    <span data-ui-icon="chevronRight"></span>
-  </button>
 
   <!-- 👤 상세 정보 (좌측 우클릭 → 정보보기) -->
   <div id="user-info-modal" class="modal-overlay" onclick="if(event.target===this) closeUserInfoModal()">
