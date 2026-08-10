@@ -12340,7 +12340,9 @@ ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
   return { success: true };
 });
 
-const AUTO_BACKUP_RETENTION_DAYS = 5;
+// 6시간 단위로 백업 파일이 4배 늘었으니(하루 4개), 보관 일수를 줄여 전체 용량은
+// 비슷하게 유지하면서 최근 구간의 복구 지점만 촘촘하게 가져간다.
+const AUTO_BACKUP_RETENTION_DAYS = 2;
 const PRE_UPDATE_BACKUP_RETENTION_DAYS = 7;
 
 /** 업데이트할 때마다 pre_update_backup_<timestamp> 폴더가 새로 생기는데 지금까지
@@ -12380,8 +12382,13 @@ async function getAutoBackupDir() {
 async function performAutoBackupIfNeeded() {
   try {
     const dir = await getAutoBackupDir();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayFile = path.join(dir, `auto_backup_${todayStr}.db`);
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    // 예전엔 하루에 한 번만 백업해서, 만약 백업 복구가 발동하면 최대 24시간치
+    // 대화·공지·일정이 통째로 날아갈 수 있었다(오늘 실제로 겪은 chat_pins 사고와
+    // 같은 성격의 위험). 6시간 단위로 나눠 그 위험 구간을 최대 6시간으로 좁힌다.
+    const bucket = String(Math.floor(now.getUTCHours() / 6) * 6).padStart(2, '0');
+    const todayFile = path.join(dir, `auto_backup_${todayStr}_${bucket}.db`);
     let alreadyExists = true;
     try { await fs.promises.access(todayFile); } catch (e) { alreadyExists = false; }
     if (!alreadyExists) {
