@@ -3389,6 +3389,27 @@ function cleanupOldLogFiles() {
   });
 }
 
+/** 대화 내용(messages 테이블)은 절대 자동 삭제하지 않는다 — 몇 년 전 대화도 「전체 대화
+ * 기록」에서 그대로 조회된다. 이 함수가 지우는 채팅로그 .txt는 그 DB 내용과 완전히
+ * 중복되는 사본이고(메시지 보낼 때마다 한 줄씩 추가되는 텍스트 백업, 화면에 다시
+ * 읽어서 보여주는 곳이 없음 — 「채팅 기록 내보내기」할 때만 복사됨), IP가 바뀔 때마다
+ * DM_<IP>.txt로 새 파일이 또 생겨 상대방 IP가 여러 번 바뀌면 계속 늘어나기만 했다.
+ * 오래 안 쓰인(=상대가 더 이상 활성 대화 상대가 아닌) 파일만 정리한다. */
+function cleanupOldChatLogFiles() {
+  const dir = getChatLogDir();
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  fs.readdir(dir, (err, names) => {
+    if (err || !names) return;
+    names.forEach(name => {
+      if (!name.endsWith('.txt')) return;
+      const filePath = path.join(dir, name);
+      fs.stat(filePath, (err2, stat) => {
+        if (!err2 && stat.mtimeMs < cutoff) fs.unlink(filePath, () => {});
+      });
+    });
+  });
+}
+
 function logToRendererConsole(level, message) {
   console.log(message);
   writeToLogFile(level, message);
@@ -12431,9 +12452,11 @@ async function performAutoBackupIfNeeded() {
 function startAutoBackup() {
   performAutoBackupIfNeeded();
   cleanupOldLogFiles();
+  cleanupOldChatLogFiles();
   cleanupOldPreUpdateBackups();
   setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
+  setInterval(cleanupOldChatLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldPreUpdateBackups, 6 * 60 * 60 * 1000);
   // 방금 보낸 메시지가 -wal 파일에만 있다가, 앱이 비정상 종료되거나 DB 손상 복구
   // 절차가 WAL을 통째로 지우는 경로를 타면서 사라지는 사고가 있었다(실제 발생).
