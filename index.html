@@ -2478,6 +2478,20 @@
       overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0;
       position: relative;
     }
+    body.sidebar-right-collapsed #sidebar-right { display: none; }
+    .sidebar-right-toggle-btn {
+      position: fixed; top: 46px; right: 12px; z-index: 25;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface); border: 1px solid var(--border-soft);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      color: var(--text-muted); cursor: pointer; padding: 0;
+    }
+    .sidebar-right-toggle-btn:hover { background: var(--sidebar-active); color: var(--accent-dark); }
+    .sidebar-right-toggle-btn .icon-glyph { width: 12px; height: 12px; }
+    body.sidebar-right-collapsed .sidebar-right-toggle-btn .icon-glyph { transform: rotate(180deg); }
+    body.compact-mode .sidebar-right-toggle-btn,
+    body.schedule-board-standalone .sidebar-right-toggle-btn { display: none; }
     .detail-heading { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--accent-dark); text-transform: uppercase; letter-spacing: 0.06em; }
     .user-info-modal-card {
       width: min(420px, 94vw); max-height: min(88vh, 760px); overflow-y: auto;
@@ -5147,6 +5161,9 @@
       </div>
     </div>
   </div>
+  <button type="button" id="sidebar-right-toggle-btn" class="sidebar-right-toggle-btn" onclick="toggleSidebarRightCollapsed()" title="병원 달력 패널 접기">
+    <span data-ui-icon="chevronRight"></span>
+  </button>
 
   <!-- 👤 상세 정보 (좌측 우클릭 → 정보보기) -->
   <div id="user-info-modal" class="modal-overlay" onclick="if(event.target===this) closeUserInfoModal()">
@@ -8994,6 +9011,18 @@
     }).catch(() => {});
 
     loadNoticeOperatorSession();
+
+    const SIDEBAR_RIGHT_COLLAPSED_KEY = 'mirae_sidebar_right_collapsed';
+    function toggleSidebarRightCollapsed(forceState) {
+      const collapsed = typeof forceState === 'boolean' ? forceState : !document.body.classList.contains('sidebar-right-collapsed');
+      document.body.classList.toggle('sidebar-right-collapsed', collapsed);
+      const btn = document.getElementById('sidebar-right-toggle-btn');
+      if (btn) btn.title = collapsed ? '병원 달력 패널 펼치기' : '병원 달력 패널 접기';
+      try { localStorage.setItem(SIDEBAR_RIGHT_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    }
+    if (localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1') {
+      toggleSidebarRightCollapsed(true);
+    }
 
     function refreshNoticePermission() {
       canManageNotices = isMasterAuthenticated || isNoticeOperatorAuthenticated;
