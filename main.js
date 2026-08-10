@@ -4658,14 +4658,13 @@ app.whenReady().then(async () => {
     app.setAppUserModelId('미래병원 메신저');
   }
   // 보류 업데이트·preload 캐시는 타임아웃 — OneDrive/잠금 시 무한 대기 방지.
-  // 서로 다른 파일을 다루는 독립적인 작업이라, 순서대로 기다리지 않고 동시에 실행한다
-  // — 디스크가 느린 PC에서 창이 뜨기까지 최대 8+6=14초 걸리던 걸 최대 8초로 줄인다.
-  const [pendingResult, preloadResult] = await Promise.allSettled([
-    withTimeout(applyPendingUpdatesOnStartup(), 8000, 'pending-update'),
-    withTimeout(initPreloadScriptCache(), 6000, 'preload-cache')
-  ]);
-  if (pendingResult.status === 'fulfilled') {
-    const pendingApplied = pendingResult.value;
+  // ⚠️ 되돌림(1.0.570→): 이 둘을 "독립적"이라 보고 동시 실행했었는데, 사실 보류 업데이트
+  // 적용이 __dirname/preload.js를 새로 "쓰는" 도중에 preload 캐시가 같은 파일을 "읽어"
+  // 캐시로 복사할 수 있는 경쟁 상태였다 — 그 결과로 깨진(잘린) preload.js가 캐시되면
+  // 렌더러 IPC 브릿지가 통째로 깨져 창이 정상 동작을 못 하고 꺼짐/켜짐을 반복하는
+  // 사고로 이어질 수 있다. 안전하게 순서대로 되돌린다.
+  try {
+    const pendingApplied = await withTimeout(applyPendingUpdatesOnStartup(), 8000, 'pending-update');
     if (pendingApplied > 0) {
       console.log(`[업데이트] 보류 파일 ${pendingApplied}개 적용됨`);
       // ⚠️ APP_VERSION은 파일 맨 위 require() 시점(=이 보류 적용보다 먼저)에 캐시된 값이라,
@@ -4679,11 +4678,13 @@ app.whenReady().then(async () => {
         console.warn('[업데이트] APP_VERSION 갱신 실패:', e && e.message ? e.message : e);
       }
     }
-  } else {
-    console.warn('[업데이트] 보류 적용 스킵:', pendingResult.reason && pendingResult.reason.message ? pendingResult.reason.message : pendingResult.reason);
+  } catch (e) {
+    console.warn('[업데이트] 보류 적용 스킵:', e && e.message ? e.message : e);
   }
-  if (preloadResult.status === 'rejected') {
-    console.warn('[preload-cache] 타임아웃/실패 — 설치 폴더 preload 사용:', preloadResult.reason && preloadResult.reason.message ? preloadResult.reason.message : preloadResult.reason);
+  try {
+    await withTimeout(initPreloadScriptCache(), 6000, 'preload-cache');
+  } catch (e) {
+    console.warn('[preload-cache] 타임아웃/실패 — 설치 폴더 preload 사용:', e && e.message ? e.message : e);
     resolvedMainPreloadPath = path.join(__dirname, 'preload.js');
     resolvedToastPreloadPath = path.join(__dirname, 'toast-preload.js');
   }
