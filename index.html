@@ -2681,7 +2681,6 @@
     }
     .sidebar-ad-room { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--text-muted); font-weight: 700; flex: 0 0 auto; }
     .sidebar-ad-name { font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; flex: 1 1 auto; min-width: 0; color: var(--text-primary); }
-    .sidebar-ad-rm { font-size: 11.5px; font-weight: 700; color: var(--text-muted); flex: 0 0 auto; }
     .sidebar-ad-time { order: -1; font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--text-muted); font-weight: 700; flex: 0 0 auto; width: 34px; }
     .sidebar-ad-empty {
       padding: 0; font-size: 12px; font-weight: 600; color: var(--text-muted);
@@ -21271,14 +21270,6 @@
       return '—';
     }
 
-    function formatSidebarAdmitDischargeRm(sch, norm) {
-      const rm = String(norm?.rm_team || sch?.rm_team || '').trim().toUpperCase().replace(/\s/g, '');
-      if (!rm) return '—';
-      const m = rm.match(/RM?\s*(\d+)/i) || rm.match(/^(\d+)$/);
-      if (m) return m[1];
-      return rm.replace(/^RM/, '') || rm;
-    }
-
     function formatSidebarAdmitDischargeTime(sch) {
       if (!sch) return '—';
       if (isScheduleStartUndecided(sch)) return '미정';
@@ -21306,8 +21297,8 @@
       const colHead = document.createElement('div');
       colHead.className = 'sidebar-ad-col-head';
       colHead.innerHTML = kind === 'ROOM_CHANGE'
-        ? '<span>호실이동</span><span>이름</span><span>RM</span><span>시간</span>'
-        : '<span>호실</span><span>이름</span><span>RM</span><span>시간</span>';
+        ? '<span>호실이동</span><span>이름</span><span>시간</span>'
+        : '<span>호실</span><span>이름</span><span>시간</span>';
       card.appendChild(colHead);
       const rows = document.createElement('div');
       rows.className = 'sidebar-ad-rows';
@@ -21325,13 +21316,11 @@
           row.title = [
             formatSidebarAdmitDischargeRoom(sch, norm),
             scheduleBoardPatientLabel(norm.patient_name) || sch.title || '',
-            formatSidebarAdmitDischargeRm(sch, norm),
             formatSidebarAdmitDischargeTime(sch)
           ].filter(Boolean).join(' · ');
           row.innerHTML =
             `<span class="sidebar-ad-room">${escapeHtml(formatSidebarAdmitDischargeRoom(sch, norm))}</span>` +
             `<span class="sidebar-ad-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '—')}</span>` +
-            `<span class="sidebar-ad-rm">${escapeHtml(formatSidebarAdmitDischargeRm(sch, norm))}</span>` +
             `<span class="sidebar-ad-time">${escapeHtml(formatSidebarAdmitDischargeTime(sch))}</span>`;
           rows.appendChild(row);
         });
