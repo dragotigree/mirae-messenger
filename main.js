@@ -2910,6 +2910,19 @@ function getTrayIcon() {
 const dbPath = path.join(app.getPath('userData'), 'mirae_messenger.db');
 const db = new sqlite3.Database(dbPath);
 
+// ⚠️ 핵심 발견: sqlite_master 카탈로그에 chat_pins 항목이 중복 손상되어 있으면, chat_pins를
+// 건드리지 않는 아무 쿼리(메시지 전송, 접속 알림 등)를 실행해도 SQLite가 스키마 전체를 먼저
+// 읽어야 하기 때문에 "malformed database schema (chat_pins)" 오류가 똑같이 난다. 즉 이 손상이
+// 남아있으면 이 DB 연결로 하는 모든 작업이 매번(재전송 루프 등으로 초당 여러 번) 실패하고,
+// 그때마다 감지→복구→재시작을 반복해 "껐다 켜졌다"처럼 보인다. 그래서 다른 어떤 쿼리보다도
+// 먼저, DB를 연 직후 이 시점에 손상된 카탈로그 행을 지운다 — 아래에서 나중에 벌어질 수 있는
+// 오류를 기다렸다가 고치는 게 아니라, 애초에 그 오류가 날 기회 자체를 없앤다.
+db.serialize(() => {
+  db.run('PRAGMA writable_schema = ON');
+  db.run(`DELETE FROM sqlite_master WHERE type IN ('table','index') AND name IN ('chat_pins','deleted_chat_pins')`);
+  db.run('PRAGMA writable_schema = OFF');
+});
+
 const DB_CORRUPT_USER_MSG =
   '로컬 데이터베이스가 손상되었습니다. 백업에서 복구한 뒤 앱을 다시 시작합니다. 복구가 끝나면 공지를 다시 작성해 주세요.';
 
