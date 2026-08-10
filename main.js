@@ -2917,10 +2917,18 @@ const db = new sqlite3.Database(dbPath);
 // 그때마다 감지→복구→재시작을 반복해 "껐다 켜졌다"처럼 보인다. 그래서 다른 어떤 쿼리보다도
 // 먼저, DB를 연 직후 이 시점에 손상된 카탈로그 행을 지운다 — 아래에서 나중에 벌어질 수 있는
 // 오류를 기다렸다가 고치는 게 아니라, 애초에 그 오류가 날 기회 자체를 없앤다.
+// 콜백을 반드시 넘겨야 한다 — 콜백 없이 db.run이 실패하면 sqlite3 모듈이 이 오류를 db의
+// 'error' 이벤트로 흘려보내는데, 그 전역 핸들러(db.on('error', ...))는 아래에서 아직 등록되기
+// 전이라 처리되지 않거나, 등록된 뒤라도 이 시점의 오류를 "진짜 손상"으로 오판해 파괴적인
+// 백업 복구(scheduleDbCorruptRecovery)를 곧바로 트리거할 수 있다. 이 정리 작업 자체의 실패는
+// 절대 그 경로를 타면 안 되므로, 여기서는 그냥 조용히 기록만 하고 넘어간다.
 db.serialize(() => {
-  db.run('PRAGMA writable_schema = ON');
-  db.run(`DELETE FROM sqlite_master WHERE type IN ('table','index') AND name IN ('chat_pins','deleted_chat_pins')`);
-  db.run('PRAGMA writable_schema = OFF');
+  db.run('PRAGMA writable_schema = ON', () => {});
+  db.run(
+    `DELETE FROM sqlite_master WHERE type IN ('table','index') AND name IN ('chat_pins','deleted_chat_pins')`,
+    (err) => { if (err) console.error('[DB] 부팅 시 chat_pins 카탈로그 정리 실패(무시):', err.message); }
+  );
+  db.run('PRAGMA writable_schema = OFF', () => {});
 });
 
 const DB_CORRUPT_USER_MSG =
