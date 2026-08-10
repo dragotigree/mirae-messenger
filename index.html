@@ -107,7 +107,7 @@
       box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
     }
     #titlebar-sidebar-accent {
-      width: var(--sidebar-width, 300px);
+      width: var(--sidebar-width, 260px);
       flex-shrink: 0;
       background: transparent;
       -webkit-app-region: drag;
@@ -237,7 +237,7 @@
     }
 
     #sidebar-left {
-      width: var(--sidebar-width, 300px);
+      width: var(--sidebar-width, 260px);
       background: var(--sidebar-bg);
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; position: relative;
@@ -8698,9 +8698,12 @@
       } catch (e) { /* ignore */ }
 
       refreshLeftSidebarMinWidth();
-      const savedWidth = parseInt(localStorage.getItem('sidebarWidth'), 10);
+      let savedWidth = parseInt(localStorage.getItem('sidebarWidth'), 10);
+      // 기본값을 300→260으로 줄이면서, 예전 기본값(300)을 그대로 쓰던(=직접 조절한 적 없는) 경우만
+      // 새 기본값으로 옮겨준다. 사용자가 직접 다른 폭으로 조절해둔 경우는 그대로 둔다.
+      if (savedWidth === 300) { savedWidth = 260; localStorage.setItem('sidebarWidth', '260'); }
       // 저장된 값이 예전 최소(200)보다 좁아 버튼·필터가 깨졌다면 측정 최소로 끌어올림
-      applySidebarWidth(savedWidth || 300);
+      applySidebarWidth(savedWidth || 260);
       refreshRightSidebarMinWidth();
       const savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
