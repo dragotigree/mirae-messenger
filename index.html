@@ -296,6 +296,7 @@
     .settings-profile-avatar .avatar-emoji { font-size: 28px; }
     .msg-avatar .avatar-emoji { font-size: 15px; }
     .group-member-avatar .avatar-emoji { font-size: 14px; }
+    .avatar-initial { font-weight: 800; font-family: 'SUIT', -apple-system, sans-serif; letter-spacing: 0; }
     /* ⚠️ "너무 알록달록하다"는 피드백으로 무지개 팔레트(노랑·분홍·초록·보라·주황·청록) 폐지 —
        사람 구분은 이니셜 텍스트로 충분하므로, 전부 기본 아바타와 같은 파란색 계열 톤으로
        통일해 차분하게 정리한다. JS의 avatar-cute-N 배정 로직은 그대로 두되(다른 곳에서
@@ -2645,7 +2646,7 @@
     .sidebar-admit-discharge-row {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
       min-width: 0;
       flex-shrink: 0;
     }
@@ -2658,7 +2659,7 @@
     }
     .sidebar-ad-card-head {
       display: flex; align-items: center; gap: 7px;
-      padding: 0 0 8px; font-size: 12px; font-weight: 800; letter-spacing: -0.02em;
+      padding: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: -0.02em;
       white-space: nowrap; flex-shrink: 0; color: var(--text-primary); background: transparent;
     }
     .sidebar-ad-card-head::before {
@@ -2670,10 +2671,10 @@
     .sidebar-ad-card.is-flow .sidebar-ad-card-head::before { background: #f97316; }
     .sidebar-ad-card-count { font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 700; margin-left: auto; }
     .sidebar-ad-col-head { display: none; }
-    .sidebar-ad-rows { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+    .sidebar-ad-rows { display: flex; flex-direction: column; gap: 11px; min-width: 0; }
     .sidebar-ad-row {
       display: flex; align-items: center; gap: 8px;
-      padding: 0; font-size: 12.5px; font-weight: 600; line-height: 1.3;
+      padding: 1px 0; font-size: 12.5px; font-weight: 600; line-height: 1.3;
       white-space: nowrap; min-width: 0; border: none; color: var(--text-primary);
     }
     .sidebar-ad-row > span {
@@ -2683,7 +2684,7 @@
     .sidebar-ad-name { font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; flex: 1 1 auto; min-width: 0; color: var(--text-primary); }
     .sidebar-ad-rm-badge {
       flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px;
-      padding: 1px 6px 1px 4px; border-radius: 999px; background: #eef2ff; color: #4338ca;
+      padding: 1px 6px 1px 4px; border-radius: 999px; background: var(--sidebar-active); color: var(--accent-dark);
       font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
     }
     .sidebar-ad-rm-badge .icon-glyph { width: 10px; height: 10px; }
@@ -5900,6 +5901,7 @@
             <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">메뉴·버튼·직원 목록 등 화면 전체 글꼴입니다. (채팅 말풍선 안 글씨는 아래 「채팅방 폰트」가 따로 적용됩니다)</p>
             <label class="settings-field">채팅방 폰트
               <select id="setting-chat-font-family" class="settings-select">
+                <option value="suit">SUIT (기본)</option>
                 <option value="ridiBatang">리디바탕</option>
                 <option value="maruBuri">마루부리</option>
                 <option value="eulyoo1945">을유1945</option>
@@ -7704,7 +7706,7 @@
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
     let sidebarUnreadOnly = localStorage.getItem('sidebarUnreadOnly') === 'true';
 
-    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "ridiBatang", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
+    let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "suit", "chatFontFamily": "suit", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0}');
     if (!appSettings.defaultViewMode) {
       appSettings.defaultViewMode = localStorage.getItem('isCompactMode') === 'true' ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
@@ -7744,6 +7746,9 @@
     };
 
     const CHAT_FONT_PRESETS = {
+      suit: {
+        cssFamily: "'SUIT', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+      },
       ridiBatang: {
         cssFamily: "'RIDIBatang', 'Batang', 'BatangChe', 'Apple Myungjo', serif"
       },
@@ -7776,7 +7781,7 @@
           settings.fontFamily = 'suit';
         } else {
           settings.fontFamily = LEGACY_SYSTEM_FONT_MAP[oldKey] || 'suit';
-          settings.chatFontFamily = 'ridiBatang';
+          settings.chatFontFamily = 'suit';
         }
       } else {
         if (!SYSTEM_FONT_PRESETS[settings.fontFamily]) {
@@ -7788,11 +7793,11 @@
           }
         }
         if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) {
-          settings.chatFontFamily = CHAT_FONT_PRESETS[oldKey] ? oldKey : 'ridiBatang';
+          settings.chatFontFamily = CHAT_FONT_PRESETS[oldKey] ? oldKey : 'suit';
         }
       }
       if (!SYSTEM_FONT_PRESETS[settings.fontFamily]) settings.fontFamily = 'suit';
-      if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) settings.chatFontFamily = 'ridiBatang';
+      if (!CHAT_FONT_PRESETS[settings.chatFontFamily]) settings.chatFontFamily = 'suit';
       return settings;
     }
 
@@ -7804,7 +7809,7 @@
     }
 
     function resolveChatFontPreset(key) {
-      return CHAT_FONT_PRESETS[key] || CHAT_FONT_PRESETS.ridiBatang;
+      return CHAT_FONT_PRESETS[key] || CHAT_FONT_PRESETS.suit;
     }
 
     function applyUserListAvatarVisibility() {
@@ -13510,12 +13515,7 @@
       badge.textContent = n > 99 ? '99+' : n;
     }
 
-    // 👤 프로필 사진이 있으면 사진을, 없으면 IP/이름 기준 고정 귀여운 이모지 아바타
-    const CUTE_AVATAR_EMOJIS = [
-      '🐻', '🐰', '🐱', '🐶', '🦊', '🐼', '🐨', '🐯', '🦁', '🐸',
-      '🐙', '🦄', '🐣', '🐧', '🦉', '🐝', '🦋', '🌸', '🍀', '⭐',
-      '🎈', '🧸', '🍓', '🍡', '🍩', '🐹', '🦔', '🐢', '🐳', '🐬'
-    ];
+    // 👤 프로필 사진이 있으면 사진을, 없으면 IP/이름 기준 고정 이니셜 아바타
     const CUTE_AVATAR_PALETTE_COUNT = 7;
 
     function cuteAvatarSeedKey(username, seed) {
@@ -13531,9 +13531,11 @@
       return Math.abs(h) % Math.max(1, len);
     }
 
-    function pickCuteAvatarEmoji(username, seed) {
-      const key = cuteAvatarSeedKey(username, seed);
-      return CUTE_AVATAR_EMOJIS[hashSeedToIndex(key, CUTE_AVATAR_EMOJIS.length)];
+    function pickAvatarInitial(username) {
+      const name = String(username || '').trim();
+      if (!name) return '?';
+      const ch = [...name][0];
+      return /[a-z]/.test(ch) ? ch.toUpperCase() : ch;
     }
 
     function cuteAvatarClassFor(username, photo, seed) {
@@ -13665,8 +13667,8 @@
         const alt = (username || '').charAt(0) || '?';
         return `<img src="${safePhoto.replace(/"/g, '&quot;')}" alt="${alt}">`;
       }
-      const emoji = pickCuteAvatarEmoji(username, seed);
-      return `<span class="avatar-emoji" aria-hidden="true">${emoji}</span>`;
+      const initial = pickAvatarInitial(username);
+      return `<span class="avatar-emoji avatar-initial" aria-hidden="true">${escapeHtml(initial)}</span>`;
     }
 
     function applyAvatarPhotoClass(el, photo) {
@@ -23845,7 +23847,7 @@
         document.getElementById('setting-font-size').value = appSettings.fontSize;
         document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
         const chatFontEl = document.getElementById('setting-chat-font-family');
-        if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'ridiBatang';
+        if (chatFontEl) chatFontEl.value = appSettings.chatFontFamily || 'suit';
         const uiAnimOn = document.getElementById('setting-ui-animations-on');
         const uiAnimOff = document.getElementById('setting-ui-animations-off');
         if (isUiAnimationsEnabled()) {
@@ -23931,8 +23933,8 @@
   const fontSize = document.getElementById('setting-font-size').value;
   const fontFamily = document.getElementById('setting-font-family').value || 'suit';
   const chatFontFamily = document.getElementById('setting-chat-font-family')
-    ? (document.getElementById('setting-chat-font-family').value || 'ridiBatang')
-    : (appSettings.chatFontFamily || 'ridiBatang');
+    ? (document.getElementById('setting-chat-font-family').value || 'suit')
+    : (appSettings.chatFontFamily || 'suit');
   const defaultViewMode = document.getElementById('setting-default-view').value || 'normal';
   const compactPersonClickMode = (document.getElementById('setting-compact-person-click')?.value === 'chat')
     ? 'chat'
