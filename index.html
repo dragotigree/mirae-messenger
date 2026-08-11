@@ -72,7 +72,7 @@
     .section-label, .subsection-label, .compact-item-name, .compact-section-label,
     .detail-name, .sidebar-section-title, .all-logs-title, .empty-title,
     h1, h2, h3, h4 { font-weight: var(--font-weight-semibold); }
-    .btn-send, .unread-badge, .urgent-badge, .btn-urgent.active, .net-status-ok, .net-status-bad,
+    .btn-send, .unread-badge, .urgent-badge, .net-status-ok, .net-status-bad,
     .read-status, .badge-admission, .badge-discharge, .badge-outpatient, .badge-outing, .badge-overnight,
     .badge-transfer, .badge-room-change, .badge-general, .badge-leave, .badge-exam, .msg-sender-name, .msg-avatar, .detail-heading,
     .detail-avatar, .group-member-avatar, .mini-cal-header, .mini-cal-day.today, .mini-cal-day.selected,
@@ -1510,7 +1510,7 @@
     .chat-tool-btn:hover { background: var(--border-soft); color: #0f172a; }
     label.chat-tool-btn { margin: 0; font-weight: 500; }
     .chat-tool-btn .icon-glyph, .btn-schedule .icon-glyph, .btn-quickphrase .icon-glyph,
-    .btn-capture .icon-glyph, .btn-urgent .icon-glyph { width: 18px; height: 18px; pointer-events: none; }
+    .btn-capture .icon-glyph { width: 18px; height: 18px; pointer-events: none; }
     .btn-send {
       width: 38px; height: 38px; padding: 0; background: var(--accent); color: white;
       border: none; border-radius: 50%; cursor: pointer; flex-shrink: 0;
@@ -1999,16 +1999,15 @@
     }
     .chat-quick-switcher-foot-count b { color: var(--accent-dark); font-weight: 800; }
 
-    .btn-schedule, .btn-quickphrase, .btn-capture, .btn-urgent {
+    .btn-schedule, .btn-quickphrase, .btn-capture {
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; height: 34px; padding: 0; background: transparent; border: none; border-radius: var(--radius-md);
       font-size: 16px; cursor: pointer; color: #64748b;
       transition: background 0.12s, color 0.12s;
     }
-    .btn-schedule:hover, .btn-quickphrase:hover, .btn-capture:hover, .btn-urgent:hover {
+    .btn-schedule:hover, .btn-quickphrase:hover, .btn-capture:hover {
       background: var(--border-soft); color: #0f172a;
     }
-    .btn-urgent.active { background: #fef2f2; color: #dc2626; font-weight: 700; }
 
     /* 🔍 대화 내용 검색 */
     #chat-search-bar { display: none; padding: 8px 24px; border-bottom: 1px solid var(--border-soft); gap: 8px; align-items: center; background: var(--surface-muted); flex-shrink: 0; }
@@ -2289,7 +2288,6 @@
     body.compact-mode .chat-tool-btn,
     body.compact-mode .btn-schedule,
     body.compact-mode .btn-quickphrase,
-    body.compact-mode .btn-urgent,
     body.compact-mode .btn-capture {
       width: 32px; height: 32px; padding: 0; font-size: 15px; background: transparent; border-radius: var(--radius-md);
     }
@@ -5157,7 +5155,6 @@
               <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)" data-ui-icon="pencil"></button>
               <button class="btn-schedule chat-tool-btn" onclick="openScheduleMessageModal()" title="예약 전송" data-ui-icon="alarmClock"></button>
               <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구" data-ui-icon="chatBubble"></button>
-              <button class="btn-urgent chat-tool-btn" id="urgent-toggle-btn" onclick="toggleUrgentMode()" title="긴급 메시지로 표시" data-ui-icon="alertTriangle"></button>
             </div>
             <button class="btn-send" onclick="sendChatMessage()" title="전송" aria-label="전송" data-ui-icon="sendArrow"></button>
           </div>
@@ -8200,7 +8197,6 @@
     let scheduleBoardMainTypeFilters = new Set(['OUTPATIENT']);
     let scheduleBoardDoctorFilter = 'all';
     let scheduleBoardCalViewDate = new Date();
-    let isUrgentMode = false;
     let quickPhrases = JSON.parse(localStorage.getItem('quickPhrases') || '["환자 이동 도움 요청드립니다.","치료실 변경 안내드립니다.","확인했습니다.","잠시 후 연락드리겠습니다."]');
     /** 1:1 읽음 확인 TCP는 상대에게 미확인 메시지를 읽을 때 전송 (실패 시 재시도) */
     const dmReadReceiptSentFor = {};
@@ -17557,7 +17553,7 @@
       } else if (activeChatUser && activeChatUser.isGroup) {
         res = await window.api.sendGroupMessage(activeChatUser.groupUid, activeChatUser.groupName, contentHtml);
       } else {
-        res = await window.api.sendMessage(activeChatUser.ip, contentHtml, isUrgentMode);
+        res = await window.api.sendMessage(activeChatUser.ip, contentHtml, false);
       }
       if (res && res.status === 'ERROR') {
         await appAlert(res.error || '메시지를 저장하지 못했습니다.\n잠시 후 다시 보내 주세요.');
@@ -17748,7 +17744,6 @@
       return [
         { keys: ['search', '검색'], label: '/검색', desc: '대화 내용 검색' },
         { keys: ['schedule', '예약'], label: '/예약', desc: '예약 메시지 등록' },
-        { keys: ['urgent', '긴급'], label: '/긴급', desc: '긴급 메시지 표시 켜기/끄기' },
         { keys: ['phrase', '문구'], label: '/문구', desc: '빠른 문구' },
         { keys: ['settings', '설정'], label: '/설정', desc: '환경 설정' },
         { keys: ['board', '현황판'], label: '/현황판', desc: '병동 일정 현황판' },
@@ -17780,7 +17775,6 @@
       const run = async () => {
         if (['search', '검색'].includes(cmd)) { openChatSearchBarForShortcut(); return; }
         if (['schedule', '예약'].includes(cmd)) { openScheduleMessageModal(); return; }
-        if (['urgent', '긴급'].includes(cmd)) { toggleUrgentMode(); return; }
         if (['phrase', '문구'].includes(cmd)) { toggleQuickPhrasePopover(); return; }
         if (['settings', '설정'].includes(cmd)) { await openSettingsModal(); return; }
         if (['board', '현황판'].includes(cmd)) { openScheduleBoardModal(); return; }
@@ -17906,16 +17900,18 @@
         return;
       }
 
-      const urgent = isUrgentMode && activeChatUser && !activeChatUser.isBroadcast && !activeChatUser.isDept && !activeChatUser.isFloor && !activeChatUser.isGroup;
+      // 「긴급 메시지」 표시 기능은 없앴다(코드블루·코드레드 발령이 그 역할을 대신한다).
+      // 다만 아직 업데이트 안 된 PC에서 오는 긴급 메시지는 그대로 표시되어야 하므로,
+      // 받는 쪽 표시(urgent-badge·is-urgent)는 건드리지 않고 보내는 쪽만 뺀다.
       const replySnapshot = pendingReply;
       let bodyHtml = textToMessageHtml(text);
       if (replySnapshot) bodyHtml = wrapMessageWithReply(bodyHtml, replySnapshot);
-      const contentHtml = urgent ? `<span class="urgent-flag" style="display:none"></span>${bodyHtml}` : bodyHtml;
+      const contentHtml = bodyHtml;
 
       const res = await dispatchOutgoing(contentHtml);
       if (res && res.status === 'ERROR') return;
       const dmPending = res.status === 'PENDING' && activeChatUser && isDirectMessagePeerKey(activeChatUser.ip);
-      appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, urgent, res.uid, res.id, myProfile && myProfile.ip, dmPending ? 'PENDING' : null, res.createdAtFull || res.createdAt);
+      appendMessageRow(contentHtml, res.createdAt, profileDisplayName(myProfile), true, false, res.uid, res.id, myProfile && myProfile.ip, dmPending ? 'PENDING' : null, res.createdAtFull || res.createdAt);
       if (activeChatUser && isDirectMessagePeerKey(activeChatUser.ip)) {
         noteDmOutboundJustSent();
       }
@@ -17923,7 +17919,6 @@
       textarea.value = '';
       resizeChatTextarea();
       cancelReplyMessage();
-      if (isUrgentMode) toggleUrgentMode();
     }
 
     function startEditMessage(msgUid) {
@@ -17990,12 +17985,6 @@
       }
       textEl.innerHTML = data.newMessage;
     });
-
-    function toggleUrgentMode() {
-      isUrgentMode = !isUrgentMode;
-      const btn = document.getElementById('urgent-toggle-btn');
-      if (btn) btn.classList.toggle('active', isUrgentMode);
-    }
 
     function syncChatSearchToggleUi() {
       const bar = document.getElementById('chat-search-bar');
