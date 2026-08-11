@@ -4548,6 +4548,14 @@
       transition: background 0.12s, color 0.12s;
     }
     .settings-nav-btn:hover { background: var(--border-soft); color: #0f172a; }
+    /* 방향키로 옮겨 다닐 때 지금 어디에 있는지 보이게 — 마우스 클릭으로는 안 나타나도록
+       :focus 대신 :focus-visible을 쓴다(키보드로 이동했을 때만 표시). */
+    .settings-nav-btn:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: -2px; background: var(--sidebar-active);
+    }
+    .board-notice-row:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 1px;
+    }
     .settings-nav-btn-admin {
       color: var(--accent-dark);
       margin-bottom: 10px;
@@ -9829,6 +9837,84 @@
     function isFlexOverlay(id) {
       const el = document.getElementById(id);
       return !!(el && el.style.display === 'flex');
+    }
+
+    /* ⌨️ 방향키 조작 공통부
+       주의: 글자를 입력하는 곳에서는 방향키가 커서 이동이어야 하므로 절대 가로채면 안 된다.
+       (입력칸·여러줄 입력·드롭다운·직접 편집 영역) */
+    function isTypingTarget(el) {
+      if (!el) return false;
+      const tag = (el.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    }
+
+    /**
+     * 목록형 UI에서 위/아래 방향키로 항목을 옮겨 다니게 하는 공통 처리.
+     * items에서 현재 선택된 위치를 찾아 delta만큼 옮기고, 그 항목에 포커스를 준다.
+     * 목록 끝에서는 반대편으로 순환한다.
+     */
+    function moveFocusWithinList(items, delta) {
+      const list = [...(items || [])].filter((el) => el && el.offsetParent !== null && !el.disabled);
+      if (!list.length) return false;
+      const current = document.activeElement;
+      let idx = list.indexOf(current);
+      if (idx < 0) {
+        // 아직 목록 안에 포커스가 없으면, 현재 활성 항목(.active)에서 시작한다.
+        idx = list.findIndex((el) => el.classList && el.classList.contains('active'));
+      }
+      const next = idx < 0
+        ? (delta > 0 ? 0 : list.length - 1)
+        : (idx + delta + list.length) % list.length;
+      const target = list[next];
+      if (!target) return false;
+      target.focus();
+      if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'nearest' });
+      return true;
+    }
+
+    /** 환경설정: 위/아래로 왼쪽 메뉴(프로필·알림·데이터 …)를 옮겨 다닌다. */
+    function handleSettingsArrowKeys(e) {
+      if (!isFlexOverlay('settings-modal')) return false;
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return false;
+      if (isTypingTarget(document.activeElement)) return false;
+      const modal = document.getElementById('settings-modal');
+      if (!modal) return false;
+      const navBtns = modal.querySelectorAll('.settings-nav[aria-label="설정 메뉴"] .settings-nav-btn');
+      if (!navBtns.length) return false;
+      e.preventDefault();
+      const moved = moveFocusWithinList(navBtns, e.key === 'ArrowDown' ? 1 : -1);
+      // 메뉴를 옮기면 곧바로 그 탭 내용을 보여준다(Enter를 또 누르지 않아도 되게).
+      const focused = document.activeElement;
+      const tabKey = focused && focused.getAttribute ? focused.getAttribute('data-settings-tab') : '';
+      if (moved && tabKey) setSettingsTab(tabKey);
+      return moved;
+    }
+
+    /** 공지사항 목록: 위/아래로 공지를 옮겨 다니고 Enter로 연다. */
+    function handleBoardArrowKeys(e) {
+      if (!isFlexOverlay('board-modal')) return false;
+      if (isTypingTarget(document.activeElement)) return false;
+      const listView = document.getElementById('board-list-view');
+      if (!listView || listView.style.display === 'none') return false;
+      const rows = document.querySelectorAll('#board-list-container .board-notice-row');
+      if (!rows.length) return false;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        // 카드는 원래 포커스를 못 받는 div라, 방향키로 고를 수 있게 여기서 자격을 준다.
+        rows.forEach((r) => { if (!r.hasAttribute('tabindex')) r.setAttribute('tabindex', '-1'); });
+        return moveFocusWithinList(rows, e.key === 'ArrowDown' ? 1 : -1);
+      }
+      if (e.key === 'Enter') {
+        const focused = document.activeElement;
+        if (focused && focused.classList && focused.classList.contains('board-notice-row')) {
+          e.preventDefault();
+          focused.click();
+          return true;
+        }
+      }
+      return false;
     }
 
     function getEscapeCloseOverlayStack() {
@@ -23894,6 +23980,11 @@
       if (e.ctrlKey && e.altKey && (e.key === 'e' || e.key === 'E' || e.keyCode === 69)) {
         e.preventDefault();
         if (!isPrivacyScreenLocked) openAllLogsModal();
+      }
+      // 방향키 조작 — 글자 입력 중일 땐 각 핸들러가 알아서 비켜난다(isTypingTarget).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (handleSettingsArrowKeys(e)) return;
+        if (handleBoardArrowKeys(e)) return;
       }
       if (handleScheduleBoardShortcuts(e)) return;
       if (handleScheduleBoardRefreshKey(e)) return;
