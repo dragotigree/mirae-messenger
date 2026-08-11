@@ -3996,6 +3996,19 @@ db.serialize(() => {
       // GitHub 또는 Z/공유폴더. 잘린 Z경로는 messenger 폴더로 보정.
       const rawPath = row.update_source_path || DEFAULT_UPDATE_SOURCE_PATH;
       updateSourcePath = normalizeUpdateSourcePath(rawPath);
+      // 마이그레이션(1회): 예전에는 GitHub를 골라도 피어에게 Z 브리지 경로를 뿌리는 버그가
+      // 있어서, 사실상 모든 PC의 저장값이 Z 경로로 덮여 있었다. 기본값(GitHub)으로 되돌린다.
+      // 마커 파일로 한 번만 실행하므로, 이후 관리자가 의도적으로 Z 경로를 지정하면 그대로 유지된다.
+      const updateSourceMigrationMarker = path.join(app.getPath('userData'), 'update-source-github-default.txt');
+      if (updateSourcePath === Z_BRIDGE_UPDATE_SOURCE_PATH && !fs.existsSync(updateSourceMigrationMarker)) {
+        updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
+        db.run(`UPDATE app_settings SET update_source_path = ? WHERE id = 1`, [updateSourcePath], (e) => {
+          logDbErr(e);
+          if (!e) { try { fs.writeFileSync(updateSourceMigrationMarker, '1', 'utf8'); } catch (_) { /* ignore */ } }
+        });
+      } else if (!fs.existsSync(updateSourceMigrationMarker)) {
+        try { fs.writeFileSync(updateSourceMigrationMarker, '1', 'utf8'); } catch (_) { /* ignore */ }
+      }
       transportWebappUrl = row.transport_webapp_url || DEFAULT_TRANSPORT_WEBAPP_URL;
       downloadFolderPath = row.download_folder_path || app.getPath('downloads');
       trayLaunchViewMode = row.tray_launch_view_mode === 'compact' ? 'compact' : 'normal';
@@ -7642,6 +7655,15 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
 
 function handleConfigSync(payload) {
   if (payload && typeof payload.updateSourcePath === 'string') {
+    // ⚠️ 아직 업데이트 안 된 옛 버전 PC는 여전히 "항상 Z 브리지 경로"를 뿌린다. 그걸 그대로
+    // 받아 저장하면, GitHub로 맞춰놓은 이 PC가 그 PC 하나 때문에 다시 Z로 되돌아간다.
+    // 기본값(GitHub)을 쓰고 있는데 상대가 Z 브리지로 내리려는 경우만 무시한다 — 관리자가
+    // 의도적으로 Z를 쓰는 환경에서 Z끼리 동기화되는 것은 그대로 둔다.
+    const incoming = normalizeUpdateSourcePath(payload.updateSourcePath);
+    const current = normalizeUpdateSourcePath(updateSourcePath);
+    if (incoming === Z_BRIDGE_UPDATE_SOURCE_PATH && current === DEFAULT_UPDATE_SOURCE_PATH) {
+      return;
+    }
     persistUpdateSourcePath(payload.updateSourcePath);
   }
 }
@@ -11151,12 +11173,12 @@ ipcMain.handle('set-update-source-path', async (event, folderPath) => {
     return { success: false, msg: 'GitHub 주소 또는 Z/공유폴더 경로를 입력해 주세요.' };
   }
   persistUpdateSourcePath(next);
-  // 옛 PC 브리지: Z 경로를 함께 알려 주면 Z만 아는 버전도 따라올 수 있다.
-  const syncPath = meta.kind === 'folder' ? updateSourcePath : Z_BRIDGE_UPDATE_SOURCE_PATH;
-  broadcastToOnlinePeers({ type: 'CONFIG_SYNC', updateSourcePath: syncPath });
-  if (meta.kind === 'github') {
-    // GitHub도 저장돼 있으니 로컬은 GitHub 유지. 피어에는 Z 브리지를 보낸다.
-  }
+  // ⚠️ 예전엔 GitHub를 골라도 피어에게는 항상 Z 브리지 경로를 뿌렸다("옛 PC도 따라오게"라는
+  // 의도). 그런데 받는 쪽 handleConfigSync는 그 값을 그대로 저장해버리므로, GitHub로 바꾼
+  // PC가 오히려 다른 PC들을 전부 Z 경로로 되돌려놨다 — 설정 화면에 계속 Z 경로가 뜨던 원인.
+  // 이제는 내가 실제로 쓰는 경로를 그대로 알린다. Z만 아는 옛 버전은 Z 폴더 미러링
+  // (mirrorFilesToZBridge)으로 계속 최신 파일을 받으므로 브리지 역할은 유지된다.
+  broadcastToOnlinePeers({ type: 'CONFIG_SYNC', updateSourcePath });
   return { success: true, path: updateSourcePath };
 });
 
