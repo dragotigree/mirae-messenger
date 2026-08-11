@@ -129,16 +129,21 @@
     #titlebar-app-label {
       display: block;
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-      font-size: 11.5px;
-      font-weight: 800;
+      /* 11.5px + font-weight 800 + 넓은 자간 조합이 이 크기에서는 잘 뭉개져 보인다
+         (특히 100% 아닌 화면 배율에서). 크기를 살짝 키우고 자간을 줄이고, 안티앨리어싱을
+         명시해서 작은 굵은 글씨가 더 또렷하게 보이도록 했다. */
+      font-size: 13px;
+      font-weight: 700;
       color: var(--text-primary);
-      letter-spacing: 0.08em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       line-height: 1;
       user-select: none;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
     #titlebar-controls {
       display: flex;
@@ -176,11 +181,13 @@
     body.compact-mode #titlebar-drag-region .titlebar-app-label-compact {
       display: block;
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-      font-size: 10.5px;
-      font-weight: 800;
+      font-size: 11.5px;
+      font-weight: 700;
       color: var(--text-secondary);
-      letter-spacing: 0.06em;
+      letter-spacing: 0.03em;
       text-transform: uppercase;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
     #titlebar-drag-region .titlebar-app-label-compact { display: none; }
 
@@ -989,75 +996,27 @@
       display: flex; align-items: center; justify-content: flex-end;
       gap: 6px; flex-shrink: 0; flex-wrap: nowrap;
     }
+    /* 예전엔 버튼 4개가 각자 다른 색(달력=파랑 아웃라인, 보관함=회색, 비우기=분홍/빨강 상시
+       강조, 검색=파랑)을 따로 써서 한 줄인데 서로 다른 도구모음처럼 보였다. 다른 화면의
+       칩(board-category-chip 등)과 같은 방식으로 통일한다 — 평소엔 전부 같은 중립 색이고,
+       선택된(is-active) 상태에서만 강조색을 쓴다. "비우기"는 파괴적 동작이라 항상 빨갛게
+       두지 않고 hover할 때만 위험하다는 신호를 준다(다른 삭제류 버튼과 동일한 방식).*/
     .chat-header-tool-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 36px; padding: 0 12px; border-radius: 12px; border: 1px solid transparent;
+      min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-soft);
+      background: var(--surface-muted); color: var(--text-secondary);
       font-size: 12px; font-weight: 600; letter-spacing: -0.02em; cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
     .chat-header-tool-btn .icon-glyph { width: 16px; height: 16px; flex-shrink: 0; }
-    .chat-header-tool-btn:hover { transform: translateY(-1px); }
-    .chat-header-tool-btn:active { transform: translateY(0); }
-    .chat-header-tool-btn--clear {
-      background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
-      border-color: rgba(251, 113, 133, 0.35);
-      color: #be123c;
-      box-shadow: 0 1px 2px rgba(190, 18, 60, 0.06);
+    .chat-header-tool-btn:hover {
+      background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark);
+    }
+    .chat-header-tool-btn.is-active {
+      background: var(--accent); border-color: var(--accent); color: #fff;
     }
     .chat-header-tool-btn--clear:hover {
-      background: linear-gradient(180deg, #ffe4e6 0%, #fecdd3 100%);
-      border-color: rgba(244, 63, 94, 0.45);
-      box-shadow: 0 4px 14px rgba(244, 63, 94, 0.18);
-    }
-    .chat-header-tool-btn--search {
-      background: linear-gradient(180deg, var(--sidebar-active) 0%, var(--sidebar-active) 100%);
-      border-color: rgba(144, 202, 249, 0.35);
-      color: var(--accent-dark);
-      box-shadow: 0 1px 2px rgba(13, 71, 161, 0.06);
-    }
-    .chat-header-tool-btn--search:hover {
-      background: linear-gradient(180deg, var(--sidebar-active) 0%, var(--sidebar-active) 100%);
-      border-color: rgba(33, 150, 243, 0.45);
-      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.16);
-    }
-    .chat-header-tool-btn--search.is-active {
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-      border-color: transparent;
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
-    }
-    .chat-header-tool-btn--archive {
-      background: linear-gradient(180deg, #f8fafc 0%, var(--border-soft) 100%);
-      border-color: rgba(148, 163, 184, 0.45);
-      color: #334155;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    }
-    .chat-header-tool-btn--archive:hover {
-      background: linear-gradient(180deg, var(--border-soft) 0%, var(--border) 100%);
-      border-color: rgba(100, 116, 139, 0.5);
-      box-shadow: 0 4px 14px rgba(100, 116, 139, 0.12);
-    }
-    .chat-header-tool-btn--archive.is-active {
-      background: linear-gradient(135deg, #64748b 0%, #475569 100%);
-      border-color: transparent;
-      color: #fff;
-    }
-    .chat-header-tool-btn--calendar {
-      background: linear-gradient(180deg, #eaf4fe 0%, var(--sidebar-active) 100%);
-      border-color: rgba(33, 150, 243, 0.35);
-      color: var(--accent-dark);
-      box-shadow: 0 1px 2px rgba(33, 150, 243, 0.06);
-    }
-    .chat-header-tool-btn--calendar:hover {
-      background: linear-gradient(180deg, var(--sidebar-active) 0%, #bbdefb 100%);
-      border-color: rgba(33, 150, 243, 0.5);
-      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.18);
-    }
-    .chat-header-tool-btn--calendar.is-active {
-      background: linear-gradient(135deg, #42a5f5 0%, var(--accent) 100%);
-      border-color: transparent;
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(33, 150, 243, 0.35);
+      background: #fef2f2; border-color: #fecdd3; color: #be123c;
     }
     #chat-calendar-popover {
       display: none;
