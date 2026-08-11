@@ -4532,7 +4532,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: spellCheckerEnabled,
-      backgroundThrottling: true
+      // ⚠️ 실사고: 다른 프로그램에 가려져 있다가(최소화는 아니고 뒤로 밀려있다가) 다시 앞으로
+      // 나오면 흰 화면만 보이는 문제. true(기본값에 가까움)이면 창이 안 보이는 동안 Chromium이
+      // 렌더링 타이머까지 같이 줄이는데, 다시 보일 때 화면을 새로 그리는 시점과 어긋나면 마지막
+      // 프레임이 흰 화면인 채로 멈춰있게 된다. 이 창은 실시간 메시지 알림 때문에 백그라운드에서도
+      // 계속 정상 동작해야 하므로, 이미 false로 돼 있던 다른 보조 창들과 맞춘다.
+      backgroundThrottling: false
     }
   });
 
@@ -4542,6 +4547,14 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', () => {
     notifyUsageLockState();
   });
+  // ⚠️ 위 backgroundThrottling만으로 안 잡히는 경우에 대비한 이중 안전장치 — 창이 다시
+  // 활성화되거나 보일 때 마지막으로 그려진 프레임이 새로 고쳐지도록 한 번 더 강제한다.
+  const forceRepaint = () => {
+    try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.invalidate(); } catch (e) { /* ignore */ }
+  };
+  mainWindow.on('focus', forceRepaint);
+  mainWindow.on('show', forceRepaint);
+  mainWindow.on('restore', forceRepaint);
 
   mainWindow.on('hide', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
