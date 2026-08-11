@@ -24078,19 +24078,40 @@
           return;
         }
         if (el) {
-          el.innerHTML = backups.map((b) => {
+          // ⚠️ 인라인 onclick으로 경로를 넘기면 안 된다 — Windows 경로(C:\Apps\...)를
+          // 큰따옴표로 감싼 HTML 속성 안에 넣는 순간 속성이 중간에 끊겨 버튼이 아예
+          // 동작하지 않는다(실제로 "복원 눌러도 반응 없음"의 원인이었다).
+          // DOM으로 직접 만들고 addEventListener로 경로를 클로저에 담아 넘긴다.
+          el.textContent = '';
+          backups.forEach((b) => {
             const label = formatBackupTimestamp(b.mtime);
             const sizeMb = (b.sizeBytes / 1024 / 1024).toFixed(1);
+            const row = document.createElement('div');
+            row.style.cssText = 'margin-top:6px; display:flex; align-items:center; gap:8px;';
+            const text = document.createElement('span');
             if (!b.healthy) {
-              return `<div style="margin-top:6px; color:var(--text-muted);">✕ ${escapeHtml(label)} (${sizeMb}MB) — 이 백업도 손상됨</div>`;
+              row.style.color = 'var(--text-muted)';
+              text.textContent = `✕ ${label} (${sizeMb}MB) — 이 백업도 손상됨`;
+              row.appendChild(text);
+              el.appendChild(row);
+              return;
             }
-            return (
-              `<div style="margin-top:6px; display:flex; align-items:center; gap:8px;">` +
-              `<span>✔ ${escapeHtml(label)} (${sizeMb}MB)</span>` +
-              `<button type="button" class="settings-btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="restoreFromBackupPath(${JSON.stringify(b.path)}, ${JSON.stringify(label)})">이 시점으로 복원</button>` +
-              `</div>`
-            );
-          }).join('');
+            text.textContent = `✔ ${label} (${sizeMb}MB)`;
+            const btnRestore = document.createElement('button');
+            btnRestore.type = 'button';
+            btnRestore.className = 'settings-btn-secondary';
+            btnRestore.style.cssText = 'padding:4px 10px; font-size:11px;';
+            btnRestore.textContent = '이 시점으로 복원';
+            btnRestore.addEventListener('click', () => {
+              restoreFromBackupPath(b.path, label).catch((err) => {
+                console.error('복원 실패:', err);
+                appAlert('복원 중 오류가 발생했습니다.').catch(() => {});
+              });
+            });
+            row.appendChild(text);
+            row.appendChild(btnRestore);
+            el.appendChild(row);
+          });
         }
       } catch (e) {
         console.error(e);
