@@ -3953,28 +3953,88 @@
     /* 📋 공지사항 게시판 (목록/작성/보기 3단 뷰) */
     #board-list-view { display: flex; flex-direction: column; gap: 10px; }
     #board-write-view, #board-detail-view { display: none; flex-direction: column; gap: 10px; }
-    .board-notice-row { background: var(--surface-muted); border: 1px solid var(--border); padding: 14px 16px; border-radius: var(--radius-xl); cursor: pointer; transition: background var(--transition-normal), border-color var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal); }
-    .board-notice-row:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-    .board-notice-title { font-weight: var(--font-weight-bold); font-size: 14px; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px; min-width: 0; }
-    .board-notice-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .board-notice-photo-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--accent-dark); background: var(--sidebar-active); border-radius: 999px; padding: 2px 7px; }
-    .board-notice-cat-badge {
-      flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
-      color: #334155; background: var(--border-soft); border: 1px solid var(--border);
+    /* 🔍 공지 검색 */
+    .board-search-box {
+      position: relative; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      background: var(--surface-muted); border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg); padding: 0 12px; margin-bottom: 10px;
+      transition: border-color var(--transition-fast), background var(--transition-fast);
     }
-    .board-notice-cat-badge.is-all { color: var(--accent-dark); background: var(--sidebar-active); border-color: var(--sidebar-active); }
-    .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; border-color: #fed7aa; }
-    .board-notice-cat-badge.is-dept { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+    .board-search-box:focus-within { background: var(--surface); border-color: var(--accent); }
+    .board-search-icon { display: flex; color: var(--text-muted); flex-shrink: 0; }
+    .board-search-icon .icon-glyph { width: 15px; height: 15px; }
+    .board-search-input {
+      flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+      padding: 11px 0; font-size: 13px; font-family: inherit; color: var(--text-primary);
+    }
+    .board-search-input::placeholder { color: var(--text-muted); }
+    .board-search-clear {
+      border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+      font-size: 12px; padding: 4px; line-height: 1; flex-shrink: 0; border-radius: 50%;
+    }
+    .board-search-clear:hover { color: var(--text-secondary); background: var(--border-soft); }
+
+    /* 📋 공지 카드 */
+    .board-notice-row {
+      position: relative; background: var(--surface); border: 1px solid var(--border-soft);
+      padding: 15px 34px 14px 16px; border-radius: var(--radius-lg); cursor: pointer;
+      transition: border-color var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal);
+    }
+    .board-notice-row:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    /* 안 읽은 공지 — 파스텔 테두리 + 제목 앞 점 */
+    .board-notice-row.is-unread { border-color: #c7d2fe; }
+    .board-notice-row.is-unread .board-notice-title-text { font-weight: 800; }
+    .board-notice-unread-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0;
+    }
+    /* 오른쪽 화살표 */
+    .board-notice-chevron {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      display: flex; color: var(--text-muted); pointer-events: none;
+    }
+    .board-notice-chevron .icon-glyph { width: 16px; height: 16px; }
+    .board-notice-row:hover .board-notice-chevron { color: var(--accent); }
+    .board-notice-title { font-weight: var(--font-weight-bold); font-size: 14px; color: var(--text-primary); letter-spacing: -0.01em; display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .board-notice-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* 본문 미리보기 — 두 줄까지 */
+    .board-notice-preview {
+      margin-top: 5px; font-size: 12px; line-height: 1.55; color: var(--text-secondary);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .board-notice-tagrow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .board-notice-photo-badge {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+    }
+    .board-notice-cat-badge {
+      flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px;
+      color: #334155; background: var(--border-soft); border: 1px solid transparent;
+    }
+    /* 🎨 파스텔 카테고리 팔레트 — 고정 2종(전직원·업데이트) + 나머지는 이름으로 자동 배정 */
+    .board-notice-cat-badge.is-all    { color: #3730a3; background: #e0e7ff; }
+    .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; }
+    .board-notice-cat-badge.cat-p0 { color: #166534; background: #dcfce7; }
+    .board-notice-cat-badge.cat-p1 { color: #9d174d; background: #fce7f3; }
+    .board-notice-cat-badge.cat-p2 { color: #115e59; background: #ccfbf1; }
+    .board-notice-cat-badge.cat-p3 { color: #6b21a8; background: #f3e8ff; }
+    .board-notice-cat-badge.cat-p4 { color: #854d0e; background: #fef9c3; }
+    .board-notice-cat-badge.cat-p5 { color: #9f1239; background: #ffe4e6; }
+    .board-notice-cat-badge.cat-p6 { color: #075985; background: #e0f2fe; }
     .board-notice-meta { font-size: 11px; color: var(--text-muted); }
+    .board-notice-date { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .board-notice-photo-badge .icon-glyph { width: 12px; height: 12px; }
+    /* 카드 사이 간격 — 예전에는 목록이 한 덩어리로 붙어 보였다 */
+    #board-list-container { display: flex; flex-direction: column; gap: 9px; }
     .board-category-row {
       display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; flex-shrink: 0;
     }
     .board-category-chip {
-      flex-shrink: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
-      background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer;
+      flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-soft);
+      background: var(--surface-muted); color: var(--text-secondary); font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
     }
-    .board-category-chip:hover { background: var(--border-soft); border-color: #cbd5e1; }
-    .board-category-chip.is-active { background: var(--accent-dark); color: #fff; border-color: var(--accent-dark); }
+    .board-category-chip:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark); }
+    .board-category-chip.is-active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
     .board-write-category-row {
       display: flex; flex-direction: column; gap: 6px; margin-top: 2px;
     }
@@ -5684,6 +5744,12 @@
 
       <!-- 목록 화면 -->
       <div id="board-list-view" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0;">
+        <div class="board-search-box">
+          <span class="board-search-icon" data-ui-icon="search"></span>
+          <input type="text" id="board-search-input" class="board-search-input" placeholder="공지 검색..." aria-label="공지 검색"
+                 oninput="onBoardSearchInput(this.value)">
+          <button type="button" class="board-search-clear" id="board-search-clear" onclick="clearBoardSearch()" title="검색어 지우기" hidden>✕</button>
+        </div>
         <div class="board-category-row" id="board-category-filters" aria-label="공지 카테고리"></div>
         <div id="board-list-container" style="flex:1;"></div>
       </div>
@@ -14558,6 +14624,12 @@
 
     function openBoardModal() {
       document.getElementById('board-modal').style.display = 'flex';
+      // 지난번 검색어가 남아 있으면 목록이 비어 보인다 — 열 때마다 초기화한다.
+      const searchInput = document.getElementById('board-search-input');
+      if (searchInput) searchInput.value = '';
+      boardSearchKeyword = '';
+      const searchClear = document.getElementById('board-search-clear');
+      if (searchClear) searchClear.hidden = true;
       refreshNoticePermission();
       updateBoardAuthStatusText();
       showBoardListView();
@@ -14849,7 +14921,64 @@
     function boardCategoryBadgeClass(cat) {
       if (cat === '전체') return 'is-all';
       if (cat === '업데이트') return 'is-update';
-      return 'is-dept';
+      // 부서는 개수가 정해져 있지 않으므로, 이름을 숫자로 접어 파스텔 7색 중 하나를 고정 배정한다.
+      // (같은 부서는 항상 같은 색 — 목록을 다시 그려도 색이 바뀌지 않는다.)
+      // 흔한 *31 해시는 한글 부서명에서 색이 심하게 쏠려(회의실·원무과·간호부가 모두 같은 색)
+      // 배수를 키우고 상위 비트를 섞어준다 — 실제 부서명 14개로 확인해 7색을 고루 쓴다.
+      const s = String(cat || '');
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 131 + s.charCodeAt(i)) >>> 0;
+      h = (h ^ (h >>> 13)) >>> 0;
+      return `cat-p${h % 7}`;
+    }
+
+    /* 📖 읽은 공지 기억 — 서버가 없는 구조라 이 PC에만 저장한다(로컬 전용). */
+    let boardReadUids = null;
+    function getBoardReadUids() {
+      if (boardReadUids) return boardReadUids;
+      try {
+        const raw = JSON.parse(localStorage.getItem('boardReadUids') || '[]');
+        boardReadUids = new Set(Array.isArray(raw) ? raw : []);
+      } catch (e) {
+        boardReadUids = new Set();
+      }
+      return boardReadUids;
+    }
+    function markBoardNoticeRead(uid) {
+      const key = String(uid || '').trim();
+      if (!key) return;
+      const set = getBoardReadUids();
+      if (set.has(key)) return;
+      set.add(key);
+      // 삭제된 공지의 uid가 계속 쌓이지 않도록 현재 목록에 있는 것만 남긴다.
+      const alive = new Set((cachedNoticesList || []).map((n) => n && n.uid).filter(Boolean));
+      const kept = [...set].filter((u) => alive.has(u));
+      boardReadUids = new Set(kept);
+      try { localStorage.setItem('boardReadUids', JSON.stringify(kept)); } catch (e) { /* ignore */ }
+    }
+
+    /* 🔍 공지 검색 */
+    let boardSearchKeyword = '';
+    function onBoardSearchInput(value) {
+      boardSearchKeyword = String(value || '').trim().toLowerCase();
+      const clearBtn = document.getElementById('board-search-clear');
+      if (clearBtn) clearBtn.hidden = !boardSearchKeyword;
+      renderFilteredNoticesList();
+    }
+    function clearBoardSearch() {
+      const input = document.getElementById('board-search-input');
+      if (input) input.value = '';
+      onBoardSearchInput('');
+      if (input) input.focus();
+    }
+
+    /** 목록 카드에 보여줄 본문 미리보기 — HTML 태그를 걷어내고 한 줄로 */
+    function boardNoticePreviewText(html) {
+      const s = String(html == null ? '' : html);
+      if (!s) return '';
+      const tmp = document.createElement('div');
+      tmp.innerHTML = s;
+      return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
     function renderBoardCategoryFilters(notices) {
@@ -14898,9 +15027,18 @@
     }
 
     function getFilteredNoticesList() {
-      const list = cachedNoticesList || [];
-      if (boardCategoryFilter === '__all__') return list;
-      return list.filter((n) => normalizeBoardCategory(n.category) === boardCategoryFilter);
+      let list = cachedNoticesList || [];
+      if (boardCategoryFilter !== '__all__') {
+        list = list.filter((n) => normalizeBoardCategory(n.category) === boardCategoryFilter);
+      }
+      if (boardSearchKeyword) {
+        list = list.filter((n) => {
+          const title = String((n && n.title) || '').toLowerCase();
+          if (title.includes(boardSearchKeyword)) return true;
+          return boardNoticePreviewText(n && n.content).toLowerCase().includes(boardSearchKeyword);
+        });
+      }
+      return list;
     }
 
     function renderFilteredNoticesList() {
@@ -14908,28 +15046,49 @@
       if (!container) return;
       const filtered = getFilteredNoticesList();
       if (filtered.length === 0) {
-        const emptyHint = boardCategoryFilter === '__all__'
-          ? `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`
-          : `"${escapeHtml(boardCategoryFilter === '__all__' ? '모두' : boardCategoryLabel(boardCategoryFilter))}" 카테고리에 공지가 없습니다.`;
-        container.innerHTML = `<div style="text-align:center; color:#64748b; padding:60px 20px;">${emptyHint}</div>`;
+        let emptyHint;
+        if (boardSearchKeyword) {
+          emptyHint = `"${escapeHtml(boardSearchKeyword)}" 검색 결과가 없습니다.`;
+        } else if (boardCategoryFilter === '__all__') {
+          emptyHint = `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`;
+        } else {
+          emptyHint = `"${escapeHtml(boardCategoryLabel(boardCategoryFilter))}" 카테고리에 공지가 없습니다.`;
+        }
+        container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:60px 20px; font-size:13px;">${emptyHint}</div>`;
         return;
       }
+      const readSet = getBoardReadUids();
       container.innerHTML = '';
       filtered.forEach((n) => {
         const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
         const imgCount = parseNoticeImages(n.images).length;
         const cat = normalizeBoardCategory(n.category);
+        const isUnread = !readSet.has(String(n.uid || ''));
+        const preview = boardNoticePreviewText(n.content);
         const row = document.createElement('div');
-        row.className = 'board-notice-row';
+        row.className = `board-notice-row${isUnread ? ' is-unread' : ''}`;
         row.innerHTML = `
           <div class="board-notice-title">
-            <span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(boardCategoryLabel(cat))}</span>
+            ${isUnread ? '<span class="board-notice-unread-dot" aria-label="안 읽음"></span>' : ''}
             <span class="board-notice-title-text">${escapeHtml(n.title || '')}</span>
-            ${imgCount ? `<span class="board-notice-photo-badge">📷 ${imgCount}</span>` : ''}
           </div>
-          <div class="board-notice-meta">작성자: ${escapeHtml(formatNoticeAuthorName(n))} · ${createdDisplay}</div>
+          ${preview ? `<div class="board-notice-preview">${escapeHtml(preview)}</div>` : ''}
+          <div class="board-notice-tagrow">
+            <span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(boardCategoryLabel(cat))}</span>
+            <span class="board-notice-date">${escapeHtml(createdDisplay)}</span>
+            ${imgCount ? `<span class="board-notice-photo-badge"><span data-ui-icon="paperclip"></span>${imgCount}</span>` : ''}
+          </div>
+          <span class="board-notice-chevron" data-ui-icon="chevronRight"></span>
         `;
-        row.onclick = () => showBoardDetailView(n.uid);
+        row.title = `작성자: ${formatNoticeAuthorName(n)} · ${createdDisplay}`;
+        row.querySelectorAll('[data-ui-icon]').forEach((el) => {
+          const name = el.getAttribute('data-ui-icon');
+          if (name) el.innerHTML = uiIcon(name);
+        });
+        row.onclick = () => {
+          markBoardNoticeRead(n.uid);
+          showBoardDetailView(n.uid);
+        };
         container.appendChild(row);
       });
     }
