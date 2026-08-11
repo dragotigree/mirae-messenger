@@ -4005,15 +4005,23 @@
       color: #334155; background: var(--border-soft); border: 1px solid transparent;
     }
     /* 🎨 파스텔 카테고리 팔레트 — 고정 2종(전직원·업데이트) + 나머지는 이름으로 자동 배정 */
-    .board-notice-cat-badge.is-all    { color: #3730a3; background: #e0e7ff; }
     .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; }
-    .board-notice-cat-badge.cat-p0 { color: #166534; background: #dcfce7; }
-    .board-notice-cat-badge.cat-p1 { color: #9d174d; background: #fce7f3; }
-    .board-notice-cat-badge.cat-p2 { color: #115e59; background: #ccfbf1; }
-    .board-notice-cat-badge.cat-p3 { color: #6b21a8; background: #f3e8ff; }
-    .board-notice-cat-badge.cat-p4 { color: #854d0e; background: #fef9c3; }
-    .board-notice-cat-badge.cat-p5 { color: #9f1239; background: #ffe4e6; }
-    .board-notice-cat-badge.cat-p6 { color: #075985; background: #e0f2fe; }
+    /* 파스텔 14색 — 부서가 25개 이상으로 늘어나도(계속 추가 예정) 최대한 안 겹치도록
+       boardCategoryBadgeClass의 해시가 0~13을 고르게 씀 */
+    .board-notice-cat-badge.cat-p0  { color: #166534; background: #dcfce7; }
+    .board-notice-cat-badge.cat-p1  { color: #9d174d; background: #fce7f3; }
+    .board-notice-cat-badge.cat-p2  { color: #115e59; background: #ccfbf1; }
+    .board-notice-cat-badge.cat-p3  { color: #6b21a8; background: #f3e8ff; }
+    .board-notice-cat-badge.cat-p4  { color: #854d0e; background: #fef9c3; }
+    .board-notice-cat-badge.cat-p5  { color: #9f1239; background: #ffe4e6; }
+    .board-notice-cat-badge.cat-p6  { color: #075985; background: #e0f2fe; }
+    .board-notice-cat-badge.cat-p7  { color: #3730a3; background: #e0e7ff; }
+    .board-notice-cat-badge.cat-p8  { color: #a16207; background: #fef3c7; }
+    .board-notice-cat-badge.cat-p9  { color: #0e7490; background: #cffafe; }
+    .board-notice-cat-badge.cat-p10 { color: #7c2d12; background: #ffe4d5; }
+    .board-notice-cat-badge.cat-p11 { color: #3f6212; background: #ecfccb; }
+    .board-notice-cat-badge.cat-p12 { color: #86198f; background: #fae8ff; }
+    .board-notice-cat-badge.cat-p13 { color: #1e3a8a; background: #dbeafe; }
     .board-notice-meta { font-size: 11px; color: var(--text-muted); }
     .board-notice-date { font-size: 11px; color: var(--text-muted); font-weight: 500; }
     .board-notice-photo-badge .icon-glyph { width: 12px; height: 12px; }
@@ -14880,8 +14888,11 @@
         .map((d) => String(d || '').trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, 'ko'));
-      // 고정: 전체(전사) · 업데이트 + 현재 직원 부서들
-      const fixed = ['전체', '업데이트'];
+      // 고정: 업데이트 + 현재 직원 부서들. '전체(전직원)' 카테고리는 사용자 요청으로 없앴다 —
+      // '모두' 필터가 이미 전부 보기 역할을 하므로 중복이었다. 저장된 값 자체('전체')는 그대로
+      // 남아있는 옛 공지도 있을 수 있어 DB에서 지우지는 않지만, 목록·글쓰기 화면에는 더 이상
+      // 고정 카테고리로 노출하지 않는다.
+      const fixed = ['업데이트'];
       const out = [...fixed];
       depts.forEach((d) => {
         if (!out.includes(d)) out.push(d);
@@ -14889,27 +14900,21 @@
       return out;
     }
 
-    /**
-     * 「모두」(필터: 전부 보기)와 「전체」(카테고리: 전사 공지)가 한국어로는 둘 다 '전부'로
-     * 읽혀서 같은 게 두 개 있는 것처럼 보였다. 저장된 값('전체')은 그대로 두고 — 바꾸면
-     * 기존 공지와 다른 PC의 값이 전부 어긋난다 — 화면에 보이는 이름만 「전직원」으로 구분한다.
-     */
     function boardCategoryLabel(cat) {
-      return cat === '전체' ? '전직원' : cat;
+      return cat;
     }
 
+    /* 🎨 파스텔 14색 — 부서가 많아질수록(현재 최소 25개 이상) 7색으로는 겹침이 심해서
+       (mult=31 기준 회의실·원무과·간호부가 전부 같은 색) 14색으로 넓히고, 실제 병원
+       부서명 25개로 여러 해시 조합을 대입해 최다 중복이 가장 적은 조합(곱수 101,
+       상위비트 7 시프트)을 골랐다 — 25개 중 최다 중복 3, 14색 모두 사용. */
     function boardCategoryBadgeClass(cat) {
-      if (cat === '전체') return 'is-all';
       if (cat === '업데이트') return 'is-update';
-      // 부서는 개수가 정해져 있지 않으므로, 이름을 숫자로 접어 파스텔 7색 중 하나를 고정 배정한다.
-      // (같은 부서는 항상 같은 색 — 목록을 다시 그려도 색이 바뀌지 않는다.)
-      // 흔한 *31 해시는 한글 부서명에서 색이 심하게 쏠려(회의실·원무과·간호부가 모두 같은 색)
-      // 배수를 키우고 상위 비트를 섞어준다 — 실제 부서명 14개로 확인해 7색을 고루 쓴다.
       const s = String(cat || '');
       let h = 0;
-      for (let i = 0; i < s.length; i++) h = (h * 131 + s.charCodeAt(i)) >>> 0;
-      h = (h ^ (h >>> 13)) >>> 0;
-      return `cat-p${h % 7}`;
+      for (let i = 0; i < s.length; i++) h = (h * 101 + s.charCodeAt(i)) >>> 0;
+      h = (h ^ (h >>> 7)) >>> 0;
+      return `cat-p${h % 14}`;
     }
 
     /* 📖 읽은 공지 기억 — 서버가 없는 구조라 이 PC에만 저장한다(로컬 전용). */
@@ -14970,9 +14975,10 @@
         counts[c] = (counts[c] || 0) + 1;
       });
       const options = getBoardCategoryOptions();
-      // 목록에만 있는 옛 카테고리도 칩에 포함
+      // 목록에만 있는 옛 카테고리도 칩에 포함 — 단 '전체'는 사용자 요청으로 없앤 카테고리라
+      // 예전 공지에 그 값으로 저장된 게 남아있어도 칩으로 되살리지 않는다('모두'로만 보임).
       Object.keys(counts).forEach((c) => {
-        if (!options.includes(c)) options.push(c);
+        if (c !== '전체' && !options.includes(c)) options.push(c);
       });
       const chips = [{ key: '__all__', label: '모두', count: (notices || []).length }]
         .concat(options.map((c) => ({ key: c, label: boardCategoryLabel(c), count: counts[c] || 0 })));
@@ -14997,13 +15003,17 @@
       const sel = document.getElementById('board-write-category');
       if (!sel) return;
       const options = getBoardCategoryOptions();
-      const cur = normalizeBoardCategory(selected);
+      // selected가 없으면(신규 작성인데 내 부서 정보도 없는 경우) '전체'로 떨어지지 않게
+      // 직접 빈 값을 판별한다 — normalizeBoardCategory의 기본값 '전체'는 기존 데이터 호환용이라
+      // 여기서는 쓰지 않는다.
+      const trimmed = String(selected == null ? '' : selected).trim();
+      const cur = trimmed && trimmed !== '전체' ? trimmed : '';
       if (cur && !options.includes(cur)) options.unshift(cur);
       sel.innerHTML = options.map((c) => {
-        const hint = c === '전체' ? '전사 공지' : (c === '업데이트' ? '업데이트 내용' : '부서 공지');
+        const hint = c === '업데이트' ? '업데이트 내용' : '부서 공지';
         return `<option value="${escapeHtml(c)}">${escapeHtml(boardCategoryLabel(c))} · ${hint}</option>`;
       }).join('');
-      sel.value = options.includes(cur) ? cur : '전체';
+      sel.value = (cur && options.includes(cur)) ? cur : options[0];
     }
 
     function getFilteredNoticesList() {
@@ -15208,9 +15218,9 @@
         document.getElementById('board-write-title').value = '';
         document.getElementById('board-write-content').value = '';
         boardWriteImages = [];
-        // 기본: 내 부서가 있으면 부서, 없으면 전체
+        // 기본: 내 부서가 있으면 부서, 없으면 목록 첫 항목(업데이트) — '전체'는 없앤 카테고리라 기본값으로 쓰지 않는다.
         const myDept = (myProfile && myProfile.dept) ? String(myProfile.dept).trim() : '';
-        fillBoardWriteCategorySelect(myDept || '전체');
+        fillBoardWriteCategorySelect(myDept || '');
         if (submitBtn) submitBtn.textContent = '✔ 등록';
       }
       renderBoardPhotoPreview();
