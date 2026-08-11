@@ -3360,6 +3360,143 @@ async function stashAndReplaceMessengerDb(sourcePathOrNull) {
 }
 
 /**
+ * 진짜 페이지 손상(SQLITE_CORRUPT: database disk image is malformed)이 났을 때, 백업으로
+ * 통째로 되돌리는 대신(그러면 백업 이후 대화가 전부 사라진다) 손상된 파일에서 "읽을 수 있는
+ * 만큼" 최대한 건져낸다.
+ *
+ * 원리: 손상은 대개 파일의 일부 페이지에만 있다. 한 테이블을 SELECT * 로 훑다가 손상된
+ * 페이지를 만나면 그 시점에 SQLITE_CORRUPT로 멈추지만, 그 전까지 읽은 행들은 이미 정상
+ * 읽어들인 것이다. node-sqlite3의 each()는 행을 하나씩 콜백으로 넘겨주므로, 늦게 실패하는
+ * SELECT라도 그 전까지 넘어온 행은 별도의 새 DB 파일에 그대로 옮겨 담을 수 있다 — 테이블
+ * 하나를 통째로 포기하지 않고 부분 손실로 줄인다.
+ *
+ * 절대 원본을 건드리지 않는다: 원본은 읽기 전용으로만 열고, 결과는 별도의 새 파일에 쓴다.
+ * 실제로 이 복구본을 적용할지는 관리자가 결과를 보고 별도로 결정한다(apply-recovered-database).
+ */
+function recoverReadableRowsFromCorruptDb(sourcePath) {
+  return new Promise((resolve, reject) => {
+    const srcDb = new sqlite3.Database(sourcePath, sqlite3.OPEN_READONLY, (openErr) => {
+      if (openErr) { reject(openErr); return; }
+      srcDb.all(
+        `SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
+        [],
+        async (masterErr, tables) => {
+          if (masterErr || !tables || !tables.length) {
+            srcDb.close(() => reject(masterErr || new Error('테이블 목록을 읽을 수 없습니다(카탈로그도 손상됨)')));
+            return;
+          }
+          const recoveredPath = path.join(
+            app.getPath('userData'),
+            `mirae_messenger.recovered_${Date.now()}.db`
+          );
+          await fs.promises.unlink(recoveredPath).catch(() => {});
+          const dstDb = new sqlite3.Database(recoveredPath, (dstOpenErr) => {
+            if (dstOpenErr) { srcDb.close(() => reject(dstOpenErr)); return; }
+            dstDb.run(`PRAGMA journal_mode = WAL`);
+            const report = [];
+            let idx = 0;
+
+            const nextTable = () => {
+              if (idx >= tables.length) {
+                dstDb.run(`PRAGMA wal_checkpoint(TRUNCATE)`, () => {
+                  dstDb.close(() => {
+                    srcDb.close(() => resolve({ recoveredPath, report }));
+                  });
+                });
+                return;
+              }
+              const t = tables[idx];
+              idx += 1;
+              // chat_pins류는 기능이 없어졌으므로 복구 대상에서 제외한다.
+              if (t.name === 'chat_pins' || t.name === 'deleted_chat_pins') { nextTable(); return; }
+              if (!t.sql) { report.push({ table: t.name, recovered: 0, error: '테이블 정의를 읽을 수 없음' }); nextTable(); return; }
+              dstDb.run(t.sql, (createErr) => {
+                if (createErr) {
+                  report.push({ table: t.name, recovered: 0, error: createErr.message });
+                  nextTable();
+                  return;
+                }
+                let recovered = 0;
+                let rowError = null;
+                srcDb.each(
+                  `SELECT * FROM "${t.name.replace(/"/g, '""')}"`,
+                  (rowErr, row) => {
+                    if (rowErr) { rowError = rowError || rowErr; return; }
+                    if (!row) return;
+                    const cols = Object.keys(row);
+                    if (!cols.length) return;
+                    const placeholders = cols.map(() => '?').join(',');
+                    const colList = cols.map((c) => `"${c.replace(/"/g, '""')}"`).join(',');
+                    dstDb.run(
+                      `INSERT INTO "${t.name.replace(/"/g, '""')}" (${colList}) VALUES (${placeholders})`,
+                      cols.map((c) => row[c]),
+                      (insErr) => { if (insErr) rowError = rowError || insErr; }
+                    );
+                    recovered += 1;
+                  },
+                  (eachErr, count) => {
+                    if (eachErr) rowError = rowError || eachErr;
+                    report.push({
+                      table: t.name,
+                      recovered,
+                      attempted: typeof count === 'number' ? count : null,
+                      error: rowError ? rowError.message : null
+                    });
+                    nextTable();
+                  }
+                );
+              });
+            };
+            nextTable();
+          });
+        }
+      );
+    });
+  });
+}
+
+/** 복구 결과를 적용: 지금 db를 닫고, 손상 원본은 지우지 않고 이름을 바꿔 보관한 뒤,
+ * 복구본을 실제 파일 자리에 놓고 재시작한다. */
+async function applyRecoveredDatabase(recoveredPath) {
+  await new Promise((resolve) => checkpointWalPassive().finally(resolve));
+  await new Promise((resolve) => db.close(() => resolve()));
+  const stamp = Date.now();
+  const corruptedCopy = `${dbPath}.corrupted_manual_${stamp}`;
+  await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
+  await fs.promises.copyFile(`${dbPath}-wal`, `${corruptedCopy}-wal`).catch(() => {});
+  await fs.promises.copyFile(`${dbPath}-shm`, `${corruptedCopy}-shm`).catch(() => {});
+  await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
+  await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+  await fs.promises.unlink(`${recoveredPath}-wal`).catch(() => {});
+  await fs.promises.unlink(`${recoveredPath}-shm`).catch(() => {});
+  await fs.promises.copyFile(recoveredPath, dbPath);
+  app.relaunch();
+  app.exit(0);
+}
+
+ipcMain.handle('recover-corrupt-database', async () => {
+  try {
+    const { recoveredPath, report } = await recoverReadableRowsFromCorruptDb(dbPath);
+    return { success: true, recoveredPath, report };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+ipcMain.handle('apply-recovered-database', async (event, recoveredPath) => {
+  try {
+    if (!recoveredPath || !fs.existsSync(recoveredPath)) {
+      return { success: false, msg: '복구 파일을 찾을 수 없습니다.' };
+    }
+    await applyRecoveredDatabase(recoveredPath);
+    return { success: true };
+  } catch (e) {
+    console.error('복구본 적용 실패:', e && e.message);
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+/**
  * SQLITE_CORRUPT 등 감지 시: 연결 종료 → 건전한 자동백업으로 교체 → 재시작.
  * 백업이 없으면 WAL 정리 후, 본파일이 여전히 나쁘면 빈 DB로 재시작.
  */
@@ -3389,6 +3526,12 @@ function scheduleDbCorruptRecovery(reason) {
     // 재시작하지 않는다. 백업으로 덮어쓰지도, 빈 DB로 만들지도 않는다.
     console.error('[DB] 자동 백업 복구는 비활성화되어 있음 — 앱을 계속 실행합니다');
     writeToLogFile('warn', '[DB] 자동 복구 비활성화 — 재시작/백업복원 없이 계속 실행');
+    // 다만 사용자가 손을 놓고 있지 않도록, 설정 화면에 "손상 복구" 카드를 띄울 수 있게
+    // 감지 사실만 알린다(자동으로 아무것도 하지 않음 — 손상된 만큼만 읽어서 새 파일로
+    // 옮겨보는 복구는 관리자가 설정에서 직접 눌러야 시작된다).
+    if (mainWindow) {
+      try { safeWebContentsSend('db-corruption-detected', { reason: String(reason || '') }); } catch (_) { /* ignore */ }
+    }
     return;
   }
 

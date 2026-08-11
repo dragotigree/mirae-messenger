@@ -125,6 +125,7 @@ contextBridge.exposeInMainWorld('api', {
   clearChatPin: (channelKey) => ipcRenderer.invoke('clear-chat-pin', channelKey),
   onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
   onDbCorruptRecovery: (callback) => ipcRenderer.on('db-corrupt-recovery', (e, data) => callback(data)),
+  onDbCorruptionDetected: (callback) => ipcRenderer.on('db-corruption-detected', (e, data) => callback(data)),
 
   // 🩺 당직의 / 의료진 OFF
   getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),
@@ -141,6 +142,8 @@ contextBridge.exposeInMainWorld('api', {
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
   clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),
+  recoverCorruptDatabase: () => ipcRenderer.invoke('recover-corrupt-database'),
+  applyRecoveredDatabase: (recoveredPath) => ipcRenderer.invoke('apply-recovered-database', recoveredPath),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),
   setNotificationPreviewSetting: (enabled) => ipcRenderer.invoke('set-notification-preview-setting', enabled),
   getMessageNotificationSettings: () => ipcRenderer.invoke('get-message-notification-settings'),
