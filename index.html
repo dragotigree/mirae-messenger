@@ -2159,17 +2159,10 @@
       color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; font-family: inherit;
     }
     .code-alert-btn-send.is-red { background: var(--danger); }
-    /* ✍️ 작성자 로그인 — 좌: 안내 패널 / 우: 입력 폼 */
+    /* ✍️ 작성자 로그인 — 로고 없이 입력 폼 한 단으로 */
     #operator-login-modal .modal-card.signin-card {
-      width: min(680px, 94vw); padding: 0; overflow: hidden; gap: 0;
-      display: grid; grid-template-columns: 240px 1fr; align-items: stretch;
+      width: min(400px, 94vw); padding: 0; overflow: hidden;
     }
-    .signin-promo {
-      background: var(--sidebar-active);
-      padding: 26px 22px; display: flex; align-items: center; justify-content: center;
-      min-width: 0;
-    }
-    .signin-promo-logo { max-width: 100%; max-height: 160px; object-fit: contain; }
     .signin-panel { padding: 34px 34px 26px; display: flex; flex-direction: column; min-width: 0; }
     .signin-title { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); }
     .signin-hint { margin: 8px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); font-weight: 500; }
@@ -2200,10 +2193,7 @@
       font-family: inherit; cursor: pointer; border-radius: var(--radius-sm);
     }
     .signin-cancel:hover { background: var(--border-soft); color: var(--text-secondary); }
-    /* 창이 좁으면(미니 모드 등) 안내 패널을 접고 폼만 보여준다 */
     @media (max-width: 620px) {
-      #operator-login-modal .modal-card.signin-card { grid-template-columns: 1fr; }
-      .signin-promo { display: none; }
       .signin-panel { padding: 26px 22px 20px; }
     }
 
@@ -6375,10 +6365,6 @@
   <!-- ✍️ 작성자 로그인 모달 -->
   <div id="operator-login-modal" class="modal-overlay">
     <div class="modal-card signin-card" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="operator-login-title">
-      <aside class="signin-promo" aria-hidden="true">
-        <!-- TODO: 미래병원 로고 파일을 받으면 여기 <img>로 교체 (assets/mirae-hospital-logo.png 등) -->
-        <img class="signin-promo-logo" src="assets/mirae-hospital-logo.png" alt="미래병원" onerror="this.style.display='none'">
-      </aside>
       <section class="signin-panel">
         <h2 class="signin-title" id="operator-login-title">작성자 로그인</h2>
         <p class="signin-hint" id="operator-login-hint">공지·병원 일정·당직의·OFF를 작성하려면 마스터에게 발급받은 아이디로 로그인하세요. 마스터 아이디로도 로그인할 수 있습니다.</p>
