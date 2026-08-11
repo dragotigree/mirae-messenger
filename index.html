@@ -2506,9 +2506,9 @@
     .user-info-modal-card .detail-name { font-size: 18px; letter-spacing: -0.02em; }
     .user-info-modal-card .detail-dept-line { font-size: 14px; line-height: 1.4; }
     .user-info-modal-card .detail-info-group { gap: 7px; margin-top: 10px; }
-    .user-info-modal-card .detail-info-row { padding: 11px 14px; font-size: 14.5px; border-radius: 12px; gap: 10px; }
-    .user-info-modal-card .detail-info-label { font-size: 13.5px; }
-    .user-info-modal-card .detail-info-value { font-size: 14.5px; }
+    .user-info-modal-card .detail-info-row { padding: 12px 16px; font-size: 17px; border-radius: 12px; gap: 10px; }
+    .user-info-modal-card .detail-info-label { font-size: 15px; }
+    .user-info-modal-card .detail-info-value { font-size: 17px; }
     .user-info-modal-card .detail-self-edit-btn { font-size: 13.5px; padding: 10px 14px; margin-top: 12px; }
     .user-info-modal-card .group-detail-members-heading { font-size: 13.5px; margin-bottom: 6px; }
     .user-info-modal-card .group-member-row { padding: 10px 12px; gap: 12px; }
@@ -5222,7 +5222,7 @@
           <div class="detail-info-row"><span class="detail-info-label">내선번호</span><span class="detail-info-value" id="detail-ext">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">휴대폰번호</span><span class="detail-info-value" id="detail-phone">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">마지막 접속</span><span class="detail-info-value" id="detail-last-seen">-</span></div>
-          <div class="detail-info-row detail-note-row" id="detail-note-row" style="display:none;"><span class="detail-info-label">비고</span><span class="detail-info-value" id="detail-note">-</span></div>
+          <div class="detail-info-row detail-note-row" id="detail-note-row"><span class="detail-info-label">비고</span><span class="detail-info-value" id="detail-note">-</span></div>
         </div>
         <button type="button" id="detail-self-edit-btn" class="detail-self-edit-btn" style="display:none;" onclick="ctxEditMyDetails()">✏️ 내 상세정보 수정</button>
       </div>
@@ -17222,15 +17222,10 @@
         const isSelf = !!(u.isMe || (myProfile && u.ip && u.ip === myProfile.ip));
         selfEditBtn.style.display = isSelf ? 'block' : 'none';
       }
-      const noteRow = document.getElementById('detail-note-row');
-      if (noteRow) {
+      const noteEl = document.getElementById('detail-note');
+      if (noteEl) {
         const noteText = (u.note && String(u.note).trim()) || '';
-        if (noteText) {
-          document.getElementById('detail-note').textContent = noteText;
-          noteRow.style.display = 'flex';
-        } else {
-          noteRow.style.display = 'none';
-        }
+        noteEl.textContent = noteText || '없음';
       }
     }
 
