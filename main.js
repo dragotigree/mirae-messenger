@@ -414,7 +414,7 @@ const SENT_ACK_MAX_RETRIES = 20;
  * 다시 접속하면 몇 년 전 메시지가 재전송될 수도 있었다.
  * (아직 한 번도 못 보낸 PENDING은 여기서 제외 — 상대가 돌아오면 반드시 전달돼야 하므로.)
  */
-const SENT_ACK_RESEND_WINDOW = "-3 days";
+const SENT_ACK_RESEND_WINDOW = "-7 days";
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 /** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
