@@ -2934,10 +2934,17 @@ const db = new sqlite3.Database(dbPath);
 // 따로 처리한다.
 db.serialize(() => {
   db.run('DROP TABLE IF EXISTS chat_pins', (err) => {
-    if (err) console.error('[DB] chat_pins 정리 실패(무시):', err.message);
+    if (err) {
+      console.error('[DB] chat_pins 정리 실패(무시):', err.message);
+      // 이게 실패하면 아래 복구 경로가 돌면서 앱이 재시작될 수 있으므로 파일에도 남긴다.
+      try { writeToLogFile('error', `[DB] 부팅 시 chat_pins DROP 실패: ${err.message}`); } catch (e) { /* ignore */ }
+    }
   });
   db.run('DROP TABLE IF EXISTS deleted_chat_pins', (err) => {
-    if (err) console.error('[DB] deleted_chat_pins 정리 실패(무시):', err.message);
+    if (err) {
+      console.error('[DB] deleted_chat_pins 정리 실패(무시):', err.message);
+      try { writeToLogFile('error', `[DB] 부팅 시 deleted_chat_pins DROP 실패: ${err.message}`); } catch (e) { /* ignore */ }
+    }
   });
 });
 
@@ -3140,12 +3147,17 @@ function tryRepairBenignSchemaConflict(err) {
       writeToLogFile('warn', `[DB] chat_pins 복구 ${attempt}회 초과 — 재시작 중단, 계속 실행`);
       return true;
     }
+    // ⚠️ 이 경로는 앱을 재시작시키므로, 반드시 로그 파일에도 남겨야 한다. 예전엔
+    // console.error로만 남겨서, 정작 사용자가 보내준 로그 파일에는 "Database is closed"
+    // 같은 뒤따르는 증상만 보이고 진짜 원인(이 줄)은 안 보였다 — 원인 파악이 며칠 늦어진 이유.
     console.error(`[DB] chat_pins 관련 스키마 손상 감지("${table}") — 관련 카탈로그 행 정리 시도:`, err && err.message);
-    hardWipeChatPinArtifacts().then(() => {
+    writeToLogFile('error', `[DB] chat_pins 관련 스키마 손상 감지("${table}") — 정리 후 재시작 예정 (${attempt}회째): ${err && err.message}`);
+    hardWipeChatPinArtifacts().then((ok) => {
       // 성공/실패와 무관하게 재연결이 필요하다(db가 위에서 close됨) — 부가 기능이라
       // 정리가 설사 실패해도 백업 복구로 확대하지 않는다.
       // ⚠️ 여기서 카운터를 리셋하면 안 된다. 리셋하면 "고쳤다고 믿고 재시작 → 또 같은
       // 손상 → 또 고쳤다고 믿고 재시작"이 영원히 반복되어 위의 상한선이 무의미해진다.
+      writeToLogFile('error', `[DB] chat_pins 정리 ${ok ? '성공' : '실패'} — 재연결을 위해 재시작합니다`);
       relaunchWithoutBackupRestore();
     });
     return true;
