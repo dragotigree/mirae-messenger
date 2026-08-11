@@ -2236,6 +2236,8 @@
     .capture-source-card .capture-source-name { font-size: 11px; font-weight: 600; color: #334155; margin-top: 6px; line-height: 1.35; word-break: break-all; }
     .quick-phrase-item { padding: 9px 10px; font-size: 12px; border-radius: var(--radius-md); cursor: pointer; color: var(--text-primary); transition: background var(--transition-fast); }
     .quick-phrase-item:hover { background: var(--surface-muted); }
+    /* 방향키로 고른 항목 — 마우스 hover와 같은 정도로만 표시해 눈에 안 튀게 */
+    .quick-phrase-item.is-active { background: var(--sidebar-active); color: var(--accent-dark); }
     .quick-phrase-manage-row { border-top: 1px solid var(--border-soft); margin-top: 6px; padding-top: 6px; font-size: 11px; color: var(--accent); cursor: pointer; text-align: center; font-weight: 700; }
     .quick-phrase-popover-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 6px; }
     .quick-phrase-popover-title { font-size: 11px; font-weight: 700; color: #94a3b8; }
@@ -17744,7 +17746,6 @@
 
     function getChatSlashCommands() {
       return [
-        { keys: ['help', '도움', '?'], label: '/도움', desc: '명령어 목록' },
         { keys: ['search', '검색'], label: '/검색', desc: '대화 내용 검색' },
         { keys: ['schedule', '예약'], label: '/예약', desc: '예약 메시지 등록' },
         { keys: ['urgent', '긴급'], label: '/긴급', desc: '긴급 메시지 표시 켜기/끄기' },
@@ -17768,21 +17769,15 @@
       return { cmd, args };
     }
 
-    async function showChatSlashHelp() {
-      const lines = getChatSlashCommands().map((c) => `${c.label} — ${c.desc}`);
-      await appAlert(['채팅 명령어 (전송 시 실행)', '', ...lines].join('\n'));
-    }
-
     async function tryExecuteChatSlashCommand(text) {
       const parsed = parseChatSlashInput(text);
       if (!parsed) return false;
       if (parsed.incomplete) {
-        await showChatSlashHelp();
+        // 「/」만 입력한 상태 — 자동완성 목록이 이미 떠 있으므로 따로 안내를 띄우지 않는다.
         return true;
       }
       const { cmd } = parsed;
       const run = async () => {
-        if (['help', '도움', '?'].includes(cmd)) { await showChatSlashHelp(); return; }
         if (['search', '검색'].includes(cmd)) { openChatSearchBarForShortcut(); return; }
         if (['schedule', '예약'].includes(cmd)) { openScheduleMessageModal(); return; }
         if (['urgent', '긴급'].includes(cmd)) { toggleUrgentMode(); return; }
@@ -17792,7 +17787,7 @@
         if (['code', '코드'].includes(cmd)) { openCodeAlertModal(); return; }
         if (['clear', '비우기'].includes(cmd)) { await clearActiveChatView(); return; }
         if (['draw', '그림'].includes(cmd)) { openExcalidrawForChat(); return; }
-        await appAlert(`알 수 없는 명령어: /${cmd}\n/도움 으로 목록을 볼 수 있습니다.`);
+        await appAlert(`알 수 없는 명령어: /${cmd}\n입력창에 「/」만 치면 사용할 수 있는 명령어가 표시됩니다.`);
       };
       try {
         await run();
@@ -18474,7 +18469,12 @@
       closeScreenCapturePopover();
       const willShow = pop.style.display !== 'block';
       pop.style.display = willShow ? 'block' : 'none';
-      if (willShow) renderQuickPhrasePopover();
+      if (willShow) {
+        renderQuickPhrasePopover();
+        // 방향키·Enter를 받으려면 입력창에 포커스가 있어야 한다(키 처리는 onChatKeyDown에서 함).
+        const ta = document.getElementById('chat-textarea');
+        if (ta) ta.focus();
+      }
     }
 
     let screenCropState = { dataUrl: null, sel: null };
@@ -18908,9 +18908,47 @@
       const pop = document.getElementById('quick-phrase-popover');
       if (pop) pop.style.display = 'none';
     }
+    /* 빠른 문구 팝오버도 / 명령어 목록처럼 위·아래 방향키로 고르고 Enter로 넣을 수 있게 한다.
+       (마우스를 안 쓰고 키보드만으로 이어서 입력하려면 필요하다.) */
+    let quickPhraseActiveIndex = -1;
+    function isQuickPhrasePopoverOpen() {
+      const pop = document.getElementById('quick-phrase-popover');
+      return !!pop && pop.style.display === 'block';
+    }
+    function syncQuickPhraseActiveItem() {
+      const pop = document.getElementById('quick-phrase-popover');
+      if (!pop) return;
+      const items = [...pop.querySelectorAll('.quick-phrase-item')];
+      items.forEach((el, i) => el.classList.toggle('is-active', i === quickPhraseActiveIndex));
+      const active = items[quickPhraseActiveIndex];
+      if (active && typeof active.scrollIntoView === 'function') {
+        active.scrollIntoView({ block: 'nearest' });
+      }
+    }
+    function moveQuickPhraseSelection(delta) {
+      const pop = document.getElementById('quick-phrase-popover');
+      if (!pop) return;
+      const count = pop.querySelectorAll('.quick-phrase-item').length;
+      if (!count) return;
+      quickPhraseActiveIndex = quickPhraseActiveIndex < 0
+        ? (delta > 0 ? 0 : count - 1)
+        : (quickPhraseActiveIndex + delta + count) % count;
+      syncQuickPhraseActiveItem();
+    }
+    function applyQuickPhraseSelection() {
+      const pop = document.getElementById('quick-phrase-popover');
+      if (!pop) return false;
+      const items = [...pop.querySelectorAll('.quick-phrase-item')];
+      const active = items[quickPhraseActiveIndex];
+      if (!active) return false;
+      insertQuickPhrase(active.textContent);
+      return true;
+    }
+
     function renderQuickPhrasePopover() {
       const pop = document.getElementById('quick-phrase-popover');
       pop.innerHTML = '';
+      quickPhraseActiveIndex = -1;
       const header = document.createElement('div');
       header.className = 'quick-phrase-popover-header';
       header.innerHTML = `
@@ -18918,11 +18956,15 @@
         <button type="button" class="quick-phrase-close-btn" onclick="closeQuickPhrasePopover()" title="닫기" aria-label="닫기">✕</button>
       `;
       pop.appendChild(header);
-      quickPhrases.forEach((phrase) => {
+      quickPhrases.forEach((phrase, i) => {
         const item = document.createElement('div');
         item.className = 'quick-phrase-item';
         item.textContent = phrase;
         item.onclick = () => insertQuickPhrase(phrase);
+        item.addEventListener('mouseenter', () => {
+          quickPhraseActiveIndex = i;
+          syncQuickPhraseActiveItem();
+        });
         pop.appendChild(item);
       });
       const manageRow = document.createElement('div');
@@ -23698,6 +23740,20 @@
 
     function onChatKeyDown(e) {
       if (e.isComposing || e.keyCode === 229) return;
+      // 빠른 문구 목록이 떠 있으면 위/아래로 고르고 Enter로 넣는다(Esc로 닫기).
+      if (isQuickPhrasePopoverOpen()) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeQuickPhrasePopover();
+          return;
+        }
+        if (e.key === 'ArrowDown') { e.preventDefault(); moveQuickPhraseSelection(1); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); moveQuickPhraseSelection(-1); return; }
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+          // 아직 아무것도 고르지 않았으면 평소대로 전송되게 둔다.
+          if (applyQuickPhraseSelection()) { e.preventDefault(); return; }
+        }
+      }
       const pop = document.getElementById('chat-slash-popover');
       const popOpen = pop && pop.style.display === 'block';
       if (popOpen) {
