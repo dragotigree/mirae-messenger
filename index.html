@@ -4029,8 +4029,12 @@
     .board-notice-photo-badge .icon-glyph { width: 12px; height: 12px; }
     /* 카드 사이 간격 — 예전에는 목록이 한 덩어리로 붙어 보였다 */
     #board-list-container { display: flex; flex-direction: column; gap: 9px; }
+    .board-filter-row {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+      padding: 2px 0 10px; flex-shrink: 0;
+    }
     .board-category-row {
-      display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px; flex-shrink: 0;
+      display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0;
     }
     .board-category-chip {
       flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-soft);
@@ -4039,6 +4043,14 @@
     }
     .board-category-chip:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark); }
     .board-category-chip.is-active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+    .board-unread-toggle {
+      display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    }
+    .board-unread-toggle-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);
+    }
+    .board-unread-toggle.is-active { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+    .board-unread-toggle.is-active .board-unread-toggle-dot { background: var(--accent); }
     .board-write-category-row {
       display: flex; flex-direction: column; gap: 6px; margin-top: 2px;
     }
@@ -5740,7 +5752,12 @@
                  oninput="onBoardSearchInput(this.value)">
           <button type="button" class="board-search-clear" id="board-search-clear" onclick="clearBoardSearch()" title="검색어 지우기" hidden>✕</button>
         </div>
-        <div class="board-category-row" id="board-category-filters" aria-label="공지 카테고리"></div>
+        <div class="board-filter-row">
+          <div class="board-category-row" id="board-category-filters" aria-label="공지 카테고리"></div>
+          <button type="button" class="board-category-chip board-unread-toggle" id="board-unread-toggle" onclick="toggleBoardUnreadOnly()" title="안 읽은 공지만 보기">
+            <span class="board-unread-toggle-dot"></span>안읽음
+          </button>
+        </div>
         <div id="board-list-container" style="flex:1;"></div>
       </div>
 
@@ -14617,6 +14634,9 @@
       boardSearchKeyword = '';
       const searchClear = document.getElementById('board-search-clear');
       if (searchClear) searchClear.hidden = true;
+      boardUnreadOnly = false;
+      const unreadBtn = document.getElementById('board-unread-toggle');
+      if (unreadBtn) unreadBtn.classList.remove('is-active');
       refreshNoticePermission();
       updateBoardAuthStatusText();
       showBoardListView();
@@ -15015,10 +15035,22 @@
       sel.value = (cur && options.includes(cur)) ? cur : options[0];
     }
 
+    let boardUnreadOnly = false;
+    function toggleBoardUnreadOnly() {
+      boardUnreadOnly = !boardUnreadOnly;
+      const btn = document.getElementById('board-unread-toggle');
+      if (btn) btn.classList.toggle('is-active', boardUnreadOnly);
+      renderFilteredNoticesList();
+    }
+
     function getFilteredNoticesList() {
       let list = cachedNoticesList || [];
       if (boardCategoryFilter !== '__all__') {
         list = list.filter((n) => normalizeBoardCategory(n.category) === boardCategoryFilter);
+      }
+      if (boardUnreadOnly) {
+        const readSet = getBoardReadUids();
+        list = list.filter((n) => !readSet.has(String((n && n.uid) || '')));
       }
       if (boardSearchKeyword) {
         list = list.filter((n) => {
@@ -15038,6 +15070,8 @@
         let emptyHint;
         if (boardSearchKeyword) {
           emptyHint = `"${escapeHtml(boardSearchKeyword)}" 검색 결과가 없습니다.`;
+        } else if (boardUnreadOnly) {
+          emptyHint = '안 읽은 공지가 없습니다.';
         } else if (boardCategoryFilter === '__all__') {
           emptyHint = `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`;
         } else {
