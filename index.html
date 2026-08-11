@@ -1884,15 +1884,15 @@
       display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end;
     }
     .chat-quick-switcher-kbd {
-      display: inline-flex; align-items: center; gap: 3px;
-      font-size: 10px; font-weight: 600; color: var(--text-muted);
-      padding: 3px 7px; border-radius: var(--radius-sm);
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+      padding: 5px 10px; border-radius: var(--radius-md);
       background: var(--surface-muted);
       letter-spacing: -0.02em;
     }
     .chat-quick-switcher-kbd b {
-      font-size: 10px; font-weight: 700; color: var(--text-secondary);
-      min-width: 14px; text-align: center;
+      font-size: 11.5px; font-weight: 700; color: var(--text-primary);
+      min-width: 16px; text-align: center;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     /* 검색칸 — 다른 검색창(공지 검색 등)과 같은 형태로 통일 */
@@ -1903,7 +1903,9 @@
       transition: border-color var(--transition-fast), background var(--transition-fast);
     }
     .chat-quick-switcher-search-wrap:focus-within {
-      background: var(--surface); border-color: var(--accent);
+      /* 진한 파란 테두리 한 줄보다, 연한 링으로 감싸는 편이 덜 튄다 */
+      background: var(--surface); border-color: var(--sidebar-active);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
     .chat-quick-switcher-search-icon {
       position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
@@ -1977,7 +1979,7 @@
     }
     .chat-quick-switcher-badge {
       font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px;
-      background: var(--accent); color: #fff; letter-spacing: -0.02em;
+      background: var(--sidebar-active); color: var(--accent-dark); letter-spacing: -0.02em;
     }
     /* Enter 안내는 선택된 줄에만 — 평소엔 자리만 잡아두고 숨긴다 */
     .chat-quick-switcher-enter {
