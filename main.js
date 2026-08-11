@@ -4343,7 +4343,7 @@ db.serialize(() => {
       loadPersistedKnownUsers(() => {
         profileOverrides.forEach((ov) => refreshUserAfterProfileOverride(ov.ip));
         notifyUserList();
-      });
+      }, () => notifyUserListNow());
     });
     setTimeout(() => flushAllPendingOutboundMessages(), 1500);
   }
@@ -5924,7 +5924,7 @@ function persistKnownUserSnapshot(u) {
   });
 }
 
-function loadPersistedKnownUsers(callback) {
+function loadPersistedKnownUsers(callback, onQuick) {
   db.all(
     `SELECT * FROM known_users WHERE ip != ?`,
     [MY_IP],
@@ -5946,6 +5946,8 @@ function loadPersistedKnownUsers(callback) {
           allKnownUsers.set(row.ip, applyStoredProfileOverride({ ...fromDb, online: onlineUsers.has(row.ip) }));
         }
       });
+      // known_users 캐시만으로도 목록을 바로 보여준다 — 메시지 보강(N+1 쿼리)은 백그라운드에서 이어서 처리
+      if (onQuick) onQuick();
       supplementKnownUsersFromMessagePeers(callback);
     }
   );
