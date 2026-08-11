@@ -1851,166 +1851,160 @@
       from { opacity: 0; transform: translateY(-14px) scale(0.97); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
+    /* ⌘ 빠른 대화 전환 (Ctrl+1)
+       예전엔 겹친 그라데이션·안쪽 흰 테두리·호버 시 살짝 들리는 효과가 뒤섞여 다른 화면들과
+       따로 놀았다. 앱의 다른 화면들처럼 디자인 토큰만 쓰고, 강조는 선택된 항목 하나에만 준다. */
     .chat-quick-switcher-panel {
       width: min(560px, 94vw); max-height: min(72vh, 580px);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, #fff 48%);
-      border-radius: 20px;
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.65) inset,
-        0 1px 0 rgba(255,255,255,0.8) inset,
-        0 28px 80px rgba(15, 23, 42, 0.28),
-        0 8px 24px rgba(33, 150, 243, 0.08);
-      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: var(--surface);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl);
       display: flex; flex-direction: column; overflow: hidden;
       animation: cqs-panel-in 0.22s var(--ease-spring);
     }
     .chat-quick-switcher-head {
-      padding: 14px 14px 10px; flex-shrink: 0;
-      background:
-        radial-gradient(90% 120% at 10% 0%, rgba(33, 150, 243, 0.08), transparent 55%),
-        linear-gradient(180deg, #f8fbff 0%, #fff 100%);
-      border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+      padding: 16px 16px 12px; flex-shrink: 0;
+      border-bottom: 1px solid var(--border-soft);
     }
     .chat-quick-switcher-head-top {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      margin-bottom: 10px; padding: 0 2px;
+      margin-bottom: 12px; padding: 0 2px;
     }
     .chat-quick-switcher-title {
-      font-size: 12px; font-weight: 800; color: #64748b;
-      letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px;
+      font-size: 12.5px; font-weight: 700; color: var(--text-primary);
+      letter-spacing: -0.02em; display: flex; align-items: center; gap: 7px;
     }
     .chat-quick-switcher-title-mark {
-      width: 18px; height: 18px; border-radius: var(--radius-sm);
+      width: 20px; height: 20px; border-radius: var(--radius-sm);
       background: var(--accent);
-      color: #fff; font-size: 10px; font-weight: 900;
+      color: #fff; font-size: 10px; font-weight: 800;
       display: inline-flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 10px rgba(33, 150, 243, 0.28);
     }
     .chat-quick-switcher-kbds {
       display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end;
     }
     .chat-quick-switcher-kbd {
       display: inline-flex; align-items: center; gap: 3px;
-      font-size: 10px; font-weight: 700; color: #64748b;
-      padding: 3px 6px; border-radius: var(--radius-sm);
-      background: rgba(241, 245, 249, 0.95);
-      border: 1px solid var(--border);
+      font-size: 10px; font-weight: 600; color: var(--text-muted);
+      padding: 3px 7px; border-radius: var(--radius-sm);
+      background: var(--surface-muted);
       letter-spacing: -0.02em;
     }
     .chat-quick-switcher-kbd b {
-      font-size: 10px; font-weight: 800; color: #334155;
+      font-size: 10px; font-weight: 700; color: var(--text-secondary);
       min-width: 14px; text-align: center;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
-    .chat-quick-switcher-search-wrap { position: relative; }
+    /* 검색칸 — 다른 검색창(공지 검색 등)과 같은 형태로 통일 */
+    .chat-quick-switcher-search-wrap {
+      position: relative; display: flex; align-items: center;
+      background: var(--surface-muted); border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      transition: border-color var(--transition-fast), background var(--transition-fast);
+    }
+    .chat-quick-switcher-search-wrap:focus-within {
+      background: var(--surface); border-color: var(--accent);
+    }
     .chat-quick-switcher-search-icon {
       position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-      font-size: 15px; opacity: 0.45; pointer-events: none;
+      display: flex; color: var(--text-muted); pointer-events: none;
     }
+    .chat-quick-switcher-search-icon .icon-glyph { width: 15px; height: 15px; }
     .chat-quick-switcher-search {
       width: 100%; box-sizing: border-box;
-      padding: 14px 14px 14px 42px;
-      border: 1px solid var(--border); border-radius: var(--radius-lg);
-      font-size: 16px; font-weight: 600; letter-spacing: -0.03em;
-      outline: none; background: #fff; color: #0f172a;
+      padding: 13px 14px 13px 40px;
+      border: none; border-radius: var(--radius-lg);
+      font-size: 14.5px; font-weight: 500; letter-spacing: -0.02em;
+      outline: none; background: transparent; color: var(--text-primary);
       font-family: inherit;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      transition: border-color 0.15s, box-shadow 0.15s;
     }
     .chat-quick-switcher-search::placeholder {
-      color: #94a3b8; font-weight: 500;
-    }
-    .chat-quick-switcher-search:focus {
-      border-color: rgba(33, 150, 243, 0.55);
-      box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.14);
+      color: var(--text-muted); font-weight: 400;
     }
     .chat-quick-switcher-list {
-      flex: 1; min-height: 0; overflow: auto; padding: 8px 8px 6px;
-      background: linear-gradient(180deg, #f8fafc 0%, #fff 40px);
+      flex: 1; min-height: 0; overflow: auto; padding: 6px;
     }
     .chat-quick-switcher-list::-webkit-scrollbar { width: 7px; }
     .chat-quick-switcher-list::-webkit-scrollbar-thumb {
       background: rgba(148, 163, 184, 0.4); border-radius: 99px;
     }
     .chat-quick-switcher-section {
-      font-size: 10.5px; font-weight: 800; color: #94a3b8;
-      letter-spacing: 0.02em; padding: 10px 12px 5px;
+      font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+      letter-spacing: 0.02em; padding: 10px 10px 5px;
     }
     .chat-quick-switcher-item {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 12px; border-radius: var(--radius-lg);
-      cursor: pointer; border: 1px solid transparent;
-      transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+      padding: 10px; border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
     }
-    .chat-quick-switcher-item:hover { background: rgba(248, 250, 252, 0.95); }
-    .chat-quick-switcher-item.is-active {
-      background: linear-gradient(90deg, #eff8ff 0%, var(--sidebar-active) 100%);
-      border-color: rgba(144, 202, 249, 0.65);
-      box-shadow: 0 6px 16px rgba(33, 150, 243, 0.08);
-      transform: translateY(-0.5px);
-    }
+    .chat-quick-switcher-item:hover { background: var(--surface-muted); }
+    /* 선택된 항목만 확실히 강조 — 방향키로 훑을 때 지금 어디인지 바로 보이게 */
+    .chat-quick-switcher-item.is-active { background: var(--sidebar-active); }
+    .chat-quick-switcher-item.is-active .chat-quick-switcher-name { color: var(--accent-dark); }
     .chat-quick-switcher-item.is-current .chat-quick-switcher-name { font-weight: 800; }
     .chat-quick-switcher-icon {
-      width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+      width: 38px; height: 38px; border-radius: var(--radius-md); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px; background: var(--border-soft); color: #334155; overflow: hidden;
-      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+      font-size: 17px; background: var(--surface-muted); color: var(--text-secondary); overflow: hidden;
     }
     .chat-quick-switcher-icon.avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
     .chat-quick-switcher-icon.compact-avatar-broadcast,
     .chat-quick-switcher-icon.compact-avatar-group,
     .chat-quick-switcher-icon.compact-avatar-dept,
     .chat-quick-switcher-icon.compact-avatar-floor {
-      color: #fff; box-shadow: none;
+      color: #fff;
     }
     .chat-quick-switcher-body { min-width: 0; flex: 1; }
     .chat-quick-switcher-name {
-      font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.03em;
+      font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.02em;
     }
     .chat-quick-switcher-name mark {
-      background: rgba(33, 150, 243, 0.18); color: var(--accent-dark);
-      border-radius: 3px; padding: 0 1px; font-weight: 800;
+      background: var(--accent-soft); color: var(--accent-dark);
+      border-radius: 3px; padding: 0 2px; font-weight: 700;
     }
     .chat-quick-switcher-sub {
-      font-size: 11.5px; color: #64748b; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.3;
+      font-size: 11.5px; color: var(--text-secondary); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.35;
     }
     .chat-quick-switcher-sub mark {
-      background: rgba(33, 150, 243, 0.14); color: var(--accent-dark);
-      border-radius: 3px; padding: 0 1px;
+      background: var(--accent-soft); color: var(--accent-dark);
+      border-radius: 3px; padding: 0 2px;
     }
     .chat-quick-switcher-meta {
       display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
     }
     .chat-quick-switcher-badge {
-      font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 99px;
-      background: var(--sidebar-active); color: var(--accent-dark); letter-spacing: -0.02em;
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px;
+      background: var(--accent); color: #fff; letter-spacing: -0.02em;
     }
+    /* Enter 안내는 선택된 줄에만 — 평소엔 자리만 잡아두고 숨긴다 */
     .chat-quick-switcher-enter {
-      opacity: 0; font-size: 10px; font-weight: 800; color: var(--accent-dark);
+      opacity: 0; font-size: 10px; font-weight: 700; color: var(--text-muted);
       padding: 3px 7px; border-radius: var(--radius-sm);
-      background: rgba(224, 242, 254, 0.9); border: 1px solid var(--sidebar-active);
-      transition: opacity 0.12s;
+      background: var(--surface-muted);
+      transition: opacity var(--transition-fast);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
-    .chat-quick-switcher-item.is-active .chat-quick-switcher-enter { opacity: 1; }
+    .chat-quick-switcher-item.is-active .chat-quick-switcher-enter {
+      opacity: 1; background: var(--surface); color: var(--accent-dark);
+    }
     .chat-quick-switcher-empty {
-      text-align: center; color: #94a3b8; font-size: 13px; padding: 40px 16px; line-height: 1.6;
+      text-align: center; color: var(--text-secondary); font-size: 13px; padding: 44px 16px; line-height: 1.6;
     }
     .chat-quick-switcher-empty-icon {
-      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: var(--radius-lg);
+      width: 52px; height: 52px; margin: 0 auto 14px; border-radius: var(--radius-lg);
       display: flex; align-items: center; justify-content: center; font-size: 22px;
-      background: #fff; border: 1px solid #e8edf2;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+      background: var(--sidebar-active); color: var(--accent);
     }
     .chat-quick-switcher-foot {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
-      gap: 8px; padding: 8px 14px 10px;
-      border-top: 1px solid #eef2f6; background: #fafbfc;
-      font-size: 10.5px; color: #94a3b8; font-weight: 600;
+      gap: 8px; padding: 10px 16px;
+      border-top: 1px solid var(--border-soft); background: var(--surface-muted);
+      font-size: 10.5px; color: var(--text-muted); font-weight: 500;
     }
-    .chat-quick-switcher-foot-count b { color: var(--accent-dark); font-weight: 800; }
+    .chat-quick-switcher-foot-count b { color: var(--accent-dark); font-weight: 700; }
 
     .btn-schedule, .btn-quickphrase, .btn-capture {
       display: inline-flex; align-items: center; justify-content: center;
@@ -5582,7 +5576,7 @@
           </div>
         </div>
         <div class="chat-quick-switcher-search-wrap">
-          <span class="chat-quick-switcher-search-icon" aria-hidden="true">🔍</span>
+          <span class="chat-quick-switcher-search-icon" aria-hidden="true" data-ui-icon="search"></span>
           <input type="text" id="chat-quick-switcher-search" class="chat-quick-switcher-search" placeholder="이름·채널·대화 검색..." autocomplete="off" spellcheck="false" oninput="onChatQuickSwitcherFilterInput(this.value)">
         </div>
       </div>
@@ -11844,7 +11838,7 @@
           <div class="chat-quick-switcher-empty">
             <div class="chat-quick-switcher-empty-icon">🔎</div>
             일치하는 채널·대화가 없습니다.<br>
-            <span style="font-size:11.5px; color:#cbd5e1;">다른 이름이나 채널로 검색해 보세요.</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">다른 이름이나 채널로 검색해 보세요.</span>
           </div>`;
         return;
       }
