@@ -399,7 +399,22 @@ const FILE_XFER_ASSEMBLE_TIMEOUT_MS = 8 * 60 * 1000;
 const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
-const SENT_ACK_MAX_RETRIES = 4;
+/**
+ * 재전송 상한. 재전송은 15초 주기 flush에서 일어나므로 20회 ≈ 5분간 시도한다.
+ * ⚠️ 이 값은 NETWORK_QUIET_MS(45초, 상대 PC가 막 켜졌을 때 TCP가 아직 안 열린 구간)보다
+ * 넉넉히 길어야 한다. 예전 값(4회 ≈ 1분)은 이 구간을 겨우 넘기는 수준이었는데, 상한 자체가
+ * 버그로 동작하지 않아서(카운터를 지워 0으로 되돌림) 우연히 계속 재시도되며 가려져 있었다.
+ * 상한을 제대로 고치는 이상, 이 값이 quiet 구간을 확실히 덮어야 메시지가 유실되지 않는다.
+ */
+const SENT_ACK_MAX_RETRIES = 20;
+/**
+ * ACK를 못 받은 SENT 메시지를 언제까지 재전송 대상으로 볼지.
+ * ⚠️ 예전엔 하한이 없어서 몇 년 전 메시지까지 15초마다 전부 다시 조회했다. 대화를 몇 년
+ * 보관하는 정책이라 시간이 갈수록 이 주기 조회가 계속 무거워졌고, 오래 전에 떠난 상대가
+ * 다시 접속하면 몇 년 전 메시지가 재전송될 수도 있었다.
+ * (아직 한 번도 못 보낸 PENDING은 여기서 제외 — 상대가 돌아오면 반드시 전달돼야 하므로.)
+ */
+const SENT_ACK_RESEND_WINDOW = "-3 days";
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 /** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
@@ -9112,15 +9127,17 @@ function deliverPendingChatRow(row, targetIP) {
 
   // SENT·PENDING 모두 재시도 상한 — ACK 실패 시 무한 재전송으로 수신측 폭주 방지
   const retryKey = row.msg_uid ? String(row.msg_uid) : inflightKey;
-  const tries = sentAckRetryCount.get(retryKey) || 0;
+  const rec = sentAckRetryCount.get(retryKey);
+  const tries = (rec && typeof rec.n === 'number') ? rec.n : 0;
   if (tries >= SENT_ACK_MAX_RETRIES) {
-    // 상한에 도달한 항목은 더 조회되지 않으므로 카운터를 지운다 — 장시간 켜둔 채로
-    // 오프라인 상대와의 메시지가 쌓이면 이 Map이 끝없이 커지는 것을 방지.
-    sentAckRetryCount.delete(retryKey);
+    // ⚠️ 여기서 카운터를 지우면 안 된다. 지우면 다음 15초 주기에 0부터 다시 세기 시작해
+    // 사실상 무한 재전송이 되고, 위 상한이 아무 의미가 없어진다(예전 실제 동작이 그랬다).
+    // 이 항목은 재전송 대상 조회에서 계속 나오므로, 상한에 걸린 상태 그대로 두고 건너뛴다.
+    // Map이 무한정 커지는 문제는 아래 pruneSentAckRetryCounters가 따로 막는다.
     releaseInflight();
     return;
   }
-  sentAckRetryCount.set(retryKey, tries + 1);
+  sentAckRetryCount.set(retryKey, { n: tries + 1, at: Date.now() });
 
   const wireMessage = messageHtmlForWire(row.message);
   const client = new net.Socket();
@@ -9250,6 +9267,7 @@ function resendPendingMessages(targetIP) {
            status = 'SENT'
            AND msg_uid IS NOT NULL AND trim(msg_uid) != ''
            AND created_at <= datetime('now', '-8 seconds')
+           AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
          )
        )
      ORDER BY id ASC`,
@@ -9311,8 +9329,23 @@ function resendPendingMessages(targetIP) {
   );
 }
 
+/**
+ * 재전송 카운터 정리 — 상한에 걸린 항목을 그대로 두기 때문에(그래야 상한이 유효하다)
+ * 이 Map이 계속 커지지 않도록 오래된 항목을 주기적으로 비운다.
+ * 하루가 지나면 카운터를 비워 다시 시도할 기회를 준다 — 상대가 며칠 만에 돌아온 경우에도
+ * 재전송 대상 기간(SENT_ACK_RESEND_WINDOW) 안이라면 전달될 수 있게 하기 위함이다.
+ */
+const SENT_ACK_COUNTER_TTL_MS = 24 * 60 * 60 * 1000;
+function pruneSentAckRetryCounters() {
+  const cutoff = Date.now() - SENT_ACK_COUNTER_TTL_MS;
+  for (const [key, rec] of sentAckRetryCount) {
+    if (!rec || typeof rec.at !== 'number' || rec.at < cutoff) sentAckRetryCount.delete(key);
+  }
+}
+
 function flushAllPendingOutboundMessages() {
   if (!profileLoaded) return;
+  pruneSentAckRetryCounters();
   db.all(
     `SELECT DISTINCT receiver_ip FROM messages
      WHERE sender_ip = ?
@@ -9329,6 +9362,7 @@ function flushAllPendingOutboundMessages() {
            AND receiver_ip NOT LIKE 'DEPTPEER:%'
            AND receiver_ip NOT LIKE 'FLOORPEER:%'
            AND created_at <= datetime('now', '-8 seconds')
+           AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
          )
        )
        AND receiver_ip NOT IN ('BROADCAST')
@@ -9653,6 +9687,9 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     sql += ` ORDER BY id DESC LIMIT 200`;
 
     db.all(sql, params, (err, rows) => {
+      // ⚠️ 예전엔 err를 검사도 기록도 하지 않아, 조회가 실패하면 빈 대화창만 뜨고
+      // 로그에도 아무것도 안 남았다 — "대화가 사라졌다"로 보이는데 원인 추적이 불가능했다.
+      if (err) logDbErr(err);
       const ordered = (rows || []).slice().reverse();
       // 기존 호출부 호환: 배열 그대로 반환
       resolve(mapRows(ordered));
