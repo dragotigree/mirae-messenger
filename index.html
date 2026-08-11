@@ -2199,6 +2199,62 @@
       color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; font-family: inherit;
     }
     .code-alert-btn-send.is-red { background: var(--danger); }
+    /* ✍️ 작성자 로그인 — 좌: 안내 패널 / 우: 입력 폼 */
+    #operator-login-modal .modal-card.signin-card {
+      width: min(680px, 94vw); padding: 0; overflow: hidden; gap: 0;
+      display: grid; grid-template-columns: 240px 1fr; align-items: stretch;
+    }
+    .signin-promo {
+      background: var(--sidebar-active);
+      padding: 26px 22px; display: flex; flex-direction: column; gap: 18px;
+      color: var(--accent-dark); min-width: 0;
+    }
+    .signin-promo-copy { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 600; color: var(--accent-dark); }
+    .signin-promo-copy strong { font-weight: 800; }
+    .signin-promo-mark {
+      width: 84px; height: 84px; border-radius: var(--radius-lg); background: var(--accent);
+      color: #fff; font-size: 40px; font-weight: 800; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-md); margin-top: auto;
+    }
+    .signin-promo-foot { font-size: 10.5px; font-weight: 600; opacity: 0.65; }
+    .signin-panel { padding: 34px 34px 26px; display: flex; flex-direction: column; min-width: 0; }
+    .signin-title { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); }
+    .signin-hint { margin: 8px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); font-weight: 500; }
+    .signin-fields { display: flex; flex-direction: column; gap: 6px; margin-top: 26px; }
+    /* 참고 디자인처럼 밑줄만 있는 입력칸 */
+    .signin-input {
+      width: 100%; box-sizing: border-box;
+      border: none; border-bottom: 1px solid var(--border); border-radius: 0;
+      background: transparent; padding: 10px 2px; font-size: 13px; font-family: inherit;
+      color: var(--text-primary); transition: border-color var(--transition-fast);
+    }
+    .signin-input::placeholder { color: var(--text-muted); }
+    .signin-input:focus { outline: none; border-bottom-color: var(--accent); }
+    .signin-submit {
+      margin-top: 26px; width: 100%; padding: 12px; border: none; border-radius: var(--radius-sm);
+      background: var(--accent); color: #fff; font-size: 13px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: background var(--transition-fast);
+    }
+    .signin-submit:hover { background: var(--accent-dark); }
+    .signin-help {
+      margin: 16px 0 0; text-align: center; font-size: 11.5px; line-height: 1.6;
+      color: var(--text-secondary); font-weight: 500;
+    }
+    .signin-help strong { color: var(--accent); font-weight: 800; }
+    .signin-cancel {
+      margin: 18px auto 0; padding: 6px 14px; border: none; background: transparent;
+      color: var(--text-muted); font-size: 11.5px; font-weight: 600;
+      font-family: inherit; cursor: pointer; border-radius: var(--radius-sm);
+    }
+    .signin-cancel:hover { background: var(--border-soft); color: var(--text-secondary); }
+    /* 창이 좁으면(미니 모드 등) 안내 패널을 접고 폼만 보여준다 */
+    @media (max-width: 620px) {
+      #operator-login-modal .modal-card.signin-card { grid-template-columns: 1fr; }
+      .signin-promo { display: none; }
+      .signin-panel { padding: 26px 22px 20px; }
+    }
+
     .sidebar-code-alert-btn {
       padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(248,113,113,0.45);
       background: rgba(239,68,68,0.18); color: #fecaca; font-size: 11.5px; font-weight: 700;
@@ -4726,6 +4782,7 @@
       <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
       <button type="button" class="icon-rail-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
       <button type="button" class="icon-rail-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-login-btn" onclick="openOperatorLoginModal()" title="작성자 로그인" data-ui-icon="logIn"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
       <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="users"></button>
     </div>
@@ -6257,15 +6314,30 @@
 
   <!-- ✍️ 작성자 로그인 모달 -->
   <div id="operator-login-modal" class="modal-overlay">
-    <div class="modal-card" style="width:320px;">
-      <div style="font-size:16px; font-weight:700; color:var(--accent);" id="operator-login-title">✍️ 작성자 로그인</div>
-      <div id="operator-login-hint" style="font-size:11px; color:#64748b; margin-top:-8px;">공지사항·회사 일정을 작성하려면 마스터에게 발급받은 아이디로 로그인하세요.</div>
-      <input type="text" id="operator-login-id" placeholder="아이디">
-      <input type="password" id="operator-login-pwd" placeholder="비밀번호" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
-      <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button onclick="closeOperatorLoginModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
-        <button onclick="submitOperatorLogin()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">로그인</button>
-      </div>
+    <div class="modal-card signin-card" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="operator-login-title">
+      <aside class="signin-promo" aria-hidden="true">
+        <p class="signin-promo-copy">
+          공지사항과 병원 일정을<br>
+          <strong>미래병원 메신저</strong>에서<br>
+          바로 등록하세요.
+        </p>
+        <div class="signin-promo-mark">미</div>
+        <div class="signin-promo-foot">미래병원 사내 메신저</div>
+      </aside>
+      <section class="signin-panel">
+        <h2 class="signin-title" id="operator-login-title">작성자 로그인</h2>
+        <p class="signin-hint" id="operator-login-hint">공지사항·회사 일정을 작성하려면 마스터에게 발급받은 아이디로 로그인하세요.</p>
+        <div class="signin-fields">
+          <input type="text" id="operator-login-id" class="signin-input" placeholder="아이디" autocomplete="username">
+          <input type="password" id="operator-login-pwd" class="signin-input" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
+        </div>
+        <button type="button" class="signin-submit" onclick="submitOperatorLogin()">로그인</button>
+        <p class="signin-help">
+          아이디를 만들거나 비밀번호가 기억나지 않는다면<br>
+          내선번호 <strong>1010</strong>으로 연락해 주세요.
+        </p>
+        <button type="button" class="signin-cancel" onclick="closeOperatorLoginModal()">취소</button>
+      </section>
     </div>
   </div>
 
@@ -6907,6 +6979,8 @@
     const UI_SVG = {
       lock: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
       lockOpen: _uiSvg('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
+      /* 작성자 로그인 — 문 안으로 들어가는 화살표 */
+      logIn: _uiSvg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/>'),
       /* 마스터 인증 — 방패+인물 (경비원/보안 담당) */
       shieldUser: _uiSvg('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>'),
       shieldCheck: _uiSvg('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'),
