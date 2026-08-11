@@ -609,7 +609,8 @@ let myProfile = {
   extNo: '',
   phone: '',
   statusState: 'ONLINE',
-  photo: ''
+  photo: '',
+  note: ''
 };
 // DB에서 실제 저장된 프로필(직급 등)을 불러오기 전까지는 위 하드코딩된 기본값이 임시로 들어있는
 // 상태다. 이 값이 다른 PC로 전파되면 잘못된 값이 잠깐 보였다가 실제 값으로 바뀌는 것처럼
@@ -3887,7 +3888,7 @@ db.serialize(() => {
   // 예전 버전에서 이미 user_profile 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
   // ※ 바로 이 누락 때문에 phone_no 컬럼이 없는 PC에서 프로필 저장이 매번 조용히 실패하고 있었음.
-  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT'].forEach(colDef => {
+  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'note TEXT'].forEach(colDef => {
     db.run(`ALTER TABLE user_profile ADD COLUMN ${colDef}`, () => {});
   });
 
@@ -3902,7 +3903,7 @@ db.serialize(() => {
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
   )`, logDbErr);
   // 예전 DB에는 phone_no 등이 없을 수 있음 — 없으면 INSERT마다 SQLITE_ERROR로 CPU/콘솔 폭주
-  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER'].forEach((colDef) => {
+  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER', 'note TEXT'].forEach((colDef) => {
     db.run(`ALTER TABLE known_users ADD COLUMN ${colDef}`, () => {});
   });
   // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
@@ -4362,7 +4363,8 @@ db.serialize(() => {
         extNo: strOrEmpty(row.ext_no),
         phone: strOrEmpty(row.phone_no),
         statusState: row.status_state || 'ONLINE',
-        photo: row.photo || ''
+        photo: row.photo || '',
+        note: strOrEmpty(row.note)
       };
       profileLoaded = true;
       logToRendererConsole('info', `[프로필] DB에서 불러옴: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
@@ -4372,8 +4374,8 @@ db.serialize(() => {
       }
     } else {
       logToRendererConsole('info', `[프로필] DB에 저장된 프로필이 없어 기본값으로 새로 만듭니다: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank}`);
-      db.run(`INSERT INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || ''], () => {
+      db.run(`INSERT INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || '', myProfile.note || ''], () => {
           profileLoaded = true;
           onProfileLoadedForPresence();
         });
@@ -5359,6 +5361,7 @@ function startUdpDiscovery() {
           const floor = data.floor || '';
           const extNo = data.extNo || '';
           const phone = data.phone || '';
+          const note = data.note || '';
           const statusState = data.statusState || 'ONLINE';
           const appVersion = data.appVersion || previouslyKnown.appVersion || '';
           const same =
@@ -5368,6 +5371,7 @@ function startUdpDiscovery() {
             previouslyKnown.floor === floor &&
             previouslyKnown.extNo === extNo &&
             previouslyKnown.phone === phone &&
+            previouslyKnown.note === note &&
             previouslyKnown.statusState === statusState &&
             previouslyKnown.appVersion === appVersion;
           if (same) {
@@ -5392,6 +5396,7 @@ function startUdpDiscovery() {
           floor: data.floor || '',
           extNo: data.extNo || '',
           phone: data.phone || '',
+          note: data.note || '',
           statusState: data.statusState || 'ONLINE',
           appVersion: data.appVersion || (previouslyKnown && previouslyKnown.appVersion) || '',
           photo: (previouslyKnown && previouslyKnown.photo) || persistedPhotos[rinfo.address] || '',
@@ -5502,6 +5507,7 @@ function registerSelf() {
     statusState: myProfile.statusState,
     appVersion: APP_VERSION,
     photo: myProfile.photo || '',
+    note: myProfile.note || '',
     lastPingAt: now,
     // 내 카드는 보통 숨기지만, lastSeen은 이전 종료 시각을 유지
     lastSeen: (prev && Number(prev.lastSeen) > 0) ? Number(prev.lastSeen) : 0,
@@ -5575,7 +5581,8 @@ function broadcastPresence(socket) {
     extNo: myProfile.extNo,
     phone: myProfile.phone,
     statusState: myProfile.statusState,
-    appVersion: APP_VERSION
+    appVersion: APP_VERSION,
+    note: myProfile.note || ''
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
   try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
@@ -5801,10 +5808,10 @@ function mergeUserProfile(base, overlay, online) {
     merged.online = !!online;
     return merged;
   }
-  const fields = ['username', 'rank', 'dept', 'floor', 'extNo', 'phone', 'statusState', 'photo', 'appVersion'];
+  const fields = ['username', 'rank', 'dept', 'floor', 'extNo', 'phone', 'note', 'statusState', 'photo', 'appVersion'];
   // 접속 중(PING)일 때는 빈 직급도 "의도적으로 비움"으로 반영한다.
   // 비우지 않으면 known_users / 스냅샷에 남은 "실장" 등이 영원히 되살아난다.
-  const clearableWhenOnline = new Set(['rank', 'dept', 'floor', 'extNo', 'phone']);
+  const clearableWhenOnline = new Set(['rank', 'dept', 'floor', 'extNo', 'phone', 'note']);
   fields.forEach((f) => {
     const o = overlay[f];
     if (o == null) return;
@@ -5853,6 +5860,7 @@ function userObjFromKnownUsersRow(row) {
     floor: row.floor || '',
     extNo: row.ext_no || '',
     phone: row.phone_no || '',
+    note: row.note || '',
     statusState: row.status_state || 'OFFLINE',
     photo: row.photo || persistedPhotos[row.ip] || '',
     appVersion: '',
@@ -5885,8 +5893,8 @@ function persistKnownUserSnapshot(u) {
       lastSeen = Math.max(lastSeen, existing.lastSeen);
     }
     db.run(
-    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(ip) DO UPDATE SET
        username = excluded.username,
        rank = excluded.rank,
@@ -5896,7 +5904,8 @@ function persistKnownUserSnapshot(u) {
        phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
        status_state = excluded.status_state,
        photo = CASE WHEN excluded.photo != '' THEN excluded.photo ELSE known_users.photo END,
-       last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0))`,
+       last_seen_at = MAX(COALESCE(known_users.last_seen_at, 0), COALESCE(excluded.last_seen_at, 0)),
+       note = CASE WHEN excluded.note != '' THEN excluded.note ELSE known_users.note END`,
     [
       mergedForStore.ip,
       mergedForStore.username || '',
@@ -5907,7 +5916,8 @@ function persistKnownUserSnapshot(u) {
       mergedForStore.phone || '',
       mergedForStore.statusState || 'OFFLINE',
       isUsableProfilePhotoValue(mergedForStore.photo) ? mergedForStore.photo : '',
-      lastSeen
+      lastSeen,
+      mergedForStore.note || ''
     ],
     logDbErr
     );
@@ -10104,8 +10114,8 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
   myProfile = { ...myProfile, ...incoming };
   console.log('[프로필] 저장:', myProfile.username || '(이름 미설정)', myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo);
   logToRendererConsole('info', `[프로필] 저장: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
-  db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || ''], logDbErr);
+  db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || '', myProfile.note || ''], logDbErr);
   registerSelf();
   if (globalUdpSocket) broadcastPresence(globalUdpSocket);
   if (photoChanged) {

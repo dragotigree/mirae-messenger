@@ -2517,7 +2517,9 @@
     .user-info-modal-card .group-member-sub { font-size: 12.5px; }
     .user-info-modal-card .group-member-status { font-size: 12px; }
     .detail-profile-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); gap: 3px; }
-    .detail-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; font-size: 12px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(33, 150, 243, 0.2); letter-spacing: -0.03em; }
+    .detail-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #EAF4FF 0%, var(--sidebar-active) 100%); color: var(--accent-dark); font-size: 12px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; box-shadow: 0 6px 18px rgba(33, 150, 243, 0.15); letter-spacing: -0.03em; border: 1px solid var(--sidebar-active); }
+    .detail-info-row.detail-note-row { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .detail-info-row.detail-note-row .detail-info-value { text-align: left; white-space: pre-wrap; overflow: visible; text-overflow: clip; font-weight: 500; width: 100%; }
     .detail-name { font-size: 13px; font-weight: var(--font-weight-bold); color: var(--text-primary); line-height: 1.3; word-break: keep-all; }
     .detail-dept-line { font-size: 10.5px; color: var(--text-secondary); line-height: 1.3; }
     .detail-info-group { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
@@ -5210,6 +5212,7 @@
           <div class="detail-info-row"><span class="detail-info-label">내선번호</span><span class="detail-info-value" id="detail-ext">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">휴대폰번호</span><span class="detail-info-value" id="detail-phone">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">마지막 접속</span><span class="detail-info-value" id="detail-last-seen">-</span></div>
+          <div class="detail-info-row detail-note-row" id="detail-note-row" style="display:none;"><span class="detail-info-label">비고</span><span class="detail-info-value" id="detail-note">-</span></div>
         </div>
         <button type="button" id="detail-self-edit-btn" class="detail-self-edit-btn" style="display:none;" onclick="ctxEditMyDetails()">✏️ 내 상세정보 수정</button>
       </div>
@@ -5804,6 +5807,7 @@
                 <label class="settings-field">내선 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
                 <label class="settings-field">휴대폰 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
               </div>
+              <label class="settings-field settings-field-note">비고 (선택)<textarea id="setting-note" rows="2" placeholder="없으면 비움" style="resize:vertical; font-family:inherit;"></textarea></label>
               <p class="settings-profile-hint-note">성명만 필수입니다. 나머지는 비워 두어도 됩니다.</p>
             </div>
           </div>
@@ -17208,6 +17212,16 @@
         const isSelf = !!(u.isMe || (myProfile && u.ip && u.ip === myProfile.ip));
         selfEditBtn.style.display = isSelf ? 'block' : 'none';
       }
+      const noteRow = document.getElementById('detail-note-row');
+      if (noteRow) {
+        const noteText = (u.note && String(u.note).trim()) || '';
+        if (noteText) {
+          document.getElementById('detail-note').textContent = noteText;
+          noteRow.style.display = 'flex';
+        } else {
+          noteRow.style.display = 'none';
+        }
+      }
     }
 
     function renderBroadcastDetailPanel() {
@@ -24354,6 +24368,7 @@
 
         document.getElementById('setting-ext').value = p.extNo || '';
         document.getElementById('setting-phone').value = p.phone || '';
+        document.getElementById('setting-note').value = p.note || '';
         document.getElementById('setting-font-size').value = appSettings.fontSize;
         document.getElementById('setting-font-family').value = appSettings.fontFamily || 'suit';
         const chatFontEl = document.getElementById('setting-chat-font-family');
@@ -24506,6 +24521,7 @@
 
   const extNo = document.getElementById('setting-ext').value.trim();
   const phone = document.getElementById('setting-phone').value.trim();
+  const note = document.getElementById('setting-note').value.trim();
   const statusState = normalizeSelectableStatusState(document.getElementById('setting-my-status').value);
 
   const privacyLockEnabled = !!appSettings.privacyLockEnabled;
@@ -24558,7 +24574,7 @@
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
   // 저장 함수 파라미터에 floor, dept, rank, photo 추가
-  myProfile = await window.api.saveMyProfile({ username, floor, dept, rank, extNo, phone, statusState, photo: currentProfilePhotoValue });
+  myProfile = await window.api.saveMyProfile({ username, floor, dept, rank, extNo, phone, note, statusState, photo: currentProfilePhotoValue });
   
   await window.api.setAutoLaunch(autoLaunch);
   await window.api.setNotificationPreviewSetting(notificationPreview);
