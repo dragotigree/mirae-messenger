@@ -4695,6 +4695,16 @@
       outline: none; background: #fff; border-color: #90CAF9; box-shadow: 0 0 0 3px rgba(33, 150, 243,0.12);
     }
     .settings-field-row { display: flex; gap: 8px; }
+    .settings-field-note { margin-top: 10px; }
+    .settings-field-note textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+      font-size: 13px; font-family: inherit; background: var(--surface-muted); color: #0f172a; box-sizing: border-box;
+      line-height: 1.5; min-height: 56px; transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    }
+    .settings-field-note textarea::placeholder { color: #94a3b8; }
+    .settings-field-note textarea:focus {
+      outline: none; background: #fff; border-color: #90CAF9; box-shadow: 0 0 0 3px rgba(33, 150, 243,0.12);
+    }
     .settings-field-row .settings-field { flex: 1; min-width: 0; }
     .settings-form-grid {
       display: grid;
