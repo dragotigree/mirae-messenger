@@ -4801,7 +4801,6 @@
     </div>
     <div id="icon-rail-bottom">
       <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
-      <button type="button" class="icon-rail-btn" id="toolbar-refresh-btn" onclick="manualRefreshUsers()" title="사용자 목록 새로고침"></button>
       <button type="button" class="icon-rail-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-login-btn" onclick="openOperatorLoginModal()" title="작성자 로그인" data-ui-icon="logIn"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
@@ -4853,6 +4852,7 @@
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
           </span>
         </div>
@@ -9208,7 +9208,6 @@
       const pairs = [
         ['toolbar-logs-btn', 'logs'],
         ['toolbar-folder-btn', 'folder'],
-        ['toolbar-refresh-btn', 'refresh'],
         ['toolbar-settings-btn-compact', 'settings'],
         ['compact-back-btn', 'back'],
         ['chat-clear-view-btn', 'clearChat'],
