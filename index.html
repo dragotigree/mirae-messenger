@@ -23736,6 +23736,23 @@
           applyChatSlashSelection(matches[chatSlashActiveIndex].keys[0]);
           return;
         }
+        // ⚠️ 실사고: 자동완성 팝업이 떠 있는데 Enter를 누르면, 강조된 항목을 채우지 않고
+        // "지금까지 입력한 글자 그대로"(예: "/코드"를 다 치기 전 "/코"에서 Enter) 그냥
+        // 전송해버렸다. 그러면 온전한 명령어가 아니라서 "알 수 없는 명령어"로 실패하는데,
+        // 팝업엔 완성된 명령어가 분명히 보이고 있었으니 사용자 입장에선 "명령어가 안
+        // 먹힌다"로 보였다. Tab과 마찬가지로 Enter도 강조된 항목을 먼저 채운다 — 단, 이미
+        // 정확히 그 명령어를 다 입력한 상태라면(채워도 바뀌는 게 없다면) 그대로 실행되게
+        // 두어, 명령어를 다 치고 바로 Enter를 누르는 흔한 경우에 한 번 더 누르지 않게 한다.
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey && matches.length) {
+          const highlighted = matches[chatSlashActiveIndex];
+          const currentQuery = (document.getElementById('chat-textarea')?.value || '').slice(1).trim().toLowerCase();
+          const alreadyComplete = highlighted.keys.some((k) => k.toLowerCase() === currentQuery);
+          if (!alreadyComplete) {
+            e.preventDefault();
+            applyChatSlashSelection(highlighted.keys[0]);
+            return;
+          }
+        }
       }
       // Enter: 전송 / Shift+Enter: 줄바꿈
       if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
