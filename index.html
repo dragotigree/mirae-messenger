@@ -17812,6 +17812,13 @@
       chatSlashActiveIndex = 0;
     }
 
+    /** 자동완성으로 입력창에 채워 넣을 글자 — 목록에 보이는 라벨(한글)과 같게 맞춘다. */
+    function chatSlashInsertKey(cmd) {
+      if (!cmd) return '';
+      if (cmd.label) return String(cmd.label).replace(/^\//, '');
+      return (cmd.keys && cmd.keys[0]) || '';
+    }
+
     function applyChatSlashSelection(cmdKey) {
       const ta = document.getElementById('chat-textarea');
       if (!ta || !cmdKey) return;
@@ -17855,7 +17862,10 @@
       }
       if (chatSlashActiveIndex >= matches.length) chatSlashActiveIndex = 0;
       pop.innerHTML = matches.slice(0, 10).map((c, i) => {
-        const key = c.keys[0];
+        // ⚠️ keys[0]은 내부용 영문 키('schedule')라, 그걸 넣으면 목록엔 「/예약」이라고
+        // 보이는데 입력창엔 「/schedule」이 채워져 사용자가 고른 것과 다른 글자가 들어갔다.
+        // 화면에 보이는 라벨(한글)을 그대로 넣는다 — 명령 실행 쪽은 한/영 둘 다 인식한다.
+        const key = chatSlashInsertKey(c);
         const active = i === chatSlashActiveIndex ? ' is-active' : '';
         return `<button type="button" class="chat-slash-item${active}" data-slash-key="${escapeHtml(key)}"><span class="chat-slash-cmd">${escapeHtml(c.label)}</span><span class="chat-slash-desc">${escapeHtml(c.desc)}</span></button>`;
       }).join('');
@@ -23711,7 +23721,7 @@
         }
         if (e.key === 'Tab' && matches.length) {
           e.preventDefault();
-          applyChatSlashSelection(matches[chatSlashActiveIndex].keys[0]);
+          applyChatSlashSelection(chatSlashInsertKey(matches[chatSlashActiveIndex]));
           return;
         }
         // ⚠️ 실사고: 자동완성 팝업이 떠 있는데 Enter를 누르면, 강조된 항목을 채우지 않고
@@ -23727,7 +23737,7 @@
           const alreadyComplete = highlighted.keys.some((k) => k.toLowerCase() === currentQuery);
           if (!alreadyComplete) {
             e.preventDefault();
-            applyChatSlashSelection(highlighted.keys[0]);
+            applyChatSlashSelection(chatSlashInsertKey(highlighted));
             return;
           }
         }
@@ -23823,6 +23833,17 @@
           return;
         }
         if (await handleEscapeKeyForOverlays(e)) return;
+        // ⚠️ 대화 검색을 켜둔 상태에서 Esc를 누르면 곧바로 화면 잠금으로 넘어가버렸다.
+        // 검색을 끝내려고 Esc를 누른 것뿐인데 잠금 화면이 떠서 PIN을 다시 입력해야 했다.
+        // 검색이 열려 있으면 그걸 먼저 닫고, 커서를 입력창으로 돌려준다.
+        const searchBar = document.getElementById('chat-search-bar');
+        if (searchBar && searchBar.style.display === 'flex') {
+          e.preventDefault();
+          closeChatSearchBar();
+          const ta = document.getElementById('chat-textarea');
+          if (ta && activeChatUser) ta.focus();
+          return;
+        }
         if (tryPrivacyLockOnEscape(e)) return;
       }
       if (e.ctrlKey && e.altKey && (e.key === 'e' || e.key === 'E' || e.keyCode === 69)) {

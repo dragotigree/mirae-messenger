@@ -3342,6 +3342,32 @@ async function pruneCorruptedStashCopies() {
   } catch (e) { /* ignore */ }
 }
 
+/**
+ * ⚠️ DB 파일을 통째로 갈아끼울 때는 반드시 이걸 같이 불러야 한다.
+ *
+ * 일부 마이그레이션은 "한 번만 실행"하려고 userData에 마커 파일을 남긴다. 그런데 그 마커는
+ * DB 파일 밖에 있으므로, 며칠 전 백업으로 되돌려도 마커는 그대로 남아 "이미 했다"고 판단해
+ * 마이그레이션을 건너뛴다 — 정작 새로 올라온 옛 DB는 그 마이그레이션이 안 된 상태인데도.
+ * 그러면 이미 고쳤던 버그들이 그대로 되살아난다:
+ *   · self-chat-migrated: 옛 DB의 「나에게 보내기」는 그때의 IP로 저장돼 있어, 'SELF'로
+ *     옮기지 않으면 IP가 바뀐 지금은 그 메시지들을 못 찾아 사라진 것처럼 보인다.
+ *   · chat-pins-dropped: 옛 백업엔 chat_pins 테이블이 아직 남아 있어, 지우지 않으면
+ *     그 스키마 손상 → 감지 → 재시작 루프가 다시 시작될 수 있다.
+ * 마커를 지워서 새로 올라온 DB에 대해 마이그레이션이 다시 한 번 돌게 한다.
+ */
+async function resetDbMigrationMarkersForNewDbFile() {
+  const markers = [
+    'self-chat-migrated.txt',
+    'chat-pins-dropped.txt',
+    'update-source-github-default.txt',
+    'last-integrity-check.txt',
+    'db-recovery-attempts.txt'
+  ];
+  for (const name of markers) {
+    await fs.promises.unlink(path.join(app.getPath('userData'), name)).catch(() => {});
+  }
+}
+
 async function stashAndReplaceMessengerDb(sourcePathOrNull) {
   const stamp = Date.now();
   const corruptedCopy = `${dbPath}.corrupted_${stamp}`;
@@ -3470,6 +3496,7 @@ async function applyRecoveredDatabase(recoveredPath) {
   await fs.promises.unlink(`${recoveredPath}-wal`).catch(() => {});
   await fs.promises.unlink(`${recoveredPath}-shm`).catch(() => {});
   await fs.promises.copyFile(recoveredPath, dbPath);
+  await resetDbMigrationMarkersForNewDbFile();
   app.relaunch();
   app.exit(0);
 }
@@ -3525,6 +3552,7 @@ ipcMain.handle('restore-from-backup', async (event, backupPath) => {
     await new Promise((resolve) => checkpointWalPassive().finally(resolve));
     await new Promise((resolve) => db.close(() => resolve()));
     await stashAndReplaceMessengerDb(backupPath);
+    await resetDbMigrationMarkersForNewDbFile();
     app.relaunch();
     app.exit(0);
     return { success: true };
