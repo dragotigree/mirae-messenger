@@ -7989,13 +7989,27 @@ function upsertNoticeFromSync(n) {
   if (!n || !n.uid) return;
   // 동기화 응답에 본문이 온 공지는 tombstone보다 우선해 저장 (전체 직원이 읽을 수 있게)
   clearNoticeTombstone(n.uid, () => {
-    const category = normalizeNoticeCategory(n.category);
+    // ⚠️ 실사고: 여기서 무조건 normalizeNoticeCategory(n.category)를 쓰고 있었다. 동기화
+    // 응답에 category가 아예 없으면(구버전 PC이거나 그 PC의 값이 이미 비어 있는 경우)
+    // 그 값이 '전체'가 되어, 애써 "업데이트·재활치료부" 등으로 지정해둔 카테고리를 동기화가
+    // 돌 때마다 전부 '전체'로 되돌려놨다("카테고리에 넣어놔도 다시 모두로 바뀐다"의 원인).
+    // 같은 파일의 NOTICE_UPDATE 처리부는 이미 "필드가 실제로 올 때만 덮어쓴다"로 되어 있어
+    // 그 방식을 그대로 따른다 — 안 온 항목은 이 PC에 저장된 값을 그대로 둔다.
+    const hasCategory = n && Object.prototype.hasOwnProperty.call(n, 'category')
+      && n.category != null && String(n.category).trim() !== '';
+    const category = hasCategory ? normalizeNoticeCategory(n.category) : null;
     const images = normalizeNoticeImagesField(n.images);
     ensureNoticesTableSchema(() => {
       const applyUpdate = (onDone) => {
+        const sql = hasCategory
+          ? `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`
+          : `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ? WHERE uid = ?`;
+        const params = hasCategory
+          ? [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid]
+          : [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, n.uid];
         db.run(
-          `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`,
-          [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid],
+          sql,
+          params,
           function onUpd(err) {
             if (!err) {
               if (typeof onDone === 'function') onDone(null, this && this.changes > 0);

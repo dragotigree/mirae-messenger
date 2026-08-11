@@ -14837,6 +14837,15 @@
       return out;
     }
 
+    /**
+     * 「모두」(필터: 전부 보기)와 「전체」(카테고리: 전사 공지)가 한국어로는 둘 다 '전부'로
+     * 읽혀서 같은 게 두 개 있는 것처럼 보였다. 저장된 값('전체')은 그대로 두고 — 바꾸면
+     * 기존 공지와 다른 PC의 값이 전부 어긋난다 — 화면에 보이는 이름만 「전직원」으로 구분한다.
+     */
+    function boardCategoryLabel(cat) {
+      return cat === '전체' ? '전직원' : cat;
+    }
+
     function boardCategoryBadgeClass(cat) {
       if (cat === '전체') return 'is-all';
       if (cat === '업데이트') return 'is-update';
@@ -14857,7 +14866,7 @@
         if (!options.includes(c)) options.push(c);
       });
       const chips = [{ key: '__all__', label: '모두', count: (notices || []).length }]
-        .concat(options.map((c) => ({ key: c, label: c, count: counts[c] || 0 })));
+        .concat(options.map((c) => ({ key: c, label: boardCategoryLabel(c), count: counts[c] || 0 })));
       if (!chips.some((c) => c.key === boardCategoryFilter)) boardCategoryFilter = '__all__';
       row.innerHTML = '';
       chips.forEach((chip) => {
@@ -14883,7 +14892,7 @@
       if (cur && !options.includes(cur)) options.unshift(cur);
       sel.innerHTML = options.map((c) => {
         const hint = c === '전체' ? '전사 공지' : (c === '업데이트' ? '업데이트 내용' : '부서 공지');
-        return `<option value="${escapeHtml(c)}">${escapeHtml(c)} · ${hint}</option>`;
+        return `<option value="${escapeHtml(c)}">${escapeHtml(boardCategoryLabel(c))} · ${hint}</option>`;
       }).join('');
       sel.value = options.includes(cur) ? cur : '전체';
     }
@@ -14901,7 +14910,7 @@
       if (filtered.length === 0) {
         const emptyHint = boardCategoryFilter === '__all__'
           ? `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`
-          : `"${escapeHtml(boardCategoryFilter === '__all__' ? '모두' : boardCategoryFilter)}" 카테고리에 공지가 없습니다.`;
+          : `"${escapeHtml(boardCategoryFilter === '__all__' ? '모두' : boardCategoryLabel(boardCategoryFilter))}" 카테고리에 공지가 없습니다.`;
         container.innerHTML = `<div style="text-align:center; color:#64748b; padding:60px 20px;">${emptyHint}</div>`;
         return;
       }
@@ -14914,7 +14923,7 @@
         row.className = 'board-notice-row';
         row.innerHTML = `
           <div class="board-notice-title">
-            <span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(cat)}</span>
+            <span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(boardCategoryLabel(cat))}</span>
             <span class="board-notice-title-text">${escapeHtml(n.title || '')}</span>
             ${imgCount ? `<span class="board-notice-photo-badge">📷 ${imgCount}</span>` : ''}
           </div>
@@ -14980,7 +14989,7 @@
       const cat = normalizeBoardCategory(n.category);
       document.getElementById('board-detail-title').textContent = n.title;
       document.getElementById('board-detail-meta').innerHTML =
-        `<span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(cat)}</span>`
+        `<span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(boardCategoryLabel(cat))}</span>`
         + ` · 작성자: ${escapeHtml(formatNoticeAuthorName(n))} · ${escapeHtml(createdDisplay)}`;
       document.getElementById('board-detail-content').textContent = n.content || '';
 
