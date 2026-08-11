@@ -4794,6 +4794,7 @@
     <div id="icon-rail-nav">
       <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"></button>
       <button type="button" class="icon-rail-btn is-active" id="icon-rail-chat-btn" title="대화" onclick="scrollSidebarToBlock('channels')" data-ui-icon="chatBubble"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="envelope"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-transport-btn" onclick="openTransportRequestModal()" title="이동기사 요청" data-ui-icon="transportCar"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
@@ -4853,7 +4854,6 @@
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
-            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="ipmsg"></span>
           </span>
         </div>
         <div class="user-search-box" id="user-search-box">
@@ -7037,6 +7037,8 @@
       mediaArchive: _uiSvg('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>'),
       back: _uiSvg('<path d="m15 18-6-6 6-6"/>'),
       ipmsg: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>'),
+      /* 쪽지 보내기 — 편지봉투 */
+      envelope: _uiSvg('<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'),
       notice: _uiSvg('<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19 7a9 9 0 0 1 0 10"/>'),
       users: _uiSvg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
       chatBubble: _uiSvg('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
