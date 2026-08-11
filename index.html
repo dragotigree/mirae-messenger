@@ -1575,6 +1575,9 @@
       max-height: min(92vh, 680px) !important;
       padding: 0 !important; overflow: hidden; gap: 0 !important;
       display: flex !important; flex-direction: column !important;
+      /* 파란 머리말이 카드 끝까지 꽉 차는데 카드에 밝은 테두리가 있어, 파란 영역 둘레로
+         흰 줄이 한 겹 보였다. 이 카드는 테두리 없이 그림자만 쓴다. */
+      border: none !important;
     }
     .schedule-msg-hero {
       padding: 12px 16px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 45%, var(--accent-dark) 100%);
@@ -1622,11 +1625,15 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .schedule-time-inline { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 6px; }
+    /* 테두리를 없애고 은은한 배경만 — 흰 카드 위 흰 입력칸에 테두리만 떠 보였다.
+       숫자가 왼쪽에 붙어 보여서 가운데 정렬하고, 오른쪽 화살표 자리만큼 왼쪽에도 여백을 준다. */
     .schedule-time-select {
-      flex: 1; min-width: 0; padding: 7px 6px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px;
-      font-weight: 700; color: var(--text-primary); background: var(--surface); cursor: pointer;
+      flex: 1; min-width: 0; padding: 8px 6px 8px 22px; border: none; border-radius: var(--radius-md);
+      font-size: 12.5px; font-weight: 700; color: var(--text-primary);
+      background: var(--surface-muted); cursor: pointer; font-family: inherit;
+      text-align: center; text-align-last: center;
     }
-    .schedule-time-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+    .schedule-time-select:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
     .schedule-time-colon { font-size: 14px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
     /* 빠른 선택은 창 전체 폭을 쓰는 한 줄로 — 왼쪽 칸 안에 두면 5개가 안 들어가 두 줄이 됐다.
        테두리를 없애고 은은한 배경만 써서 흰 테두리가 도드라지지 않게 한다. */
@@ -19245,7 +19252,11 @@
       const suggested = new Date();
       suggested.setMinutes(suggested.getMinutes() + 5);
       setScheduleSendAt(suggested);
-      document.getElementById('sch-msg-content').value = document.getElementById('chat-textarea').value.trim();
+      // 입력창에 쓰던 내용을 그대로 가져오되, 「/예약」처럼 이 창을 여는 데 쓴 명령어
+      // 자체는 메시지 내용이 아니므로 걸러낸다(예전엔 "/예약"이 본문에 그대로 들어갔다).
+      const composed = document.getElementById('chat-textarea').value.trim();
+      document.getElementById('sch-msg-content').value =
+        parseChatSlashInput(composed) ? '' : composed;
       const targetEl = document.getElementById('sch-msg-target-label');
       if (targetEl) targetEl.innerHTML = `보낼 대상: <strong>${escapeHtml(getActiveChatLabel())}</strong>`;
       setModalOpenState(true);
