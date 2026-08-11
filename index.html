@@ -1612,29 +1612,35 @@
       transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box;
     }
     .schedule-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
-    .schedule-preview-row {
-      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-    }
+    /* 날짜 표시는 한 줄로 — 좁은 왼쪽 칸에서 두 줄로 접히면 보기 안 좋다.
+       (연도는 바로 옆 달력 제목에 이미 있어 표시 문구에서 뺐다.) */
     .schedule-preview-pill {
-      flex: 1; min-width: 0; padding: 8px 10px; border-radius: var(--radius-md);
+      width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: var(--radius-md);
       background: var(--sidebar-active);
-      border: 1px solid var(--sidebar-active); font-size: 13px; font-weight: 700; color: var(--accent-dark);
+      font-size: 13px; font-weight: 700; color: var(--accent-dark);
       letter-spacing: -0.02em; text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .schedule-time-inline { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    .schedule-time-inline { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 6px; }
     .schedule-time-select {
-      padding: 7px 6px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px;
-      font-weight: 700; color: var(--text-primary); background: var(--surface); min-width: 52px; cursor: pointer;
+      flex: 1; min-width: 0; padding: 7px 6px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px;
+      font-weight: 700; color: var(--text-primary); background: var(--surface); cursor: pointer;
     }
     .schedule-time-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
-    .schedule-time-colon { font-size: 14px; font-weight: 700; color: var(--text-muted); }
-    .schedule-quick-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-    .schedule-quick-chip {
-      padding: 4px 9px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface);
-      font-size: 10.5px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
-      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    .schedule-time-colon { font-size: 14px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+    /* 빠른 선택은 창 전체 폭을 쓰는 한 줄로 — 왼쪽 칸 안에 두면 5개가 안 들어가 두 줄이 됐다.
+       테두리를 없애고 은은한 배경만 써서 흰 테두리가 도드라지지 않게 한다. */
+    .schedule-quick-chips {
+      display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 10px; flex-shrink: 0;
     }
-    .schedule-quick-chip:hover { border-color: var(--accent); background: var(--sidebar-active); color: var(--accent-dark); }
+    .schedule-quick-chip {
+      flex: 1; min-width: 0; padding: 7px 4px; border-radius: 99px; border: none;
+      background: var(--surface-muted);
+      font-size: 11px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+      font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background 0.15s, color 0.15s;
+    }
+    .schedule-quick-chip:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     .schedule-datetime-grid {
       display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
       gap: 10px; align-items: stretch; min-height: 0; flex: 1;
@@ -6814,20 +6820,11 @@
           <div class="schedule-datetime-side">
             <div>
               <span class="schedule-field-label">전송 일시</span>
-              <div class="schedule-preview-row">
-                <div class="schedule-preview-pill" id="sch-msg-preview">—</div>
-                <div class="schedule-time-inline">
-                  <select id="sch-msg-hour" class="schedule-time-select" aria-label="시" onchange="syncScheduleSendAtFromTimeSelects()"></select>
-                  <span class="schedule-time-colon">:</span>
-                  <select id="sch-msg-minute" class="schedule-time-select" aria-label="분" onchange="syncScheduleSendAtFromTimeSelects()"></select>
-                </div>
-              </div>
-              <div class="schedule-quick-chips">
-                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('5m')">5분 후</button>
-                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('30m')">30분 후</button>
-                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('1h')">1시간 후</button>
-                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('today18')">오늘 18:00</button>
-                <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('tomorrow9')">내일 09:00</button>
+              <div class="schedule-preview-pill" id="sch-msg-preview">—</div>
+              <div class="schedule-time-inline">
+                <select id="sch-msg-hour" class="schedule-time-select" aria-label="시" onchange="syncScheduleSendAtFromTimeSelects()"></select>
+                <span class="schedule-time-colon">:</span>
+                <select id="sch-msg-minute" class="schedule-time-select" aria-label="분" onchange="syncScheduleSendAtFromTimeSelects()"></select>
               </div>
             </div>
           </div>
@@ -6842,6 +6839,13 @@
               <div id="sch-cal-grid" class="mini-cal-grid"></div>
             </div>
           </div>
+        </div>
+        <div class="schedule-quick-chips">
+          <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('5m')">5분 후</button>
+          <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('30m')">30분 후</button>
+          <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('1h')">1시간 후</button>
+          <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('today18')">오늘 18:00</button>
+          <button type="button" class="schedule-quick-chip" onclick="applySchedulePreset('tomorrow9')">내일 09:00</button>
         </div>
       </div>
       <div class="schedule-msg-footer">
@@ -19125,7 +19129,6 @@
 
     function formatSchedulePreview(d) {
       if (!d || isNaN(d.getTime())) return '—';
-      const y = d.getFullYear();
       const mo = d.getMonth() + 1;
       const day = d.getDate();
       const wd = SCHEDULE_WEEKDAY_KO[d.getDay()];
@@ -19133,7 +19136,8 @@
       const m = d.getMinutes();
       const ampm = h < 12 ? '오전' : '오후';
       const h12 = h % 12 === 0 ? 12 : h % 12;
-      return `${y}년 ${mo}월 ${day}일 (${wd}) ${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+      // 연도는 뺀다 — 바로 옆 달력 제목("2026년 8월")에 이미 있고, 넣으면 좁은 칸에서 두 줄로 접혔다.
+      return `${mo}월 ${day}일 (${wd}) ${ampm} ${h12}:${String(m).padStart(2, '0')}`;
     }
 
     function setScheduleSendAt(date) {
