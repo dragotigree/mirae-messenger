@@ -3480,6 +3480,60 @@ async function applyRecoveredDatabase(recoveredPath) {
 // 화면을 열 때 지금 상태를 능동적으로 물어보는 방식을 추가해 이 경쟁 상태를 없앤다.
 ipcMain.handle('get-db-corruption-status', async () => ({ detected: dbCorruptRecoveryScheduled }));
 
+/**
+ * 행 단위 복구(recoverReadableRowsFromCorruptDb)는 손상이 개별 페이지에만 있을 때는 잘 통하지만,
+ * 스키마 자체(sqlite_master)를 못 읽을 만큼 손상이 깊으면 첫 단계부터 실패한다(실제 발생).
+ * 그럴 땐 6시간마다 만들어지던 자동 백업 중 무결성 검사를 통과하는 가장 최근 것으로 되돌리는
+ * 수밖에 없다 — 그 백업 시점 이후의 대화는 잃지만, 그 전까지는 전부 정상 복구된다.
+ * 자동으로 고르지 않고 후보 목록(파일명의 날짜·시간, 건강 여부)을 보여줘서 관리자가 직접
+ * "어느 시점까지 되돌릴지" 확인하고 고르게 한다.
+ */
+ipcMain.handle('list-recoverable-backups', async () => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'backups');
+    const names = (await fs.promises.readdir(dir).catch(() => []))
+      .filter((n) => n.startsWith('auto_backup_') && n.endsWith('.db'))
+      .sort()
+      .reverse();
+    const out = [];
+    for (const name of names) {
+      const p = path.join(dir, name);
+      const stat = await fs.promises.stat(p).catch(() => null);
+      const healthy = await probeSqliteFileHealthy(p);
+      out.push({
+        path: p,
+        name,
+        sizeBytes: stat ? stat.size : 0,
+        mtime: stat ? stat.mtimeMs : 0,
+        healthy
+      });
+    }
+    return { success: true, backups: out };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+ipcMain.handle('restore-from-backup', async (event, backupPath) => {
+  try {
+    if (!backupPath || !fs.existsSync(backupPath)) {
+      return { success: false, msg: '백업 파일을 찾을 수 없습니다.' };
+    }
+    if (!(await probeSqliteFileHealthy(backupPath))) {
+      return { success: false, msg: '이 백업 파일도 무결성 검사를 통과하지 못했습니다.' };
+    }
+    await new Promise((resolve) => checkpointWalPassive().finally(resolve));
+    await new Promise((resolve) => db.close(() => resolve()));
+    await stashAndReplaceMessengerDb(backupPath);
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
+  } catch (e) {
+    console.error('백업 복원 실패:', e && e.message);
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
 ipcMain.handle('recover-corrupt-database', async () => {
   try {
     const { recoveredPath, report } = await recoverReadableRowsFromCorruptDb(dbPath);

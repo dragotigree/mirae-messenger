@@ -6102,6 +6102,16 @@
           </p>
           <button type="button" class="settings-btn-primary" onclick="startDbRecoveryScan()" id="db-recover-scan-btn">복구 가능한 내용 확인</button>
           <div id="db-recover-result" class="settings-hint"></div>
+          <div style="border-top:1px solid var(--border-soft); margin-top:14px; padding-top:14px;">
+            <div class="settings-section-title">자동 백업으로 되돌리기</div>
+            <p class="settings-hint">
+              손상이 너무 깊어 위 방법으로 아무것도 못 건졌다면, 이 PC가 6시간마다 자동으로 만들어두던
+              백업 중 정상인 것으로 되돌릴 수 있습니다. 그 백업 시점 이후의 대화는 사라지지만, 그 전까지는
+              전부 복구됩니다. 지금 쓰는 파일은 지우지 않고 별도로 보관됩니다.
+            </p>
+            <button type="button" class="settings-btn-secondary" onclick="startBackupRestoreScan()" id="db-backup-scan-btn">사용 가능한 백업 목록 보기</button>
+            <div id="db-backup-result" class="settings-hint"></div>
+          </div>
         </div>
         <div class="settings-card danger">
           <div class="settings-section-title" style="color:#b91c1c;">대화·로그 전체 삭제</div>
@@ -24042,6 +24052,67 @@
         await appAlert(`적용 실패: ${(res && res.msg) || '알 수 없는 오류'}`);
       }
       // 성공 시 main.js가 곧바로 재시작하므로 여기서 더 할 일은 없다.
+    }
+
+    function formatBackupTimestamp(ms) {
+      if (!ms) return '알 수 없는 시각';
+      const d = new Date(ms);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    async function startBackupRestoreScan() {
+      const btn = document.getElementById('db-backup-scan-btn');
+      const el = document.getElementById('db-backup-result');
+      if (btn) { btn.disabled = true; btn.textContent = '백업 확인 중…'; }
+      if (el) { el.textContent = ''; el.style.color = ''; }
+      try {
+        const res = await window.api.listRecoverableBackups();
+        if (!res || !res.success) {
+          if (el) { el.textContent = `백업 목록을 못 가져왔습니다: ${(res && res.msg) || '알 수 없는 오류'}`; el.style.color = '#b91c1c'; }
+          return;
+        }
+        const backups = res.backups || [];
+        if (!backups.length) {
+          if (el) { el.textContent = '이 PC에 저장된 자동 백업이 없습니다.'; el.style.color = '#b91c1c'; }
+          return;
+        }
+        if (el) {
+          el.innerHTML = backups.map((b) => {
+            const label = formatBackupTimestamp(b.mtime);
+            const sizeMb = (b.sizeBytes / 1024 / 1024).toFixed(1);
+            if (!b.healthy) {
+              return `<div style="margin-top:6px; color:var(--text-muted);">✕ ${escapeHtml(label)} (${sizeMb}MB) — 이 백업도 손상됨</div>`;
+            }
+            return (
+              `<div style="margin-top:6px; display:flex; align-items:center; gap:8px;">` +
+              `<span>✔ ${escapeHtml(label)} (${sizeMb}MB)</span>` +
+              `<button type="button" class="settings-btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="restoreFromBackupPath(${JSON.stringify(b.path)}, ${JSON.stringify(label)})">이 시점으로 복원</button>` +
+              `</div>`
+            );
+          }).join('');
+        }
+      } catch (e) {
+        console.error(e);
+        if (el) { el.textContent = '백업 확인 중 오류가 발생했습니다.'; el.style.color = '#b91c1c'; }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '사용 가능한 백업 목록 보기'; }
+      }
+    }
+
+    async function restoreFromBackupPath(backupPath, label) {
+      const ok = await appConfirm(
+        `${label} 시점의 백업으로 되돌릴까요?\n\n` +
+          `· 그 이후에 주고받은 대화·공지·일정은 사라집니다.\n` +
+          `· 지금 쓰는(손상된) 파일은 지우지 않고 별도로 보관됩니다.\n` +
+          `· 이 작업 후 앱이 자동으로 재시작됩니다.`,
+        { title: '백업으로 복원', confirmText: '복원하고 재시작', cancelText: '취소', variant: 'danger', icon: '🩹' }
+      );
+      if (!ok) return;
+      const res = await window.api.restoreFromBackup(backupPath);
+      if (!res || !res.success) {
+        await appAlert(`복원 실패: ${(res && res.msg) || '알 수 없는 오류'}`);
+      }
     }
 
     async function clearAllChatHistoryFromSettings() {
