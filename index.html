@@ -9196,6 +9196,7 @@
         appAlert(msg).catch(() => {});
       });
     }
+    syncDbCorruptionStatus();
     refreshSchedulesFromServer();
     refreshDutyRosterFromServer();
     window.api.onGroupChatsUpdate(() => { refreshGroupChats().catch((e) => console.error('그룹 갱신 실패:', e)); });
@@ -23972,6 +23973,16 @@
       const card = document.getElementById('db-recover-card');
       if (card) card.style.display = dbCorruptionDetected ? 'block' : 'none';
     }
+    async function syncDbCorruptionStatus() {
+      try {
+        if (!window.api || typeof window.api.getDbCorruptionStatus !== 'function') return;
+        const res = await window.api.getDbCorruptionStatus();
+        if (res && res.detected) {
+          dbCorruptionDetected = true;
+          updateDbRecoverCardVisibility();
+        }
+      } catch (e) { /* ignore */ }
+    }
 
     async function startDbRecoveryScan() {
       const btn = document.getElementById('db-recover-scan-btn');
@@ -24087,6 +24098,7 @@
       const clearAllResultEl = document.getElementById('chat-clear-all-result');
       if (clearAllResultEl) clearAllResultEl.textContent = '';
       updateDbRecoverCardVisibility();
+      syncDbCorruptionStatus();
       try {
         const p = await window.api.getMyProfile();
         document.getElementById('setting-name').value = isPlaceholderUsername(p.username) ? '' : (p.username || '');

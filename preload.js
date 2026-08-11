@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('api', {
   onChatPinsUpdate: (callback) => ipcRenderer.on('chat-pins-update', (e) => callback()),
   onDbCorruptRecovery: (callback) => ipcRenderer.on('db-corrupt-recovery', (e, data) => callback(data)),
   onDbCorruptionDetected: (callback) => ipcRenderer.on('db-corruption-detected', (e, data) => callback(data)),
+  getDbCorruptionStatus: () => ipcRenderer.invoke('get-db-corruption-status'),
 
   // 🩺 당직의 / 의료진 OFF
   getDutyRoster: (dateStr) => ipcRenderer.invoke('get-duty-roster', dateStr),

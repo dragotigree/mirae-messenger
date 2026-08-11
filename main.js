@@ -3474,6 +3474,12 @@ async function applyRecoveredDatabase(recoveredPath) {
   app.exit(0);
 }
 
+// ⚠️ 실사고: 'db-corruption-detected' 푸시 이벤트만으로는 부족했다 — 손상은 부팅 4초 만에
+// integrity_check로 감지되는데, 그 시점에 창(렌더러)이 아직 이 이벤트를 들을 준비가 안 돼
+// 있으면 메시지가 그냥 유실된다(늦게 로드된 리스너는 이미 지나간 이벤트를 못 받음). 설정
+// 화면을 열 때 지금 상태를 능동적으로 물어보는 방식을 추가해 이 경쟁 상태를 없앤다.
+ipcMain.handle('get-db-corruption-status', async () => ({ detected: dbCorruptRecoveryScheduled }));
+
 ipcMain.handle('recover-corrupt-database', async () => {
   try {
     const { recoveredPath, report } = await recoverReadableRowsFromCorruptDb(dbPath);
