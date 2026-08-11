@@ -4839,12 +4839,17 @@ ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
   }
 });
 
+// ⚠️ 실사고: 화면 캡처(특히 영역 캡처) 직전에 창 UI가 스크린샷에 안 찍히게 잠깐 숨기려고
+// 이 핸들러를 쓰는데, 예전엔 여기서도 'main-window-hidden' 이벤트를 그대로 쐈다. 렌더러 쪽
+// 리스너는 그 이벤트를 "트레이로 숨김(사용자가 X 버튼으로 창을 닫음)"으로만 알고 있어서,
+// 사생활 보호(숨길 때 자동 잠금)를 켜둔 사용자는 캡처할 때마다 화면이 잠겨버렸다. 이 IPC는
+// 캡처용 임시 숨김 전용(호출부가 렌더러에 전부 캡처 흐름뿐)이므로, 트레이 숨김과 구분되는
+// 진짜 신호가 아니다 — 이벤트를 쏘지 않는다(트레이 숨김은 창의 close 핸들러가 따로 쏜다).
 ipcMain.handle('set-main-window-hidden', async (event, hidden) => {
   if (!mainWindow) return { success: false };
   if (hidden) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.hide();
-    safeWebContentsSend('main-window-hidden');
   } else {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.showInactive();

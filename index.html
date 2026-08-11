@@ -18882,7 +18882,6 @@
       if (!activeChatUser) {
         await appAlert('캡처를 보낼 대화를 먼저 선택하세요.');
         return;
-        return;
       }
       if (mode === 'pick') {
         await openScreenCaptureSourceModal();
@@ -18894,16 +18893,17 @@
       } catch (e) {
         await appAlert('화면 목록을 가져오지 못했습니다.');
         return;
-        return;
       }
       const source = pickPrimaryScreenSource(sources);
       if (!source) {
         await appAlert('캡처할 화면을 찾지 못했습니다.');
         return;
-        return;
       }
       try {
         if (mode === 'region') {
+          // withMainWindowHiddenForCapture가 finally에서 항상 창을 다시 보이게 하므로,
+          // 성공/실패 어느 쪽이든 여기서 따로 복구할 필요가 없다(예전엔 실패 시 복구 코드가
+          // return 뒤에 있어 실행되지 않는 죽은 코드였다).
           const dataUrl = await withMainWindowHiddenForCapture(() => captureFrameFromSource(source.id));
           openScreenCropModal(dataUrl);
         } else {
@@ -18912,8 +18912,6 @@
       } catch (e) {
         console.error(e);
         await appAlert('화면 캡처에 실패했습니다.');
-        return;
-        await window.api.setMainWindowHidden(false);
       }
     }
     function closeQuickPhrasePopover() {
