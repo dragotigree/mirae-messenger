@@ -4128,6 +4128,7 @@ db.serialize(() => {
 
   /** 삭제된 공지 UID — NOTICE_SYNC 가 되살리는 것 방지 */
   loadNoticeTombstoneFallback();
+  loadNoticeTombstoneSigFallback();
   db.run(`CREATE TABLE IF NOT EXISTS deleted_notices (
     uid TEXT PRIMARY KEY,
     deleted_at TEXT NOT NULL
@@ -7380,6 +7381,21 @@ let noticesSchemaEnsuring = null; // callback queue
 /** 삭제된 공지 UID 즉시 기억 (DB 기록 전 레이스 방지) — 아래 const 재선언 없이 여기만 사용 */
 let noticeTombstoneMemory = new Set();
 
+// ⚠️ 실사고: 예전 버전에 uid UNIQUE 제약이 없어 같은 공지가 서로 다른 uid로 중복 저장된
+// PC들이 있었다 — 그런 상태에서 한 PC가 uid A로 삭제해도, 다른 PC가 같은 내용을 uid B로
+// 들고 있다가 동기화되면 "다른 공지"로 취급돼 되살아난다("삭제해도 재시작하면 다시
+// 나타난다"의 진짜 원인). uid뿐 아니라 제목+내용+작성시각 조합("서명")으로도 차단해,
+// uid가 달라도 같은 내용이면 다시 안 살아나게 한다.
+let noticeTombstoneSignatures = new Set();
+function noticeContentSignature(n) {
+  if (!n) return '';
+  const title = String(n.title || '').trim();
+  const content = String(n.content || '').trim();
+  const createdAt = String(n.created_at || '').trim();
+  if (!title && !content) return '';
+  return `${title}${content}${createdAt}`;
+}
+
 // ⚠️ 실사고: deleted_notices 테이블 자체가 DB 손상 영향권이면(같은 파일 내 페이지 손상이
 // 예상보다 넓게 퍼져 있을 수 있음) INSERT가 조용히 실패하고, 앱을 껐다 켜면 그 삭제 기록이
 // 사라져 이미 지운 공지가 되살아난다("삭제해도 재시작하면 다시 나온다"). SQLite와 무관한
@@ -7409,6 +7425,33 @@ function persistNoticeTombstoneFallback(uid) {
     }
   } catch (e) {
     console.warn('[notice-tombstone] fallback 파일 기록 실패:', e && e.message ? e.message : e);
+  }
+}
+function getNoticeTombstoneSigFallbackPath() {
+  try { return path.join(app.getPath('userData'), 'deleted_notices_signatures_fallback.json'); } catch (e) { return ''; }
+}
+function loadNoticeTombstoneSigFallback() {
+  const fp = getNoticeTombstoneSigFallbackPath();
+  if (!fp) return;
+  try {
+    const arr = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    if (Array.isArray(arr)) arr.forEach((sig) => { if (sig) noticeTombstoneSignatures.add(String(sig)); });
+  } catch (e) { /* 파일 없음 등 — 무시 */ }
+}
+function persistNoticeTombstoneSignature(sig) {
+  if (!sig) return;
+  noticeTombstoneSignatures.add(sig);
+  const fp = getNoticeTombstoneSigFallbackPath();
+  if (!fp) return;
+  try {
+    let arr = [];
+    try { arr = JSON.parse(fs.readFileSync(fp, 'utf8')); if (!Array.isArray(arr)) arr = []; } catch (e) { arr = []; }
+    if (!arr.includes(sig)) {
+      arr.push(sig);
+      fs.writeFileSync(fp, JSON.stringify(arr));
+    }
+  } catch (e) {
+    console.warn('[notice-tombstone-sig] fallback 파일 기록 실패:', e && e.message ? e.message : e);
   }
 }
 
@@ -8361,14 +8404,21 @@ function applyLocalNoticeDelete(uid, opts) {
     if (typeof o.done === 'function') o.done(new Error('uid missing'));
     return;
   }
-  recordNoticeTombstone(uid, (tombErr) => {
-    db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (deleteErr) => {
-      // ⚠️ DB 손상으로 물리적 DELETE가 SQLITE_CORRUPT로 실패해도, tombstone 기록(별도
-      // 테이블/페이지)이 성공했다면 get-notices 조회에서 걸러지므로 사용자 입장에서는
-      // 목록에서 사라진다 — 손상된 원본 행을 억지로 건드리려 하지 않고 안전하게 "숨긴다".
-      const effectiveErr = tombErr ? deleteErr : null;
-      if (!effectiveErr && o.notify !== false) notifyNoticesChanged();
-      if (typeof o.done === 'function') o.done(effectiveErr);
+  // 삭제 전에 내용을 먼저 읽어 "서명"도 같이 차단한다 — uid가 달라도 같은 제목/내용/작성
+  // 시각을 가진 다른 PC발 중복 데이터가 동기화로 다시 살아나는 걸 막기 위함(과거 uid
+  // UNIQUE 미보장 시절 생긴 중복 대응).
+  db.get(`SELECT title, content, created_at FROM notices WHERE uid = ?`, [String(uid)], (rowErr, row) => {
+    const sig = !rowErr && row ? noticeContentSignature(row) : '';
+    if (sig) persistNoticeTombstoneSignature(sig);
+    recordNoticeTombstone(uid, (tombErr) => {
+      db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (deleteErr) => {
+        // ⚠️ DB 손상으로 물리적 DELETE가 SQLITE_CORRUPT로 실패해도, tombstone 기록(별도
+        // 테이블/페이지)이 성공했다면 get-notices 조회에서 걸러지므로 사용자 입장에서는
+        // 목록에서 사라진다 — 손상된 원본 행을 억지로 건드리려 하지 않고 안전하게 "숨긴다".
+        const effectiveErr = tombErr ? deleteErr : null;
+        if (!effectiveErr && o.notify !== false) notifyNoticesChanged();
+        if (typeof o.done === 'function') o.done(effectiveErr);
+      });
     });
   });
 }
@@ -8382,6 +8432,9 @@ function upsertNoticeFromSync(n) {
   // 않으므로, 이미 이 PC에서 tombstone된 uid라면 동기화로 들어온 내용은 항상 옛 내용
   // (또는 되살아난 옛 공지)이지 새로 쓴 공지가 아니다 — 무시한다.
   if (noticeTombstoneMemory.has(String(n.uid))) return;
+  // uid가 달라도 같은 제목/내용/작성시각(서명)이 이미 삭제 대상이었다면 되살리지 않는다
+  // — 과거 uid 중복 버그로 다른 PC가 같은 공지를 다른 uid로 들고 있는 경우 대응.
+  if (noticeTombstoneSignatures.has(noticeContentSignature(n))) return;
   clearNoticeTombstone(n.uid, () => {
     // ⚠️ 실사고: 여기서 무조건 normalizeNoticeCategory(n.category)를 쓰고 있었다. 동기화
     // 응답에 category가 아예 없으면(구버전 PC이거나 그 PC의 값이 이미 비어 있는 경우)
@@ -10517,7 +10570,9 @@ function generateMsgUid() {
 // noticeTombstoneMemory는 DB뿐 아니라 JSON 폴백 파일(persistNoticeTombstoneFallback)에서도
 // 채워지므로, 여기서 한 번 더 JS 쪽에서 걸러 이중 안전장치로 삼는다.
 function filterOutTombstonedNotices(rows) {
-  return (rows || []).filter((r) => r && !noticeTombstoneMemory.has(String(r.uid)));
+  return (rows || []).filter((r) => r
+    && !noticeTombstoneMemory.has(String(r.uid))
+    && !noticeTombstoneSignatures.has(noticeContentSignature(r)));
 }
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
