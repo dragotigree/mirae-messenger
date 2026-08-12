@@ -664,6 +664,10 @@
       display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
+    .sidebar-list-prefs-footer {
+      border-top: 1px solid var(--border-soft); background: var(--sidebar-bg);
+      padding: 8px 10px; margin: 0;
+    }
     .sidebar-pref-seg-solo { flex: 0 0 auto; margin-left: auto; }
     .sidebar-pref-seg-solo .sidebar-pref-chip { min-width: 18px; padding: 5px 4px; font-size: 10px; }
     .sidebar-block-head {
@@ -4136,6 +4140,41 @@
     .board-write-category-select:focus {
       border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
     }
+    .board-write-dept-dropdown { position: relative; width: 100%; }
+    .board-write-dept-trigger {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg);
+      font-size: 13px; font-family: inherit; background: #fff; color: #0f172a; cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .board-write-dept-trigger:hover { border-color: rgba(33, 150, 243, 0.35); }
+    .board-write-dept-dropdown.is-open .board-write-dept-trigger {
+      border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    }
+    .board-write-dept-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+    .board-write-dept-chevron {
+      width: 14px; height: 14px; flex-shrink: 0; color: #94a3b8; transition: transform 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .board-write-dept-chevron svg { width: 100%; height: 100%; }
+    .board-write-dept-dropdown.is-open .board-write-dept-chevron { transform: rotate(180deg); }
+    .board-write-dept-menu {
+      position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+      max-height: 280px; overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16); padding: 6px; display: none; flex-direction: column; gap: 1px;
+    }
+    .board-write-dept-dropdown.is-open .board-write-dept-menu { display: flex; }
+    .board-write-dept-option {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border: none; background: transparent; border-radius: 9px; padding: 9px 10px;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .board-write-dept-option:hover { background: var(--surface-muted); color: var(--text-primary); }
+    .board-write-dept-option.active { background: var(--sidebar-active); color: var(--accent-dark); font-weight: 800; }
+    .board-write-dept-option .board-write-dept-hint { font-weight: 500; color: var(--text-muted); flex-shrink: 0; }
+    .board-write-dept-option.active .board-write-dept-hint { color: var(--accent-dark); opacity: 0.75; }
     .board-form-input, .board-form-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 13px; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none; }
     .board-form-input:focus, .board-form-textarea:focus { border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1); }
     .board-form-textarea { min-height: 180px; resize: vertical; line-height: 1.6; }
@@ -4965,23 +5004,6 @@
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="sidebar-list-prefs" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
-          <div class="sidebar-pref-seg" role="group" aria-label="분류">
-            <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
-            <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
-          </div>
-          <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
-            <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
-            <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
-          </div>
-          <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
-            <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터(직급 없음) 표시">공용</button>
-            <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
-          </div>
-          <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
-            <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">N</button>
-          </div>
-        </div>
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
@@ -5023,6 +5045,23 @@
       </div>
     </div>
 
+    <div class="sidebar-list-prefs sidebar-list-prefs-footer" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
+      <div class="sidebar-pref-seg" role="group" aria-label="분류">
+        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
+      </div>
+      <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
+        <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
+      </div>
+      <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
+        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터(직급 없음) 표시">공용</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
+      </div>
+      <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
+        <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">N</button>
+      </div>
+    </div>
   </div>
 
   <!-- 2단 대화 영역 -->
@@ -5865,8 +5904,15 @@
       <div id="board-write-view" style="flex:1; overflow-y:auto;">
         <input type="hidden" id="board-write-uid">
         <div class="board-write-category-row">
-          <label class="board-write-category-label" for="board-write-category">부서</label>
-          <select id="board-write-category" class="board-write-category-select" aria-label="공지 부서"></select>
+          <label class="board-write-category-label" id="board-write-category-label">부서</label>
+          <div class="board-write-dept-dropdown" id="board-write-dept-dropdown">
+            <input type="hidden" id="board-write-category">
+            <button type="button" class="board-write-dept-trigger" id="board-write-dept-trigger" aria-labelledby="board-write-category-label" onclick="toggleBoardWriteDeptDropdown(event)">
+              <span class="board-write-dept-trigger-label" id="board-write-dept-trigger-label">선택</span>
+              <span class="board-write-dept-chevron">▾</span>
+            </button>
+            <div class="board-write-dept-menu" id="board-write-dept-menu"></div>
+          </div>
         </div>
         <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요" style="margin-top:10px;">
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
@@ -6142,6 +6188,11 @@
             <div class="settings-radio-stack span-2">
               <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="on" id="setting-ui-animations-on" checked> <span><b>On</b><small>채팅·모달·빈 화면 등 가벼운 모션</small></span></label>
               <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="off" id="setting-ui-animations-off"> <span><b>Off</b><small>모션 없이 즉시 표시</small></span></label>
+            </div>
+            <div class="settings-section-title span-2" style="margin-top:4px;">아바타 색상</div>
+            <div class="settings-radio-stack span-2">
+              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="sky" id="setting-avatar-color-mode-sky" checked> <span><b>하늘색 계열만</b><small>차분한 파스텔 하늘색 톤 안에서만 배정</small></span></label>
+              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="full" id="setting-avatar-color-mode-full"> <span><b>다양한 색상</b><small>더 다채로운 색으로 사람 구분이 잘 되게</small></span></label>
             </div>
             <label class="settings-inline-check span-2">
               <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
@@ -7972,6 +8023,7 @@
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
     if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = false; // Win 유휴 CPU 완화 기본값
     if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = false;
+    if (appSettings.avatarColorMode === undefined) appSettings.avatarColorMode = 'sky';
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -14114,15 +14166,26 @@
     }
 
     /* 🎨 Boring Avatars(beam 스타일)풍 얼굴 아바타 — 이름/IP 해시로 매번 같은 모양을
-       재현한다. 색은 따뜻한 계열(빨강·주황·노랑)은 피하고 파랑·인디고·청록·민트·연보라
-       등 차분한 "쿨톤" 파스텔 안에서만 고르되, 사람마다 눈에 띄게 구분되도록 색 종류를
-       넉넉히 늘렸다. 사진이 없을 때 이니셜 대신 이 SVG를 그린다. */
-    const BORING_AVATAR_COLORS = [
+       재현한다. 사진이 없을 때 이니셜 대신 이 SVG를 그린다. 색상 팔레트는 설정에서
+       "하늘색 계열만"(차분) / "다양한 색상"(구분 잘 되게) 중 고를 수 있다. */
+    const BORING_AVATAR_COLORS_SKY = [
       '#BAE6FD', '#7DD3FC', '#38BDF8', '#0EA5E9', // sky
       '#93C5FD', '#60A5FA', '#3B82F6', // blue
       '#A5B4FC', '#818CF8', '#C4B5FD', // indigo/violet
       '#67E8F9', '#22D3EE', '#5EEAD4', '#2DD4BF' // cyan/teal/mint
     ];
+    // "하늘색만이라 차이가 안 난다"는 피드백으로 추가된 다채로운 팔레트 — 색상환을
+    // 넓게 돌며 사람마다 뚜렷이 구분되는 파스텔 톤 다수.
+    const BORING_AVATAR_COLORS_FULL = [
+      '#FCA5A5', '#FDBA74', '#FCD34D', '#FDE68A', // red/orange/yellow
+      '#BEF264', '#86EFAC', '#6EE7B7', // lime/green
+      '#5EEAD4', '#67E8F9', '#7DD3FC', '#93C5FD', // teal/cyan/sky/blue
+      '#A5B4FC', '#C4B5FD', '#D8B4FE', '#F0ABFC', // indigo/violet/purple/fuchsia
+      '#F9A8D4', '#FDA4AF' // pink/rose
+    ];
+    function getBoringAvatarColors() {
+      return (appSettings && appSettings.avatarColorMode === 'full') ? BORING_AVATAR_COLORS_FULL : BORING_AVATAR_COLORS_SKY;
+    }
     const BORING_AVATAR_FACE_COLOR = '#0C4A6E';
     function boringAvatarHash(str) {
       let h = 0;
@@ -14141,7 +14204,7 @@
     }
     function boringAvatarSvg(seed) {
       const rand = boringAvatarRng(boringAvatarHash(seed));
-      const colors = BORING_AVATAR_COLORS;
+      const colors = getBoringAvatarColors();
       const bgIdx = Math.floor(rand() * colors.length);
       let blobIdx = Math.floor(rand() * colors.length);
       if (blobIdx === bgIdx) blobIdx = (blobIdx + 2) % colors.length;
@@ -15496,9 +15559,16 @@
       renderFilteredNoticesList();
     }
 
+    function boardWriteDeptLabel(c) {
+      const hint = c === '업데이트' ? '업데이트 내용' : '부서 공지';
+      return { name: boardCategoryLabel(c), hint };
+    }
+
     function fillBoardWriteCategorySelect(selected) {
-      const sel = document.getElementById('board-write-category');
-      if (!sel) return;
+      const hidden = document.getElementById('board-write-category');
+      const menu = document.getElementById('board-write-dept-menu');
+      const triggerLabel = document.getElementById('board-write-dept-trigger-label');
+      if (!hidden || !menu || !triggerLabel) return;
       const options = getBoardCategoryOptions();
       // selected가 없으면(신규 작성인데 내 부서 정보도 없는 경우) '전체'로 떨어지지 않게
       // 직접 빈 값을 판별한다 — normalizeBoardCategory의 기본값 '전체'는 기존 데이터 호환용이라
@@ -15506,12 +15576,49 @@
       const trimmed = String(selected == null ? '' : selected).trim();
       const cur = trimmed && trimmed !== '전체' ? trimmed : '';
       if (cur && !options.includes(cur)) options.unshift(cur);
-      sel.innerHTML = options.map((c) => {
-        const hint = c === '업데이트' ? '업데이트 내용' : '부서 공지';
-        return `<option value="${escapeHtml(c)}">${escapeHtml(boardCategoryLabel(c))} · ${hint}</option>`;
+      const value = (cur && options.includes(cur)) ? cur : options[0];
+      hidden.value = value;
+      const vLabel = boardWriteDeptLabel(value);
+      triggerLabel.textContent = `${vLabel.name} · ${vLabel.hint}`;
+      menu.innerHTML = options.map((c) => {
+        const l = boardWriteDeptLabel(c);
+        return `<button type="button" class="board-write-dept-option${c === value ? ' active' : ''}" data-value="${escapeHtml(c)}" onclick="selectBoardWriteDept(this.dataset.value)">` +
+          `<span>${escapeHtml(l.name)}</span><span class="board-write-dept-hint">${escapeHtml(l.hint)}</span>` +
+          `</button>`;
       }).join('');
-      sel.value = (cur && options.includes(cur)) ? cur : options[0];
+      closeBoardWriteDeptDropdown();
     }
+
+    function selectBoardWriteDept(value) {
+      const hidden = document.getElementById('board-write-category');
+      const triggerLabel = document.getElementById('board-write-dept-trigger-label');
+      const menu = document.getElementById('board-write-dept-menu');
+      if (hidden) hidden.value = value;
+      if (triggerLabel) {
+        const l = boardWriteDeptLabel(value);
+        triggerLabel.textContent = `${l.name} · ${l.hint}`;
+      }
+      if (menu) {
+        [...menu.children].forEach((btn) => btn.classList.toggle('active', btn.dataset.value === value));
+      }
+      closeBoardWriteDeptDropdown();
+    }
+
+    function toggleBoardWriteDeptDropdown(e) {
+      if (e) e.stopPropagation();
+      const dd = document.getElementById('board-write-dept-dropdown');
+      if (dd) dd.classList.toggle('is-open');
+    }
+
+    function closeBoardWriteDeptDropdown() {
+      const dd = document.getElementById('board-write-dept-dropdown');
+      if (dd) dd.classList.remove('is-open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const dd = document.getElementById('board-write-dept-dropdown');
+      if (dd && dd.classList.contains('is-open') && !dd.contains(e.target)) closeBoardWriteDeptDropdown();
+    });
 
     let boardUnreadOnly = false;
     function toggleBoardUnreadOnly() {
@@ -24850,6 +24957,11 @@
         const stabilityEl = document.getElementById('setting-stability-mode');
         if (stabilityEl) stabilityEl.checked = isStabilityModeEnabled();
         syncStabilityModeSettingsUi();
+        const avatarColorSky = document.getElementById('setting-avatar-color-mode-sky');
+        const avatarColorFull = document.getElementById('setting-avatar-color-mode-full');
+        if (appSettings.avatarColorMode === 'full') {
+          if (avatarColorFull) avatarColorFull.checked = true;
+        } else if (avatarColorSky) avatarColorSky.checked = true;
         document.getElementById('setting-default-view').value = appSettings.defaultViewMode || 'normal';
         const compactClickEl = document.getElementById('setting-compact-person-click');
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
@@ -24959,6 +25071,9 @@
   const spellcheck = document.getElementById('setting-spellcheck') ? document.getElementById('setting-spellcheck').checked : false;
   const uiAnimEl = document.querySelector('input[name="setting-ui-animations"]:checked');
   const uiAnimationsEnabled = !uiAnimEl || uiAnimEl.value !== 'off';
+  const avatarColorModeEl = document.querySelector('input[name="setting-avatar-color-mode"]:checked');
+  const avatarColorMode = (avatarColorModeEl && avatarColorModeEl.value === 'full') ? 'full' : 'sky';
+  const avatarColorModeChanged = appSettings.avatarColorMode !== avatarColorMode;
   const stabilityModeEnabled = !!(document.getElementById('setting-stability-mode')
     && document.getElementById('setting-stability-mode').checked);
   if (stabilityModeEnabled) {
@@ -25021,12 +25136,17 @@
   appSettings = {
     fileMode, fontSize, fontFamily, chatFontFamily, userGrouping, nameOrder, autoLaunch, defaultViewMode,
     spellcheck, uiAnimationsEnabled: uiAnimationsEnabledFinal, stabilityModeEnabled, showUserListAvatars,
-    showOfflineUsers, showSharedPcs, compactPersonClickMode,
+    showOfflineUsers, showSharedPcs, compactPersonClickMode, avatarColorMode,
     privacyLockEnabled, privacyLockPinHash, privacyLockOnHide, privacyLockIdleMinutes,
     operatorAutoLogin,
     scheduleAlarmEnabled, scheduleAlarmLeadMinutes, scheduleAlarmOnEdit
   };
   localStorage.setItem('appSettings', JSON.stringify(appSettings));
+  if (avatarColorModeChanged) {
+    lastUserListStructureKey = '';
+    renderUserListTree(true);
+    if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+  }
   // 자동 로그인 on/off에 맞춰 작성자 세션 저장 여부 즉시 반영
   try { await saveNoticeOperatorSession(); } catch (_) {}
   refreshScheduleBoardEntryUi();
