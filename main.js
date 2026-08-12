@@ -11963,6 +11963,9 @@ async function applyUpdateFiles(opts = {}) {
     'toast.html',
     'toast-preload.js',
     'lib/minimal-xlsx.js',
+    // 공지 서식 편집기 번들(약 456KB). 이 파일이 아직 없는 PC에서도 index.html이
+    // 자동으로 기존 입력창으로 대체하도록 되어 있어, 순차 업데이트 중에도 안전하다.
+    'lib/tiptap-editor.js',
     'excalidraw-editor.html',
     'preload-excalidraw.js',
     'mobile_server.js'

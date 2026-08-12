@@ -4238,6 +4238,64 @@
       position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 999px;
       background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
     }
+    /* ✍️ 공지 서식 편집기(Tiptap) */
+    .board-rte-toolbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
+      padding: 7px 8px; border: 1px solid var(--border-soft); border-bottom: none;
+      border-radius: 12px 12px 0 0; background: var(--surface-muted);
+    }
+    .board-rte-btn {
+      min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid transparent;
+      background: transparent; border-radius: 7px; cursor: pointer;
+      font-size: 12px; font-weight: 700; color: var(--text-secondary); line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background 0.1s, color 0.1s;
+    }
+    .board-rte-btn:hover { background: var(--surface); color: var(--text-primary); }
+    .board-rte-btn.is-active { background: var(--sidebar-active); color: var(--accent-dark); border-color: rgba(33,150,243,0.35); }
+    .board-rte-sep { width: 1px; height: 18px; background: var(--border-soft); margin: 0 3px; }
+    .board-rte-swatches { display: inline-flex; align-items: center; gap: 3px; }
+    .board-rte-swatch {
+      width: 17px; height: 17px; border-radius: 5px; border: 1px solid rgba(15,23,42,0.18);
+      cursor: pointer; padding: 0; flex-shrink: 0;
+    }
+    .board-rte-swatch.is-highlight { border-radius: 999px; }
+    .board-rte-surface {
+      border: 1px solid var(--border-soft); border-radius: 0 0 12px 12px;
+      background: var(--surface); padding: 0;
+    }
+    .board-rte-surface .ProseMirror {
+      min-height: 190px; max-height: 42vh; overflow-y: auto; outline: none;
+      padding: 12px 14px; font-size: 14px; line-height: 1.7; color: var(--text-primary);
+    }
+    .board-rte-surface .ProseMirror p.is-editor-empty:first-child::before {
+      content: '내용을 입력하세요'; color: var(--text-muted); float: left; height: 0; pointer-events: none;
+    }
+    /* 편집기 안과 공지 상세 보기의 서식이 똑같이 보이도록 한 곳에서 같이 정의한다. */
+    .board-rte-surface .ProseMirror h1, #board-detail-content h1 { font-size: 20px; font-weight: 800; margin: 12px 0 6px; }
+    .board-rte-surface .ProseMirror h2, #board-detail-content h2 { font-size: 17px; font-weight: 800; margin: 11px 0 5px; }
+    .board-rte-surface .ProseMirror h3, #board-detail-content h3 { font-size: 15px; font-weight: 700; margin: 10px 0 4px; }
+    .board-rte-surface .ProseMirror ul, #board-detail-content ul { list-style: disc; padding-left: 22px; margin: 6px 0; }
+    .board-rte-surface .ProseMirror ol, #board-detail-content ol { list-style: decimal; padding-left: 22px; margin: 6px 0; }
+    .board-rte-surface .ProseMirror li, #board-detail-content li { margin: 2px 0; }
+    .board-rte-surface .ProseMirror blockquote, #board-detail-content blockquote {
+      border-left: 3px solid var(--border); padding-left: 10px; margin: 8px 0; color: var(--text-secondary);
+    }
+    .board-rte-surface .ProseMirror table, #board-detail-content table {
+      border-collapse: collapse; width: 100%; margin: 10px 0; table-layout: fixed;
+    }
+    .board-rte-surface .ProseMirror th, .board-rte-surface .ProseMirror td,
+    #board-detail-content th, #board-detail-content td {
+      border: 1px solid var(--border); padding: 6px 9px; vertical-align: top; word-break: break-word;
+    }
+    .board-rte-surface .ProseMirror th, #board-detail-content th { background: var(--surface-muted); font-weight: 700; }
+    .board-rte-surface .ProseMirror .selectedCell { background: rgba(33,150,243,0.12); }
+    /* ⚠️ #board-detail-content의 white-space는 인라인 style로 지정돼 있어 여기서 못 덮는다.
+       서식 HTML로 그릴 때는 'normal', 옛 순수 텍스트를 textContent로 그릴 때는 'pre-wrap'이
+       필요하므로 renderBoardDetailContent()에서 상황에 맞게 직접 설정한다. */
+    #board-detail-content p { margin: 0 0 8px; }
+    #board-detail-content p:last-child { margin-bottom: 0; }
+
     /* 그림은 가운데 정렬하고, 원본보다 크게 늘리지 않는다(작은 그림이 흐릿하게 확대되던 문제).
        margin-top이 아니라 margin-bottom을 쓰는 이유: 그림이 본문보다 위에 오도록 순서를 바꿨다. */
     .board-detail-images { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -4973,6 +5031,9 @@
   <div id="splash-screen">
     <img src="assets/splash.png" alt="미래병원" width="384" height="173" decoding="async">
   </div>
+  <!-- ✍️ 공지 서식 편집기 번들(오프라인 내장). 이 파일이 없어도 앱은 정상 동작하며,
+       공지 작성은 기존 입력창으로 자동 대체된다 — onerror로 조용히 넘어간다. -->
+  <script src="lib/tiptap-editor.js" onerror="console.warn('[공지] 서식 편집기 번들 없음 — 기본 입력창 사용')"></script>
   <script>
     (function () {
       var SPLASH_FORCE_MS = 5000;
@@ -5962,6 +6023,33 @@
           </div>
         </div>
         <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요" style="margin-top:10px;">
+        <!-- 서식 편집기(Tiptap). lib/tiptap-editor.js 가 없으면 아래 textarea가 그대로 쓰인다. -->
+        <div id="board-rich-editor-wrap" style="display:none; margin-top:10px;">
+          <div class="board-rte-toolbar" id="board-rte-toolbar">
+            <button type="button" class="board-rte-btn" data-cmd="bold" title="굵게"><b>B</b></button>
+            <button type="button" class="board-rte-btn" data-cmd="italic" title="기울임"><i>I</i></button>
+            <button type="button" class="board-rte-btn" data-cmd="underline" title="밑줄"><u>U</u></button>
+            <button type="button" class="board-rte-btn" data-cmd="strike" title="취소선"><s>S</s></button>
+            <span class="board-rte-sep"></span>
+            <button type="button" class="board-rte-btn" data-cmd="h1" title="제목 1">H1</button>
+            <button type="button" class="board-rte-btn" data-cmd="h2" title="제목 2">H2</button>
+            <button type="button" class="board-rte-btn" data-cmd="h3" title="제목 3">H3</button>
+            <span class="board-rte-sep"></span>
+            <button type="button" class="board-rte-btn" data-cmd="bulletList" title="글머리 기호">••</button>
+            <button type="button" class="board-rte-btn" data-cmd="orderedList" title="번호 목록">1.</button>
+            <button type="button" class="board-rte-btn" data-cmd="blockquote" title="인용">❝</button>
+            <span class="board-rte-sep"></span>
+            <span class="board-rte-swatches" id="board-rte-colors" title="글자 색"></span>
+            <span class="board-rte-swatches" id="board-rte-highlights" title="형광펜"></span>
+            <button type="button" class="board-rte-btn" data-cmd="clearFormat" title="서식 지우기">✕서식</button>
+            <span class="board-rte-sep"></span>
+            <button type="button" class="board-rte-btn" data-cmd="insertTable" title="표 삽입">⊞표</button>
+            <button type="button" class="board-rte-btn" data-cmd="addColumn" title="열 추가">＋열</button>
+            <button type="button" class="board-rte-btn" data-cmd="addRow" title="행 추가">＋행</button>
+            <button type="button" class="board-rte-btn" data-cmd="deleteTable" title="표 삭제">🗑표</button>
+          </div>
+          <div id="board-rich-editor" class="board-rte-surface"></div>
+        </div>
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
         <div class="board-photo-toolbar">
           <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
@@ -15615,9 +15703,179 @@
     }
 
     /** 목록 카드에 보여줄 본문 미리보기 — HTML 태그를 걷어내고 한 줄로 */
+    /* ✍️ 공지 서식 편집기(Tiptap)
+       ⚠️ lib/tiptap-editor.js는 자동 업데이트 파일 목록에 새로 추가된 파일이라, 구버전
+       main.js가 받아온 직후에는 아직 없을 수 있다. 그래서 편집기가 없으면 예전 textarea를
+       그대로 쓰도록 모든 경로를 이중화했다 — 파일이 없어도 공지 작성은 항상 가능하다. */
+    let boardRichEditor = null;
+    const BOARD_RTE_TEXT_COLORS = ['#0f172a', '#dc2626', '#ea580c', '#16a34a', '#2563eb', '#7c3aed'];
+    const BOARD_RTE_HIGHLIGHTS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8'];
+
+    function boardRichEditorAvailable() {
+      return !!(window.MiraeEditor && typeof window.MiraeEditor.create === 'function');
+    }
+
+    // 툴바 버튼은 위임(delegation)으로 한 번만 묶는다 — 편집기를 다시 만들어도 다시 묶을 필요가 없다.
+    document.addEventListener('DOMContentLoaded', () => {
+      const toolbar = document.getElementById('board-rte-toolbar');
+      if (!toolbar) return;
+      toolbar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.board-rte-btn');
+        if (!btn || !toolbar.contains(btn)) return;
+        e.preventDefault();
+        runBoardRteCommand(btn.dataset.cmd);
+      });
+      // 툴바를 눌러도 편집기 선택 영역이 풀리지 않게 한다.
+      toolbar.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.board-rte-btn, .board-rte-swatch')) e.preventDefault();
+      });
+    });
+
+    function buildBoardRteSwatches() {
+      const colorBox = document.getElementById('board-rte-colors');
+      const hlBox = document.getElementById('board-rte-highlights');
+      if (colorBox && !colorBox.childElementCount) {
+        colorBox.innerHTML = BOARD_RTE_TEXT_COLORS.map((c) =>
+          `<button type="button" class="board-rte-swatch" data-color="${c}" style="background:${c}" title="글자색 ${c}"></button>`
+        ).join('');
+        colorBox.querySelectorAll('.board-rte-swatch').forEach((b) => {
+          b.addEventListener('click', () => {
+            if (!boardRichEditor) return;
+            boardRichEditor.chain().focus().setColor(b.dataset.color).run();
+          });
+        });
+      }
+      if (hlBox && !hlBox.childElementCount) {
+        hlBox.innerHTML = BOARD_RTE_HIGHLIGHTS.map((c) =>
+          `<button type="button" class="board-rte-swatch is-highlight" data-color="${c}" style="background:${c}" title="형광펜"></button>`
+        ).join('');
+        hlBox.querySelectorAll('.board-rte-swatch').forEach((b) => {
+          b.addEventListener('click', () => {
+            if (!boardRichEditor) return;
+            boardRichEditor.chain().focus().toggleHighlight({ color: b.dataset.color }).run();
+          });
+        });
+      }
+    }
+
+    function runBoardRteCommand(cmd) {
+      if (!boardRichEditor) return;
+      const c = boardRichEditor.chain().focus();
+      switch (cmd) {
+        case 'bold': c.toggleBold().run(); break;
+        case 'italic': c.toggleItalic().run(); break;
+        case 'underline': c.toggleUnderline().run(); break;
+        case 'strike': c.toggleStrike().run(); break;
+        case 'h1': c.toggleHeading({ level: 1 }).run(); break;
+        case 'h2': c.toggleHeading({ level: 2 }).run(); break;
+        case 'h3': c.toggleHeading({ level: 3 }).run(); break;
+        case 'bulletList': c.toggleBulletList().run(); break;
+        case 'orderedList': c.toggleOrderedList().run(); break;
+        case 'blockquote': c.toggleBlockquote().run(); break;
+        case 'clearFormat': c.unsetAllMarks().clearNodes().run(); break;
+        case 'insertTable': c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+        case 'addColumn': c.addColumnAfter().run(); break;
+        case 'addRow': c.addRowAfter().run(); break;
+        case 'deleteTable': c.deleteTable().run(); break;
+        default: break;
+      }
+      updateBoardRteToolbarState();
+    }
+
+    function updateBoardRteToolbarState() {
+      if (!boardRichEditor) return;
+      const map = {
+        bold: () => boardRichEditor.isActive('bold'),
+        italic: () => boardRichEditor.isActive('italic'),
+        underline: () => boardRichEditor.isActive('underline'),
+        strike: () => boardRichEditor.isActive('strike'),
+        h1: () => boardRichEditor.isActive('heading', { level: 1 }),
+        h2: () => boardRichEditor.isActive('heading', { level: 2 }),
+        h3: () => boardRichEditor.isActive('heading', { level: 3 }),
+        bulletList: () => boardRichEditor.isActive('bulletList'),
+        orderedList: () => boardRichEditor.isActive('orderedList'),
+        blockquote: () => boardRichEditor.isActive('blockquote')
+      };
+      document.querySelectorAll('#board-rte-toolbar .board-rte-btn').forEach((btn) => {
+        const fn = map[btn.dataset.cmd];
+        if (!fn) return;
+        let on = false;
+        try { on = !!fn(); } catch (e) { on = false; }
+        btn.classList.toggle('is-active', on);
+      });
+    }
+
+    /** 글쓰기 화면을 열 때 호출 — 편집기를 준비하고 기존 내용을 채운다. */
+    function setBoardWriteContent(content) {
+      const textarea = document.getElementById('board-write-content');
+      const wrap = document.getElementById('board-rich-editor-wrap');
+      const host = document.getElementById('board-rich-editor');
+      if (!boardRichEditorAvailable() || !wrap || !host) {
+        // 폴백: 예전처럼 textarea를 쓴다. 서식 HTML이 저장돼 있으면 읽을 수 있게 텍스트로 변환.
+        if (wrap) wrap.style.display = 'none';
+        if (textarea) {
+          textarea.style.display = '';
+          const raw = String(content || '');
+          textarea.value = /<\/?[a-z][^>]*>/i.test(raw) ? boardNoticePreviewText(raw) : raw;
+        }
+        return;
+      }
+      if (textarea) textarea.style.display = 'none';
+      wrap.style.display = '';
+      buildBoardRteSwatches();
+      try {
+        if (boardRichEditor) { boardRichEditor.destroy(); boardRichEditor = null; }
+        host.innerHTML = '';
+        boardRichEditor = window.MiraeEditor.create(host, {
+          content: content || '',
+          onUpdate: updateBoardRteToolbarState
+        });
+        boardRichEditor.on('selectionUpdate', updateBoardRteToolbarState);
+        updateBoardRteToolbarState();
+      } catch (e) {
+        // 편집기 생성 실패 시에도 공지 작성은 가능해야 한다 — textarea로 되돌린다.
+        console.error('[공지] 서식 편집기 초기화 실패 — 기본 입력창으로 전환:', e);
+        boardRichEditor = null;
+        wrap.style.display = 'none';
+        if (textarea) { textarea.style.display = ''; textarea.value = String(content || ''); }
+      }
+    }
+
+    /** 저장할 본문을 가져온다(서식이면 검사기를 통과한 HTML). */
+    function getBoardWriteContent() {
+      if (boardRichEditor) {
+        const html = boardRichEditor.getHTML();
+        // 빈 편집기는 '<p></p>' 를 돌려준다 — 내용 없음으로 취급해야 한다.
+        if (!boardNoticePreviewText(html)) return '';
+        return window.MiraeEditor.sanitize(html);
+      }
+      const textarea = document.getElementById('board-write-content');
+      return textarea ? textarea.value.trim() : '';
+    }
+
+    /** 공지 상세 본문을 안전하게 그린다. */
+    function renderBoardDetailContent(content) {
+      const el = document.getElementById('board-detail-content');
+      if (!el) return;
+      const raw = String(content || '');
+      if (window.MiraeEditor && typeof window.MiraeEditor.toDisplayHtml === 'function') {
+        el.style.whiteSpace = 'normal';
+        el.innerHTML = window.MiraeEditor.toDisplayHtml(raw);
+        return;
+      }
+      // 편집기 번들이 아직 없는 PC — 절대 innerHTML을 쓰지 않는다(XSS 방지).
+      el.style.whiteSpace = 'pre-wrap';
+      el.textContent = raw;
+    }
+
     function boardNoticePreviewText(html) {
       const s = String(html == null ? '' : html);
       if (!s) return '';
+      // 서식 편집기(Tiptap)가 있으면 그쪽 변환기를 쓴다 — 표의 칸 사이를 띄우는 등
+      // 미리보기용으로 더 낫게 뽑아준다. 없으면 예전 방식 그대로.
+      if (window.MiraeEditor && typeof window.MiraeEditor.htmlToPlainText === 'function') {
+        try { return window.MiraeEditor.htmlToPlainText(s).replace(/\s+/g, ' ').trim(); } catch (e) { /* 폴백 */ }
+      }
       const tmp = document.createElement('div');
       tmp.innerHTML = s;
       return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
@@ -15900,7 +16158,7 @@
       document.getElementById('board-detail-meta').innerHTML =
         `<span class="board-notice-cat-badge ${boardCategoryBadgeClass(cat)}">${escapeHtml(boardCategoryLabel(cat))}</span>`
         + ` · 작성자: ${escapeHtml(formatNoticeAuthorName(n))} · ${escapeHtml(createdDisplay)}`;
-      document.getElementById('board-detail-content').textContent = n.content || '';
+      renderBoardDetailContent(n.content || '');
 
       const imagesEl = document.getElementById('board-detail-images');
       if (imagesEl) {
@@ -15966,7 +16224,7 @@
         document.getElementById('board-modal-title').textContent = '✍️ 공지사항 수정';
         document.getElementById('board-write-uid').value = uid;
         document.getElementById('board-write-title').value = n ? n.title : '';
-        document.getElementById('board-write-content').value = n ? n.content : '';
+        setBoardWriteContent(n ? n.content : '');
         boardWriteImages = parseNoticeImages(n && n.images);
         fillBoardWriteCategorySelect(n && n.category);
         if (submitBtn) submitBtn.textContent = '✔ 수정 저장';
@@ -15976,7 +16234,7 @@
         document.getElementById('board-modal-title').textContent = '✍️ 새 공지사항 작성';
         document.getElementById('board-write-uid').value = '';
         document.getElementById('board-write-title').value = '';
-        document.getElementById('board-write-content').value = '';
+        setBoardWriteContent('');
         boardWriteImages = [];
         // 기본: 내 부서가 있으면 부서, 없으면 목록 첫 항목(업데이트) — '전체'는 없앤 카테고리라 기본값으로 쓰지 않는다.
         const myDept = (myProfile && myProfile.dept) ? String(myProfile.dept).trim() : '';
@@ -16004,7 +16262,7 @@
       const isEdit = boardWriteMode === 'edit' && !!boardWriteEditingUid;
       const uid = isEdit ? boardWriteEditingUid : '';
       const title = document.getElementById('board-write-title').value.trim();
-      const content = document.getElementById('board-write-content').value.trim();
+      const content = getBoardWriteContent();
       const category = normalizeBoardCategory(document.getElementById('board-write-category')?.value);
       const images = boardWriteImages.slice(0, MAX_NOTICE_IMAGES);
       if (!title) { await appAlert('제목을 입력해 주세요.'); return; }
