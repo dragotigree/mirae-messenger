@@ -1755,8 +1755,9 @@
     /* ✉️ IPmsg 스타일 쪽지 보내기 */
     .ipmsg-modal-card {
       width: min(720px, 96vw) !important;
-      height: min(94vh, 820px) !important;
-      max-height: min(94vh, 820px) !important;
+      height: min(90vh, 450px) !important;
+      max-height: min(90vh, 450px) !important;
+      transition: height 0.18s ease, max-height 0.18s ease;
       padding: 0 !important;
       gap: 0 !important;
       display: flex !important;
@@ -1764,6 +1765,10 @@
       overflow: hidden !important;
       border-radius: 20px !important;
       box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(148, 163, 184, 0.12) !important;
+    }
+    .ipmsg-modal-card.is-recipient-expanded {
+      height: min(94vh, 760px) !important;
+      max-height: min(94vh, 760px) !important;
     }
     .ipmsg-modal-header {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -10504,9 +10509,11 @@
     function toggleIpmsgRecipientSection() {
       const el = document.getElementById('ipmsg-recipient-section');
       const btn = document.getElementById('ipmsg-recipient-toggle-btn');
+      const card = document.querySelector('.ipmsg-modal-card');
       if (!el) return;
       const collapsed = el.classList.toggle('is-collapsed');
       if (btn) btn.textContent = collapsed ? '받는 사람 편집 ▾' : '받는 사람 접기 ▴';
+      if (card) card.classList.toggle('is-recipient-expanded', !collapsed);
     }
 
     function updateIpmsgSelectionUi() {
@@ -10665,8 +10672,10 @@
       renderIpmsgRecipientTable('');
       const recipientSection = document.getElementById('ipmsg-recipient-section');
       const recipientToggleBtn = document.getElementById('ipmsg-recipient-toggle-btn');
+      const ipmsgCard = document.querySelector('.ipmsg-modal-card');
       if (recipientSection) recipientSection.classList.add('is-collapsed');
       if (recipientToggleBtn) recipientToggleBtn.textContent = '받는 사람 편집 ▾';
+      if (ipmsgCard) ipmsgCard.classList.remove('is-recipient-expanded');
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
       document.getElementById('ipmsg-send-modal').style.display = 'flex';
