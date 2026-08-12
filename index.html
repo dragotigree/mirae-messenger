@@ -11528,7 +11528,9 @@
 
       const sorted = [...filtered].sort(compareUsersSidebarOrder);
       const favorites = compactListFilter !== 'favorite' ? sorted.filter(isFavoriteUser) : [];
-      const rest = compactListFilter !== 'favorite' ? sorted.filter(u => !isFavoriteUser(u)) : sorted;
+      // 즐겨찾기해도 아래 일반 목록에서 사라지지 않도록 — 위 즐겨찾기 패널은 빠른 접근용
+      // "복사본"일 뿐, 원래 목록에서 빼는 용도가 아니다.
+      const rest = sorted;
 
       if (favorites.length > 0) {
         const favPanel = createCompactPanel('즐겨찾는 직원', '');
@@ -14626,7 +14628,9 @@
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
       const favorites = filtered.filter(isFavoriteUser);
       favorites.sort(compareUsersSidebarOrder);
-      const rest = filtered.filter(u => !isFavoriteUser(u));
+      // 즐겨찾기해도 아래 일반 목록(층/부서별)에서 사라지지 않도록 — 즐겨찾기 섹션은
+      // 빠른 접근용 "복사본"일 뿐, 원래 목록에서 빼는 용도가 아니다.
+      const rest = filtered;
 
       const groupingKey = appSettings.userGrouping || 'floor';
       const groups = {};
@@ -14636,7 +14640,7 @@
         groups[groupName].push(u);
       });
 
-      const restAll = (allUsers || []).filter((u) => !favoriteIps.has(u.ip));
+      const restAll = allUsers || [];
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
       renderFavoritesSection(favorites);
