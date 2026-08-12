@@ -24777,11 +24777,22 @@
        백업으로 통째로 덮어썼는데(그러면 백업 이후 대화가 전부 사라짐), 지금은 아무것도 자동으로
        하지 않는 대신 이 카드가 나타나 관리자가 "읽을 수 있는 만큼 건져보기"를 직접 시작할 수 있다. */
     let dbCorruptionDetected = false;
+    let dbCorruptionAlertShown = false;
     let lastRecoveredDbInfo = null;
+    async function alertDbCorruptionOnce() {
+      if (dbCorruptionAlertShown) return;
+      dbCorruptionAlertShown = true;
+      const goToRecover = await appConfirm(
+        '데이터베이스 파일이 손상되어 대화·공지 등 일부 내용이 표시되지 않을 수 있습니다.\n지금 설정의 「데이터」 화면으로 이동해 복구를 진행하시겠습니까?',
+        { title: '데이터베이스 손상 감지', confirmText: '지금 복구하기', cancelText: '나중에', variant: 'warning' }
+      );
+      if (goToRecover) openSettingsModal({ focus: 'data' });
+    }
     if (window.api && typeof window.api.onDbCorruptionDetected === 'function') {
       window.api.onDbCorruptionDetected(() => {
         dbCorruptionDetected = true;
         updateDbRecoverCardVisibility();
+        alertDbCorruptionOnce();
       });
     }
     function updateDbRecoverCardVisibility() {
@@ -24795,6 +24806,7 @@
         if (res && res.detected) {
           dbCorruptionDetected = true;
           updateDbRecoverCardVisibility();
+          alertDbCorruptionOnce();
         }
       } catch (e) { /* ignore */ }
     }
