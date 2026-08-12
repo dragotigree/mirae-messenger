@@ -8030,7 +8030,7 @@
     if (appSettings.scheduleAlarmLeadMinutes === undefined) appSettings.scheduleAlarmLeadMinutes = 0;
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
     if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = false; // Win 유휴 CPU 완화 기본값
-    if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = false;
+    if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = true;
     if (appSettings.avatarColorMode === undefined) appSettings.avatarColorMode = 'full';
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
@@ -9282,13 +9282,19 @@
       const sel = document.getElementById('setting-default-view');
       if (sel) sel.value = next;
     });
+    // ⚠️ 실사고: 예전엔 여기서 main 프로세스의 tray_launch_view_mode(DB) 값을 무조건 가져와
+    // 이 PC에 저장된 「화면 모드」(appSettings.defaultViewMode) 설정을 덮어썼다 — 그 결과 DB
+    // 쪽 값이 한 번이라도 'compact'로 남아있으면(예: 트레이 메뉴로 미니 화면을 한 번 열었던
+    // 적이 있으면) 이후 업데이트·재시작 때마다 사용자가 설정에서 고른 화면 모드를 무시하고
+    // 계속 미니 모드로 열렸다("업데이트하면 항상 미니모드로 열린다"의 원인). 이제 이 PC에
+    // 저장된 설정을 그대로 쓰고, DB 쪽 값은 여기에 맞춰 동기화만 한다(반대 방향이 아님).
     window.api.getTrayLaunchViewMode().then((mode) => {
       const fromDb = mode === 'compact' ? 'compact' : 'normal';
-      if (fromDb !== (appSettings.defaultViewMode || 'normal')) {
-        appSettings.defaultViewMode = fromDb;
-        localStorage.setItem('appSettings', JSON.stringify(appSettings));
+      const desired = appSettings.defaultViewMode === 'compact' ? 'compact' : 'normal';
+      if (fromDb !== desired && window.api.setTrayLaunchViewMode) {
+        window.api.setTrayLaunchViewMode(desired).catch(() => {});
       }
-      isCompactMode = appSettings.defaultViewMode === 'compact';
+      isCompactMode = desired === 'compact';
       if (isCompactMode) document.body.classList.add('compact-mode');
       updateCompactModeButtonUi();
     }).catch(() => {});
