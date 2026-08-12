@@ -3631,9 +3631,36 @@ ipcMain.handle('reset-database-fresh', async () => {
     await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
     await fs.promises.copyFile(`${dbPath}-wal`, `${corruptedCopy}-wal`).catch(() => {});
     await fs.promises.copyFile(`${dbPath}-shm`, `${corruptedCopy}-shm`).catch(() => {});
-    await fs.promises.unlink(dbPath).catch(() => {});
     await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
     await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+    // ⚠️ 실사고: unlink()가 (백신 실시간 검사 등으로 파일이 아직 잠겨 있어) 조용히 실패하면
+    // dbPath에 손상된 원본이 그대로 남아있는데도 "성공"으로 처리되어, 재시작 후 같은 손상을
+    // 또 감지하는 일이 있었다. unlink 실패 시 0바이트로 덮어써서라도(빈 파일은 SQLite가
+    // 새 DB로 인식한다) 반드시 깨끗한 상태로 만들고, 그것도 안 되면 실패로 보고한다.
+    let cleared = false;
+    try {
+      await fs.promises.unlink(dbPath);
+      cleared = true;
+    } catch (e) {
+      try {
+        await fs.promises.truncate(dbPath, 0);
+        cleared = true;
+      } catch (e2) {
+        cleared = false;
+      }
+    }
+    if (!cleared || fs.existsSync(dbPath)) {
+      // unlink는 실패했지만 truncate로 0바이트가 됐다면 fs.existsSync는 true라도 정상이다 —
+      // 실제로 내용이 비었는지로 다시 판정한다.
+      let stillCorrupt = true;
+      try {
+        const stat = await fs.promises.stat(dbPath).catch(() => null);
+        stillCorrupt = !!(stat && stat.size > 0);
+      } catch (e) { /* ignore */ }
+      if (stillCorrupt) {
+        return { success: false, msg: '손상된 파일을 지우지 못했습니다(다른 프로그램이 사용 중일 수 있음). 프로그램을 완전히 종료한 뒤 다시 시도해 주세요.' };
+      }
+    }
     await resetDbMigrationMarkersForNewDbFile();
     app.relaunch();
     app.exit(0);
