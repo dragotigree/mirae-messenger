@@ -648,6 +648,8 @@
     .user-group-block.is-user-group-dragging { opacity: 0.45; }
     .user-group-block.is-user-group-drop-target .subsection-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
     .subsection-label:hover .channel-reorder-grip { opacity: 0.5; }
+    .sidebar-group-icon { display: inline-flex; width: 12px; height: 12px; vertical-align: -2px; color: var(--sidebar-text-dim); margin-right: 1px; }
+    .sidebar-group-icon .icon-glyph { width: 100%; height: 100%; }
     .group-count-badge { font-size: 11px; opacity: 0.72; font-weight: 600; }
 
     #sidebar-left .user-search-box { padding: 2px 10px 5px 10px; }
@@ -6191,8 +6193,8 @@
             </div>
             <div class="settings-section-title span-2" style="margin-top:4px;">아바타 색상</div>
             <div class="settings-radio-stack span-2">
-              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="sky" id="setting-avatar-color-mode-sky" checked> <span><b>하늘색 계열만</b><small>차분한 파스텔 하늘색 톤 안에서만 배정</small></span></label>
-              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="full" id="setting-avatar-color-mode-full"> <span><b>다양한 색상</b><small>더 다채로운 색으로 사람 구분이 잘 되게</small></span></label>
+              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="sky" id="setting-avatar-color-mode-sky"> <span><b>하늘색 계열만</b><small>차분한 파스텔 하늘색 톤 안에서만 배정</small></span></label>
+              <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="full" id="setting-avatar-color-mode-full" checked> <span><b>다양한 색상</b><small>더 다채로운 색으로 사람 구분이 잘 되게</small></span></label>
             </div>
             <label class="settings-inline-check span-2">
               <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
@@ -7253,7 +7255,9 @@
       clipboardList: _uiSvg('<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h1"/>'),
       calendarPlus: _uiSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M12 14v4"/><path d="M10 16h4"/>'),
       userRound: _uiSvg('<path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/>'),
-      hash: _uiSvg('<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>')
+      hash: _uiSvg('<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>'),
+      layers: _uiSvg('<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>'),
+      buildingDept: _uiSvg('<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -8023,7 +8027,7 @@
     if (appSettings.scheduleAlarmOnEdit === undefined) appSettings.scheduleAlarmOnEdit = false;
     if (appSettings.uiAnimationsEnabled === undefined) appSettings.uiAnimationsEnabled = false; // Win 유휴 CPU 완화 기본값
     if (appSettings.stabilityModeEnabled === undefined) appSettings.stabilityModeEnabled = false;
-    if (appSettings.avatarColorMode === undefined) appSettings.avatarColorMode = 'sky';
+    if (appSettings.avatarColorMode === undefined) appSettings.avatarColorMode = 'full';
     let isCompactMode = appSettings.defaultViewMode === 'compact';
 
     const SYSTEM_FONT_PRESETS = {
@@ -12335,7 +12339,8 @@
     function getUserGroupSidebarIcon(groupingKey, groupName) {
       const custom = getChannelTitleEmoji(getUserGroupTitleKey(groupingKey, groupName));
       if (custom) return custom;
-      return groupingKey === 'floor' ? '🏢' : '🏥';
+      const glyph = groupingKey === 'floor' ? uiIcon('layers') : uiIcon('buildingDept');
+      return `<span class="sidebar-group-icon">${glyph}</span>`;
     }
 
     function getTitleKeyForChat(user) {
