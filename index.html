@@ -14092,9 +14092,15 @@
     }
 
     /* 🎨 Boring Avatars(beam 스타일)풍 얼굴 아바타 — 이름/IP 해시로 매번 같은 모양을
-       재현하되, 배경·블롭·이목구비를 전부 파스텔 하늘색 계열 안에서만 골라 앱 톤과
-       맞춘다. 사진이 없을 때 이니셜 대신 이 SVG를 그린다. */
-    const BORING_AVATAR_COLORS = ['#BAE6FD', '#7DD3FC', '#93C5FD', '#A5B4FC', '#38BDF8', '#0EA5E9'];
+       재현한다. 색은 따뜻한 계열(빨강·주황·노랑)은 피하고 파랑·인디고·청록·민트·연보라
+       등 차분한 "쿨톤" 파스텔 안에서만 고르되, 사람마다 눈에 띄게 구분되도록 색 종류를
+       넉넉히 늘렸다. 사진이 없을 때 이니셜 대신 이 SVG를 그린다. */
+    const BORING_AVATAR_COLORS = [
+      '#BAE6FD', '#7DD3FC', '#38BDF8', '#0EA5E9', // sky
+      '#93C5FD', '#60A5FA', '#3B82F6', // blue
+      '#A5B4FC', '#818CF8', '#C4B5FD', // indigo/violet
+      '#67E8F9', '#22D3EE', '#5EEAD4', '#2DD4BF' // cyan/teal/mint
+    ];
     const BORING_AVATAR_FACE_COLOR = '#0C4A6E';
     function boringAvatarHash(str) {
       let h = 0;

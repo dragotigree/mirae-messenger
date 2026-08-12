@@ -8250,7 +8250,7 @@ function recordScheduleTombstone(uid, done) {
 
 function recordNoticeTombstone(uid, done) {
   if (!uid) {
-    if (typeof done === 'function') done();
+    if (typeof done === 'function') done(null);
     return;
   }
   const key = String(uid);
@@ -8259,7 +8259,7 @@ function recordNoticeTombstone(uid, done) {
   db.run(
     `INSERT OR REPLACE INTO deleted_notices (uid, deleted_at) VALUES (?, ?)`,
     [key, at],
-    () => pruneNoticeTombstones(done)
+    (tombErr) => pruneNoticeTombstones(() => { if (typeof done === 'function') done(tombErr || null); })
   );
 }
 
@@ -8327,10 +8327,14 @@ function applyLocalNoticeDelete(uid, opts) {
     if (typeof o.done === 'function') o.done(new Error('uid missing'));
     return;
   }
-  recordNoticeTombstone(uid, () => {
-    db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (err) => {
-      if (!err && o.notify !== false) notifyNoticesChanged();
-      if (typeof o.done === 'function') o.done(err || null);
+  recordNoticeTombstone(uid, (tombErr) => {
+    db.run(`DELETE FROM notices WHERE uid = ?`, [String(uid)], (deleteErr) => {
+      // ⚠️ DB 손상으로 물리적 DELETE가 SQLITE_CORRUPT로 실패해도, tombstone 기록(별도
+      // 테이블/페이지)이 성공했다면 get-notices 조회에서 걸러지므로 사용자 입장에서는
+      // 목록에서 사라진다 — 손상된 원본 행을 억지로 건드리려 하지 않고 안전하게 "숨긴다".
+      const effectiveErr = tombErr ? deleteErr : null;
+      if (!effectiveErr && o.notify !== false) notifyNoticesChanged();
+      if (typeof o.done === 'function') o.done(effectiveErr);
     });
   });
 }
@@ -10461,26 +10465,33 @@ function generateMsgUid() {
   return `${MY_IP}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
+// ⚠️ tombstone(deleted_notices)에 있는 uid는 항상 걸러낸다 — DB 손상으로 물리적
+// DELETE가 실패해도 tombstone 기록만 성공하면 목록에서 사라지게 하기 위한 안전장치
+// (applyLocalNoticeDelete 참고). NOT IN 서브쿼리 자체가 깨졌을 가능성은 낮지만, 혹시
+// 실패하면 필터 없이라도 목록은 보여준다(공지 자체를 못 보는 것보단 낫다).
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
     ensureNoticesTableSchema(() => {
-      db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (err, rows) => {
+      db.all(`SELECT * FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) {
-          console.error('get-notices 실패:', err.message);
-          noticesSchemaReady = false;
-          ensureNoticesTableSchema(() => {
-            db.all(`SELECT uid, title, content, author_name, author_ip, created_at, images, category FROM notices ORDER BY created_at DESC`, [], (err2, rows2) => {
-              if (err2) {
-                db.all(`SELECT uid, title, content, author_name, author_ip, created_at FROM notices ORDER BY created_at DESC`, [], (err3, rows3) => {
-                  if (err3) {
-                    resolve([]);
-                    return;
-                  }
-                  resolve((rows3 || []).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
-                });
-                return;
-              }
-              resolve((rows2 || []).map((r) => mapNoticeRowForListIpc(r)));
+          db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (errNoFilter, rowsNoFilter) => {
+            if (!errNoFilter) { resolve((rowsNoFilter || []).map((r) => mapNoticeRowForListIpc(r))); return; }
+            console.error('get-notices 실패:', errNoFilter.message);
+            noticesSchemaReady = false;
+            ensureNoticesTableSchema(() => {
+              db.all(`SELECT uid, title, content, author_name, author_ip, created_at, images, category FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err2, rows2) => {
+                if (err2) {
+                  db.all(`SELECT uid, title, content, author_name, author_ip, created_at FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err3, rows3) => {
+                    if (err3) {
+                      resolve([]);
+                      return;
+                    }
+                    resolve((rows3 || []).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
+                  });
+                  return;
+                }
+                resolve((rows2 || []).map((r) => mapNoticeRowForListIpc(r)));
+              });
             });
           });
           return;
