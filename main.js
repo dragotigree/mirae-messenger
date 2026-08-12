@@ -4331,6 +4331,15 @@ db.serialize(() => {
   /** 삭제된 공지 UID — NOTICE_SYNC 가 되살리는 것 방지 */
   loadNoticeTombstoneFallback();
   loadNoticeTombstoneSigFallback();
+  /* 🖊 화면 문구 덮어쓰기 — 마스터가 앱 안에서 버튼·라벨·안내문 문구를 직접 고칠 수 있게 하고,
+     그 결과를 같은 네트워크의 다른 PC에도 퍼뜨린다. key는 렌더러가 만든 안정적인 요소 경로.
+     value가 없으면(삭제) 원래 문구로 되돌아간다. updated_at으로 키 단위 최신값을 판정한다. */
+  db.run(`CREATE TABLE IF NOT EXISTS ui_text_overrides (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TEXT NOT NULL
+  )`, logDbErr);
+
   db.run(`CREATE TABLE IF NOT EXISTS deleted_notices (
     uid TEXT PRIMARY KEY,
     deleted_at TEXT NOT NULL
@@ -5492,6 +5501,8 @@ app.whenReady().then(async () => {
       try {
         broadcastWipeClaim();
         flushAllPendingWipesForOnlinePeers();
+        // 꺼져 있는 동안 마스터가 고친 화면 문구를 따라잡는다.
+        requestUiTextSyncFromOnlinePeers(3);
       } catch (e) { /* ignore */ }
     }, 2000);
   }, 3500);
@@ -6799,6 +6810,14 @@ function routeIncomingPayloadInner(payload, senderIP) {
     case 'NOTICE_ADD': handleNoticeAdd(payload.notice); break;
     case 'NOTICE_UPDATE': handleNoticeUpdate(payload.notice); break;
     case 'NOTICE_DELETE': handleNoticeDelete(payload.uid); break;
+    case 'UI_TEXT_SYNC': handleUiTextSync(payload); break;
+    case 'UI_TEXT_SYNC_REQUEST': {
+      // 요청한 PC에게만 현재 스냅샷을 보낸다(껐다 켠 PC가 최신 문구를 따라잡게).
+      readUiTextOverrides().then((overrides) => {
+        try { sendJsonToPeer(senderIP, { type: 'UI_TEXT_SYNC', overrides }); } catch (e) { /* ignore */ }
+      });
+      break;
+    }
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
     case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
@@ -8908,6 +8927,33 @@ ipcMain.handle('request-notice-sync', async () => {
   return { success: true };
 });
 
+/** 특정 PC 한 곳에만 JSON 한 줄을 보낸다(동기화 응답 등). 실패해도 조용히 넘어간다. */
+function sendJsonToPeer(targetIP, payloadObj) {
+  if (!targetIP || targetIP === MY_IP) return;
+  let wire;
+  try { wire = JSON.stringify(payloadObj) + '\n'; } catch (e) { return; }
+  const client = new net.Socket();
+  client.setTimeout(2000);
+  client.connect(TCP_PORT, targetIP, () => {
+    client.write(wire);
+    client.end();
+  });
+  client.on('error', () => {});
+  client.on('timeout', () => client.destroy());
+}
+
+/** 부팅 후 온라인 동료들에게 최신 화면 문구를 요청한다 — 꺼져 있는 동안 바뀐 문구를 따라잡기 위함. */
+function requestUiTextSyncFromOnlinePeers(limit) {
+  const max = Math.max(1, Math.min(Number(limit) || 3, 8));
+  let sent = 0;
+  onlineUsers.forEach((_u, ip) => {
+    if (sent >= max) return;
+    if (!ip || ip === MY_IP) return;
+    sendJsonToPeer(ip, { type: 'UI_TEXT_SYNC_REQUEST' });
+    sent += 1;
+  });
+}
+
 function broadcastToOnlinePeers(payloadObj) {
   let wireData;
   try {
@@ -10807,6 +10853,98 @@ ipcMain.handle('debug-notice-tombstone-status', async (event, titleOrUid) => {
     sigFallbackFilePath: sigFallbackPath,
     fallbackFileSigs: fileSigs
   };
+});
+
+/* ─── 🖊 화면 문구 덮어쓰기 ─────────────────────────────────────────────
+   마스터가 고친 문구를 저장하고, 같은 네트워크의 다른 PC에도 자동으로 퍼뜨린다.
+   데이터가 작아서(문구 몇십 개) 변경 시마다 전체 스냅샷을 보내는 방식이 가장 단순하고 안전하다.
+   병합은 키 단위 last-write-wins(updated_at 비교) — 두 PC에서 동시에 고쳐도 최신 것이 남는다. */
+function readUiTextOverrides() {
+  return new Promise((resolve) => {
+    db.all(`SELECT key, value, updated_at FROM ui_text_overrides`, [], (err, rows) => {
+      if (err) { logDbErr(err); resolve({}); return; }
+      const out = {};
+      (rows || []).forEach((r) => {
+        if (r && r.key) out[r.key] = { value: r.value, updatedAt: r.updated_at };
+      });
+      resolve(out);
+    });
+  });
+}
+
+function upsertUiTextOverride(key, value, updatedAt) {
+  return new Promise((resolve) => {
+    if (!key) { resolve(false); return; }
+    // 기존 값이 더 최신이면 덮어쓰지 않는다(오래된 스냅샷이 새 수정을 되돌리는 것 방지).
+    db.get(`SELECT updated_at FROM ui_text_overrides WHERE key = ?`, [key], (err, row) => {
+      if (err) { logDbErr(err); resolve(false); return; }
+      if (row && row.updated_at && String(row.updated_at) > String(updatedAt)) { resolve(false); return; }
+      if (value == null || value === '') {
+        db.run(`DELETE FROM ui_text_overrides WHERE key = ?`, [key], (delErr) => { logDbErr(delErr); resolve(true); });
+        return;
+      }
+      db.run(
+        `INSERT INTO ui_text_overrides (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        [key, String(value), String(updatedAt)],
+        (insErr) => { logDbErr(insErr); resolve(true); }
+      );
+    });
+  });
+}
+
+async function broadcastUiTextOverrides() {
+  const overrides = await readUiTextOverrides();
+  try { broadcastToOnlinePeers({ type: 'UI_TEXT_SYNC', overrides }); } catch (e) { /* ignore */ }
+}
+
+async function handleUiTextSync(payload) {
+  const incoming = (payload && payload.overrides) || {};
+  let changed = false;
+  for (const [key, rec] of Object.entries(incoming)) {
+    if (!rec || typeof rec !== 'object') continue;
+    const ok = await upsertUiTextOverride(key, rec.value, rec.updatedAt || '');
+    if (ok) changed = true;
+  }
+  if (changed) {
+    const merged = await readUiTextOverrides();
+    try { safeWebContentsSend('ui-text-overrides-updated', merged); } catch (e) { /* ignore */ }
+  }
+}
+
+ipcMain.handle('get-ui-text-overrides', async () => {
+  try { return { success: true, overrides: await readUiTextOverrides() }; }
+  catch (e) { return { success: false, overrides: {} }; }
+});
+
+ipcMain.handle('set-ui-text-override', async (event, key, value) => {
+  try {
+    const updatedAt = new Date().toISOString();
+    await upsertUiTextOverride(key, value, updatedAt);
+    await broadcastUiTextOverrides();
+    return { success: true, overrides: await readUiTextOverrides() };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+ipcMain.handle('reset-all-ui-text-overrides', async () => {
+  try {
+    // 전부 지울 때도 "지웠다"는 사실이 퍼져야 하므로, 각 키를 빈 값으로 표시해 최신 시각으로 전파한다.
+    const current = await readUiTextOverrides();
+    const updatedAt = new Date().toISOString();
+    for (const key of Object.keys(current)) {
+      await upsertUiTextOverride(key, null, updatedAt);
+    }
+    try {
+      const tombstones = {};
+      Object.keys(current).forEach((k) => { tombstones[k] = { value: '', updatedAt }; });
+      broadcastToOnlinePeers({ type: 'UI_TEXT_SYNC', overrides: tombstones });
+    } catch (e) { /* ignore */ }
+    return { success: true, overrides: {} };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
 });
 
 ipcMain.handle('get-notices', async () => {

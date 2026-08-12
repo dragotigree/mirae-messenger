@@ -150,6 +150,11 @@ contextBridge.exposeInMainWorld('api', {
   applyRecoveredDatabase: (recoveredPath) => ipcRenderer.invoke('apply-recovered-database', recoveredPath),
   resetDatabaseFresh: () => ipcRenderer.invoke('reset-database-fresh'),
   cleanupLeftoverDbFiles: () => ipcRenderer.invoke('cleanup-leftover-db-files'),
+  // 🖊 화면 문구 덮어쓰기(마스터 전용 기능이지만, 적용은 모든 PC에서 이뤄진다)
+  getUiTextOverrides: () => ipcRenderer.invoke('get-ui-text-overrides'),
+  setUiTextOverride: (key, value) => ipcRenderer.invoke('set-ui-text-override', key, value),
+  resetAllUiTextOverrides: () => ipcRenderer.invoke('reset-all-ui-text-overrides'),
+  onUiTextOverridesUpdated: (callback) => ipcRenderer.on('ui-text-overrides-updated', (e, data) => callback(data)),
   listRecoverableBackups: () => ipcRenderer.invoke('list-recoverable-backups'),
   restoreFromBackup: (backupPath) => ipcRenderer.invoke('restore-from-backup', backupPath),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),
