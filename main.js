@@ -3628,38 +3628,28 @@ ipcMain.handle('reset-database-fresh', async () => {
     await withTimeout(new Promise((resolve) => db.close(() => resolve())), 6000, 'reset-close').catch(() => {});
     const stamp = Date.now();
     const corruptedCopy = `${dbPath}.corrupted_reset_${stamp}`;
-    await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
-    await fs.promises.copyFile(`${dbPath}-wal`, `${corruptedCopy}-wal`).catch(() => {});
-    await fs.promises.copyFile(`${dbPath}-shm`, `${corruptedCopy}-shm`).catch(() => {});
-    await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
-    await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
-    // ⚠️ 실사고: unlink()가 (백신 실시간 검사 등으로 파일이 아직 잠겨 있어) 조용히 실패하면
-    // dbPath에 손상된 원본이 그대로 남아있는데도 "성공"으로 처리되어, 재시작 후 같은 손상을
-    // 또 감지하는 일이 있었다. unlink 실패 시 0바이트로 덮어써서라도(빈 파일은 SQLite가
-    // 새 DB로 인식한다) 반드시 깨끗한 상태로 만들고, 그것도 안 되면 실패로 보고한다.
-    let cleared = false;
-    try {
-      await fs.promises.unlink(dbPath);
-      cleared = true;
-    } catch (e) {
-      try {
-        await fs.promises.truncate(dbPath, 0);
-        cleared = true;
-      } catch (e2) {
-        cleared = false;
+    // ⚠️ 실사고: 복사(copyFile) 후 삭제(unlink)하는 방식은, 백신 등이 방금 닫힌 파일을 잠깐
+    // 스캔하느라 잠그고 있으면 unlink가 조용히 실패해도 앱은 "성공"으로 착각하고 재시작 →
+    // 여전히 318MB짜리 손상 원본을 그대로 다시 여는 사고로 이어졌다(실제 발생, 2회 반복).
+    // rename은 디렉터리 항목만 바꾸는 훨씬 가벼운 연산이라 같은 잠금 상황에서도 성공할
+    // 확률이 높고, 짧은 재시도까지 곁들이면 스캔이 끝나는 짧은 순간을 기다릴 수 있다.
+    const renameWithRetry = async (from, to) => {
+      if (!fs.existsSync(from)) return true;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          await fs.promises.rename(from, to);
+          return true;
+        } catch (e) {
+          await new Promise((r) => setTimeout(r, 400));
+        }
       }
-    }
-    if (!cleared || fs.existsSync(dbPath)) {
-      // unlink는 실패했지만 truncate로 0바이트가 됐다면 fs.existsSync는 true라도 정상이다 —
-      // 실제로 내용이 비었는지로 다시 판정한다.
-      let stillCorrupt = true;
-      try {
-        const stat = await fs.promises.stat(dbPath).catch(() => null);
-        stillCorrupt = !!(stat && stat.size > 0);
-      } catch (e) { /* ignore */ }
-      if (stillCorrupt) {
-        return { success: false, msg: '손상된 파일을 지우지 못했습니다(다른 프로그램이 사용 중일 수 있음). 프로그램을 완전히 종료한 뒤 다시 시도해 주세요.' };
-      }
+      return false;
+    };
+    const mainMoved = await renameWithRetry(dbPath, corruptedCopy);
+    await renameWithRetry(`${dbPath}-wal`, `${corruptedCopy}-wal`);
+    await renameWithRetry(`${dbPath}-shm`, `${corruptedCopy}-shm`);
+    if (!mainMoved) {
+      return { success: false, msg: '손상된 파일이 다른 프로그램(백신 실시간 검사 등)에 의해 잠겨 있어 옮기지 못했습니다. 1분 정도 기다렸다가 프로그램을 다시 실행해서 재시도해 주세요.' };
     }
     await resetDbMigrationMarkersForNewDbFile();
     app.relaunch();
