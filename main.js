@@ -7688,6 +7688,11 @@ function clearNoticeTombstone(uid, done) {
 
 function handleNoticeAdd(n) {
   if (!n || !n.uid) return;
+  // ⚠️ 실사고: NOTICE_SYNC_RESPONSE(upsertNoticeFromSync)와 똑같이, 여기서도 uid만 보고
+  // 무조건 tombstone을 지운 뒤 저장하고 있었다 — 다른 PC가 이미 삭제된 옛 공지를 재전송
+  // (재접속 시 재알림 등)하면 이 실시간 경로로도 되살아났다("공지 삭제해도 다시 나타난다"의
+  // 또 다른 경로). uid 또는 내용 서명이 이미 tombstone된 경우 무시한다.
+  if (noticeTombstoneMemory.has(String(n.uid)) || noticeTombstoneSignatures.has(noticeContentSignature(n))) return;
   // 실시간 추가도 tombstone에 막히지 않도록 정리 후 저장 (작성 PC → 전 직원 전파)
   clearNoticeTombstone(n.uid, () => {
     db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (err, row) => {
