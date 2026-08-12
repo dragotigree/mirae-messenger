@@ -207,11 +207,16 @@
       width: 40px; height: 40px; border-radius: var(--radius-md); border: none; background: transparent;
       color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
       cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
-      flex-shrink: 0;
+      flex-shrink: 0; position: relative;
     }
     .icon-rail-btn .icon-glyph { width: 20px; height: 20px; }
     .icon-rail-btn:hover { background: var(--surface-muted); color: var(--text-primary); }
     .icon-rail-btn.is-active { background: var(--sidebar-active); color: var(--accent-dark); }
+    .icon-rail-badge {
+      position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 999px; background: #ef4444; color: #fff; font-size: 10px; font-weight: 800;
+      line-height: 16px; text-align: center; box-shadow: 0 0 0 2px #fff; pointer-events: none;
+    }
     #icon-rail-account-btn {
       width: 34px; height: 34px; border-radius: 50%; border: none;
       background: var(--accent-soft); color: var(--accent);
@@ -635,7 +640,7 @@
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-pref-seg-solo { flex: 0 0 auto; margin-left: auto; }
-    .sidebar-pref-seg-solo .sidebar-pref-chip { padding-left: 10px; padding-right: 10px; }
+    .sidebar-pref-seg-solo .sidebar-pref-chip { min-width: 22px; padding: 5px 6px; font-size: 10px; }
     .sidebar-block-head {
       white-space: nowrap;
       gap: 8px;
@@ -4861,10 +4866,10 @@
   <div id="app-body-row">
   <div id="app-icon-rail">
     <div id="icon-rail-nav">
-      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"><span class="icon-rail-badge" id="icon-rail-users-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"><span class="icon-rail-badge" id="icon-rail-channels-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="envelope"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
       <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
@@ -4919,7 +4924,6 @@
         </div>
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
-            <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
@@ -4948,7 +4952,6 @@
       <div id="sidebar-block-channels" class="sidebar-main-block" data-sidebar-block="channels">
         <div class="section-label sidebar-block-head" id="channels-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px; cursor:pointer;">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
-            <span class="channel-reorder-grip sidebar-block-drag-handle" title="섹션 순서 변경">⠿</span>
             <span><span class="group-chevron" id="channels-section-chevron">▾</span>채널 및 대화방</span>
           </span>
           <span style="display:flex; align-items:center; gap:6px;">
@@ -9388,7 +9391,10 @@
     if (isCompactMode) {
       document.body.classList.add('compact-mode');
       setCompactRailTab(compactRailTab);
+    } else {
+      setSidebarRailFilter('users');
     }
+    loadNoticesList().catch(() => {});
     let pendingScheduleBoardOpenDate = '';
     let pendingScheduleBoardQuickOpts = null;
 
@@ -9750,6 +9756,25 @@
       return n > 99 ? '99+' : String(n);
     }
 
+    function getFavoritesUnreadCount() {
+      const favs = (allUsers || []).filter((u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip)));
+      return sumUnreadForUsers(favs);
+    }
+
+    function getNoticeUnreadCount() {
+      const list = cachedNoticesList || [];
+      if (!list.length) return 0;
+      const readSet = getBoardReadUids();
+      return list.filter((n) => !readSet.has(String((n && n.uid) || ''))).length;
+    }
+
+    function refreshIconRailBadges() {
+      setBadgeEl(document.getElementById('icon-rail-notice-badge'), getNoticeUnreadCount());
+      setBadgeEl(document.getElementById('icon-rail-users-badge'), getDmSectionUnread());
+      setBadgeEl(document.getElementById('icon-rail-favorites-badge'), getFavoritesUnreadCount());
+      setBadgeEl(document.getElementById('icon-rail-channels-badge'), getChannelsSectionUnread());
+    }
+
     function setBadgeEl(el, count) {
       if (!el) return;
       if (count > 0) {
@@ -9779,6 +9804,7 @@
       renderGroupChannels();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
+      refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
@@ -10264,14 +10290,11 @@
     }
 
     window.api.onNoticesUpdate(() => {
-      const boardModal = document.getElementById('board-modal');
-      if (boardModal && boardModal.style.display === 'flex') {
-        if (window._noticesReloadTimer) return;
-        window._noticesReloadTimer = setTimeout(() => {
-          window._noticesReloadTimer = null;
-          loadNoticesList().catch(() => {});
-        }, 500);
-      }
+      if (window._noticesReloadTimer) return;
+      window._noticesReloadTimer = setTimeout(() => {
+        window._noticesReloadTimer = null;
+        loadNoticesList().catch(() => {});
+      }, 500);
     });
 
     window.api.onScheduledMessageSent((data) => {
@@ -14396,6 +14419,7 @@
       highlightBroadcastChannel();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
+      refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       syncSidebarUserSelectionUi();
@@ -14503,6 +14527,7 @@
       highlightBroadcastChannel();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
+      refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       pruneSidebarUserSelection();
@@ -15331,6 +15356,7 @@
       }
       renderBoardCategoryFilters(cachedNoticesList);
       renderFilteredNoticesList();
+      refreshIconRailBadges();
     }
 
     async function showBoardDetailView(uid) {
