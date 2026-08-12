@@ -15403,17 +15403,24 @@
       return s || '전체';
     }
 
+    // 병원 부서 고정 목록 — 현재 접속 중인 직원의 부서만 모아 보여주면 그 순간 접속 안 한
+    // 부서는 목록에서 아예 빠져버리는 문제가 있었다("부서가 3개밖에 안 뜬다"). 병원
+    // 조직도 기준으로 전체 부서를 고정해, 아무도 접속해 있지 않아도 항상 다 보이게 한다.
+    const BOARD_FIXED_DEPTS = [
+      '재활치료부', '진료실', '병동', '신장투석센터', '원무과', '외래', '관리과', '사무국', '간호부',
+      '심사과', '총무과', '교육전담', '병원장실', '회의실', '진료협력팀', '사회사업팀',
+      'QPS실', '감염관리실', '진단검사실', '약제실', '방사선실', '영양실', '신경심리실'
+    ];
     function getBoardCategoryOptions() {
-      const depts = (typeof getDeptList === 'function' ? getDeptList() : [])
-        .map((d) => String(d || '').trim())
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, 'ko'));
-      // 고정: 업데이트 + 현재 직원 부서들. '전체(전직원)' 카테고리는 사용자 요청으로 없앴다 —
+      // 고정: 업데이트 + 병원 부서 전체. '전체(전직원)' 카테고리는 사용자 요청으로 없앴다 —
       // '모두' 필터가 이미 전부 보기 역할을 하므로 중복이었다. 저장된 값 자체('전체')는 그대로
       // 남아있는 옛 공지도 있을 수 있어 DB에서 지우지는 않지만, 목록·글쓰기 화면에는 더 이상
       // 고정 카테고리로 노출하지 않는다.
-      const fixed = ['업데이트'];
-      const out = [...fixed];
+      const depts = (typeof getDeptList === 'function' ? getDeptList() : [])
+        .map((d) => String(d || '').trim())
+        .filter(Boolean);
+      const out = ['업데이트', ...BOARD_FIXED_DEPTS];
+      // 조직도에 없는 새 부서명이 실제 직원 프로필에 등장하면(개편 등) 그것도 뒤에 추가
       depts.forEach((d) => {
         if (!out.includes(d)) out.push(d);
       });
