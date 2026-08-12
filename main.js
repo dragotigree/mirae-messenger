@@ -2966,6 +2966,10 @@ function getTrayIcon() {
 }
 
 const dbPath = path.join(app.getPath('userData'), 'mirae_messenger.db');
+try {
+  const preOpenStat = fs.existsSync(dbPath) ? fs.statSync(dbPath) : null;
+  writeToLogFile('info', `[부팅] DB 파일 열기 전 크기: ${preOpenStat ? preOpenStat.size : '(파일 없음 — 새로 생성됨)'}`);
+} catch (e) { /* ignore */ }
 const db = new sqlite3.Database(dbPath);
 
 // ⚠️ 핵심 발견: sqlite_master 카탈로그에 chat_pins 항목이 중복 손상되어 있으면, chat_pins를
@@ -3621,11 +3625,18 @@ ipcMain.handle('restore-from-backup', async (event, backupPath) => {
  * 빈 DB로 재시작한다. 사용자가 과거 데이터 손실을 감수하겠다고 명시적으로 동의한 경우에만
  * 호출되어야 한다. */
 ipcMain.handle('reset-database-fresh', async () => {
+  writeToLogFile('warn', '[DB초기화] 요청 받음 — 시작');
   try {
     // ⚠️ 이미 손상된 DB에서는 체크포인트/close 콜백이 응답 없이 멈출 수 있다 — 과거 데이터를
     // 포기하기로 한 이상, 체크포인트가 안 되더라도 그냥 넘어가서 확실히 끝나는 게 낫다.
-    await withTimeout(new Promise((resolve) => checkpointWalPassive().finally(resolve)), 6000, 'reset-checkpoint').catch(() => {});
-    await withTimeout(new Promise((resolve) => db.close(() => resolve())), 6000, 'reset-close').catch(() => {});
+    await withTimeout(new Promise((resolve) => checkpointWalPassive().finally(resolve)), 6000, 'reset-checkpoint').catch((e) => {
+      writeToLogFile('warn', `[DB초기화] 체크포인트 실패/타임아웃: ${e && e.message}`);
+    });
+    writeToLogFile('warn', '[DB초기화] 체크포인트 단계 통과 — db.close 시도');
+    await withTimeout(new Promise((resolve) => db.close(() => resolve())), 6000, 'reset-close').catch((e) => {
+      writeToLogFile('warn', `[DB초기화] db.close 실패/타임아웃: ${e && e.message}`);
+    });
+    writeToLogFile('warn', '[DB초기화] db.close 단계 통과 — 파일 이동 시도');
     const stamp = Date.now();
     const corruptedCopy = `${dbPath}.corrupted_reset_${stamp}`;
     // ⚠️ 실사고: 복사(copyFile) 후 삭제(unlink)하는 방식은, 백신 등이 방금 닫힌 파일을 잠깐
@@ -3634,28 +3645,39 @@ ipcMain.handle('reset-database-fresh', async () => {
     // rename은 디렉터리 항목만 바꾸는 훨씬 가벼운 연산이라 같은 잠금 상황에서도 성공할
     // 확률이 높고, 짧은 재시도까지 곁들이면 스캔이 끝나는 짧은 순간을 기다릴 수 있다.
     const renameWithRetry = async (from, to) => {
-      if (!fs.existsSync(from)) return true;
+      if (!fs.existsSync(from)) {
+        writeToLogFile('warn', `[DB초기화] 대상 없음(이동 불필요): ${from}`);
+        return true;
+      }
+      let lastErr = null;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           await fs.promises.rename(from, to);
+          writeToLogFile('warn', `[DB초기화] 이동 성공(시도 ${attempt + 1}회째): ${from} → ${to}`);
           return true;
         } catch (e) {
+          lastErr = e;
+          writeToLogFile('warn', `[DB초기화] 이동 실패(시도 ${attempt + 1}회째): ${from} — ${e && e.message}`);
           await new Promise((r) => setTimeout(r, 400));
         }
       }
+      writeToLogFile('error', `[DB초기화] 이동 최종 실패: ${from} — ${lastErr && lastErr.message}`);
       return false;
     };
     const mainMoved = await renameWithRetry(dbPath, corruptedCopy);
     await renameWithRetry(`${dbPath}-wal`, `${corruptedCopy}-wal`);
     await renameWithRetry(`${dbPath}-shm`, `${corruptedCopy}-shm`);
     if (!mainMoved) {
+      writeToLogFile('error', '[DB초기화] 실패로 종료 — 재시작하지 않음');
       return { success: false, msg: '손상된 파일이 다른 프로그램(백신 실시간 검사 등)에 의해 잠겨 있어 옮기지 못했습니다. 1분 정도 기다렸다가 프로그램을 다시 실행해서 재시도해 주세요.' };
     }
     await resetDbMigrationMarkersForNewDbFile();
+    writeToLogFile('warn', '[DB초기화] 성공 — 재시작합니다');
     app.relaunch();
     app.exit(0);
     return { success: true };
   } catch (e) {
+    writeToLogFile('error', `[DB초기화] 예외 발생: ${e && e.message}`);
     console.error('DB 초기화 실패:', e && e.message);
     return { success: false, msg: e && e.message ? e.message : String(e) };
   }
