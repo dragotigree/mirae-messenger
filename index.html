@@ -14453,26 +14453,33 @@
       const tip = document.getElementById('fast-user-tooltip');
       if (tip) tip.style.display = 'none';
     }
-    document.addEventListener('mouseover', (e) => {
-      const card = e.target.closest('.user-card-item[data-user-ip]');
-      if (!card || card === fastUserTipEl) return;
-      fastUserTipEl = card;
-      clearTimeout(fastUserTipTimer);
-      fastUserTipTimer = setTimeout(() => {
-        const u = findUserByIp(card.dataset.userIp);
-        const tip = document.getElementById('fast-user-tooltip');
-        if (!u || !tip) return;
-        tip.innerHTML = fastUserTooltipHtml(u);
-        tip.style.display = 'block';
-        positionFastUserTooltip(card);
-      }, 150);
-    });
-    document.addEventListener('mouseout', (e) => {
-      const card = e.target.closest('.user-card-item[data-user-ip]');
-      if (!card) return;
-      if (e.relatedTarget && card.contains(e.relatedTarget)) return;
-      hideFastUserTooltip();
-    });
+    // ⚠️ 실사고: 이 리스너를 document에 달아뒀더니 채팅 메시지 영역처럼 작은 요소가
+    // 빽빽한 곳에서 마우스를 움직일 때마다 closest() 탐색이 계속 돌아 버벅거림의 원인이
+    // 됐다 — 사이드바(#sidebar-left) 안에서만 반응하도록 범위를 좁힌다.
+    (function bindFastUserTooltipListeners() {
+      const scope = document.getElementById('sidebar-left');
+      if (!scope) return;
+      scope.addEventListener('mouseover', (e) => {
+        const card = e.target.closest('.user-card-item[data-user-ip]');
+        if (!card || card === fastUserTipEl) return;
+        fastUserTipEl = card;
+        clearTimeout(fastUserTipTimer);
+        fastUserTipTimer = setTimeout(() => {
+          const u = findUserByIp(card.dataset.userIp);
+          const tip = document.getElementById('fast-user-tooltip');
+          if (!u || !tip) return;
+          tip.innerHTML = fastUserTooltipHtml(u);
+          tip.style.display = 'block';
+          requestAnimationFrame(() => positionFastUserTooltip(card));
+        }, 150);
+      });
+      scope.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('.user-card-item[data-user-ip]');
+        if (!card) return;
+        if (e.relatedTarget && card.contains(e.relatedTarget)) return;
+        hideFastUserTooltip();
+      });
+    })();
 
     function buildUserCard(u) {
       const unread = getUnreadForUser(u);
