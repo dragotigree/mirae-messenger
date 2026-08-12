@@ -4888,7 +4888,7 @@
             <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
           </div>
           <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
-            <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">안읽음</button>
+            <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">N</button>
           </div>
         </div>
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
@@ -8891,8 +8891,10 @@
       // 기본값을 300→260으로 줄이면서, 예전 기본값(300)을 그대로 쓰던(=직접 조절한 적 없는) 경우만
       // 새 기본값으로 옮겨준다. 사용자가 직접 다른 폭으로 조절해둔 경우는 그대로 둔다.
       if (savedWidth === 300) { savedWidth = 260; localStorage.setItem('sidebarWidth', '260'); }
+      // 기본값을 260→230으로 한 번 더 줄임 (직접 조절한 적 없는 경우만)
+      if (savedWidth === 260) { savedWidth = 230; localStorage.setItem('sidebarWidth', '230'); }
       // 저장된 값이 예전 최소(200)보다 좁아 버튼·필터가 깨졌다면 측정 최소로 끌어올림
-      applySidebarWidth(savedWidth || 260);
+      applySidebarWidth(savedWidth || 230);
       refreshRightSidebarMinWidth();
       const savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
