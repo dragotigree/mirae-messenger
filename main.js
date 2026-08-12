@@ -8341,7 +8341,13 @@ function applyLocalNoticeDelete(uid, opts) {
 
 function upsertNoticeFromSync(n) {
   if (!n || !n.uid) return;
-  // 동기화 응답에 본문이 온 공지는 tombstone보다 우선해 저장 (전체 직원이 읽을 수 있게)
+  // ⚠️ 실사고: 예전엔 여기서 무조건 tombstone을 지우고 덮어썼다("동기화 응답에 본문이
+  // 있으면 tombstone보다 우선") — 그 결과 삭제 당시 오프라인이었거나 동기화가 늦은 PC가
+  // 옛 공지를 계속 들고 있다가 나중에 동기화될 때마다 이미 지운 공지를 되살려버렸다
+  // ("공지 삭제해도 다시 나타난다"의 원인). uid는 작성 시 새로 생성되는 값이라 재사용되지
+  // 않으므로, 이미 이 PC에서 tombstone된 uid라면 동기화로 들어온 내용은 항상 옛 내용
+  // (또는 되살아난 옛 공지)이지 새로 쓴 공지가 아니다 — 무시한다.
+  if (noticeTombstoneMemory.has(String(n.uid))) return;
   clearNoticeTombstone(n.uid, () => {
     // ⚠️ 실사고: 여기서 무조건 normalizeNoticeCategory(n.category)를 쓰고 있었다. 동기화
     // 응답에 category가 아예 없으면(구버전 PC이거나 그 PC의 값이 이미 비어 있는 경우)
