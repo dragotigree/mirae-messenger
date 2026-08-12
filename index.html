@@ -1788,6 +1788,14 @@
     }
     .ipmsg-close-btn:hover { background: var(--border-soft); color: #0f172a; }
     .ipmsg-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; }
+    .ipmsg-recipient-summary {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin: 8px 12px 0; padding: 8px 12px; background: var(--surface-muted); border: 1px solid var(--border-soft);
+      border-radius: 12px;
+    }
+    .ipmsg-recipient-toggle-btn { display: inline-flex; align-items: center; gap: 3px; }
+    .ipmsg-recipient-section { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; }
+    .ipmsg-recipient-section.is-collapsed { display: none; flex: 0 0 auto; }
     .ipmsg-controls-strip {
       flex-shrink: 0;
       margin: 6px 12px 4px;
@@ -6761,46 +6769,52 @@
         <button type="button" class="ipmsg-close-btn" onclick="closeIpmsgSendModal()" title="닫기">×</button>
       </div>
       <div class="ipmsg-modal-body">
-        <div class="ipmsg-controls-strip" aria-label="받는 사람 찾기·선택">
-          <div class="ipmsg-controls-line ipmsg-controls-line--primary">
-            <span class="ipmsg-controls-stats">접속 <strong id="ipmsg-online-count">0</strong> · 선택 <strong id="ipmsg-selected-count">0</strong></span>
-            <div class="ipmsg-search-wrap ipmsg-recipient-toolbar">
-              <input type="text" id="ipmsg-user-filter" placeholder="이름 · 직급 · 부서 · 층 · 내선 검색" oninput="renderIpmsgRecipientTable(this.value)">
-            </div>
-            <button type="button" class="ipmsg-mini-btn ipmsg-refresh-btn" onclick="manualRefreshUsers(); setTimeout(() => { fillIpmsgBulkSelects(); renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || ''); }, 400);">↻ 새로고침</button>
-          </div>
-          <div class="ipmsg-controls-line">
-            <div class="ipmsg-filter-chips">
-              <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectAllVisible()">목록 전체</button>
-              <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectOnlineVisible()">온라인만</button>
-              <button type="button" class="ipmsg-mini-btn" onclick="ipmsgClearSelection()">선택 해제</button>
-              <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-bulk-toggle-btn" onclick="toggleIpmsgBulkInline()" title="층·부서로 한번에 선택">층·부서 선택 ▾</button>
-            </div>
-            <div class="ipmsg-bulk-inline is-collapsed" id="ipmsg-bulk-inline" aria-label="층·부서 일괄 선택">
-              <span class="ipmsg-bulk-label">층</span>
-              <select id="ipmsg-floor-select" aria-label="층 선택"></select>
-              <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByFloor()" title="해당 층 전체 선택·해제">층 선택</button>
-              <span class="ipmsg-bulk-sep" aria-hidden="true"></span>
-              <span class="ipmsg-bulk-label">부서</span>
-              <select id="ipmsg-dept-select" aria-label="부서 선택"></select>
-              <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByDept()" title="해당 부서 전체 선택·해제">부서 선택</button>
-            </div>
-          </div>
+        <div class="ipmsg-recipient-summary" id="ipmsg-recipient-summary">
+          <span class="ipmsg-controls-stats">받는 사람 <strong id="ipmsg-selected-count-summary">0</strong>명</span>
+          <button type="button" class="ipmsg-mini-btn ipmsg-recipient-toggle-btn" id="ipmsg-recipient-toggle-btn" onclick="toggleIpmsgRecipientSection()">받는 사람 편집 ▾</button>
         </div>
-        <div class="ipmsg-recipient-pane">
-          <div class="ipmsg-table-wrap">
-            <table class="ipmsg-user-table">
-              <thead>
-                <tr>
-                  <th class="col-check"><input type="checkbox" id="ipmsg-check-all" title="표시된 목록 전체" onchange="ipmsgToggleAllVisible(this.checked)"></th>
-                  <th>사용자</th>
-                  <th>직급</th>
-                  <th>부서 · 층</th>
-                  <th>내선</th>
-                </tr>
-              </thead>
-              <tbody id="ipmsg-user-tbody"></tbody>
-            </table>
+        <div class="ipmsg-recipient-section is-collapsed" id="ipmsg-recipient-section">
+          <div class="ipmsg-controls-strip" aria-label="받는 사람 찾기·선택">
+            <div class="ipmsg-controls-line ipmsg-controls-line--primary">
+              <span class="ipmsg-controls-stats">접속 <strong id="ipmsg-online-count">0</strong> · 선택 <strong id="ipmsg-selected-count">0</strong></span>
+              <div class="ipmsg-search-wrap ipmsg-recipient-toolbar">
+                <input type="text" id="ipmsg-user-filter" placeholder="이름 · 직급 · 부서 · 층 · 내선 검색" oninput="renderIpmsgRecipientTable(this.value)">
+              </div>
+              <button type="button" class="ipmsg-mini-btn ipmsg-refresh-btn" onclick="manualRefreshUsers(); setTimeout(() => { fillIpmsgBulkSelects(); renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || ''); }, 400);">↻ 새로고침</button>
+            </div>
+            <div class="ipmsg-controls-line">
+              <div class="ipmsg-filter-chips">
+                <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectAllVisible()">목록 전체</button>
+                <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectOnlineVisible()">온라인만</button>
+                <button type="button" class="ipmsg-mini-btn" onclick="ipmsgClearSelection()">선택 해제</button>
+                <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-bulk-toggle-btn" onclick="toggleIpmsgBulkInline()" title="층·부서로 한번에 선택">층·부서 선택 ▾</button>
+              </div>
+              <div class="ipmsg-bulk-inline is-collapsed" id="ipmsg-bulk-inline" aria-label="층·부서 일괄 선택">
+                <span class="ipmsg-bulk-label">층</span>
+                <select id="ipmsg-floor-select" aria-label="층 선택"></select>
+                <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByFloor()" title="해당 층 전체 선택·해제">층 선택</button>
+                <span class="ipmsg-bulk-sep" aria-hidden="true"></span>
+                <span class="ipmsg-bulk-label">부서</span>
+                <select id="ipmsg-dept-select" aria-label="부서 선택"></select>
+                <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByDept()" title="해당 부서 전체 선택·해제">부서 선택</button>
+              </div>
+            </div>
+          </div>
+          <div class="ipmsg-recipient-pane">
+            <div class="ipmsg-table-wrap">
+              <table class="ipmsg-user-table">
+                <thead>
+                  <tr>
+                    <th class="col-check"><input type="checkbox" id="ipmsg-check-all" title="표시된 목록 전체" onchange="ipmsgToggleAllVisible(this.checked)"></th>
+                    <th>사용자</th>
+                    <th>직급</th>
+                    <th>부서 · 층</th>
+                    <th>내선</th>
+                  </tr>
+                </thead>
+                <tbody id="ipmsg-user-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
         <div class="ipmsg-compose-pane">
@@ -10487,9 +10501,19 @@
       return list;
     }
 
+    function toggleIpmsgRecipientSection() {
+      const el = document.getElementById('ipmsg-recipient-section');
+      const btn = document.getElementById('ipmsg-recipient-toggle-btn');
+      if (!el) return;
+      const collapsed = el.classList.toggle('is-collapsed');
+      if (btn) btn.textContent = collapsed ? '받는 사람 편집 ▾' : '받는 사람 접기 ▴';
+    }
+
     function updateIpmsgSelectionUi() {
       const countEl = document.getElementById('ipmsg-selected-count');
       if (countEl) countEl.textContent = String(ipmsgSelectedIps.size);
+      const summaryCountEl = document.getElementById('ipmsg-selected-count-summary');
+      if (summaryCountEl) summaryCountEl.textContent = String(ipmsgSelectedIps.size);
       const onlineEl = document.getElementById('ipmsg-online-count');
       if (onlineEl) {
         const myIp = myProfile && myProfile.ip;
@@ -10536,6 +10560,7 @@
           ipmsgSetSelected(u.ip, !ipmsgSelectedIps.has(u.ip));
           renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || '');
         };
+        tr.oncontextmenu = (e) => showUserContextMenu(e, u);
         tbody.appendChild(tr);
       });
       updateIpmsgSelectionUi();
@@ -10638,6 +10663,10 @@
       clearIpmsgPendingImage();
       fillIpmsgBulkSelects();
       renderIpmsgRecipientTable('');
+      const recipientSection = document.getElementById('ipmsg-recipient-section');
+      const recipientToggleBtn = document.getElementById('ipmsg-recipient-toggle-btn');
+      if (recipientSection) recipientSection.classList.add('is-collapsed');
+      if (recipientToggleBtn) recipientToggleBtn.textContent = '받는 사람 편집 ▾';
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
       document.getElementById('ipmsg-send-modal').style.display = 'flex';
