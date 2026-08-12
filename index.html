@@ -6333,10 +6333,11 @@
           <p class="settings-hint">
             버튼·메뉴·안내문 같은 <b>화면에 고정된 문구</b>를 프로그램 안에서 직접 고칠 수 있습니다.
             고친 문구는 같은 네트워크의 다른 직원 PC에도 자동으로 반영됩니다.
-            대화 내용·직원 이름·공지 본문 같은 실제 데이터는 고칠 수 없게 막혀 있습니다.
+            <b>Ctrl+Shift+E</b> 로도 켜고 끌 수 있습니다.
+            대화 내용·직원 이름·공지 본문은 물론, 시각·인원수·전화번호처럼 값이 바뀌는 글자도 고칠 수 없게 막혀 있습니다.
           </p>
           <div class="settings-btn-row">
-            <button type="button" class="settings-btn-primary" id="ui-text-edit-toggle" onclick="toggleUiTextEditMode()">문구 수정 모드 켜기</button>
+            <button type="button" class="settings-btn-primary" id="ui-text-edit-toggle" onclick="toggleUiTextEditMode()">문구 수정 모드 켜기 (Ctrl+Shift+E)</button>
             <button type="button" class="settings-btn-secondary" onclick="resetAllUiTextOverrides()">전부 원래대로</button>
           </div>
           <div id="ui-text-edit-result" class="settings-hint"></div>
@@ -15814,15 +15815,47 @@
       return parts.length ? parts.join('>') : null;
     }
 
+    /** 화면에 실제로 보이는 요소인가? (숨겨진 메뉴·모달까지 표시하면 혼란스럽다) */
+    function uiTextVisible(el) {
+      if (!el.offsetParent && el.tagName !== 'BODY') {
+        const st = window.getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || st.position !== 'fixed') return false;
+      }
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+
+    /* 값처럼 보이는 글자는 고정 문구가 아니라 그때그때 바뀌는 데이터일 가능성이 높다.
+       (시각 12:30, 날짜, 인원 0/2, 개수 3건, 전화번호 등) 이런 것을 고정 문구로 덮으면
+       그 자리의 실제 값이 계속 틀린 채로 보이므로 아예 대상에서 뺀다. */
+    function uiTextLooksLikeData(txt) {
+      const s = String(txt || '').trim();
+      if (!s) return true;
+      if (s.length > 120) return true;                 // 긴 본문은 데이터일 확률이 높다
+      if (/^[\d\s./:%\-+()]+$/.test(s)) return true;   // 숫자·기호만
+      if (/^\d{1,2}:\d{2}/.test(s)) return true;       // 12:30
+      if (/^\d+\s*\/\s*\d+$/.test(s)) return true;     // 0/2
+      if (/^\d+\s*(건|명|개|장|회|분|시간|일|월|년)$/.test(s)) return true;
+      if (/^\d{2,4}[-.]\d{3,4}[-.]\d{4}$/.test(s)) return true; // 전화번호
+      if (/^v?\d+\.\d+\.\d+$/.test(s)) return true;    // 버전
+      return false;
+    }
+
     /** 이 요소의 문구를 고쳐도 되는가? 'text' | 'placeholder' | null */
     function uiTextEditableTarget(el) {
       if (!el || el.nodeType !== 1) return null;
       if (el.closest(UI_TEXT_BLOCKED_SELECTOR)) return null;
       if (UI_TEXT_BLOCKED_CLASS.test(typeof el.className === 'string' ? el.className : '')) return null;
-      if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.placeholder) return 'placeholder';
+      if (el.isContentEditable) return null;
+      if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+        // 입력창은 안내글만 고칠 수 있다(사용자가 입력한 값은 건드리지 않는다).
+        return el.placeholder && !uiTextLooksLikeData(el.placeholder) ? 'placeholder' : null;
+      }
       // 자식 요소가 있으면 통째로 덮어써 구조가 깨지므로 제외한다.
-      if (el.children.length === 0 && (el.textContent || '').trim()) return 'text';
-      return null;
+      if (el.children.length !== 0) return null;
+      const txt = (el.textContent || '').trim();
+      if (!txt || uiTextLooksLikeData(txt)) return null;
+      return 'text';
     }
 
     function uiTextKeyFor(el, kind) {
@@ -15921,13 +15954,33 @@
       });
     }
 
+    let uiTextMarkObserver = null;
+
     function markUiTextEditableAttrs(on) {
+      document.querySelectorAll('[data-uitext-editable]').forEach((el) => el.removeAttribute('data-uitext-editable'));
+      if (!on) return;
+      document.querySelectorAll('button, label, span, div, p, h1, h2, h3, h4, small, a, input, textarea')
+        .forEach((el) => {
+          if (!uiTextEditableTarget(el)) return;
+          if (!uiTextVisible(el)) return;   // 지금 화면에 안 보이는 것은 표시하지 않는다
+          el.setAttribute('data-uitext-editable', '1');
+        });
+    }
+
+    /* 수정 모드를 켠 뒤에 연 창(설정·공지 등)의 문구도 고칠 수 있어야 한다.
+       화면이 바뀔 때마다 대상 표시를 다시 계산한다(수정 모드일 때만 동작). */
+    function ensureUiTextMarkObserver(on) {
       if (!on) {
-        document.querySelectorAll('[data-uitext-editable]').forEach((el) => el.removeAttribute('data-uitext-editable'));
+        if (uiTextMarkObserver) { uiTextMarkObserver.disconnect(); uiTextMarkObserver = null; }
         return;
       }
-      document.querySelectorAll('button, label, span, div, p, h1, h2, h3, h4, small, a, input, textarea')
-        .forEach((el) => { if (uiTextEditableTarget(el)) el.setAttribute('data-uitext-editable', '1'); });
+      if (uiTextMarkObserver) return;
+      let timer = null;
+      uiTextMarkObserver = new MutationObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { if (uiTextEditing) markUiTextEditableAttrs(true); }, 200);
+      });
+      uiTextMarkObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
     }
 
     async function onUiTextEditClick(e) {
@@ -15961,6 +16014,7 @@
       uiTextEditing = !!on;
       document.documentElement.classList.toggle('ui-text-editing', uiTextEditing);
       markUiTextEditableAttrs(uiTextEditing);
+      ensureUiTextMarkObserver(uiTextEditing);
       const btn = document.getElementById('ui-text-edit-toggle');
       if (btn) btn.textContent = uiTextEditing ? '문구 수정 모드 끄기' : '문구 수정 모드 켜기';
       let banner = document.getElementById('ui-text-edit-banner');
@@ -15970,7 +16024,7 @@
           banner = document.createElement('div');
           banner.id = 'ui-text-edit-banner';
           banner.setAttribute('data-uitext-block', '1');
-          banner.innerHTML = '🖊 문구 수정 모드 — 바꿀 문구를 클릭하세요 <button type="button">끄기</button>';
+          banner.innerHTML = '🖊 문구 수정 모드 — 바꿀 문구를 클릭하세요 <span style="opacity:.75;font-weight:600">(Ctrl+Shift+E)</span> <button type="button">끄기</button>';
           banner.querySelector('button').onclick = function () { setUiTextEditMode(false); };
           document.body.appendChild(banner);
         }
@@ -25264,6 +25318,16 @@
       }
       if (handleScheduleBoardShortcuts(e)) return;
       if (handleScheduleBoardRefreshKey(e)) return;
+      // 🖊 Ctrl+Shift+E — 화면 문구 수정 모드 켜기/끄기 (마스터 계정에서만)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === 'E' || e.key === 'e' || e.code === 'KeyE')) {
+        e.preventDefault();
+        if (!isMasterAuthenticated) {
+          appAlert('화면 문구 수정은 마스터 계정으로 로그인한 경우에만 사용할 수 있습니다.');
+          return;
+        }
+        setUiTextEditMode(!uiTextEditing);
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '1' || e.code === 'Digit1')) {
         e.preventDefault();
         openChatQuickSwitcher();
