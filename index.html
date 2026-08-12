@@ -4247,27 +4247,42 @@
       background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
     }
     /* ✍️ 공지 서식 편집기(Tiptap) */
+    /* 툴바는 기능별로 묶어서 보여준다 — 버튼이 20개 가까이라 한 줄로 늘어놓으면 찾기 어렵다.
+       각 그룹을 흰 알약으로 감싸고 그룹 사이만 띄워, 구분선 없이도 묶음이 눈에 들어오게 했다. */
     .board-rte-toolbar {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
-      padding: 7px 8px; border: 1px solid var(--border-soft); border-bottom: none;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      padding: 8px 9px; border: 1px solid var(--border-soft); border-bottom: none;
       border-radius: 12px 12px 0 0; background: var(--surface-muted);
     }
+    .board-rte-group {
+      display: inline-flex; align-items: center; gap: 2px;
+      background: var(--surface); border: 1px solid var(--border-soft);
+      border-radius: 9px; padding: 2px;
+    }
+    .board-rte-group-color { gap: 4px; padding: 3px 6px; }
     .board-rte-btn {
-      min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid transparent;
+      min-width: 27px; height: 26px; padding: 0 7px; border: 1px solid transparent;
       background: transparent; border-radius: 7px; cursor: pointer;
       font-size: 12px; font-weight: 700; color: var(--text-secondary); line-height: 1;
       display: inline-flex; align-items: center; justify-content: center;
-      transition: background 0.1s, color 0.1s;
+      transition: background 0.12s, color 0.12s;
     }
-    .board-rte-btn:hover { background: var(--surface); color: var(--text-primary); }
+    .board-rte-btn-wide { padding: 0 10px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .board-rte-ico { font-size: 13px; line-height: 1; }
+    .board-rte-btn:hover { background: var(--surface-muted); color: var(--text-primary); }
     .board-rte-btn.is-active { background: var(--sidebar-active); color: var(--accent-dark); border-color: rgba(33,150,243,0.35); }
-    .board-rte-sep { width: 1px; height: 18px; background: var(--border-soft); margin: 0 3px; }
+    .board-rte-btn-danger { color: #b91c1c; }
+    .board-rte-btn-danger:hover { background: #fee2e2; color: #991b1b; }
+    .board-rte-mini-sep { width: 1px; height: 14px; background: var(--border-soft); flex-shrink: 0; }
     .board-rte-swatches { display: inline-flex; align-items: center; gap: 3px; }
     .board-rte-swatch {
-      width: 17px; height: 17px; border-radius: 5px; border: 1px solid rgba(15,23,42,0.18);
+      width: 15px; height: 15px; border-radius: 999px; border: 1px solid rgba(15,23,42,0.15);
       cursor: pointer; padding: 0; flex-shrink: 0;
+      transition: transform 0.1s, box-shadow 0.1s;
     }
-    .board-rte-swatch.is-highlight { border-radius: 999px; }
+    .board-rte-swatch:hover { transform: scale(1.18); box-shadow: 0 2px 6px rgba(15,23,42,0.2); }
+    /* 형광펜은 글자색과 구분되게 사각형(펜으로 칠한 느낌)으로 둔다. */
+    .board-rte-swatch.is-highlight { border-radius: 4px; }
     .board-rte-surface {
       border: 1px solid var(--border-soft); border-radius: 0 0 12px 12px;
       background: var(--surface); padding: 0;
@@ -6037,27 +6052,38 @@
         <!-- 서식 편집기(Tiptap). lib/tiptap-editor.js 가 없으면 아래 textarea가 그대로 쓰인다. -->
         <div id="board-rich-editor-wrap" style="display:none; margin-top:10px;">
           <div class="board-rte-toolbar" id="board-rte-toolbar">
-            <button type="button" class="board-rte-btn" data-cmd="bold" title="굵게"><b>B</b></button>
-            <button type="button" class="board-rte-btn" data-cmd="italic" title="기울임"><i>I</i></button>
-            <button type="button" class="board-rte-btn" data-cmd="underline" title="밑줄"><u>U</u></button>
-            <button type="button" class="board-rte-btn" data-cmd="strike" title="취소선"><s>S</s></button>
-            <span class="board-rte-sep"></span>
-            <button type="button" class="board-rte-btn" data-cmd="h1" title="제목 1">H1</button>
-            <button type="button" class="board-rte-btn" data-cmd="h2" title="제목 2">H2</button>
-            <button type="button" class="board-rte-btn" data-cmd="h3" title="제목 3">H3</button>
-            <span class="board-rte-sep"></span>
-            <button type="button" class="board-rte-btn" data-cmd="bulletList" title="글머리 기호">••</button>
-            <button type="button" class="board-rte-btn" data-cmd="orderedList" title="번호 목록">1.</button>
-            <button type="button" class="board-rte-btn" data-cmd="blockquote" title="인용">❝</button>
-            <span class="board-rte-sep"></span>
-            <span class="board-rte-swatches" id="board-rte-colors" title="글자 색"></span>
-            <span class="board-rte-swatches" id="board-rte-highlights" title="형광펜"></span>
-            <button type="button" class="board-rte-btn" data-cmd="clearFormat" title="서식 지우기">✕서식</button>
-            <span class="board-rte-sep"></span>
-            <button type="button" class="board-rte-btn" data-cmd="insertTable" title="표 삽입">⊞표</button>
-            <button type="button" class="board-rte-btn" data-cmd="addColumn" title="열 추가">＋열</button>
-            <button type="button" class="board-rte-btn" data-cmd="addRow" title="행 추가">＋행</button>
-            <button type="button" class="board-rte-btn" data-cmd="deleteTable" title="표 삭제">🗑표</button>
+            <div class="board-rte-group">
+              <button type="button" class="board-rte-btn" data-cmd="bold" title="굵게"><b>B</b></button>
+              <button type="button" class="board-rte-btn" data-cmd="italic" title="기울임"><i>I</i></button>
+              <button type="button" class="board-rte-btn" data-cmd="underline" title="밑줄"><u>U</u></button>
+              <button type="button" class="board-rte-btn" data-cmd="strike" title="취소선"><s>S</s></button>
+            </div>
+            <div class="board-rte-group">
+              <button type="button" class="board-rte-btn" data-cmd="h1" title="제목 1">H1</button>
+              <button type="button" class="board-rte-btn" data-cmd="h2" title="제목 2">H2</button>
+              <button type="button" class="board-rte-btn" data-cmd="h3" title="제목 3">H3</button>
+            </div>
+            <div class="board-rte-group">
+              <button type="button" class="board-rte-btn" data-cmd="bulletList" title="글머리 기호 목록">
+                <span class="board-rte-ico" aria-hidden="true">☰</span>
+              </button>
+              <button type="button" class="board-rte-btn" data-cmd="orderedList" title="번호 목록">1.</button>
+              <button type="button" class="board-rte-btn" data-cmd="blockquote" title="인용">❝</button>
+            </div>
+            <div class="board-rte-group board-rte-group-color">
+              <span class="board-rte-swatches" id="board-rte-colors" title="글자 색"></span>
+              <span class="board-rte-mini-sep"></span>
+              <span class="board-rte-swatches" id="board-rte-highlights" title="형광펜"></span>
+            </div>
+            <div class="board-rte-group">
+              <button type="button" class="board-rte-btn board-rte-btn-wide" data-cmd="clearFormat" title="서식 지우기">서식 지우기</button>
+            </div>
+            <div class="board-rte-group">
+              <button type="button" class="board-rte-btn board-rte-btn-wide" data-cmd="insertTable" title="표 삽입">표 넣기</button>
+              <button type="button" class="board-rte-btn" data-cmd="addColumn" title="열 추가">＋열</button>
+              <button type="button" class="board-rte-btn" data-cmd="addRow" title="행 추가">＋행</button>
+              <button type="button" class="board-rte-btn board-rte-btn-danger" data-cmd="deleteTable" title="표 삭제">표 삭제</button>
+            </div>
           </div>
           <div id="board-rich-editor" class="board-rte-surface"></div>
         </div>
