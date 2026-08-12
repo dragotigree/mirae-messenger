@@ -949,6 +949,9 @@
       -webkit-app-region: no-drag;
     }
     #privacy-lock-overlay.is-open { display: flex; }
+    .privacy-lock-clock { text-align: center; margin-bottom: 26px; color: #fff; -webkit-app-region: no-drag; }
+    .privacy-lock-clock-time { font-size: 56px; font-weight: 200; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 24px rgba(0,0,0,0.25); }
+    .privacy-lock-clock-date { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.68); margin-top: 6px; letter-spacing: -0.01em; }
     .privacy-lock-card {
       width: min(360px, calc(100vw - 40px)); padding: 28px 24px 22px;
       border-radius: var(--radius-xl); background: rgba(255,255,255,0.96);
@@ -5538,10 +5541,14 @@
 
   <!-- 🔒 사생활 화면 잠금 (PIN) -->
   <div id="privacy-lock-overlay" aria-modal="true" role="dialog" aria-label="화면 잠금">
+    <div class="privacy-lock-clock" id="privacy-lock-clock">
+      <div class="privacy-lock-clock-time" id="privacy-lock-clock-time">--:--</div>
+      <div class="privacy-lock-clock-date" id="privacy-lock-clock-date">-</div>
+    </div>
     <div class="privacy-lock-card">
       <div class="privacy-lock-icon" data-ui-icon="lock"></div>
       <div class="privacy-lock-title">화면이 잠겼습니다</div>
-      <div class="privacy-lock-sub">PIN을 입력하면 대화 내용을 다시 볼 수 있습니다.<br>자리 비울 때 사생활 보호용입니다.</div>
+      <div class="privacy-lock-sub">잠금을 해제하려면 PIN을 입력해주세요.</div>
       <input type="password" id="privacy-lock-pin-input" class="privacy-lock-pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyUnlock();}">
       <div class="privacy-lock-error" id="privacy-lock-error"></div>
       <div class="privacy-lock-actions">
@@ -10650,10 +10657,32 @@
         clearTimeout(privacyIdleTimer);
         privacyIdleTimer = null;
       }
+      startPrivacyLockClock();
       setTimeout(() => {
         try { pinEl?.focus(); } catch (_) {}
       }, 60);
       return true;
+    }
+
+    let privacyLockClockTimer = null;
+    function updatePrivacyLockClock() {
+      const timeEl = document.getElementById('privacy-lock-clock-time');
+      const dateEl = document.getElementById('privacy-lock-clock-date');
+      if (!timeEl || !dateEl) return;
+      const now = new Date();
+      timeEl.textContent = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      dateEl.textContent = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+    }
+    function startPrivacyLockClock() {
+      updatePrivacyLockClock();
+      if (privacyLockClockTimer) clearInterval(privacyLockClockTimer);
+      privacyLockClockTimer = setInterval(updatePrivacyLockClock, 1000);
+    }
+    function stopPrivacyLockClock() {
+      if (privacyLockClockTimer) {
+        clearInterval(privacyLockClockTimer);
+        privacyLockClockTimer = null;
+      }
     }
 
     function unlockPrivacyScreen() {
@@ -10661,6 +10690,7 @@
       const overlay = document.getElementById('privacy-lock-overlay');
       if (overlay) overlay.classList.remove('is-open');
       document.body.classList.remove('privacy-locked');
+      stopPrivacyLockClock();
       const pinEl = document.getElementById('privacy-lock-pin-input');
       const errEl = document.getElementById('privacy-lock-error');
       if (pinEl) pinEl.value = '';
