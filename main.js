@@ -793,6 +793,11 @@ async function findNewestUpdateCandidate() {
 
 /** Z드라이브 브리지 폴더에 현재 설치본을 미러 (가능하면). GitHub 배포 후 옛 PC도 따라오게 함. */
 async function mirrorLocalInstallToZBridge(opts = {}) {
+  // ⛔ Z드라이브 배포는 폐지됐다(1.0.686) — 업데이트는 GitHub에서만 받는다.
+  // 호출부가 여러 곳이라 함수는 남겨 두고 여기서 즉시 반환한다(네트워크 드라이브 접근으로
+  // 앱이 멈추던 위험도 함께 사라진다).
+  return { mirrored: false, reason: 'z-bridge-disabled' };
+  /* eslint-disable no-unreachable */
   const force = !!(opts && opts.force);
   const timeoutMs = Number(opts && opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 12000;
   try {
@@ -928,7 +933,12 @@ function parseUpdateSource(src) {
   return { kind: 'folder', dir: s };
 }
 
-/** 빈 값·잘못된 값만 기본(GitHub)으로. Z경로는 유지(잘린 경로는 messenger로 보정). */
+/**
+ * 업데이트는 GitHub에서만 받는다(사용자 요청, 1.0.686).
+ * 예전에는 Z드라이브 공유폴더도 소스로 쓸 수 있었는데, Z가 안 붙거나 구버전이 올라가 있으면
+ * "최신인데 구버전에서 멈춤" 같은 혼선이 생겨 폴더 소스를 완전히 제거했다.
+ * 기존 PC에 Z경로가 저장돼 있어도 여기서 GitHub로 되돌려 준다.
+ */
 function normalizeUpdateSourcePath(src) {
   const s = String(src || '').trim();
   if (!s) return DEFAULT_UPDATE_SOURCE_PATH;
@@ -937,13 +947,7 @@ function normalizeUpdateSourcePath(src) {
     const ref = meta.ref && meta.ref !== 'main' ? `#${meta.ref}` : '';
     return `https://github.com/${meta.owner}/${meta.repo}${ref}`;
   }
-  if (meta.kind === 'folder') {
-    const cleaned = s.replace(/[\\/]+$/, '');
-    if (/물리치료실$/i.test(cleaned) && !/messenger$/i.test(cleaned)) {
-      return Z_BRIDGE_UPDATE_SOURCE_PATH;
-    }
-    return s;
-  }
+  // 폴더(Z드라이브 등) 경로는 더 이상 지원하지 않는다 — 항상 GitHub로 고정.
   return DEFAULT_UPDATE_SOURCE_PATH;
 }
 
