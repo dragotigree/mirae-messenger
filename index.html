@@ -716,6 +716,7 @@
     /* 왼쪽 아이콘 레일의 #(채널)·⭐(즐겨찾기) 버튼으로 목록을 해당 블록만 보이게 필터링 */
     #sidebar-main-sections.rail-filter-channels [data-sidebar-block]:not([data-sidebar-block="channels"]) { display: none !important; }
     #sidebar-main-sections.rail-filter-favorites [data-sidebar-block]:not([data-sidebar-block="favorites"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-users [data-sidebar-block]:not([data-sidebar-block="users"]) { display: none !important; }
     .rail-filter-channels #sidebar-block-channels #channels-section-body,
     .rail-filter-favorites #sidebar-block-favorites #favorites-section-body {
       max-height: none;
@@ -4863,14 +4864,15 @@
       <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="envelope"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-transport-btn" onclick="openTransportRequestModal()" title="이동기사 요청" data-ui-icon="transportCar"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
+      <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
     </div>
     <div id="icon-rail-bottom">
-      <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
       <button type="button" class="icon-rail-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-transport-btn" onclick="openTransportRequestModal()" title="이동기사 요청" data-ui-icon="transportCar"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-login-btn" onclick="openOperatorLoginModal()" title="작성자 로그인" data-ui-icon="logIn"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
       <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="users"></button>
@@ -9345,18 +9347,17 @@
       if (btn) btn.classList.add('is-active');
     }
 
-    /* # / ⭐ 레일 버튼: 사이드바를 채널만 · 즐겨찾기만 보이도록 필터링 (다시 누르면 전체 보기로 복귀) */
+    /* # / ⭐ / 💬 레일 버튼: 사이드바를 채널만 · 즐겨찾기만 · 사용자만 보이도록 필터링 (다시 누르면 전체 보기로 복귀) */
     let sidebarRailFilter = 'all';
+    const SIDEBAR_RAIL_FILTER_BTN_IDS = { channels: 'icon-rail-chat-btn', favorites: 'icon-rail-favorites-btn', users: 'icon-rail-users-btn' };
+    const SIDEBAR_RAIL_FILTER_BLOCK_IDS = { channels: 'sidebar-block-channels', favorites: 'sidebar-block-favorites', users: 'sidebar-block-users' };
     function setSidebarRailFilter(kind) {
       const sections = document.getElementById('sidebar-main-sections');
       if (!sections) return;
       sidebarRailFilter = (sidebarRailFilter === kind) ? 'all' : kind;
-      sections.classList.remove('rail-filter-channels', 'rail-filter-favorites');
+      sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users');
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
-      if (sidebarRailFilter === 'channels') {
-        sections.classList.add('rail-filter-channels');
-        document.getElementById('icon-rail-chat-btn')?.classList.add('is-active');
-      } else if (sidebarRailFilter === 'favorites') {
+      if (sidebarRailFilter === 'favorites') {
         const collapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
         if (collapsed && typeof toggleFavoritesSectionCollapse === 'function') toggleFavoritesSectionCollapse();
         const body = document.getElementById('favorites-section-body');
@@ -9364,12 +9365,14 @@
         if (body && block && block.style.display === 'none') {
           body.innerHTML = '<div style="padding:16px 12px; text-align:center; color:#94a3b8; font-size:12px; line-height:1.5;">즐겨찾기한 직원이 없습니다.<br>목록에서 우클릭으로 추가할 수 있습니다.</div>';
         }
-        sections.classList.add('rail-filter-favorites');
-        document.getElementById('icon-rail-favorites-btn')?.classList.add('is-active');
+      }
+      if (sidebarRailFilter !== 'all') {
+        sections.classList.add(`rail-filter-${sidebarRailFilter}`);
+        document.getElementById(SIDEBAR_RAIL_FILTER_BTN_IDS[sidebarRailFilter])?.classList.add('is-active');
       } else {
         document.getElementById('icon-rail-chat-btn')?.classList.add('is-active');
       }
-      const target = document.getElementById(sidebarRailFilter === 'favorites' ? 'sidebar-block-favorites' : sidebarRailFilter === 'channels' ? 'sidebar-block-channels' : 'sidebar-block-users');
+      const target = document.getElementById(SIDEBAR_RAIL_FILTER_BLOCK_IDS[sidebarRailFilter] || 'sidebar-block-users');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     function updateCompactModeButtonUi() {
