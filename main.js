@@ -10221,25 +10221,28 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
 
 // 🔑 마스터 아이디 + 비밀번호 검증 IPC 핸들러
 ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
-  return new Promise((resolve) => {
-    db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
-      const currentId = row && row.master_id ? row.master_id : 'admin';
-      if (row && currentId === id && row.master_password === password) {
-        masterSessionActive = true;
-        resolve({ success: true });
-      } else {
-        resolve({ success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' });
-      }
-    });
-  });
+  const ok = await verifyLocalMasterAuth(id, password);
+  if (ok) masterSessionActive = true;
+  return ok ? { success: true } : { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
 });
 
-// 기존 호환성을 위해 유지
+// 기존 호환성을 위해 유지 (아이디 무관, 비밀번호만 확인 — 현재 렌더러에서 호출하는 곳은 없음)
 ipcMain.handle('verify-master-password', async (event, inputPassword) => {
   return new Promise((resolve) => {
     db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
-      if (row && row.master_password === inputPassword) resolve({ success: true });
-      else resolve({ success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
+      if (!err && row) {
+        resolve(row.master_password === inputPassword
+          ? { success: true }
+          : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
+        return;
+      }
+      ensureMasterConfigRow(() => {
+        db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err2, row2) => {
+          resolve(row2 && row2.master_password === inputPassword
+            ? { success: true }
+            : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
+        });
+      });
     });
   });
 });
@@ -11849,11 +11852,29 @@ function verifyLocalMasterPassword(password) {
   });
 }
 
+// ⚠️ 실사고: master_config 행이(예: DB 손상 복구 과정에서) 유실되면 db.get이 row=undefined를
+// 반환하는데, 그걸 그냥 "비밀번호 틀림"으로 처리해버려서 admin/admin1234가 실제로는 맞는데도
+// 모든 마스터 로그인 화면에서 전부 거부당하는 것처럼 보였다. 행이 없을 때만 기본값(admin/
+// admin1234)으로 되살리고(기존 값이 있으면 절대 덮어쓰지 않음) 그 값으로 재검사한다.
+function ensureMasterConfigRow(cb) {
+  db.run(`INSERT OR IGNORE INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'admin1234')`, () => {
+    if (typeof cb === 'function') cb();
+  });
+}
 function verifyLocalMasterAuth(id, password) {
   return new Promise((resolve) => {
     db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
-      const currentId = row && row.master_id ? String(row.master_id) : 'admin';
-      resolve(!!(row && currentId === String(id || '') && String(row.master_password) === String(password || '')));
+      if (err || !row) {
+        ensureMasterConfigRow(() => {
+          db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err2, row2) => {
+            const currentId = row2 && row2.master_id ? String(row2.master_id) : 'admin';
+            resolve(!!(row2 && currentId === String(id || '') && String(row2.master_password) === String(password || '')));
+          });
+        });
+        return;
+      }
+      const currentId = row.master_id ? String(row.master_id) : 'admin';
+      resolve(!!(currentId === String(id || '') && String(row.master_password) === String(password || '')));
     });
   });
 }
