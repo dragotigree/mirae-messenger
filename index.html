@@ -6388,7 +6388,7 @@
     <div class="modal-card signin-card" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="operator-login-title">
       <section class="signin-panel">
         <h2 class="signin-title" id="operator-login-title">작성자 로그인</h2>
-        <p class="signin-hint" id="operator-login-hint">공지·병원 일정·당직의·OFF를 작성하려면 마스터에게 발급받은 아이디로 로그인하세요. 마스터 아이디로도 로그인할 수 있습니다.</p>
+        <p class="signin-hint" id="operator-login-hint" style="display:none;"></p>
         <div class="signin-fields">
           <input type="text" id="operator-login-id" class="signin-input" placeholder="아이디" autocomplete="username">
           <input type="password" id="operator-login-pwd" class="signin-input" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitOperatorLogin()">
@@ -17019,15 +17019,10 @@
       const hintEl = document.getElementById('operator-login-hint');
       if (pendingOpenDutyRosterAfterLogin) {
         if (titleEl) titleEl.textContent = '🩺 일정등록 로그인';
-        if (hintEl) {
-          hintEl.textContent = '마스터 아이디 또는 등록된 작성 권한자 계정으로 로그인하세요. (당직의·OFF 포함)';
-        }
       } else {
         if (titleEl) titleEl.textContent = '✍️ 작성자 로그인';
-        if (hintEl) {
-          hintEl.textContent = '공지·병원 일정·당직의·OFF를 작성하려면 마스터에게 발급받은 아이디로 로그인하세요. 마스터 아이디로도 로그인할 수 있습니다.';
-        }
       }
+      if (hintEl) hintEl.style.display = 'none';
       document.getElementById('operator-login-modal').style.display = 'flex';
       if (!document.body.classList.contains('schedule-board-standalone')) {
         setModalOpenState(true);
