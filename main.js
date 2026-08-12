@@ -4127,6 +4127,7 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_schedules_at ON deleted_schedules(deleted_at)`, () => {});
 
   /** 삭제된 공지 UID — NOTICE_SYNC 가 되살리는 것 방지 */
+  loadNoticeTombstoneFallback();
   db.run(`CREATE TABLE IF NOT EXISTS deleted_notices (
     uid TEXT PRIMARY KEY,
     deleted_at TEXT NOT NULL
@@ -7379,6 +7380,38 @@ let noticesSchemaEnsuring = null; // callback queue
 /** 삭제된 공지 UID 즉시 기억 (DB 기록 전 레이스 방지) — 아래 const 재선언 없이 여기만 사용 */
 let noticeTombstoneMemory = new Set();
 
+// ⚠️ 실사고: deleted_notices 테이블 자체가 DB 손상 영향권이면(같은 파일 내 페이지 손상이
+// 예상보다 넓게 퍼져 있을 수 있음) INSERT가 조용히 실패하고, 앱을 껐다 켜면 그 삭제 기록이
+// 사라져 이미 지운 공지가 되살아난다("삭제해도 재시작하면 다시 나온다"). SQLite와 무관한
+// 평범한 JSON 파일에도 같이 남겨서, DB가 얼마나 손상됐든 삭제 기록만은 살아남게 한다.
+function getNoticeTombstoneFallbackPath() {
+  try { return path.join(app.getPath('userData'), 'deleted_notices_fallback.json'); } catch (e) { return ''; }
+}
+function loadNoticeTombstoneFallback() {
+  const fp = getNoticeTombstoneFallbackPath();
+  if (!fp) return;
+  try {
+    const raw = fs.readFileSync(fp, 'utf8');
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) arr.forEach((uid) => { if (uid) noticeTombstoneMemory.add(String(uid)); });
+  } catch (e) { /* 파일 없음 등 — 무시 */ }
+}
+function persistNoticeTombstoneFallback(uid) {
+  const fp = getNoticeTombstoneFallbackPath();
+  if (!fp || !uid) return;
+  try {
+    let arr = [];
+    try { arr = JSON.parse(fs.readFileSync(fp, 'utf8')); if (!Array.isArray(arr)) arr = []; } catch (e) { arr = []; }
+    const key = String(uid);
+    if (!arr.includes(key)) {
+      arr.push(key);
+      fs.writeFileSync(fp, JSON.stringify(arr));
+    }
+  } catch (e) {
+    console.warn('[notice-tombstone] fallback 파일 기록 실패:', e && e.message ? e.message : e);
+  }
+}
+
 let noticesUidUniqueEnsured = false;
 /**
  * ⚠️ 실사고: uid에 UNIQUE 제약이 없어 upsertNoticeFromSync의 "SELECT로 확인 후 INSERT" 가
@@ -8255,6 +8288,7 @@ function recordNoticeTombstone(uid, done) {
   }
   const key = String(uid);
   noticeTombstoneMemory.add(key);
+  persistNoticeTombstoneFallback(key);
   const at = new Date().toISOString();
   db.run(
     `INSERT OR REPLACE INTO deleted_notices (uid, deleted_at) VALUES (?, ?)`,
@@ -10478,13 +10512,20 @@ function generateMsgUid() {
 // DELETE가 실패해도 tombstone 기록만 성공하면 목록에서 사라지게 하기 위한 안전장치
 // (applyLocalNoticeDelete 참고). NOT IN 서브쿼리 자체가 깨졌을 가능성은 낮지만, 혹시
 // 실패하면 필터 없이라도 목록은 보여준다(공지 자체를 못 보는 것보단 낫다).
+// ⚠️ SQL의 "NOT IN (SELECT uid FROM deleted_notices)"만으로는 부족했다 — DB 손상이
+// deleted_notices 테이블 쓰기에도 영향을 주면 그 기록 자체가 재시작 후 사라질 수 있다.
+// noticeTombstoneMemory는 DB뿐 아니라 JSON 폴백 파일(persistNoticeTombstoneFallback)에서도
+// 채워지므로, 여기서 한 번 더 JS 쪽에서 걸러 이중 안전장치로 삼는다.
+function filterOutTombstonedNotices(rows) {
+  return (rows || []).filter((r) => r && !noticeTombstoneMemory.has(String(r.uid)));
+}
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
     ensureNoticesTableSchema(() => {
       db.all(`SELECT * FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) {
           db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (errNoFilter, rowsNoFilter) => {
-            if (!errNoFilter) { resolve((rowsNoFilter || []).map((r) => mapNoticeRowForListIpc(r))); return; }
+            if (!errNoFilter) { resolve(filterOutTombstonedNotices(rowsNoFilter).map((r) => mapNoticeRowForListIpc(r))); return; }
             console.error('get-notices 실패:', errNoFilter.message);
             noticesSchemaReady = false;
             ensureNoticesTableSchema(() => {
@@ -10495,17 +10536,17 @@ ipcMain.handle('get-notices', async () => {
                       resolve([]);
                       return;
                     }
-                    resolve((rows3 || []).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
+                    resolve(filterOutTombstonedNotices(rows3).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
                   });
                   return;
                 }
-                resolve((rows2 || []).map((r) => mapNoticeRowForListIpc(r)));
+                resolve(filterOutTombstonedNotices(rows2).map((r) => mapNoticeRowForListIpc(r)));
               });
             });
           });
           return;
         }
-        resolve((rows || []).map((r) => mapNoticeRowForListIpc(r)));
+        resolve(filterOutTombstonedNotices(rows).map((r) => mapNoticeRowForListIpc(r)));
       });
     });
   });
