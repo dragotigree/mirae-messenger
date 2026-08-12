@@ -3622,8 +3622,10 @@ ipcMain.handle('restore-from-backup', async (event, backupPath) => {
  * 호출되어야 한다. */
 ipcMain.handle('reset-database-fresh', async () => {
   try {
-    await new Promise((resolve) => checkpointWalPassive().finally(resolve));
-    await new Promise((resolve) => db.close(() => resolve()));
+    // ⚠️ 이미 손상된 DB에서는 체크포인트/close 콜백이 응답 없이 멈출 수 있다 — 과거 데이터를
+    // 포기하기로 한 이상, 체크포인트가 안 되더라도 그냥 넘어가서 확실히 끝나는 게 낫다.
+    await withTimeout(new Promise((resolve) => checkpointWalPassive().finally(resolve)), 6000, 'reset-checkpoint').catch(() => {});
+    await withTimeout(new Promise((resolve) => db.close(() => resolve())), 6000, 'reset-close').catch(() => {});
     const stamp = Date.now();
     const corruptedCopy = `${dbPath}.corrupted_reset_${stamp}`;
     await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
