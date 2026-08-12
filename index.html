@@ -4068,24 +4068,38 @@
       flex-shrink: 0; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px;
       color: #334155; background: var(--border-soft); border: 1px solid transparent;
     }
-    /* 🎨 파스텔 카테고리 팔레트 — 고정 2종(전직원·업데이트) + 나머지는 이름으로 자동 배정 */
-    .board-notice-cat-badge.is-update { color: #9a3412; background: #ffedd5; }
-    /* 파스텔 14색 — 부서가 25개 이상으로 늘어나도(계속 추가 예정) 최대한 안 겹치도록
-       boardCategoryBadgeClass의 해시가 0~13을 고르게 씀 */
-    .board-notice-cat-badge.cat-p0  { color: #166534; background: #dcfce7; }
-    .board-notice-cat-badge.cat-p1  { color: #9d174d; background: #fce7f3; }
-    .board-notice-cat-badge.cat-p2  { color: #115e59; background: #ccfbf1; }
-    .board-notice-cat-badge.cat-p3  { color: #6b21a8; background: #f3e8ff; }
-    .board-notice-cat-badge.cat-p4  { color: #854d0e; background: #fef9c3; }
-    .board-notice-cat-badge.cat-p5  { color: #9f1239; background: #ffe4e6; }
-    .board-notice-cat-badge.cat-p6  { color: #075985; background: #e0f2fe; }
-    .board-notice-cat-badge.cat-p7  { color: #3730a3; background: #e0e7ff; }
-    .board-notice-cat-badge.cat-p8  { color: #a16207; background: #fef3c7; }
-    .board-notice-cat-badge.cat-p9  { color: #0e7490; background: #cffafe; }
-    .board-notice-cat-badge.cat-p10 { color: #7c2d12; background: #ffe4d5; }
-    .board-notice-cat-badge.cat-p11 { color: #3f6212; background: #ecfccb; }
-    .board-notice-cat-badge.cat-p12 { color: #86198f; background: #fae8ff; }
-    .board-notice-cat-badge.cat-p13 { color: #1e3a8a; background: #dbeafe; }
+    /* 🎨 부서 색상 팔레트 — 색을 --cat-fg/--cat-bg 변수로만 정의하고, 실제로 칠하는 건
+       아래 .board-notice-cat-badge(목록 배지)와 .board-write-dept-swatch(글쓰기 드롭다운)가
+       각자 가져다 쓴다. 이렇게 해두면 색을 한 곳에서 고치면 목록·드롭다운이 같이 바뀐다.
+       고정 부서 목록(BOARD_FIXED_DEPTS)이 23개라, 24색을 두어 부서마다 다른 색이 배정된다
+       (boardCategoryBadgeClass가 고정 목록은 순번으로 배정 — 해시 충돌로 같은 색이 겹치던 문제 해결). */
+    .cat-p0  { --cat-fg: #166534; --cat-bg: #dcfce7; }
+    .cat-p1  { --cat-fg: #9d174d; --cat-bg: #fce7f3; }
+    .cat-p2  { --cat-fg: #115e59; --cat-bg: #ccfbf1; }
+    .cat-p3  { --cat-fg: #6b21a8; --cat-bg: #f3e8ff; }
+    .cat-p4  { --cat-fg: #854d0e; --cat-bg: #fef9c3; }
+    .cat-p5  { --cat-fg: #9f1239; --cat-bg: #ffe4e6; }
+    .cat-p6  { --cat-fg: #075985; --cat-bg: #e0f2fe; }
+    .cat-p7  { --cat-fg: #3730a3; --cat-bg: #e0e7ff; }
+    .cat-p8  { --cat-fg: #a16207; --cat-bg: #fef3c7; }
+    .cat-p9  { --cat-fg: #0e7490; --cat-bg: #cffafe; }
+    .cat-p10 { --cat-fg: #7c2d12; --cat-bg: #ffe4d5; }
+    .cat-p11 { --cat-fg: #3f6212; --cat-bg: #ecfccb; }
+    .cat-p12 { --cat-fg: #86198f; --cat-bg: #fae8ff; }
+    .cat-p13 { --cat-fg: #1e3a8a; --cat-bg: #dbeafe; }
+    .cat-p14 { --cat-fg: #4c1d95; --cat-bg: #ede9fe; }
+    .cat-p15 { --cat-fg: #065f46; --cat-bg: #d1fae5; }
+    .cat-p16 { --cat-fg: #b91c1c; --cat-bg: #fee2e2; }
+    .cat-p17 { --cat-fg: #1d4ed8; --cat-bg: #dde7fe; }
+    .cat-p18 { --cat-fg: #92400e; --cat-bg: #fde8c8; }
+    .cat-p19 { --cat-fg: #5b21b6; --cat-bg: #e9d8fd; }
+    .cat-p20 { --cat-fg: #0f766e; --cat-bg: #d5f5f0; }
+    .cat-p21 { --cat-fg: #a21caf; --cat-bg: #fbe3fb; }
+    .cat-p22 { --cat-fg: #365314; --cat-bg: #e3f5c4; }
+    .cat-p23 { --cat-fg: #0c4a6e; --cat-bg: #d3ecfb; }
+    .is-update { --cat-fg: #9a3412; --cat-bg: #ffedd5; }
+    .board-notice-cat-badge.is-update,
+    .board-notice-cat-badge[class*="cat-p"] { color: var(--cat-fg); background: var(--cat-bg); }
     .board-notice-meta { font-size: 11px; color: var(--text-muted); }
     .board-notice-date { font-size: 11px; color: var(--text-muted); font-weight: 500; }
     .board-notice-photo-badge .icon-glyph { width: 12px; height: 12px; }
@@ -4191,6 +4205,17 @@
     }
     .board-write-dept-option:hover { background: var(--surface-muted); color: var(--text-primary); }
     .board-write-dept-option.active { background: var(--sidebar-active); color: var(--accent-dark); font-weight: 800; }
+    /* 부서 색상 표시 — 목록 배지와 같은 팔레트(--cat-fg/--cat-bg)를 그대로 쓴다.
+       드롭다운 항목에서는 부서명 자체를 그 색 알약으로 보여줘서 색-부서 대응이 한눈에 보이게 한다. */
+    .board-write-dept-option-name {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .board-write-dept-pill {
+      display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+      color: var(--cat-fg, var(--text-secondary)); background: var(--cat-bg, var(--border-soft));
+    }
+    .board-write-dept-trigger .board-write-dept-pill { font-size: 12.5px; }
     .board-write-dept-option .board-write-dept-check { opacity: 0; color: var(--accent-dark); font-size: 12px; flex-shrink: 0; }
     .board-write-dept-option.active .board-write-dept-check { opacity: 1; }
     .board-form-input, .board-form-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 13px; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none; }
@@ -4213,9 +4238,13 @@
       position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 999px;
       background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
     }
-    .board-detail-images { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    /* 그림은 가운데 정렬하고, 원본보다 크게 늘리지 않는다(작은 그림이 흐릿하게 확대되던 문제).
+       margin-top이 아니라 margin-bottom을 쓰는 이유: 그림이 본문보다 위에 오도록 순서를 바꿨다. */
+    .board-detail-images { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .board-detail-images:empty { display: none; margin-bottom: 0; }
     .board-detail-images img {
-      max-width: 100%; width: 100%; height: auto; max-height: min(72vh, 720px);
+      width: auto; height: auto;
+      max-width: 100%; max-height: min(72vh, 720px);
       object-fit: contain; border-radius: var(--radius-lg); border: 1px solid var(--border);
       cursor: zoom-in; background: #f8fafc;
     }
@@ -5954,8 +5983,8 @@
         </div>
         <div id="board-detail-title" style="font-size:17px; font-weight:700; color:#0f172a; margin-bottom:6px;"></div>
         <div id="board-detail-meta" style="font-size:11px; color:#94a3b8; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border-soft);"></div>
-        <div id="board-detail-content" style="font-size:14px; color:#334155; line-height:1.7; white-space:pre-wrap;"></div>
         <div id="board-detail-images" class="board-detail-images"></div>
+        <div id="board-detail-content" style="font-size:14px; color:#334155; line-height:1.7; white-space:pre-wrap;"></div>
         <div id="board-detail-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;"></div>
       </div>
     </div>
@@ -15467,6 +15496,34 @@
       if (preview) preview.remove();
     }
 
+    /* 🕘 공지 작성 시각은 DB에 UTC(ISO 8601, 예: 2026-08-12T06:22:00.000Z)로 저장된다.
+       예전엔 이 문자열에서 'T'만 공백으로 바꿔 그대로 보여줘서, 한국 시간 15:22가 06:22로
+       9시간 어긋나 표시됐다(실제 사용자 보고). 반드시 한국(Asia/Seoul) 시간으로 변환해 보여준다.
+       ※ 옛 데이터에는 타임존 표기가 없는 로컬 시각 문자열이 섞여 있을 수 있어, 그런 값은
+         이미 현지 시각이므로 변환하지 않고 그대로 보여준다(이중 변환 방지). */
+    function formatNoticeDateTime(raw) {
+      const s = String(raw || '').trim();
+      if (!s) return '';
+      const hasTimezone = /[Zz]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+      if (!hasTimezone) return s.replace('T', ' ').slice(0, 16);
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return s.replace('T', ' ').slice(0, 16);
+      try {
+        const parts = new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(d).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+        if (parts.year && parts.month && parts.day && parts.hour && parts.minute) {
+          // hour12:false에서 자정이 '24'로 나오는 환경이 있어 '00'으로 보정한다.
+          const hh = parts.hour === '24' ? '00' : parts.hour;
+          return `${parts.year}-${parts.month}-${parts.day} ${hh}:${parts.minute}`;
+        }
+      } catch (e) { /* Intl 사용 불가 환경 — 아래 폴백 */ }
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
     function normalizeBoardCategory(raw) {
       const s = String(raw == null ? '' : raw).trim();
       return s || '전체';
@@ -15500,17 +15557,21 @@
       return cat;
     }
 
-    /* 🎨 파스텔 14색 — 부서가 많아질수록(현재 최소 25개 이상) 7색으로는 겹침이 심해서
-       (mult=31 기준 회의실·원무과·간호부가 전부 같은 색) 14색으로 넓히고, 실제 병원
-       부서명 25개로 여러 해시 조합을 대입해 최다 중복이 가장 적은 조합(곱수 101,
-       상위비트 7 시프트)을 골랐다 — 25개 중 최다 중복 3, 14색 모두 사용. */
+    /* 🎨 부서별 색상 배정 — 팔레트는 24색(cat-p0~cat-p23).
+       예전에는 부서명을 해시해서 색을 골랐는데, 색이 14개뿐이라 서로 다른 부서 3개가 같은 색이
+       되는 일이 있었다. 고정 부서 목록(BOARD_FIXED_DEPTS)은 개수가 정해져 있으니 해시 대신
+       "목록 순번"으로 배정하면 겹칠 일이 아예 없다. 목록에 없는 부서(조직 개편 등으로 새로
+       등장한 이름)만 예전처럼 해시로 배정한다. */
+    const BOARD_CAT_PALETTE_SIZE = 24;
     function boardCategoryBadgeClass(cat) {
       if (cat === '업데이트') return 'is-update';
-      const s = String(cat || '');
+      const s = String(cat || '').trim();
+      const fixedIdx = BOARD_FIXED_DEPTS.indexOf(s);
+      if (fixedIdx >= 0) return `cat-p${fixedIdx % BOARD_CAT_PALETTE_SIZE}`;
       let h = 0;
       for (let i = 0; i < s.length; i++) h = (h * 101 + s.charCodeAt(i)) >>> 0;
       h = (h ^ (h >>> 7)) >>> 0;
-      return `cat-p${h % 14}`;
+      return `cat-p${h % BOARD_CAT_PALETTE_SIZE}`;
     }
 
     /* 📖 읽은 공지 기억 — 서버가 없는 구조라 이 PC에만 저장한다(로컬 전용). */
@@ -15649,14 +15710,25 @@
       if (cur && !options.includes(cur)) options.unshift(cur);
       const value = (cur && options.includes(cur)) ? cur : options[0];
       hidden.value = value;
-      triggerLabel.textContent = boardCategoryLabel(value);
+      setBoardWriteDeptTriggerLabel(triggerLabel, value);
       menu.innerHTML = options.map((c) =>
         `<button type="button" class="board-write-dept-option${c === value ? ' active' : ''}" data-value="${escapeHtml(c)}" onclick="selectBoardWriteDept(this.dataset.value)">` +
-          `<span>${escapeHtml(boardCategoryLabel(c))}</span>` +
+          `<span class="board-write-dept-option-name">` +
+            `<span class="board-write-dept-pill ${boardCategoryBadgeClass(c)}">${escapeHtml(boardCategoryLabel(c))}</span>` +
+          `</span>` +
           `<span class="board-write-dept-check">✓</span>` +
         `</button>`
       ).join('');
       closeBoardWriteDeptDropdown();
+    }
+
+    /** 드롭다운 버튼에 선택된 부서를 그 부서 색 알약으로 표시한다. */
+    function setBoardWriteDeptTriggerLabel(triggerLabel, value) {
+      if (!triggerLabel) return;
+      const v = String(value == null ? '' : value).trim();
+      if (!v) { triggerLabel.textContent = '선택'; return; }
+      triggerLabel.innerHTML =
+        `<span class="board-write-dept-pill ${boardCategoryBadgeClass(v)}">${escapeHtml(boardCategoryLabel(v))}</span>`;
     }
 
     function selectBoardWriteDept(value) {
@@ -15664,7 +15736,7 @@
       const triggerLabel = document.getElementById('board-write-dept-trigger-label');
       const menu = document.getElementById('board-write-dept-menu');
       if (hidden) hidden.value = value;
-      if (triggerLabel) triggerLabel.textContent = boardCategoryLabel(value);
+      setBoardWriteDeptTriggerLabel(triggerLabel, value);
       if (menu) {
         [...menu.children].forEach((btn) => btn.classList.toggle('active', btn.dataset.value === value));
       }
@@ -15735,7 +15807,7 @@
       const readSet = getBoardReadUids();
       container.innerHTML = '';
       filtered.forEach((n) => {
-        const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
+        const createdDisplay = formatNoticeDateTime(n.created_at);
         const imgCount = parseNoticeImages(n.images).length;
         const cat = normalizeBoardCategory(n.category);
         const isUnread = !readSet.has(String(n.uid || ''));
@@ -15822,7 +15894,7 @@
       document.getElementById('board-header-actions').style.display = 'none';
       document.getElementById('board-modal-title').textContent = '📋 공지사항 보기';
 
-      const createdDisplay = (n.created_at || '').toString().replace('T', ' ').slice(0, 16);
+      const createdDisplay = formatNoticeDateTime(n.created_at);
       const cat = normalizeBoardCategory(n.category);
       document.getElementById('board-detail-title').textContent = n.title;
       document.getElementById('board-detail-meta').innerHTML =
