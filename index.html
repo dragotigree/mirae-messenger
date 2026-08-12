@@ -949,41 +949,58 @@
       -webkit-app-region: no-drag;
     }
     #privacy-lock-overlay.is-open { display: flex; }
-    .privacy-lock-clock { text-align: center; margin-bottom: 26px; color: #fff; -webkit-app-region: no-drag; }
-    .privacy-lock-clock-time { font-size: 56px; font-weight: 200; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 24px rgba(0,0,0,0.25); }
-    .privacy-lock-clock-date { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.68); margin-top: 6px; letter-spacing: -0.01em; }
+    .privacy-lock-clock { text-align: center; margin-bottom: 28px; color: #fff; -webkit-app-region: no-drag; }
+    .privacy-lock-clock-time {
+      font-family: 'Pretendard', var(--font-family); font-size: 58px; font-weight: 300;
+      letter-spacing: -0.01em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 28px rgba(0,0,0,0.3);
+    }
+    .privacy-lock-clock-date {
+      font-family: 'Pretendard', var(--font-family); font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,0.7); margin-top: 7px; letter-spacing: -0.005em;
+    }
     .privacy-lock-card {
-      width: min(360px, calc(100vw - 40px)); padding: 28px 24px 22px;
-      border-radius: var(--radius-xl); background: rgba(255,255,255,0.96);
+      width: min(360px, calc(100vw - 40px)); padding: 30px 26px 24px;
+      border-radius: 24px; background: rgba(255,255,255,0.97);
       box-shadow: 0 24px 60px rgba(0,0,0,0.35); text-align: center;
     }
     .privacy-lock-icon {
-      width: 56px; height: 56px; margin: 0 auto 12px; border-radius: var(--radius-xl);
+      width: 56px; height: 56px; margin: 0 auto 14px; border-radius: var(--radius-xl);
       background: var(--sidebar-active); color: var(--accent-dark); display: flex; align-items: center; justify-content: center;
     }
     .privacy-lock-icon .icon-glyph { width: 26px; height: 26px; }
-    .privacy-lock-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; }
-    .privacy-lock-sub { font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.5; }
+    .privacy-lock-title { font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; line-height: 1.35; }
+    .privacy-lock-sub { font-size: 12.5px; color: #64748b; margin-top: 7px; line-height: 1.5; }
     .privacy-lock-pin {
-      width: 100%; margin-top: 16px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: var(--radius-lg);
-      font-size: 20px; letter-spacing: 0.28em; text-align: center; font-weight: 700; color: #0f172a;
-      caret-color: transparent;
+      width: 100%; margin-top: 18px; padding: 13px 14px; border: 1px solid #dbe3ec; border-radius: 14px;
+      font-size: 22px; letter-spacing: 0.3em; text-align: center; font-weight: 700; color: #0f172a;
+      background: #f8fafc; caret-color: transparent; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
     }
-    .privacy-lock-pin:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-    .privacy-lock-error { min-height: 1.2em; margin-top: 8px; font-size: 12px; color: #dc2626; }
-    .privacy-lock-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .privacy-lock-pin:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+    .privacy-lock-error { min-height: 1.2em; margin-top: 8px; font-size: 12px; color: #dc2626; font-weight: 600; }
+    .privacy-lock-actions { display: flex; gap: 8px; margin-top: 14px; }
     .privacy-lock-actions button {
-      flex: 1; padding: 10px 12px; border: none; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+      flex: 1; padding: 11px 12px; border: none; border-radius: 13px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
     }
-    .privacy-lock-unlock-btn { background: var(--accent); color: #fff; }
+    .privacy-lock-actions button:active { transform: scale(0.98); }
+    .privacy-lock-unlock-btn { background: var(--accent); color: #fff; box-shadow: 0 8px 20px rgba(33, 150, 243, 0.28); }
     .privacy-lock-unlock-btn:hover { background: var(--accent-dark); }
     .privacy-lock-master-btn { background: var(--border-soft); color: #475569; }
     .privacy-lock-master-btn:hover { background: var(--border); }
-    .privacy-lock-master-box { display: none; margin-top: 12px; text-align: left; gap: 8px; flex-direction: column; }
+    .privacy-lock-master-box {
+      display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-soft);
+      text-align: left; gap: 9px; flex-direction: column;
+    }
     .privacy-lock-master-box.is-open { display: flex; }
     .privacy-lock-master-box input {
-      padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 13px;
+      padding: 11px 13px; border: 1px solid #dbe3ec; border-radius: 13px; font-size: 13px;
+      background: #f8fafc; color: #0f172a; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
     }
+    .privacy-lock-master-box input::placeholder { color: #94a3b8; }
+    .privacy-lock-master-box input:focus {
+      outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .privacy-lock-master-box .privacy-lock-unlock-btn { margin-top: 2px; }
     /* ========== 2단 대화 영역 ========== */
     #main-chat-panel { flex: 1; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); min-height: 0; min-width: 420px; }
     #chat-header {
@@ -5579,7 +5596,7 @@
     </div>
     <div class="privacy-lock-card">
       <div class="privacy-lock-icon" data-ui-icon="lock"></div>
-      <div class="privacy-lock-title">화면이 잠겼습니다</div>
+      <div class="privacy-lock-title">환자의 소중한 개인정보 보호를 위해 잠겼습니다</div>
       <div class="privacy-lock-sub">잠금을 해제하려면 PIN을 입력해주세요.</div>
       <input type="password" id="privacy-lock-pin-input" class="privacy-lock-pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyUnlock();}">
       <div class="privacy-lock-error" id="privacy-lock-error"></div>
