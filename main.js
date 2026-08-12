@@ -237,7 +237,22 @@ function ensureAppsLocalUserData() {
     app.setPath('userData', preferred);
     console.log('[userdata] local:', preferred, underApps ? '(Apps install)' : '(cloud AppData redirect)');
 
-    if (prev && path.resolve(prev) !== path.resolve(preferred)) {
+    // ⚠️⚠️ 실사고(2026-08-12): 이 이전(AppData) → 신규(C:\Apps) 데이터 이전은 원래 "처음 한 번"만
+    // 하려던 것인데, 조건이 "대상 파일이 없으면 복사"였다. 그래서 설정에서 「전부 포기하고 새로
+    // 시작하기」로 손상된 DB를 치우면, 바로 다음 부팅에서 이 코드가 "DB가 없네?" 하고 예전
+    // 위치(OneDrive가 동기화하던 AppData)에 남아있던 **그 손상된 318MB DB를 그대로 다시
+    // 복사**해왔다. 사용자 입장에선 "초기화를 해도 손상 알림이 계속 뜬다"가 되고, 318MB
+    // copyFileSync가 메인 스레드를 막아 부팅 직후 13초씩 멈추기까지 했다(로그의 이벤트 루프
+    // 지연 13590ms). 이전은 반드시 "최초 1회"로만 제한한다 — 마커 파일로 못박는다.
+    const migrationMarker = path.join(preferred, 'userdata-migrated-once.txt');
+    const alreadyMigrated = fs.existsSync(migrationMarker);
+    const dstDbPath = path.join(preferred, 'mirae_messenger.db');
+    if (alreadyMigrated) {
+      // 이미 이전을 마쳤다. 예전 위치에 무엇이 남아있든 다시는 가져오지 않는다.
+    } else if (fs.existsSync(dstDbPath)) {
+      // 이 업데이트 이전에 이미 이전이 끝나 있던 설치본 — 지금 마커만 남기고 끝낸다.
+      try { fs.writeFileSync(migrationMarker, String(Date.now()), 'utf8'); } catch (e) { /* ignore */ }
+    } else if (prev && path.resolve(prev) !== path.resolve(preferred)) {
       const names = [
         'mirae_messenger.db',
         'mirae_messenger.db-wal',
@@ -256,6 +271,9 @@ function ensureAppsLocalUserData() {
           console.warn('[userdata] migrate skip', name, e.message);
         }
       }
+      try { fs.writeFileSync(migrationMarker, String(Date.now()), 'utf8'); } catch (e) { /* ignore */ }
+    } else {
+      try { fs.writeFileSync(migrationMarker, String(Date.now()), 'utf8'); } catch (e) { /* ignore */ }
     }
   } catch (e) {
     console.warn('[userdata] redirect failed:', e && e.message ? e.message : e);
@@ -3688,6 +3706,17 @@ ipcMain.handle('reset-database-fresh', async () => {
       return { success: false, msg: '손상된 파일이 다른 프로그램(백신 실시간 검사 등)에 의해 잠겨 있어 옮기지 못했습니다. 1분 정도 기다렸다가 프로그램을 다시 실행해서 재시도해 주세요.' };
     }
     await resetDbMigrationMarkersForNewDbFile();
+    // ⚠️ 초기화 직후 부팅에서 ensureAppsLocalUserData()가 "DB가 없네?" 하고 예전 위치(AppData)의
+    // 손상된 DB를 다시 복사해오던 사고를 원천 차단한다 — 이전 완료 마커를 확실히 남겨둔다.
+    try {
+      fs.writeFileSync(
+        path.join(app.getPath('userData'), 'userdata-migrated-once.txt'),
+        String(Date.now()),
+        'utf8'
+      );
+    } catch (e) {
+      writeToLogFile('warn', `[DB초기화] 이전-완료 마커 기록 실패: ${e && e.message}`);
+    }
     writeToLogFile('warn', '[DB초기화] 성공 — 재시작합니다');
     app.relaunch();
     app.exit(0);
