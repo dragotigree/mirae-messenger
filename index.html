@@ -247,6 +247,21 @@
       opacity: 1; visibility: visible; transform: translate(0, -50%); transition-delay: 0.15s;
     }
 
+    /* ⚡ 사용자 카드용 빠른 정보 말풍선 — 브라우저 기본 title 툴팁은 OS 딜레이가 길어서
+       (약 1초+) 별도로 짧은 딜레이(showFastUserTooltip 참고)로 직접 그린다. */
+    #fast-user-tooltip {
+      display: none; position: fixed; z-index: 100000; max-width: 260px;
+      background: #1e293b; color: #fff; padding: 9px 12px; border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35); pointer-events: none;
+      font-size: 12px; line-height: 1.5;
+    }
+    #fast-user-tooltip .fast-tip-name { font-weight: 800; font-size: 13px; margin-bottom: 2px; }
+    #fast-user-tooltip .fast-tip-sub { color: rgba(255,255,255,0.72); }
+    #fast-user-tooltip .fast-tip-note {
+      margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.9); white-space: pre-wrap;
+    }
+
     #sidebar-left {
       width: var(--sidebar-width, 240px);
       background: var(--sidebar-bg);
@@ -5645,6 +5660,8 @@
   </div>
 
   <!-- 🔒 사생활 화면 잠금 (PIN) -->
+  <div id="fast-user-tooltip" role="tooltip"></div>
+
   <div id="privacy-lock-overlay" aria-modal="true" role="dialog" aria-label="화면 잠금">
     <div class="privacy-lock-clock" id="privacy-lock-clock">
       <div class="privacy-lock-clock-date" id="privacy-lock-clock-date">-</div>
@@ -5929,7 +5946,7 @@
                 <label class="settings-field">내선 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
                 <label class="settings-field">휴대폰 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
               </div>
-              <label class="settings-field settings-field-note">비고 (선택)<textarea id="setting-note" rows="2" placeholder="없으면 비움" style="resize:vertical; font-family:inherit;"></textarea></label>
+              <label class="settings-field settings-field-note">비고 (선택) — 다른 사람이 마우스를 올렸을 때도 표시됩니다<textarea id="setting-note" rows="2" placeholder="없으면 비움" style="resize:vertical; font-family:inherit;"></textarea></label>
               <p class="settings-profile-hint-note">성명만 필수입니다. 나머지는 비워 두어도 됩니다.</p>
             </div>
           </div>
@@ -14405,6 +14422,58 @@
       bindUserDropZone(document.getElementById('dm-section-label'), openDmWithUserConfirm);
     }
 
+    /* ⚡ 사용자 카드 빠른 정보 말풍선 — 기본 title 툴팁(OS 딜레이 약 1초+)보다 훨씬 빠르게
+       (150ms) 뜨도록 직접 구현. 내용은 이름/직급/부서/층/내선/휴대폰과, 설정한 경우 비고까지. */
+    let fastUserTipTimer = null;
+    let fastUserTipEl = null;
+    function fastUserTooltipHtml(u) {
+      const parts = [`<div class="fast-tip-name">${escapeHtml(profileDisplayName(u))}</div>`];
+      const sub = formatUserSubLineSidebar(u);
+      if (sub) parts.push(`<div class="fast-tip-sub">${escapeHtml(sub)}</div>`);
+      const note = (u && u.note && String(u.note).trim()) || '';
+      if (note) parts.push(`<div class="fast-tip-note">${escapeHtml(note)}</div>`);
+      return parts.join('');
+    }
+    function positionFastUserTooltip(anchorEl) {
+      const tip = document.getElementById('fast-user-tooltip');
+      if (!tip || !anchorEl) return;
+      const rect = anchorEl.getBoundingClientRect();
+      const tipRect = tip.getBoundingClientRect();
+      let top = rect.top + rect.height / 2 - tipRect.height / 2;
+      top = Math.max(6, Math.min(top, window.innerHeight - tipRect.height - 6));
+      let left = rect.right + 10;
+      if (left + tipRect.width > window.innerWidth - 6) left = rect.left - tipRect.width - 10;
+      if (left < 6) left = 6;
+      tip.style.top = `${top}px`;
+      tip.style.left = `${left}px`;
+    }
+    function hideFastUserTooltip() {
+      clearTimeout(fastUserTipTimer);
+      fastUserTipEl = null;
+      const tip = document.getElementById('fast-user-tooltip');
+      if (tip) tip.style.display = 'none';
+    }
+    document.addEventListener('mouseover', (e) => {
+      const card = e.target.closest('.user-card-item[data-user-ip]');
+      if (!card || card === fastUserTipEl) return;
+      fastUserTipEl = card;
+      clearTimeout(fastUserTipTimer);
+      fastUserTipTimer = setTimeout(() => {
+        const u = findUserByIp(card.dataset.userIp);
+        const tip = document.getElementById('fast-user-tooltip');
+        if (!u || !tip) return;
+        tip.innerHTML = fastUserTooltipHtml(u);
+        tip.style.display = 'block';
+        positionFastUserTooltip(card);
+      }, 150);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const card = e.target.closest('.user-card-item[data-user-ip]');
+      if (!card) return;
+      if (e.relatedTarget && card.contains(e.relatedTarget)) return;
+      hideFastUserTooltip();
+    });
+
     function buildUserCard(u) {
       const unread = getUnreadForUser(u);
       const isActive = isSidebarDmCardActive(u.ip);
@@ -14416,11 +14485,9 @@
       const photoOk = isUsableProfilePhoto(u.photo);
       const displayName = formatDmListDisplayName(u);
       const subHtml = formatUserSubLineSidebarHtml(u);
-      const subPlain = formatUserSubLineSidebar(u);
-      const tip = escapeHtml(subPlain ? `${profileDisplayName(u)} / ${subPlain}` : profileDisplayName(u));
       const bodyHtml = subHtml
-        ? `<div class="user-card-body"><div class="user-name-text" title="${tip}">${displayName}</div><div class="user-sub-text">${subHtml}</div></div>`
-        : `<div class="user-card-body"><div class="user-name-text" title="${tip}">${displayName}</div></div>`;
+        ? `<div class="user-card-body"><div class="user-name-text">${displayName}</div><div class="user-sub-text">${subHtml}</div></div>`
+        : `<div class="user-card-body"><div class="user-name-text">${displayName}</div></div>`;
       card.innerHTML = `
         <div class="avatar-wrapper">
           <div class="avatar-circle ${photoOk ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
