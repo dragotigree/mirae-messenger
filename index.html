@@ -2179,6 +2179,14 @@
     }
     .signin-input::placeholder { color: var(--text-muted); }
     .signin-input:focus { outline: none; border-bottom-color: var(--accent); }
+    .signin-input:-webkit-autofill,
+    .signin-input:-webkit-autofill:hover,
+    .signin-input:-webkit-autofill:focus {
+      -webkit-box-shadow: 0 0 0 1000px #fff inset;
+      -webkit-text-fill-color: var(--text-primary);
+      border: none; border-bottom: 1px solid var(--border); border-radius: 0;
+      transition: background-color 9999s ease-in-out 0s;
+    }
     .signin-submit {
       margin-top: 26px; width: 100%; padding: 12px; border: none; border-radius: var(--radius-sm);
       background: var(--accent); color: #fff; font-size: 13px; font-weight: 700;
