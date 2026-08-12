@@ -2966,10 +2966,26 @@ function getTrayIcon() {
 }
 
 const dbPath = path.join(app.getPath('userData'), 'mirae_messenger.db');
+// ⚠️ writeToLogFile()는 fs.appendFile(비동기)이라, 이 시점(모듈 최상단, app.whenReady 이전)
+// 이후 곧바로 발생하는 재시작/예외가 있으면 쓰기 전에 유실될 수 있다. 이 한 줄만은 원인
+// 추적에 결정적이라 fs.appendFileSync로 직접, 무조건 남긴다(실패해도 흔적은 남기려고
+// try/catch 안에서도 최대한 시도한다).
 try {
   const preOpenStat = fs.existsSync(dbPath) ? fs.statSync(dbPath) : null;
-  writeToLogFile('info', `[부팅] DB 파일 열기 전 크기: ${preOpenStat ? preOpenStat.size : '(파일 없음 — 새로 생성됨)'}`);
-} catch (e) { /* ignore */ }
+  const logsDirSync = path.join(app.getPath('userData'), 'logs');
+  try { fs.mkdirSync(logsDirSync, { recursive: true }); } catch (e0) { /* ignore */ }
+  const todayStrSync = new Date().toISOString().slice(0, 10);
+  const lineSync = `[${new Date().toLocaleString('ko-KR')}] [BOOT] DB 파일 열기 전: ${dbPath} 크기=${preOpenStat ? preOpenStat.size : '(없음, 새로 생성됨)'}\n`;
+  fs.appendFileSync(path.join(logsDirSync, `messenger_${todayStrSync}.log`), lineSync, 'utf8');
+} catch (e) {
+  try {
+    fs.appendFileSync(
+      path.join(app.getPath('userData'), 'boot-log-error.txt'),
+      `${new Date().toISOString()} boot log 실패: ${e && e.message}\n`,
+      'utf8'
+    );
+  } catch (e2) { /* 정말 아무것도 할 수 없음 */ }
+}
 const db = new sqlite3.Database(dbPath);
 
 // ⚠️ 핵심 발견: sqlite_master 카탈로그에 chat_pins 항목이 중복 손상되어 있으면, chat_pins를
