@@ -1795,7 +1795,7 @@
     .ipmsg-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; }
     .ipmsg-recipient-summary {
       flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      margin: 8px 12px 0; padding: 8px 12px; background: var(--surface-muted); border: 1px solid var(--border-soft);
+      margin: 8px 12px 10px; padding: 8px 12px; background: var(--surface-muted); border: 1px solid var(--border-soft);
       border-radius: 12px;
     }
     .ipmsg-recipient-toggle-btn { display: inline-flex; align-items: center; gap: 3px; }
@@ -17890,6 +17890,21 @@
             msgsEl.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:12px; padding:24px; line-height:1.5;">선택한 날짜 근처의 대화가 없습니다.</div>`;
             setChatDateJumpBanner(null);
           } else {
+            // ⚠️ 실사고: 채팅 도중(예: 미니모드 전환 등으로) loadChatHistory가 다시 불릴 때,
+            // 방금 보낸/받은 메시지가 DB에 아직 커밋되지 않은 순간과 겹치면 조회가 일시적으로
+            // 0건을 반환해 화면이 "표시할 메시지가 없습니다"로 지워졌다 — 이후 실시간 이벤트로
+            // 메시지가 다시 append되면서 그 안내문구 아래에 메시지가 붙는 기이한 화면이 됐다
+            // ("대화창 비우기 안 했는데 비워진다"). 최초 시도에서 0건이면 곧바로 "없음"으로
+            // 단정하지 않고 한 번 더 확인한 뒤에만 표시한다.
+            const targetUser = activeChatUser;
+            if (!opts || !opts._retried) {
+              setTimeout(() => {
+                if (activeChatUser && targetUser && activeChatUser.ip === targetUser.ip) {
+                  loadChatHistory(keyword, { ...(opts || {}), _retried: true });
+                }
+              }, 400);
+              return;
+            }
             msgsEl.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:12px; padding:24px; line-height:1.5;">표시할 메시지가 없습니다.<br><span style="font-size:11px;">새 메시지를 보내면 여기에 표시됩니다.</span></div>`;
             setChatDateJumpBanner(null);
           }
