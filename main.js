@@ -10579,6 +10579,39 @@ function filterOutTombstonedNotices(rows) {
     && !noticeTombstoneMemory.has(String(r.uid))
     && !noticeTombstoneSignatures.has(noticeContentSignature(r)));
 }
+// 🩺 진단용 — "d" 공지처럼 삭제해도 되살아나는 사례를 원격으로 못 보니, 렌더러 콘솔에서
+// 직접 호출해 지금 이 프로세스의 tombstone 메모리·파일 상태를 그대로 들여다본다.
+ipcMain.handle('debug-notice-tombstone-status', async (event, titleOrUid) => {
+  const key = String(titleOrUid || '').trim();
+  const fallbackPath = getNoticeTombstoneFallbackPath();
+  const sigFallbackPath = getNoticeTombstoneSigFallbackPath();
+  let fileUids = [];
+  let fileSigs = [];
+  try { fileUids = JSON.parse(fs.readFileSync(fallbackPath, 'utf8')); } catch (e) { fileUids = `읽기 실패: ${e.message}`; }
+  try { fileSigs = JSON.parse(fs.readFileSync(sigFallbackPath, 'utf8')); } catch (e) { fileSigs = `읽기 실패: ${e.message}`; }
+  const rows = await new Promise((resolve) => {
+    db.all(`SELECT uid, title, content, created_at FROM notices WHERE title = ? OR uid = ?`, [key, key], (err, r) => {
+      resolve(err ? `쿼리 실패: ${err.message}` : (r || []));
+    });
+  });
+  const deletedNoticesRows = await new Promise((resolve) => {
+    db.all(`SELECT uid, deleted_at FROM deleted_notices`, [], (err, r) => {
+      resolve(err ? `쿼리 실패: ${err.message}` : (r || []));
+    });
+  });
+  return {
+    memoryUidCount: noticeTombstoneMemory.size,
+    memorySigCount: noticeTombstoneSignatures.size,
+    matchingRowsInNoticesTable: rows,
+    matchingRowsTombstonedByUid: Array.isArray(rows) ? rows.map((r) => ({ uid: r.uid, inMemoryUid: noticeTombstoneMemory.has(String(r.uid)), inMemorySig: noticeTombstoneSignatures.has(noticeContentSignature(r)) })) : rows,
+    deletedNoticesTableRows: deletedNoticesRows,
+    fallbackFilePath: fallbackPath,
+    fallbackFileUids: fileUids,
+    sigFallbackFilePath: sigFallbackPath,
+    fallbackFileSigs: fileSigs
+  };
+});
+
 ipcMain.handle('get-notices', async () => {
   return new Promise((resolve) => {
     ensureNoticesTableSchema(() => {

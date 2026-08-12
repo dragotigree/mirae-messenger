@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld('api', {
   requestNoticeSync: () => ipcRenderer.invoke('request-notice-sync'),
   updateNotice: (noticeData) => ipcRenderer.invoke('update-notice', noticeData),
   deleteNotice: (uid) => ipcRenderer.invoke('delete-notice', uid),
+  debugNoticeTombstoneStatus: (titleOrUid) => ipcRenderer.invoke('debug-notice-tombstone-status', titleOrUid),
 
   // 📅 회사 공용 일정(달력)
   getSchedules: () => ipcRenderer.invoke('get-schedules'),
