@@ -107,7 +107,7 @@
       box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
     }
     #titlebar-sidebar-accent {
-      width: var(--sidebar-width, 260px);
+      width: var(--sidebar-width, 240px);
       flex-shrink: 0;
       background: transparent;
       -webkit-app-region: drag;
@@ -243,7 +243,7 @@
     }
 
     #sidebar-left {
-      width: var(--sidebar-width, 260px);
+      width: var(--sidebar-width, 240px);
       background: var(--sidebar-bg);
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; position: relative;
@@ -2478,7 +2478,7 @@
 
     /* ========== 3단 상세 패널 ========== */
     #sidebar-right {
-      width: var(--sidebar-right-width, 280px);
+      width: var(--sidebar-right-width, 388px);
       min-width: var(--sidebar-right-min-width, 220px);
       background: var(--surface); padding: 10px 8px; display: flex; flex-direction: column; gap: 8px;
       overflow-y: auto; border-left: 1px solid var(--border-soft); flex-shrink: 0;
@@ -8891,14 +8891,17 @@
       // 기본값을 300→260으로 줄이면서, 예전 기본값(300)을 그대로 쓰던(=직접 조절한 적 없는) 경우만
       // 새 기본값으로 옮겨준다. 사용자가 직접 다른 폭으로 조절해둔 경우는 그대로 둔다.
       if (savedWidth === 300) { savedWidth = 260; localStorage.setItem('sidebarWidth', '260'); }
-      // 기본값을 260→230으로 한 번 더 줄임 (직접 조절한 적 없는 경우만)
-      if (savedWidth === 260) { savedWidth = 230; localStorage.setItem('sidebarWidth', '230'); }
+      // 기본값을 260→230으로 줄였지만 콘텐츠 최소 폭(240)보다 좁아 항상 240으로 올려붙던 문제가
+      // 있었음 — 좌/우 사이드바 폭을 황금비(1:1.618)로 맞추며 왼쪽은 최소 폭인 240으로 고정
+      if (savedWidth === 260 || savedWidth === 230) { savedWidth = 240; localStorage.setItem('sidebarWidth', '240'); }
       // 저장된 값이 예전 최소(200)보다 좁아 버튼·필터가 깨졌다면 측정 최소로 끌어올림
-      applySidebarWidth(savedWidth || 230);
+      applySidebarWidth(savedWidth || 240);
       refreshRightSidebarMinWidth();
-      const savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
+      let savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
+      // 오른쪽 폭을 왼쪽(240px)의 황금비인 약 388px로 — 직접 조절한 적 없는 경우만
+      if (savedRightWidth === 280) { savedRightWidth = 388; localStorage.setItem('sidebarRightWidth', '388'); }
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
-      applyRightSidebarWidth(savedRightWidth || 280);
+      applyRightSidebarWidth(savedRightWidth || 388);
 
       const handle = document.getElementById('sidebar-resize-handle');
       const rightHandle = document.getElementById('sidebar-right-resize-handle');
