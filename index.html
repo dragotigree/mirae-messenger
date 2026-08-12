@@ -2592,12 +2592,17 @@
       width: 68px; height: 68px; border-radius: 20px; font-size: 18px; margin-bottom: 6px;
     }
     .user-info-modal-card .detail-avatar .avatar-emoji { font-size: 30px; }
-    .user-info-modal-card .detail-name { font-size: 28px; letter-spacing: -0.02em; }
+    /* ⚠️ 실사고: 아래 라벨/값 규칙을 예전엔 `.user-info-modal-card .detail-info-label`로 썼는데,
+       파일 뒤쪽의 `.detail-info-row .detail-info-label`(기본 10px)과 우선순위가 똑같아서
+       "나중에 나온 쪽이 이기는" 규칙에 따라 항상 10px로 덮어써졌다. 그래서 글씨 크기를
+       몇 번을 올려도 화면이 전혀 바뀌지 않았다. `.detail-info-row`를 사이에 넣어 우선순위를
+       한 단계 높여 확실히 적용되게 한다. 크기를 바꿀 땐 이 구조를 유지할 것. */
+    .user-info-modal-card .detail-name { font-size: 20px; letter-spacing: -0.02em; }
     .user-info-modal-card .detail-dept-line { font-size: 19px; line-height: 1.4; }
     .user-info-modal-card .detail-info-group { gap: 10px; margin-top: 12px; }
-    .user-info-modal-card .detail-info-row { padding: 18px 20px; font-size: 27px; border-radius: 14px; gap: 12px; }
-    .user-info-modal-card .detail-info-label { font-size: 23px; }
-    .user-info-modal-card .detail-info-value { font-size: 27px; }
+    .user-info-modal-card .detail-info-row { padding: 14px 16px; font-size: 19px; border-radius: 14px; gap: 12px; }
+    .user-info-modal-card .detail-info-row .detail-info-label { font-size: 17px; }
+    .user-info-modal-card .detail-info-row .detail-info-value { font-size: 19px; }
     .user-info-modal-card .detail-self-edit-btn { font-size: 13.5px; padding: 10px 14px; margin-top: 12px; }
     .user-info-modal-card .group-detail-members-heading { font-size: 13.5px; margin-bottom: 6px; }
     .user-info-modal-card .group-member-row { padding: 10px 12px; gap: 12px; }
@@ -4160,9 +4165,12 @@
     }
     .board-unread-toggle.is-active { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
     .board-unread-toggle.is-active .board-unread-toggle-dot { background: var(--accent); }
+    /* 부서 드롭다운과 제목을 한 줄에 나란히 둔다(예전엔 부서가 제목 위 한 줄을 따로 차지했다). */
     .board-write-category-row {
-      display: flex; flex-direction: column; gap: 6px; margin-top: 2px;
+      display: flex; flex-direction: row; align-items: center; gap: 8px; margin-top: 2px;
     }
+    .board-write-category-row .board-write-dept-dropdown { flex: 0 0 auto; width: 160px; }
+    .board-write-title-inline { flex: 1 1 auto; min-width: 0; margin-top: 0; }
     .board-write-category-label { font-size: 12px; font-weight: 700; color: #475569; }
     .board-write-category-select {
       width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -4815,12 +4823,15 @@
     .board-notice-row:focus-visible {
       outline: 2px solid var(--accent); outline-offset: 1px;
     }
+    /* 맨 아래로 내렸으므로 구분선도 위쪽에 둔다.
+       .settings-nav가 세로 flex라 margin-top:auto면 목록이 짧아도 항상 맨 밑에 붙는다. */
     .settings-nav-btn-admin {
       color: var(--accent-dark);
-      margin-bottom: 10px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border-soft);
-      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-soft);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      flex-shrink: 0;
     }
     .settings-nav-btn-admin:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     .settings-nav-btn.active {
@@ -6021,8 +6032,8 @@
             </button>
             <div class="board-write-dept-menu" id="board-write-dept-menu"></div>
           </div>
+          <input type="text" id="board-write-title" class="board-form-input board-write-title-inline" placeholder="제목을 입력하세요">
         </div>
-        <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요" style="margin-top:10px;">
         <!-- 서식 편집기(Tiptap). lib/tiptap-editor.js 가 없으면 아래 textarea가 그대로 쓰인다. -->
         <div id="board-rich-editor-wrap" style="display:none; margin-top:10px;">
           <div class="board-rte-toolbar" id="board-rte-toolbar">
@@ -6086,7 +6097,6 @@
       </div>
       <div class="settings-modal-shell">
         <nav class="settings-nav" aria-label="설정 메뉴">
-          <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
           <button type="button" class="settings-nav-btn active" data-settings-tab="profile" onclick="setSettingsTab('profile')">프로필</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="list" onclick="setSettingsTab('list')">목록·상태</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="notify" onclick="setSettingsTab('notify')">알림</button>
@@ -6096,6 +6106,9 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
+          <!-- 관리자화면은 설정 탭이 아니라 별도 화면으로 나가는 항목이라, 탭 목록과 섞이지 않게
+               맨 아래로 내리고 위쪽에 여백·구분선을 둔다. -->
+          <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
         </nav>
         <div class="settings-panels">
 
