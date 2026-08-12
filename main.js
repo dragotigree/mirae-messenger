@@ -12156,13 +12156,16 @@ async function applyUpdateFiles(opts = {}) {
     // 가벼운 자체 그림판(합쳐서 약 24KB) — Excalidraw(8MB)를 대체한다.
     'draw-editor.html',
     'lib/draw-app.js',
-    'excalidraw-editor.html',
+    // ⚠️ preload-excalidraw.js(0.6KB)는 계속 필요하다 — 새 그림판도 이 파일이 만들어 주는
+    //    통신 창구(window.excalidrawBridge)를 그대로 쓴다. 이름만 excalidraw일 뿐 공용 파일이다.
     'preload-excalidraw.js',
+    // 🗑 Excalidraw 본체(excalidraw-editor.html 9.7KB, lib/excalidraw-app.js 8.2MB,
+    //    lib/excalidraw-app.css 141KB)는 더 이상 내려받지 않는다. 자체 그림판으로 대체됐고,
+    //    이미 그 파일들을 갖고 있는 PC에서는 파일이 지워지지 않으므로 폴백도 그대로 남는다.
+    //    이것만으로 전체 업데이트 용량이 약 8.3MB 줄어든다.
     'mobile_server.js'
   ];
-  if (!soft) {
-    filesToUpdate.push('lib/excalidraw-app.js', 'lib/excalidraw-app.css');
-  }
+  // (Excalidraw 본체 8.3MB는 더 이상 받지 않는다 — 위 목록의 주석 참고)
   const FONT_ASSETS = [
     'assets/fonts/mirae-fonts.css',
     'assets/fonts/Eulyoo1945-Regular.woff2',
