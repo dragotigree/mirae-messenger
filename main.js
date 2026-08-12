@@ -262,6 +262,28 @@ function ensureAppsLocalUserData() {
   }
 }
 
+/**
+ * ⚠️ 실사고: 실시간 백신(내장 Windows Defender 포함)이 DB 파일을 쓰는 도중 잠그면서
+ * SQLITE_CORRUPT가 반복 발생한 PC가 있었다. 관리자 권한 설치가 아니라 매번 사용자에게
+ * 수동으로 예외 등록을 시키기는 현실적이지 않으므로, 켤 때마다 조용히(관리자 권한이
+ * 있을 때만 성공, 없으면 그냥 실패하고 넘어간다) 설치 폴더와 데이터 폴더를
+ * Defender 예외로 등록해본다. 실패해도 앱 동작에는 영향 없다.
+ */
+function tryRegisterDefenderExclusions() {
+  if (process.platform !== 'win32') return;
+  try {
+    const { exec } = require('child_process');
+    const paths = [];
+    try { paths.push(String(__dirname || '')); } catch (e) { /* ignore */ }
+    try { paths.push(String(app.getPath('userData') || '')); } catch (e) { /* ignore */ }
+    const uniquePaths = [...new Set(paths.filter(Boolean))];
+    if (!uniquePaths.length) return;
+    const psPaths = uniquePaths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',');
+    const cmd = `powershell -NoProfile -WindowStyle Hidden -Command "try { Add-MpPreference -ExclusionPath @(${psPaths}) -ErrorAction Stop } catch {}"`;
+    exec(cmd, { windowsHide: true, timeout: 15000 }, () => { /* 결과 무시 — 관리자 권한 없으면 조용히 실패 */ });
+  } catch (e) { /* ignore */ }
+}
+
 ensureAppsLocalUserData();
 
 async function copyFileWithRetry(sourcePath, destPath, retries = 10) {
@@ -5251,6 +5273,7 @@ app.whenReady().then(async () => {
     resolvedToastPreloadPath = path.join(__dirname, 'toast-preload.js');
   }
   try { initSpellCheckerSession(); } catch (e) { /* ignore */ }
+  try { tryRegisterDefenderExclusions(); } catch (e) { /* ignore */ }
   registerMiraeFileProtocol();
   // 창을 먼저 연다 — 네트워크/UDP보다 UI 응답이 우선
   createWindow();
