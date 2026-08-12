@@ -2615,9 +2615,13 @@
       box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
       display: flex; flex-direction: column; min-height: 0; overflow: hidden; flex: 1 1 auto;
     }
-    .sidebar-cal-day-date {
+    .sidebar-cal-day-toprow {
       flex-shrink: 0; min-width: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 12px 0;
+    }
+    .sidebar-cal-day-date {
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-size: 12.5px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em;
     }
     .sidebar-cal-day-duty {
@@ -2626,21 +2630,38 @@
     }
     .sidebar-cal-day-duty:empty { display: none; }
     .sidebar-cal-day-filter {
-      flex-shrink: 0; min-width: 0;
-      display: flex; gap: 4px; flex-wrap: wrap;
-      padding: 6px 12px 0;
+      position: relative; flex-shrink: 0;
     }
-    .sidebar-cal-day-filter-btn {
-      /* ⚠️ 예전엔 --accent-color/--border-color를 썼는데, 이 앱 어디에도 정의돼 있지 않은
-         이름이라 항상 폴백값(#2563eb 진한 파랑)으로 그려졌다 — 실제 테마 색(--accent,
-         #2196F3)보다 훨씬 진해서 앱의 다른 화면과 안 맞았다. 실제 토큰으로 교체. */
-      border: 1px solid var(--border-soft); background: var(--surface);
-      border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700;
-      color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+    .cal-day-filter-trigger {
+      display: flex; align-items: center; gap: 5px;
+      border: 1px solid var(--border-soft); background: var(--surface-muted);
+      border-radius: 999px; padding: 4px 9px 4px 11px; font-size: 11.5px; font-weight: 700;
+      color: var(--accent-dark); cursor: pointer; white-space: nowrap;
+      transition: background 0.12s, border-color 0.12s;
     }
-    .sidebar-cal-day-filter-btn.active {
-      background: var(--accent); border-color: var(--accent); color: #fff;
+    .cal-day-filter-trigger:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); }
+    .cal-day-filter-trigger .cal-day-filter-chevron {
+      width: 13px; height: 13px; flex-shrink: 0; transition: transform 0.15s;
+      display: flex; align-items: center; justify-content: center;
     }
+    .cal-day-filter-trigger .cal-day-filter-chevron svg { width: 100%; height: 100%; }
+    .sidebar-cal-day-filter.is-open .cal-day-filter-chevron { transform: rotate(180deg); }
+    .cal-day-filter-menu {
+      position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+      min-width: 116px; background: var(--surface); border: 1px solid var(--border-soft);
+      border-radius: 12px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+      padding: 5px; display: none; flex-direction: column; gap: 1px;
+    }
+    .sidebar-cal-day-filter.is-open .cal-day-filter-menu { display: flex; }
+    .cal-day-filter-option {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      border: none; background: transparent; border-radius: 8px; padding: 7px 9px;
+      font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
+    }
+    .cal-day-filter-option:hover { background: var(--surface-muted); color: var(--text-primary); }
+    .cal-day-filter-option.active { background: var(--sidebar-active); color: var(--accent-dark); font-weight: 800; }
+    .cal-day-filter-option .cal-day-filter-check { opacity: 0; font-size: 11px; }
+    .cal-day-filter-option.active .cal-day-filter-check { opacity: 1; }
     .sidebar-cal-day-body {
       flex: 1; min-height: 160px; max-height: none; overflow-y: auto;
       padding: 6px; scrollbar-width: thin;
@@ -5208,8 +5229,10 @@
         <div id="mini-cal-grid" class="mini-cal-grid"></div>
       </div>
       <div id="sidebar-calendar-day" class="sidebar-calendar-day">
-        <div class="sidebar-cal-day-date" id="sidebar-cal-day-date"></div>
-        <div class="sidebar-cal-day-filter" id="sidebar-cal-day-filter"></div>
+        <div class="sidebar-cal-day-toprow">
+          <div class="sidebar-cal-day-date" id="sidebar-cal-day-date"></div>
+          <div class="sidebar-cal-day-filter" id="sidebar-cal-day-filter"></div>
+        </div>
         <div class="sidebar-cal-day-duty" id="sidebar-cal-day-duty"></div>
         <div class="sidebar-cal-day-body" id="sidebar-cal-day-body"></div>
       </div>
@@ -21717,15 +21740,45 @@
 
     function setSidebarCalDayFilter(key) {
       sidebarCalDayFilter = key;
+      closeSidebarCalDayFilterMenu();
       if (selectedCalendarDateStr) renderSidebarCalendarDay(selectedCalendarDateStr);
     }
+
+    function toggleSidebarCalDayFilterMenu(e) {
+      if (e) e.stopPropagation();
+      const el = document.getElementById('sidebar-cal-day-filter');
+      if (!el) return;
+      el.classList.toggle('is-open');
+    }
+
+    function closeSidebarCalDayFilterMenu() {
+      const el = document.getElementById('sidebar-cal-day-filter');
+      if (el) el.classList.remove('is-open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const el = document.getElementById('sidebar-cal-day-filter');
+      if (el && el.classList.contains('is-open') && !el.contains(e.target)) closeSidebarCalDayFilterMenu();
+    });
 
     function renderSidebarCalDayFilterBar() {
       const el = document.getElementById('sidebar-cal-day-filter');
       if (!el) return;
-      el.innerHTML = SIDEBAR_CAL_DAY_FILTERS.map((f) =>
-        `<button type="button" class="sidebar-cal-day-filter-btn${sidebarCalDayFilter === f.key ? ' active' : ''}" onclick="setSidebarCalDayFilter('${f.key}')">${f.label}</button>`
-      ).join('');
+      const wasOpen = el.classList.contains('is-open');
+      const current = SIDEBAR_CAL_DAY_FILTERS.find((f) => f.key === sidebarCalDayFilter) || SIDEBAR_CAL_DAY_FILTERS[0];
+      el.innerHTML =
+        `<button type="button" class="cal-day-filter-trigger" onclick="toggleSidebarCalDayFilterMenu(event)">` +
+          `<span>${escapeHtml(current.label)}</span>` +
+          `<span class="cal-day-filter-chevron">${uiIcon('chevronDown') || '▾'}</span>` +
+        `</button>` +
+        `<div class="cal-day-filter-menu">` +
+          SIDEBAR_CAL_DAY_FILTERS.map((f) =>
+            `<button type="button" class="cal-day-filter-option${sidebarCalDayFilter === f.key ? ' active' : ''}" onclick="setSidebarCalDayFilter('${f.key}')">` +
+              `<span>${escapeHtml(f.label)}</span><span class="cal-day-filter-check">✓</span>` +
+            `</button>`
+          ).join('') +
+        `</div>`;
+      if (wasOpen) el.classList.add('is-open');
     }
 
     function renderSidebarCalendarDay(dateStr) {
