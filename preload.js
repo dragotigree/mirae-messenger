@@ -146,6 +146,7 @@ contextBridge.exposeInMainWorld('api', {
   clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),
   recoverCorruptDatabase: () => ipcRenderer.invoke('recover-corrupt-database'),
   applyRecoveredDatabase: (recoveredPath) => ipcRenderer.invoke('apply-recovered-database', recoveredPath),
+  resetDatabaseFresh: () => ipcRenderer.invoke('reset-database-fresh'),
   listRecoverableBackups: () => ipcRenderer.invoke('list-recoverable-backups'),
   restoreFromBackup: (backupPath) => ipcRenderer.invoke('restore-from-backup', backupPath),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),

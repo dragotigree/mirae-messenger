@@ -6323,6 +6323,15 @@
             <button type="button" class="settings-btn-secondary" onclick="startBackupRestoreScan()" id="db-backup-scan-btn">사용 가능한 백업 목록 보기</button>
             <div id="db-backup-result" class="settings-hint"></div>
           </div>
+          <div style="border-top:1px solid var(--border-soft); margin-top:14px; padding-top:14px;">
+            <div class="settings-section-title" style="color:#b91c1c;">완전히 새로 시작하기</div>
+            <p class="settings-hint">
+              위 방법들도 소용없거나 지금 바로 정상 상태로 되돌리고 싶다면, 지금까지의 대화·공지 등을
+              전부 포기하고 완전히 빈 데이터베이스로 새로 시작할 수 있습니다. 지금 파일은 지우지 않고
+              별도로 보관되지만, 다시 불러오지는 않습니다.
+            </p>
+            <button type="button" class="settings-btn-danger" onclick="resetDatabaseFreshFromSettings()" id="db-reset-fresh-btn">전부 포기하고 새로 시작하기</button>
+          </div>
         </div>
         <div class="settings-card danger">
           <div class="settings-section-title" style="color:#b91c1c;">대화·로그 전체 삭제</div>
@@ -24867,6 +24876,25 @@
       const res = await window.api.applyRecoveredDatabase(lastRecoveredDbInfo.recoveredPath);
       if (!res || !res.success) {
         await appAlert(`적용 실패: ${(res && res.msg) || '알 수 없는 오류'}`);
+      }
+      // 성공 시 main.js가 곧바로 재시작하므로 여기서 더 할 일은 없다.
+    }
+
+    async function resetDatabaseFreshFromSettings() {
+      const ok = await appConfirm(
+        '지금까지 저장된 모든 대화·공지·일정 등을 포기하고 완전히 빈 데이터베이스로 새로 시작합니다.\n\n' +
+          '· 지금 파일은 지우지 않고 별도로 보관되지만, 다시 불러오지는 않습니다.\n' +
+          '· 이 작업은 되돌릴 수 없습니다.\n' +
+          '· 이 작업 후 앱이 자동으로 재시작됩니다.',
+        { title: '완전히 새로 시작하기', confirmText: '전부 포기하고 새로 시작', cancelText: '취소', variant: 'danger', icon: '⚠️' }
+      );
+      if (!ok) return;
+      const btn = document.getElementById('db-reset-fresh-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '초기화 중…'; }
+      const res = await window.api.resetDatabaseFresh();
+      if (!res || !res.success) {
+        if (btn) { btn.disabled = false; btn.textContent = '전부 포기하고 새로 시작하기'; }
+        await appAlert(`초기화 실패: ${(res && res.msg) || '알 수 없는 오류'}`);
       }
       // 성공 시 main.js가 곧바로 재시작하므로 여기서 더 할 일은 없다.
     }

@@ -3600,6 +3600,31 @@ ipcMain.handle('restore-from-backup', async (event, backupPath) => {
   }
 });
 
+/** 지금까지의 대화·공지 등은 포기하고, 손상 파일은 안전하게 보관만 해둔 채 완전히 새
+ * 빈 DB로 재시작한다. 사용자가 과거 데이터 손실을 감수하겠다고 명시적으로 동의한 경우에만
+ * 호출되어야 한다. */
+ipcMain.handle('reset-database-fresh', async () => {
+  try {
+    await new Promise((resolve) => checkpointWalPassive().finally(resolve));
+    await new Promise((resolve) => db.close(() => resolve()));
+    const stamp = Date.now();
+    const corruptedCopy = `${dbPath}.corrupted_reset_${stamp}`;
+    await fs.promises.copyFile(dbPath, corruptedCopy).catch(() => {});
+    await fs.promises.copyFile(`${dbPath}-wal`, `${corruptedCopy}-wal`).catch(() => {});
+    await fs.promises.copyFile(`${dbPath}-shm`, `${corruptedCopy}-shm`).catch(() => {});
+    await fs.promises.unlink(dbPath).catch(() => {});
+    await fs.promises.unlink(`${dbPath}-wal`).catch(() => {});
+    await fs.promises.unlink(`${dbPath}-shm`).catch(() => {});
+    await resetDbMigrationMarkersForNewDbFile();
+    app.relaunch();
+    app.exit(0);
+    return { success: true };
+  } catch (e) {
+    console.error('DB 초기화 실패:', e && e.message);
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
 ipcMain.handle('recover-corrupt-database', async () => {
   try {
     const { recoveredPath, report } = await recoverReadableRowsFromCorruptDb(dbPath);
@@ -3723,7 +3748,10 @@ db.on('error', (err) => {
 //  비-SQLite 비동기 작업까지 기다려주지는 않으므로 복구 로직은 아래에서 별도로 안전하게 처리한다.)
 db.serialize(() => {
   db.run(`PRAGMA journal_mode = WAL`);
-  db.run(`PRAGMA synchronous = NORMAL`);
+  // ⚠️ NORMAL은 OS/전원이 갑자기 죽으면 최근 커밋 몇 건을 잃을 수는 있어도 파일 자체가
+  // malformed로 깨지지는 않는 게 정상이다 — 하지만 반복적인 원인불명 손상을 겪은 뒤로는
+  // 조금 더 느리더라도(각 커밋마다 fsync) 더 강한 내구성 쪽으로 기본값을 바꾼다.
+  db.run(`PRAGMA synchronous = FULL`);
   db.run(`PRAGMA busy_timeout = 5000`);
 });
 
