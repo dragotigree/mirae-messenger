@@ -8,6 +8,19 @@ const https = require('https');
 const transportHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 8 });
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
+
+// ⚠️ 실사고: 이 두 변수가 원래 파일 훨씬 아래(7000번대)에 let으로 선언돼 있었는데,
+// loadNoticeTombstoneFallback()/loadNoticeTombstoneSigFallback() 호출은 4130번대
+// db.serialize() 블록 안에서 부팅 시 바로 실행됐다 — let은 선언 라인이 실행되기 전까지
+// "일시적 사각지대(TDZ)"라, 그 호출이 noticeTombstoneMemory.add(...)를 쓰는 순간
+// ReferenceError가 나는데 하필 그 함수 안 try/catch가 "파일 없음 등 — 무시"로 조용히
+// 삼켜버렸다. 그 결과 삭제 기록 파일(JSON 폴백)이 있어도 부팅 시 전혀 안 불러와져서,
+// DB 쪽 tombstone 기록까지 같이 손상된 공지는 재시작할 때마다 계속 되살아났다
+// ("공지 삭제해도 재시작하면 다시 나타난다"의 진짜 근본 원인). 맨 위로 옮겨 항상 먼저
+// 초기화되게 한다.
+let noticeTombstoneMemory = new Set();
+let noticeTombstoneSignatures = new Set();
+
 let startMobileServer = null;
 try {
   startMobileServer = require('./mobile_server').startMobileServer;
@@ -7378,15 +7391,7 @@ function normalizeNoticeCategory(raw) {
 
 let noticesSchemaReady = false;
 let noticesSchemaEnsuring = null; // callback queue
-/** 삭제된 공지 UID 즉시 기억 (DB 기록 전 레이스 방지) — 아래 const 재선언 없이 여기만 사용 */
-let noticeTombstoneMemory = new Set();
 
-// ⚠️ 실사고: 예전 버전에 uid UNIQUE 제약이 없어 같은 공지가 서로 다른 uid로 중복 저장된
-// PC들이 있었다 — 그런 상태에서 한 PC가 uid A로 삭제해도, 다른 PC가 같은 내용을 uid B로
-// 들고 있다가 동기화되면 "다른 공지"로 취급돼 되살아난다("삭제해도 재시작하면 다시
-// 나타난다"의 진짜 원인). uid뿐 아니라 제목+내용+작성시각 조합("서명")으로도 차단해,
-// uid가 달라도 같은 내용이면 다시 안 살아나게 한다.
-let noticeTombstoneSignatures = new Set();
 function noticeContentSignature(n) {
   if (!n) return '';
   const title = String(n.title || '').trim();
