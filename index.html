@@ -309,16 +309,23 @@
     .group-member-avatar .avatar-emoji { font-size: 14px; }
     .avatar-initial { font-weight: 800; font-family: 'SUIT', -apple-system, sans-serif; letter-spacing: 0; }
     /* ⚠️ "너무 알록달록하다"는 피드백으로 무지개 팔레트(노랑·분홍·초록·보라·주황·청록) 폐지 —
-       사람 구분은 이니셜 텍스트로 충분하므로, 전부 기본 아바타와 같은 파란색 계열 톤으로
-       통일해 차분하게 정리한다. JS의 avatar-cute-N 배정 로직은 그대로 두되(다른 곳에서
-       참조할 수 있어 건드리지 않음) 실제 보이는 색만 한 가지 계열로 맞춘다. */
-    .avatar-cute-0 { background: linear-gradient(135deg, #90CAF9 0%, #90CAF9 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-1 { background: linear-gradient(135deg, var(--sidebar-active) 0%, #90CAF9 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-2 { background: linear-gradient(135deg, #90CAF9 0%, var(--accent) 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-3 { background: linear-gradient(150deg, #90CAF9 0%, var(--accent) 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-4 { background: linear-gradient(135deg, var(--sidebar-active) 0%, #90CAF9 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-5 { background: linear-gradient(120deg, #90CAF9 0%, #90CAF9 100%) !important; box-shadow: none !important; color: #fff; }
-    .avatar-cute-6 { background: linear-gradient(160deg, #90CAF9 0%, var(--accent) 100%) !important; box-shadow: none !important; color: #fff; }
+       사람 구분은 이니셜 텍스트로 충분하므로, 전부 파란색 계열 톤 안에서만 정리한다.
+       다만 예전엔 전부 같은 파랑이라 사람별 구분이 거의 안 됐던 문제(Boring Avatars처럼
+       사람마다 알아볼 수 있는 톤 차이를 원함)를 보완하기 위해, 파스텔 블루 계열 안에서
+       6가지 베이스 색을 섞은 12개 그라디언트로 넓혔다 — 여전히 "파란 계열"이라 차분하되
+       사람마다 눈에 띄게 달라 보인다. JS의 avatar-cute-N 배정 로직(해시 기반)은 그대로 둔다. */
+    .avatar-cute-0  { background: linear-gradient(135deg, #7DD3FC 0%, #38BDF8 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-1  { background: linear-gradient(135deg, #93C5FD 0%, #60A5FA 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-2  { background: linear-gradient(135deg, #A5B4FC 0%, #818CF8 100%) !important; box-shadow: none !important; color: #1e293b; }
+    .avatar-cute-3  { background: linear-gradient(150deg, #67E8F9 0%, #22D3EE 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-4  { background: linear-gradient(135deg, #BAE6FD 0%, #7DD3FC 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-5  { background: linear-gradient(120deg, #93C5FD 0%, #A5B4FC 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-6  { background: linear-gradient(160deg, #38BDF8 0%, #818CF8 100%) !important; box-shadow: none !important; color: #fff; }
+    .avatar-cute-7  { background: linear-gradient(135deg, #67E8F9 0%, #60A5FA 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-8  { background: linear-gradient(140deg, #A5B4FC 0%, #60A5FA 100%) !important; box-shadow: none !important; color: #1e293b; }
+    .avatar-cute-9  { background: linear-gradient(135deg, #7DD3FC 0%, #A5B4FC 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-10 { background: linear-gradient(125deg, #38BDF8 0%, #22D3EE 100%) !important; box-shadow: none !important; color: #0c4a6e; }
+    .avatar-cute-11 { background: linear-gradient(150deg, #818CF8 0%, #38BDF8 100%) !important; box-shadow: none !important; color: #fff; }
 
     /* 직원 목록 전용: 부서/층별 파스텔 색상. avatar-cute-N(사람별 랜덤, 파란 단색 유지)과는
        별개 팔레트 — 같은 부서/층이면 항상 같은 파스텔 색이 되어 목록에서 소속을 색으로도
@@ -13926,7 +13933,7 @@
     }
 
     // 👤 프로필 사진이 있으면 사진을, 없으면 IP/이름 기준 고정 이니셜 아바타
-    const CUTE_AVATAR_PALETTE_COUNT = 7;
+    const CUTE_AVATAR_PALETTE_COUNT = 12;
 
     function cuteAvatarSeedKey(username, seed) {
       const s = String(seed || '').trim();
