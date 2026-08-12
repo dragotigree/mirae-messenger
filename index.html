@@ -11135,7 +11135,7 @@
       item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
       item.dataset.userIp = u.ip;
       item.innerHTML = `
-        <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : deptAvatarClassFor(u, u.photo)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
+        <div class="compact-avatar ${isUsableProfilePhoto(u.photo) ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
         <div class="compact-item-body">
           <div class="compact-item-top">
             <span class="compact-item-name">${formatDmListDisplayName(u)}</span>
@@ -14368,7 +14368,7 @@
         : `<div class="user-card-body"><div class="user-name-text" title="${tip}">${displayName}</div></div>`;
       card.innerHTML = `
         <div class="avatar-wrapper">
-          <div class="avatar-circle ${photoOk ? 'avatar-photo' : deptAvatarClassFor(u, u.photo)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
+          <div class="avatar-circle ${photoOk ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
           <div class="avatar-status-badge status-${userStatus}"></div>
         </div>
         ${bodyHtml}
