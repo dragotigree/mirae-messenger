@@ -4246,6 +4246,25 @@
       position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 999px;
       background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1;
     }
+    /* 🖊 화면 문구 수정 모드 — 켜져 있을 때만 표시가 나타난다(평소엔 아무 영향 없음) */
+    html.ui-text-editing [data-uitext-editable]:hover {
+      outline: 2px dashed #2563eb !important;
+      outline-offset: 2px;
+      cursor: text !important;
+      background: rgba(37, 99, 235, .07) !important;
+    }
+    #ui-text-edit-banner {
+      position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 99999;
+      background: #1d4ed8; color: #fff; padding: 9px 16px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 700; box-shadow: 0 8px 24px rgba(29, 78, 216, .35);
+      display: flex; align-items: center; gap: 10px;
+    }
+    #ui-text-edit-banner button {
+      border: none; background: rgba(255,255,255,.22); color: #fff; border-radius: 999px;
+      padding: 4px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    #ui-text-edit-banner button:hover { background: rgba(255,255,255,.34); }
+
     /* ✍️ 공지 서식 편집기(Tiptap) */
     /* 툴바는 기능별로 묶어서 보여준다 — 버튼이 20개 가까이라 한 줄로 늘어놓으면 찾기 어렵다.
        각 그룹을 흰 알약으로 감싸고 그룹 사이만 띄워, 구분선 없이도 묶음이 눈에 들어오게 했다. */
@@ -6308,6 +6327,20 @@
       <div class="settings-panel" data-settings-panel="appearance">
         <h3 class="settings-panel-title">화면·글꼴</h3>
         <p class="settings-panel-desc">화면 모드와 글꼴을 조정합니다.</p>
+        <!-- 🖊 화면 문구 고치기 — 마스터 계정에서만 보인다 -->
+        <div class="settings-card" id="ui-text-edit-card" style="display:none;">
+          <div class="settings-section-title">화면 문구 고치기</div>
+          <p class="settings-hint">
+            버튼·메뉴·안내문 같은 <b>화면에 고정된 문구</b>를 프로그램 안에서 직접 고칠 수 있습니다.
+            고친 문구는 같은 네트워크의 다른 직원 PC에도 자동으로 반영됩니다.
+            대화 내용·직원 이름·공지 본문 같은 실제 데이터는 고칠 수 없게 막혀 있습니다.
+          </p>
+          <div class="settings-btn-row">
+            <button type="button" class="settings-btn-primary" id="ui-text-edit-toggle" onclick="toggleUiTextEditMode()">문구 수정 모드 켜기</button>
+            <button type="button" class="settings-btn-secondary" onclick="resetAllUiTextOverrides()">전부 원래대로</button>
+          </div>
+          <div id="ui-text-edit-result" class="settings-hint"></div>
+        </div>
         <div class="settings-card">
           <div class="settings-form-grid settings-form-stack">
             <label class="settings-field">화면 모드
@@ -9603,6 +9636,7 @@
         appAlert(msg).catch(() => {});
       });
     }
+    loadUiTextOverrides();
     syncDbCorruptionStatus();
     refreshSchedulesFromServer();
     refreshDutyRosterFromServer();
@@ -15741,6 +15775,247 @@
     }
 
     /** 목록 카드에 보여줄 본문 미리보기 — HTML 태그를 걷어내고 한 줄로 */
+    /* ══════════════════════════════════════════════════════════════════
+       🖊 화면 문구 고치기
+       마스터가 버튼·라벨·안내문 문구를 앱 안에서 직접 고치고, 그 결과가 다른 PC로 퍼진다.
+
+       ⚠️ 안전 원칙: 대화 내용·직원 이름·공지 본문처럼 "데이터"인 글자는 절대 대상이 되면 안 된다.
+          그 자리의 실제 내용이 고정 문구로 덮여 보이기 때문이다. 그래서
+          ① 아래 차단 목록 안쪽 요소는 제외하고
+          ② 자식 요소 없이 순수 텍스트만 가진 요소(또는 입력창 안내글)만 대상으로 삼는다.
+       ══════════════════════════════════════════════════════════════════ */
+    var UI_TEXT_BLOCKED_SELECTOR = [
+      '#chat-messages-area', '#board-list-container', '#board-detail-view', '#board-write-view',
+      '#all-logs-list', '#all-logs-body', '#sidebar-main-sections', '#detail-contact-section',
+      '#mini-cal-grid', '#sidebar-calendar-day', '#ipmsg-recipient-table', '#board-rich-editor',
+      '#ui-text-edit-banner', '[data-uitext-block]'
+    ].join(',');
+    var UI_TEXT_BLOCKED_CLASS = /(^|\s)(detail-info-value|detail-name|chat-|board-notice-|sidebar-user|msg-)/;
+
+    let uiTextOverrides = {};
+    let uiTextOriginals = new Map();
+    let uiTextEditing = false;
+    let uiTextObserver = null;
+
+    /** 요소를 다시 찾을 수 있는 안정적인 경로. id가 있으면 그걸 기준점 삼아 짧게 유지한다. */
+    function uiTextPathFor(el) {
+      if (!el || el.nodeType !== 1 || el === document.body) return null;
+      const parts = [];
+      let cur = el;
+      while (cur && cur.nodeType === 1 && cur !== document.body) {
+        if (cur.id) { parts.unshift('#' + CSS.escape(cur.id)); break; }
+        const tag = cur.tagName.toLowerCase();
+        const parent = cur.parentElement;
+        if (!parent) { parts.unshift(tag); break; }
+        const same = [...parent.children].filter((c) => c.tagName === cur.tagName);
+        parts.unshift(same.length > 1 ? `${tag}:nth-of-type(${same.indexOf(cur) + 1})` : tag);
+        cur = parent;
+      }
+      return parts.length ? parts.join('>') : null;
+    }
+
+    /** 이 요소의 문구를 고쳐도 되는가? 'text' | 'placeholder' | null */
+    function uiTextEditableTarget(el) {
+      if (!el || el.nodeType !== 1) return null;
+      if (el.closest(UI_TEXT_BLOCKED_SELECTOR)) return null;
+      if (UI_TEXT_BLOCKED_CLASS.test(typeof el.className === 'string' ? el.className : '')) return null;
+      if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.placeholder) return 'placeholder';
+      // 자식 요소가 있으면 통째로 덮어써 구조가 깨지므로 제외한다.
+      if (el.children.length === 0 && (el.textContent || '').trim()) return 'text';
+      return null;
+    }
+
+    function uiTextKeyFor(el, kind) {
+      const p = uiTextPathFor(el);
+      return p ? (kind === 'placeholder' ? p + '|placeholder' : p) : null;
+    }
+
+    function applyUiTextOverrides() {
+      Object.keys(uiTextOverrides).forEach((key) => {
+        const rec = uiTextOverrides[key];
+        if (!rec || rec.value == null || rec.value === '') return;
+        const isPh = key.endsWith('|placeholder');
+        const sel = isPh ? key.slice(0, -11) : key;
+        let el = null;
+        try { el = document.querySelector(sel); } catch (e) { return; }
+        if (!el) return;
+        if (isPh) {
+          if (!uiTextOriginals.has(key)) uiTextOriginals.set(key, el.placeholder);
+          if (el.placeholder !== rec.value) el.placeholder = rec.value;
+        } else {
+          if (el.children.length) return;
+          if (!uiTextOriginals.has(key)) uiTextOriginals.set(key, el.textContent);
+          if (el.textContent !== rec.value) el.textContent = rec.value;
+        }
+      });
+    }
+
+    /** 화면이 다시 그려져도 고친 문구가 유지되게 감시한다.
+        ⚠️ 고친 문구가 없으면 감시를 아예 걸지 않는다 — 대부분의 PC에서 비용 0. */
+    function ensureUiTextObserver() {
+      const need = Object.keys(uiTextOverrides).length > 0;
+      if (!need) {
+        if (uiTextObserver) { uiTextObserver.disconnect(); uiTextObserver = null; }
+        return;
+      }
+      if (uiTextObserver) return;
+      let timer = null;
+      uiTextObserver = new MutationObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(applyUiTextOverrides, 180);
+      });
+      uiTextObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    async function loadUiTextOverrides() {
+      try {
+        if (!window.api || typeof window.api.getUiTextOverrides !== 'function') return;
+        const res = await window.api.getUiTextOverrides();
+        uiTextOverrides = (res && res.overrides) || {};
+        applyUiTextOverrides();
+        ensureUiTextObserver();
+      } catch (e) { /* 이 기능 실패가 앱을 막으면 안 된다 */ }
+    }
+
+    if (window.api && typeof window.api.onUiTextOverridesUpdated === 'function') {
+      window.api.onUiTextOverridesUpdated((data) => {
+        uiTextOverrides = data || {};
+        applyUiTextOverrides();
+        ensureUiTextObserver();
+      });
+    }
+
+    /** 클릭한 자리에 뜨는 작은 입력창 — 취소하면 null을 돌려준다. */
+    function uiTextPrompt(anchorEl, current) {
+      return new Promise((resolve) => {
+        const old = document.getElementById('ui-text-popup');
+        if (old) old.remove();
+        const r = anchorEl.getBoundingClientRect();
+        const box = document.createElement('div');
+        box.id = 'ui-text-popup';
+        box.setAttribute('data-uitext-block', '1');
+        box.style.cssText =
+          'position:fixed;z-index:100000;background:#fff;border:1px solid #cbd5e1;border-radius:12px;' +
+          'box-shadow:0 14px 38px rgba(15,23,42,.22);padding:11px;display:flex;flex-direction:column;gap:8px;' +
+          'min-width:280px;font-family:inherit;';
+        box.style.left = Math.min(Math.max(8, r.left), window.innerWidth - 300) + 'px';
+        box.style.top = Math.min(r.bottom + 8, window.innerHeight - 120) + 'px';
+        box.innerHTML =
+          '<div style="font-size:11.5px;font-weight:700;color:#64748b;">바꿀 문구</div>' +
+          '<input type="text" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none;">' +
+          '<div style="display:flex;justify-content:flex-end;gap:6px;">' +
+          '<button type="button" data-act="cancel" style="border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;font-family:inherit;">취소</button>' +
+          '<button type="button" data-act="ok" style="border:none;background:#2563eb;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">저장</button>' +
+          '</div>';
+        document.body.appendChild(box);
+        const input = box.querySelector('input');
+        input.value = current == null ? '' : String(current);
+        const done = (v) => { box.remove(); resolve(v); };
+        box.querySelector('[data-act="ok"]').onclick = () => done(input.value);
+        box.querySelector('[data-act="cancel"]').onclick = () => done(null);
+        input.onkeydown = (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); done(input.value); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); done(null); }
+        };
+        setTimeout(() => { input.focus(); input.select(); }, 0);
+      });
+    }
+
+    function markUiTextEditableAttrs(on) {
+      if (!on) {
+        document.querySelectorAll('[data-uitext-editable]').forEach((el) => el.removeAttribute('data-uitext-editable'));
+        return;
+      }
+      document.querySelectorAll('button, label, span, div, p, h1, h2, h3, h4, small, a, input, textarea')
+        .forEach((el) => { if (uiTextEditableTarget(el)) el.setAttribute('data-uitext-editable', '1'); });
+    }
+
+    async function onUiTextEditClick(e) {
+      if (e.target.closest('#ui-text-popup')) return;
+      const el = e.target.closest('[data-uitext-editable]');
+      if (!el) return;
+      const kind = uiTextEditableTarget(el);
+      if (!kind) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const key = uiTextKeyFor(el, kind);
+      if (!key) { await appAlert('이 문구는 위치를 특정할 수 없어 고칠 수 없습니다.'); return; }
+      const cur = kind === 'placeholder' ? el.placeholder : el.textContent;
+      const next = await uiTextPrompt(el, cur);
+      if (next == null) return;
+      const trimmed = String(next).trim();
+      if (!trimmed || trimmed === String(cur).trim()) return;
+      try {
+        const res = await window.api.setUiTextOverride(key, trimmed);
+        if (!res || !res.success) { await appAlert('저장하지 못했습니다: ' + ((res && res.msg) || '알 수 없는 오류')); return; }
+        uiTextOverrides = res.overrides || {};
+        if (!uiTextOriginals.has(key)) uiTextOriginals.set(key, cur);
+        if (kind === 'placeholder') el.placeholder = trimmed; else el.textContent = trimmed;
+        ensureUiTextObserver();
+      } catch (err) {
+        await appAlert('저장 중 오류가 발생했습니다.\n프로그램을 완전히 종료했다 다시 실행한 뒤 시도해 주세요.');
+      }
+    }
+
+    function setUiTextEditMode(on) {
+      uiTextEditing = !!on;
+      document.documentElement.classList.toggle('ui-text-editing', uiTextEditing);
+      markUiTextEditableAttrs(uiTextEditing);
+      const btn = document.getElementById('ui-text-edit-toggle');
+      if (btn) btn.textContent = uiTextEditing ? '문구 수정 모드 끄기' : '문구 수정 모드 켜기';
+      let banner = document.getElementById('ui-text-edit-banner');
+      if (uiTextEditing) {
+        document.addEventListener('click', onUiTextEditClick, true);
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.id = 'ui-text-edit-banner';
+          banner.setAttribute('data-uitext-block', '1');
+          banner.innerHTML = '🖊 문구 수정 모드 — 바꿀 문구를 클릭하세요 <button type="button">끄기</button>';
+          banner.querySelector('button').onclick = function () { setUiTextEditMode(false); };
+          document.body.appendChild(banner);
+        }
+      } else {
+        document.removeEventListener('click', onUiTextEditClick, true);
+        if (banner) banner.remove();
+        const pop = document.getElementById('ui-text-popup');
+        if (pop) pop.remove();
+      }
+    }
+
+    function toggleUiTextEditMode() {
+      if (!isMasterAuthenticated) { appAlert('마스터 계정으로 로그인한 경우에만 사용할 수 있습니다.'); return; }
+      const turningOn = !uiTextEditing;
+      if (turningOn) closeSettingsModal();
+      setUiTextEditMode(turningOn);
+    }
+
+    async function resetAllUiTextOverrides() {
+      const ok = await appConfirm(
+        '고친 문구를 전부 원래대로 되돌립니다.\n이 변경도 다른 직원 PC에 함께 반영됩니다.',
+        { title: '문구 되돌리기', confirmText: '전부 되돌리기', cancelText: '취소', variant: 'danger' }
+      );
+      if (!ok) return;
+      const el = document.getElementById('ui-text-edit-result');
+      try {
+        const res = await window.api.resetAllUiTextOverrides();
+        if (!res || !res.success) { if (el) el.textContent = '되돌리지 못했습니다.'; return; }
+        uiTextOriginals.forEach((orig, key) => {
+          const isPh = key.endsWith('|placeholder');
+          const sel = isPh ? key.slice(0, -11) : key;
+          let t = null;
+          try { t = document.querySelector(sel); } catch (e) { return; }
+          if (!t) return;
+          if (isPh) t.placeholder = orig; else t.textContent = orig;
+        });
+        uiTextOriginals.clear();
+        uiTextOverrides = {};
+        ensureUiTextObserver();
+        if (el) el.textContent = '모든 문구를 원래대로 되돌렸습니다.';
+      } catch (e) {
+        if (el) el.textContent = '되돌리는 중 오류가 발생했습니다.';
+      }
+    }
+
     /* ✍️ 공지 서식 편집기(Tiptap)
        ⚠️ lib/tiptap-editor.js는 자동 업데이트 파일 목록에 새로 추가된 파일이라, 구버전
        main.js가 받아온 직후에는 아직 없을 수 있다. 그래서 편집기가 없으면 예전 textarea를
@@ -16408,6 +16683,9 @@
       const pathInput = document.getElementById('update-source-path-input');
       pathInput.value = savedPath || '';
       pathInput.disabled = !isMasterAuthenticated;
+      // 문구 고치기는 마스터에게만 노출한다
+      const uiTextCard = document.getElementById('ui-text-edit-card');
+      if (uiTextCard) uiTextCard.style.display = isMasterAuthenticated ? 'block' : 'none';
       document.getElementById('update-save-path-btn').style.display = isMasterAuthenticated ? 'inline-block' : 'none';
       document.getElementById('update-check-result').textContent = '';
       try {
