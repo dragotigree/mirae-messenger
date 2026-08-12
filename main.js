@@ -60,8 +60,10 @@ try {
 } catch (e) {
   /* ignore */
 }
-app.on('second-instance', () => {
+app.on('second-instance', (event, argv) => {
   showAndFocusWindow();
+  const jumpAction = parseJumpListActionFromArgv(argv);
+  if (jumpAction) dispatchJumpListAction(jumpAction);
 });
 
 // 🛡 마지막 안전장치: 여기서 잡지 못한 예외/Promise 거부가 있어도 병원 업무 중에
@@ -4473,6 +4475,85 @@ function createTray() {
   tray.on('double-click', () => openMainWindowWithViewMode(trayLaunchViewMode));
 }
 
+/** Windows 작업표시줄 아이콘 우클릭 시 뜨는 점프리스트 — 화면 모드/빠른 실행/작업 3개 그룹 */
+const JUMPLIST_ACTION_FLAG = '--jumplist=';
+function getJumpListIconPath() {
+  const icoPath = path.join(__dirname, 'icon.ico');
+  return fs.existsSync(icoPath) ? icoPath : process.execPath;
+}
+function buildJumpListTask(title, description, action) {
+  return {
+    type: 'task',
+    title,
+    description: description || title,
+    program: process.execPath,
+    args: `${JUMPLIST_ACTION_FLAG}${action}`,
+    iconPath: getJumpListIconPath(),
+    iconIndex: 0
+  };
+}
+function setupJumpList() {
+  if (process.platform !== 'win32') return;
+  try {
+    app.setJumpList([
+      {
+        type: 'custom',
+        name: '화면 모드',
+        items: [
+          buildJumpListTask('기본 화면으로 열기', '기본 화면으로 엽니다', 'open-normal'),
+          buildJumpListTask('미니 화면으로 열기', '미니 화면으로 엽니다', 'open-compact')
+        ]
+      },
+      {
+        type: 'custom',
+        name: '빠른 실행',
+        items: [
+          buildJumpListTask('쪽지 보내기', '채팅방 없이 쪽지를 보냅니다', 'send-note'),
+          buildJumpListTask('원내 공지', '원내 공지사항을 엽니다', 'open-board'),
+          buildJumpListTask('전체 공지 채널', '전체 공지 채널을 엽니다', 'open-broadcast'),
+          buildJumpListTask('이동기사 요청', '이동기사 요청을 엽니다', 'open-transport'),
+          buildJumpListTask('코드 발령', '코드 발령을 엽니다', 'open-code-alert'),
+          buildJumpListTask('병동 일정 현황판', '병동 일정 현황판을 엽니다', 'open-schedule-board'),
+          buildJumpListTask('그룹 만들기', '새 그룹 채팅을 만듭니다', 'open-group-chat'),
+          buildJumpListTask('전체 대화 기록', '전체 대화 기록을 엽니다', 'open-all-logs'),
+          buildJumpListTask('환경 설정', '환경 설정을 엽니다', 'open-settings')
+        ]
+      },
+      {
+        type: 'custom',
+        name: '작업',
+        items: [
+          buildJumpListTask('화면 잠금', '화면을 잠급니다', 'privacy-lock'),
+          buildJumpListTask('종료', '프로그램을 종료합니다', 'quit')
+        ]
+      }
+    ]);
+  } catch (e) {
+    console.warn('[jumplist] 설정 실패:', e && e.message ? e.message : e);
+  }
+}
+function parseJumpListActionFromArgv(argv) {
+  if (!Array.isArray(argv)) return '';
+  const hit = argv.find((a) => typeof a === 'string' && a.startsWith(JUMPLIST_ACTION_FLAG));
+  return hit ? hit.slice(JUMPLIST_ACTION_FLAG.length) : '';
+}
+function dispatchJumpListAction(action) {
+  if (!action) return;
+  if (action === 'quit') { beginAppQuit(); return; }
+  if (action === 'open-schedule-board') {
+    showAndFocusWindow();
+    openScheduleBoardWindow({}).catch(() => {});
+    return;
+  }
+  if (action === 'open-normal' || action === 'open-compact') {
+    showAndFocusWindow();
+    safeWebContentsSend('apply-tray-view-mode', action === 'open-compact' ? 'compact' : 'normal');
+    return;
+  }
+  showAndFocusWindow();
+  safeWebContentsSend('jumplist-action', action);
+}
+
 function showAndFocusWindow() {
   if (!mainWindow) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -5159,7 +5240,15 @@ app.whenReady().then(async () => {
   // 창을 먼저 연다 — 네트워크/UDP보다 UI 응답이 우선
   createWindow();
   createTray();
+  setupJumpList();
   registerGlobalShortcuts();
+
+  const initialJumpAction = parseJumpListActionFromArgv(process.argv);
+  if (initialJumpAction && mainWindow) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(() => dispatchJumpListAction(initialJumpAction), 400);
+    });
+  }
 
   setTimeout(() => {
     if (isSafeUiMode()) {

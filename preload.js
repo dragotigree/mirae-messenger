@@ -211,6 +211,7 @@ contextBridge.exposeInMainWorld('api', {
   onPendingStatusUpdate: (callback) => ipcRenderer.on('pending-status-update', (e, data) => callback(data)),
   onTriggerOpenAllLogs: (callback) => ipcRenderer.on('trigger-open-all-logs', () => callback()),
   onTriggerOpenSettings: (callback) => ipcRenderer.on('trigger-open-settings', () => callback()),
+  onJumpListAction: (callback) => ipcRenderer.on('jumplist-action', (e, action) => callback(action)),
   onMainProcessLog: (callback) => ipcRenderer.on('main-process-log', (e, data) => callback(data)),
   windowMinimize: () => ipcRenderer.invoke('window-minimize'),
   windowMaximizeToggle: () => ipcRenderer.invoke('window-maximize-toggle'),
