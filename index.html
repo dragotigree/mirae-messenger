@@ -1827,6 +1827,8 @@
       display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
       margin-left: auto;
     }
+    .ipmsg-bulk-inline.is-collapsed { display: none; }
+    .ipmsg-bulk-toggle-btn { display: inline-flex; align-items: center; gap: 3px; }
     .ipmsg-bulk-label {
       font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: -0.02em; flex-shrink: 0;
     }
@@ -6772,8 +6774,9 @@
               <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectAllVisible()">목록 전체</button>
               <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectOnlineVisible()">온라인만</button>
               <button type="button" class="ipmsg-mini-btn" onclick="ipmsgClearSelection()">선택 해제</button>
+              <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-bulk-toggle-btn" onclick="toggleIpmsgBulkInline()" title="층·부서로 한번에 선택">층·부서 선택 ▾</button>
             </div>
-            <div class="ipmsg-bulk-inline" aria-label="층·부서 일괄 선택">
+            <div class="ipmsg-bulk-inline is-collapsed" id="ipmsg-bulk-inline" aria-label="층·부서 일괄 선택">
               <span class="ipmsg-bulk-label">층</span>
               <select id="ipmsg-floor-select" aria-label="층 선택"></select>
               <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByFloor()" title="해당 층 전체 선택·해제">층 선택</button>
@@ -10563,6 +10566,14 @@
     function ipmsgClearSelection() {
       ipmsgSelectedIps.clear();
       renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || '');
+    }
+
+    function toggleIpmsgBulkInline() {
+      const el = document.getElementById('ipmsg-bulk-inline');
+      const btn = document.getElementById('ipmsg-bulk-toggle-btn');
+      if (!el) return;
+      const collapsed = el.classList.toggle('is-collapsed');
+      if (btn) btn.textContent = collapsed ? '층·부서 선택 ▾' : '층·부서 접기 ▴';
     }
 
     function getIpmsgPeerUsers() {
