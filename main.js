@@ -3061,6 +3061,21 @@ const RECREATABLE_SCHEMA_SQL = {
 };
 const schemaHardRepairInProgress = new Set();
 
+/** ⚠️ 스키마 복구 중 db.close()~재연결 사이, 3~5초 주기로 도는 다른 작업들(예약 메시지
+ * 확인, 접속 상태 체크 등)이 이미 닫힌 db에 계속 쿼리를 던지다 SQLITE_MISUSE가 나고, 그
+ * 경합이 VACUUM 도중과 겹치면 실제 손상으로 이어진 것으로 보인다(2026-08-12 사고 분석).
+ * 복구가 진행되는 동안은 이 플래그를 보고 다른 주기 작업들이 스스로 건너뛰게 한다. */
+let dbRepairInProgress = false;
+function beginDbRepair(reason) {
+  dbRepairInProgress = true;
+  console.error('[DB] 복구 시작 — 다른 주기 작업 일시 중단:', reason || '');
+  try { safeWebContentsSend('db-repair-in-progress', { reason: String(reason || '') }); } catch (_) { /* ignore */ }
+}
+function endDbRepair() {
+  dbRepairInProgress = false;
+  try { safeWebContentsSend('db-repair-finished', {}); } catch (_) { /* ignore */ }
+}
+
 /**
  * sqlite_master의 손상된 스키마 행을 저수준으로 직접 정리한다.
  * 일반 DROP TABLE은 실행 전에 손상된 카탈로그 행 자체를 먼저 읽어야 하므로, 그 손상 때문에
@@ -3205,6 +3220,7 @@ function tryRepairBenignSchemaConflict(err) {
     // 같은 뒤따르는 증상만 보이고 진짜 원인(이 줄)은 안 보였다 — 원인 파악이 며칠 늦어진 이유.
     console.error(`[DB] chat_pins 관련 스키마 손상 감지("${table}") — 관련 카탈로그 행 정리 시도:`, err && err.message);
     writeToLogFile('error', `[DB] chat_pins 관련 스키마 손상 감지("${table}") — 정리 후 재시작 예정 (${attempt}회째): ${err && err.message}`);
+    beginDbRepair(`chat_pins:${table}`);
     hardWipeChatPinArtifacts().then((ok) => {
       // 성공/실패와 무관하게 재연결이 필요하다(db가 위에서 close됨) — 부가 기능이라
       // 정리가 설사 실패해도 백업 복구로 확대하지 않는다.
@@ -3231,6 +3247,7 @@ function tryRepairBenignSchemaConflict(err) {
     return true;
   }
   console.error(`[DB] "${table}" 스키마 손상 감지 — writable_schema 저수준 재생성 시도:`, err && err.message);
+  beginDbRepair(`schema:${table}`);
   hardRepairSchemaRow(table).then((ok) => {
     console.error(`[DB] "${table}" 저수준 재생성 ${ok ? '성공' : '실패'}`);
     if (!ok) {
@@ -3797,6 +3814,7 @@ function checkpointWal() {
 // 합치면 충분한 경우에는 PASSIVE를 쓴다.
 function checkpointWalPassive() {
   return new Promise((resolve) => {
+    if (dbRepairInProgress) { resolve(); return; }
     db.run(`PRAGMA wal_checkpoint(PASSIVE)`, () => resolve());
   });
 }
@@ -6465,6 +6483,7 @@ function startPresenceSweeper() {
   }, 3000);
 
   function presenceSweepTick() {
+    if (dbRepairInProgress) return;
     // 🌐 DHCP 갱신 등으로 이 PC의 IP가 바뀌면, 살아있는 동안엔 예전 IP로 계속 통신하게 되어
     // 다른 PC들이 나를 못 찾게 된다. IP 자체를 실시간으로 바꿔 쓰는 건 워낙 여러 곳(메시지 기록,
     // 상대방이 알고 있는 내 주소 등)에 영향을 줘서 위험하므로, 감지되면 재시작을 안내한다.
@@ -9889,6 +9908,7 @@ function pruneSentAckRetryCounters() {
 
 function flushAllPendingOutboundMessages() {
   if (!profileLoaded) return;
+  if (dbRepairInProgress) return;
   pruneSentAckRetryCounters();
   db.all(
     `SELECT DISTINCT receiver_ip FROM messages
@@ -13256,6 +13276,7 @@ async function getAutoBackupDir() {
 }
 
 async function performAutoBackupIfNeeded() {
+  if (dbRepairInProgress) return;
   try {
     const dir = await getAutoBackupDir();
     const now = new Date();
@@ -13451,6 +13472,7 @@ function parseScheduledSendAtMs(raw) {
 }
 
 function checkAndSendDueScheduledMessages() {
+  if (dbRepairInProgress) return Promise.resolve(0);
   if (scheduledMessageCheckInFlight) return Promise.resolve(0);
   scheduledMessageCheckInFlight = true;
   const nowMs = Date.now();

@@ -24785,6 +24785,30 @@
        malformed)을 감지하면 'db-corruption-detected' 신호를 보낸다. 예전엔 감지되면 자동으로
        백업으로 통째로 덮어썼는데(그러면 백업 이후 대화가 전부 사라짐), 지금은 아무것도 자동으로
        하지 않는 대신 이 카드가 나타나 관리자가 "읽을 수 있는 만큼 건져보기"를 직접 시작할 수 있다. */
+    /* 🩹 스키마 손상 복구(예: chat_pins 정리) 중에는 db 연결이 잠깐 닫혔다 새로 열리는데,
+       그동안은 재연결 뒤 앱이 곧 재시작되는 게 보통이다. 조용히 몇 초 멈췄다 재시작되면
+       사용자 입장에선 "먹통"으로 보일 수 있어, 아주 짧게라도 이유를 알려준다. */
+    function showDbRepairBanner(show) {
+      let el = document.getElementById('db-repair-banner');
+      if (show) {
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'db-repair-banner';
+          el.style.cssText = 'position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:99999; background:#1e293b; color:#fff; padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.25);';
+          el.textContent = '데이터 손상 부분을 복구 중입니다… 잠시 후 자동으로 다시 시작됩니다.';
+          document.body.appendChild(el);
+        }
+      } else if (el) {
+        el.remove();
+      }
+    }
+    if (window.api && typeof window.api.onDbRepairInProgress === 'function') {
+      window.api.onDbRepairInProgress(() => showDbRepairBanner(true));
+    }
+    if (window.api && typeof window.api.onDbRepairFinished === 'function') {
+      window.api.onDbRepairFinished(() => showDbRepairBanner(false));
+    }
+
     let dbCorruptionDetected = false;
     let dbCorruptionAlertShown = false;
     let lastRecoveredDbInfo = null;
