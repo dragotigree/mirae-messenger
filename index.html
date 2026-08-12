@@ -4047,9 +4047,7 @@
       display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
       padding: 2px 0 10px; flex-shrink: 0;
     }
-    .board-category-row {
-      display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0;
-    }
+    .board-category-row { position: relative; min-width: 0; }
     .board-category-chip {
       flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-soft);
       background: var(--surface-muted); color: var(--text-secondary); font-size: 12px; font-weight: 600;
@@ -4057,6 +4055,41 @@
     }
     .board-category-chip:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark); }
     .board-category-chip.is-active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+    .board-dept-dropdown-trigger {
+      display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+      padding: 7px 10px 7px 14px; border-radius: 999px; border: 1px solid var(--border-soft);
+      background: var(--surface-muted); color: var(--text-primary); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: background 0.12s, border-color 0.12s;
+    }
+    .board-dept-dropdown-trigger:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark); }
+    .board-category-row.is-open .board-dept-dropdown-trigger { background: var(--sidebar-active); border-color: var(--sidebar-active); color: var(--accent-dark); }
+    .board-dept-dropdown-trigger .board-dept-dropdown-chevron {
+      width: 14px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s;
+    }
+    .board-dept-dropdown-trigger .board-dept-dropdown-chevron svg { width: 100%; height: 100%; }
+    .board-category-row.is-open .board-dept-dropdown-chevron { transform: rotate(180deg); }
+    .board-dept-dropdown-badge {
+      min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #ef4444; color: #fff;
+      font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; flex-shrink: 0;
+    }
+    .board-dept-dropdown-menu {
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+      width: max-content; min-width: 180px; max-width: 260px; max-height: 320px; overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16); padding: 6px; display: none; flex-direction: column; gap: 1px;
+    }
+    .board-category-row.is-open .board-dept-dropdown-menu { display: flex; }
+    .board-dept-dropdown-option {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border: none; background: transparent; border-radius: 9px; padding: 8px 10px;
+      font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .board-dept-dropdown-option:hover { background: var(--surface-muted); color: var(--text-primary); }
+    .board-dept-dropdown-option.active { background: var(--sidebar-active); color: var(--accent-dark); font-weight: 800; }
+    .board-dept-dropdown-option .board-dept-dropdown-badge { background: #ef4444; }
+    .board-dept-dropdown-option.active .board-dept-dropdown-badge { background: var(--accent-dark); }
     .board-unread-toggle {
       display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
     }
@@ -5791,7 +5824,7 @@
           <button type="button" class="board-search-clear" id="board-search-clear" onclick="clearBoardSearch()" title="검색어 지우기" hidden>✕</button>
         </div>
         <div class="board-filter-row">
-          <div class="board-category-row" id="board-category-filters" aria-label="공지 카테고리"></div>
+          <div class="board-category-row" id="board-category-filters" aria-label="공지 부서"></div>
           <button type="button" class="board-category-chip board-unread-toggle" id="board-unread-toggle" onclick="toggleBoardUnreadOnly()" title="안 읽은 공지만 보기">
             <span class="board-unread-toggle-dot"></span>안읽음
           </button>
@@ -5803,8 +5836,8 @@
       <div id="board-write-view" style="flex:1; overflow-y:auto;">
         <input type="hidden" id="board-write-uid">
         <div class="board-write-category-row">
-          <label class="board-write-category-label" for="board-write-category">카테고리</label>
-          <select id="board-write-category" class="board-write-category-select" aria-label="공지 카테고리"></select>
+          <label class="board-write-category-label" for="board-write-category">부서</label>
+          <select id="board-write-category" class="board-write-category-select" aria-label="공지 부서"></select>
         </div>
         <input type="text" id="board-write-title" class="board-form-input" placeholder="제목을 입력하세요" style="margin-top:10px;">
         <textarea id="board-write-content" class="board-form-textarea" placeholder="내용을 입력하세요" style="margin-top:10px;"></textarea>
@@ -15198,37 +15231,77 @@
       return (tmp.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
-    function renderBoardCategoryFilters(notices) {
-      const row = document.getElementById('board-category-filters');
-      if (!row) return;
+    function getBoardUnreadCountsByCategory(notices) {
+      const readSet = getBoardReadUids();
       const counts = Object.create(null);
       (notices || []).forEach((n) => {
+        if (readSet.has(String((n && n.uid) || ''))) return;
         const c = normalizeBoardCategory(n && n.category);
         counts[c] = (counts[c] || 0) + 1;
       });
+      return counts;
+    }
+
+    function closeBoardDeptDropdown() {
+      const row = document.getElementById('board-category-filters');
+      if (row) row.classList.remove('is-open');
+    }
+
+    function toggleBoardDeptDropdown(e) {
+      if (e) e.stopPropagation();
+      const row = document.getElementById('board-category-filters');
+      if (row) row.classList.toggle('is-open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const row = document.getElementById('board-category-filters');
+      if (row && row.classList.contains('is-open') && !row.contains(e.target)) closeBoardDeptDropdown();
+    });
+
+    function renderBoardCategoryFilters(notices) {
+      const row = document.getElementById('board-category-filters');
+      if (!row) return;
+      const totalCounts = Object.create(null);
+      (notices || []).forEach((n) => {
+        const c = normalizeBoardCategory(n && n.category);
+        totalCounts[c] = (totalCounts[c] || 0) + 1;
+      });
+      const unreadCounts = getBoardUnreadCountsByCategory(notices);
       const options = getBoardCategoryOptions();
-      // 목록에만 있는 옛 카테고리도 칩에 포함 — 단 '전체'는 사용자 요청으로 없앤 카테고리라
-      // 예전 공지에 그 값으로 저장된 게 남아있어도 칩으로 되살리지 않는다('모두'로만 보임).
-      Object.keys(counts).forEach((c) => {
+      // 목록에만 있는 옛 카테고리(부서)도 포함 — 단 '전체'는 사용자 요청으로 없앤 값이라
+      // 예전 공지에 그 값으로 저장된 게 남아있어도 옵션으로 되살리지 않는다('모두'로만 보임).
+      Object.keys(totalCounts).forEach((c) => {
         if (c !== '전체' && !options.includes(c)) options.push(c);
       });
-      const chips = [{ key: '__all__', label: '모두', count: (notices || []).length }]
-        .concat(options.map((c) => ({ key: c, label: boardCategoryLabel(c), count: counts[c] || 0 })));
-      if (!chips.some((c) => c.key === boardCategoryFilter)) boardCategoryFilter = '__all__';
-      row.innerHTML = '';
-      chips.forEach((chip) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `board-category-chip${boardCategoryFilter === chip.key ? ' is-active' : ''}`;
-        btn.textContent = chip.count > 0 ? `${chip.label} ${chip.count}` : chip.label;
-        btn.onclick = () => {
-          boardCategoryFilter = chip.key;
-          localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
-          renderBoardCategoryFilters(cachedNoticesList);
-          renderFilteredNoticesList();
-        };
-        row.appendChild(btn);
-      });
+      const totalUnread = (notices || []).length ? Object.values(unreadCounts).reduce((a, b) => a + b, 0) : 0;
+      const items = [{ key: '__all__', label: '모두', count: totalCounts && (notices || []).length, unread: totalUnread }]
+        .concat(options.map((c) => ({ key: c, label: boardCategoryLabel(c), count: totalCounts[c] || 0, unread: unreadCounts[c] || 0 })));
+      if (!items.some((c) => c.key === boardCategoryFilter)) boardCategoryFilter = '__all__';
+      const wasOpen = row.classList.contains('is-open');
+      const current = items.find((c) => c.key === boardCategoryFilter) || items[0];
+      row.innerHTML =
+        `<button type="button" class="board-dept-dropdown-trigger" onclick="toggleBoardDeptDropdown(event)">` +
+          `<span>${escapeHtml(current.label)}</span>` +
+          (current.unread > 0 ? `<span class="board-dept-dropdown-badge">${current.unread > 99 ? '99+' : current.unread}</span>` : '') +
+          `<span class="board-dept-dropdown-chevron">${uiIcon('chevronDown') || '▾'}</span>` +
+        `</button>` +
+        `<div class="board-dept-dropdown-menu">` +
+          items.map((chip) =>
+            `<button type="button" class="board-dept-dropdown-option${boardCategoryFilter === chip.key ? ' active' : ''}" onclick="selectBoardDeptFilter('${escapeHtml(chip.key).replace(/'/g, "\\'")}')">` +
+              `<span>${escapeHtml(chip.label)}</span>` +
+              (chip.unread > 0 ? `<span class="board-dept-dropdown-badge">${chip.unread > 99 ? '99+' : chip.unread}</span>` : '') +
+            `</button>`
+          ).join('') +
+        `</div>`;
+      if (wasOpen) row.classList.add('is-open');
+    }
+
+    function selectBoardDeptFilter(key) {
+      boardCategoryFilter = key;
+      localStorage.setItem('boardCategoryFilter', boardCategoryFilter);
+      closeBoardDeptDropdown();
+      renderBoardCategoryFilters(cachedNoticesList);
+      renderFilteredNoticesList();
     }
 
     function fillBoardWriteCategorySelect(selected) {
@@ -15288,7 +15361,7 @@
         } else if (boardCategoryFilter === '__all__') {
           emptyHint = `등록된 공지사항이 없습니다.${canManageNotices ? '<br><br>우측 상단 "✍️ 글쓰기" 버튼으로 첫 공지를 작성해 보세요.' : ''}`;
         } else {
-          emptyHint = `"${escapeHtml(boardCategoryLabel(boardCategoryFilter))}" 카테고리에 공지가 없습니다.`;
+          emptyHint = `"${escapeHtml(boardCategoryLabel(boardCategoryFilter))}" 부서에 공지가 없습니다.`;
         }
         container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding:60px 20px; font-size:13px;">${emptyHint}</div>`;
         return;
@@ -15323,6 +15396,8 @@
         });
         row.onclick = () => {
           markBoardNoticeRead(n.uid);
+          renderBoardCategoryFilters(cachedNoticesList);
+          refreshIconRailBadges();
           showBoardDetailView(n.uid);
         };
         container.appendChild(row);
