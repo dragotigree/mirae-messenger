@@ -14593,6 +14593,16 @@
       treeEl.querySelectorAll('.user-group-block[data-group-name]').forEach((block) => {
         const groupName = block.dataset.groupName;
         const groupUsers = groups[groupName] || [];
+        // ⚠️ 실사고: 이 "제자리 패치" 경로는 배지·상태만 갱신하고 카드 순서는 절대 안 바꿔서,
+        // 처음 그릴 때만 온라인이 위로 오고 이후 온라인/오프라인이 바뀌어도 순서가 그대로
+        // 굳어 있었다("온라인이 제일 위에 안 온다"의 원인). 정렬된 순서대로 다시 appendChild
+        // 해서(이미 있는 카드를 이동만 함 — 재생성 아님) 매번 순서를 맞춘다.
+        const sortedGroupUsers = [...groupUsers].sort(compareUsersSidebarOrder);
+        sortedGroupUsers.forEach((u) => {
+          const ipSel = CSS.escape ? CSS.escape(u.ip) : u.ip;
+          const card = block.querySelector(`.user-card-item[data-user-ip="${ipSel}"]`);
+          if (card) block.appendChild(card);
+        });
         const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
         const countBadge = block.querySelector('.group-count-badge');
         if (countBadge) countBadge.textContent = groupStaffCountBadge(groupUsers);
