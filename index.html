@@ -4145,38 +4145,39 @@
     .board-write-dept-dropdown { position: relative; width: 100%; }
     .board-write-dept-trigger {
       width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg);
-      font-size: 13px; font-family: inherit; background: #fff; color: #0f172a; cursor: pointer;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      padding: 10px 14px; border: 1px solid var(--border-soft); border-radius: 14px;
+      font-size: 13.5px; font-weight: 700; font-family: inherit; background: var(--surface-muted); color: #0f172a; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
-    .board-write-dept-trigger:hover { border-color: rgba(33, 150, 243, 0.35); }
+    .board-write-dept-trigger:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); }
     .board-write-dept-dropdown.is-open .board-write-dept-trigger {
-      border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+      background: #fff; border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
     }
     .board-write-dept-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
     .board-write-dept-chevron {
-      width: 14px; height: 14px; flex-shrink: 0; color: #94a3b8; transition: transform 0.15s;
+      width: 15px; height: 15px; flex-shrink: 0; color: var(--accent-dark); transition: transform 0.18s;
       display: flex; align-items: center; justify-content: center;
     }
     .board-write-dept-chevron svg { width: 100%; height: 100%; }
     .board-write-dept-dropdown.is-open .board-write-dept-chevron { transform: rotate(180deg); }
     .board-write-dept-menu {
-      position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
-      max-height: 280px; overflow-y: auto;
-      background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px;
-      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16); padding: 6px; display: none; flex-direction: column; gap: 1px;
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 40;
+      max-height: 300px; overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border-soft); border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18); padding: 7px; display: none; flex-direction: column; gap: 2px;
     }
     .board-write-dept-dropdown.is-open .board-write-dept-menu { display: flex; }
     .board-write-dept-option {
       display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      border: none; background: transparent; border-radius: 9px; padding: 9px 10px;
+      border: none; background: transparent; border-radius: 10px; padding: 9px 12px;
       font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background 0.1s;
     }
     .board-write-dept-option:hover { background: var(--surface-muted); color: var(--text-primary); }
     .board-write-dept-option.active { background: var(--sidebar-active); color: var(--accent-dark); font-weight: 800; }
-    .board-write-dept-option .board-write-dept-hint { font-weight: 500; color: var(--text-muted); flex-shrink: 0; }
-    .board-write-dept-option.active .board-write-dept-hint { color: var(--accent-dark); opacity: 0.75; }
+    .board-write-dept-option .board-write-dept-check { opacity: 0; color: var(--accent-dark); font-size: 12px; flex-shrink: 0; }
+    .board-write-dept-option.active .board-write-dept-check { opacity: 1; }
     .board-form-input, .board-form-textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 13px; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none; }
     .board-form-input:focus, .board-form-textarea:focus { border-color: rgba(33, 150, 243, 0.45); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1); }
     .board-form-textarea { min-height: 180px; resize: vertical; line-height: 1.6; }
@@ -15571,11 +15572,6 @@
       renderFilteredNoticesList();
     }
 
-    function boardWriteDeptLabel(c) {
-      const hint = c === '업데이트' ? '업데이트 내용' : '부서 공지';
-      return { name: boardCategoryLabel(c), hint };
-    }
-
     function fillBoardWriteCategorySelect(selected) {
       const hidden = document.getElementById('board-write-category');
       const menu = document.getElementById('board-write-dept-menu');
@@ -15590,14 +15586,13 @@
       if (cur && !options.includes(cur)) options.unshift(cur);
       const value = (cur && options.includes(cur)) ? cur : options[0];
       hidden.value = value;
-      const vLabel = boardWriteDeptLabel(value);
-      triggerLabel.textContent = `${vLabel.name} · ${vLabel.hint}`;
-      menu.innerHTML = options.map((c) => {
-        const l = boardWriteDeptLabel(c);
-        return `<button type="button" class="board-write-dept-option${c === value ? ' active' : ''}" data-value="${escapeHtml(c)}" onclick="selectBoardWriteDept(this.dataset.value)">` +
-          `<span>${escapeHtml(l.name)}</span><span class="board-write-dept-hint">${escapeHtml(l.hint)}</span>` +
-          `</button>`;
-      }).join('');
+      triggerLabel.textContent = boardCategoryLabel(value);
+      menu.innerHTML = options.map((c) =>
+        `<button type="button" class="board-write-dept-option${c === value ? ' active' : ''}" data-value="${escapeHtml(c)}" onclick="selectBoardWriteDept(this.dataset.value)">` +
+          `<span>${escapeHtml(boardCategoryLabel(c))}</span>` +
+          `<span class="board-write-dept-check">✓</span>` +
+        `</button>`
+      ).join('');
       closeBoardWriteDeptDropdown();
     }
 
@@ -15606,10 +15601,7 @@
       const triggerLabel = document.getElementById('board-write-dept-trigger-label');
       const menu = document.getElementById('board-write-dept-menu');
       if (hidden) hidden.value = value;
-      if (triggerLabel) {
-        const l = boardWriteDeptLabel(value);
-        triggerLabel.textContent = `${l.name} · ${l.hint}`;
-      }
+      if (triggerLabel) triggerLabel.textContent = boardCategoryLabel(value);
       if (menu) {
         [...menu.children].forEach((btn) => btn.classList.toggle('active', btn.dataset.value === value));
       }
