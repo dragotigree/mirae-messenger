@@ -4817,6 +4817,7 @@
     <div id="icon-rail-nav">
       <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"></button>
       <button type="button" class="icon-rail-btn is-active" id="icon-rail-chat-btn" title="대화" onclick="scrollSidebarToBlock('channels')" data-ui-icon="chatBubble"></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기" onclick="scrollSidebarToBlock('favorites')" data-ui-icon="star"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="envelope"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-transport-btn" onclick="openTransportRequestModal()" title="이동기사 요청" data-ui-icon="transportCar"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
@@ -9277,11 +9278,17 @@
 
     /* 🧭 좌측 아이콘 레일: 채널/사용자 섹션으로 스크롤 이동 */
     function scrollSidebarToBlock(kind) {
-      const id = kind === 'users' ? 'sidebar-block-users' : 'sidebar-block-channels';
+      const blockIds = { users: 'sidebar-block-users', favorites: 'sidebar-block-favorites' };
+      const id = blockIds[kind] || 'sidebar-block-channels';
       const el = document.getElementById(id);
+      if (kind === 'favorites') {
+        const collapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
+        if (collapsed && typeof toggleFavoritesSectionCollapse === 'function') toggleFavoritesSectionCollapse();
+      }
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
-      const btn = document.getElementById(kind === 'users' ? 'icon-rail-users-btn' : 'icon-rail-chat-btn');
+      const btnIds = { users: 'icon-rail-users-btn', favorites: 'icon-rail-favorites-btn' };
+      const btn = document.getElementById(btnIds[kind] || 'icon-rail-chat-btn');
       if (btn) btn.classList.add('is-active');
     }
     function updateCompactModeButtonUi() {
