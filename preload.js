@@ -149,6 +149,7 @@ contextBridge.exposeInMainWorld('api', {
   recoverCorruptDatabase: () => ipcRenderer.invoke('recover-corrupt-database'),
   applyRecoveredDatabase: (recoveredPath) => ipcRenderer.invoke('apply-recovered-database', recoveredPath),
   resetDatabaseFresh: () => ipcRenderer.invoke('reset-database-fresh'),
+  cleanupLeftoverDbFiles: () => ipcRenderer.invoke('cleanup-leftover-db-files'),
   listRecoverableBackups: () => ipcRenderer.invoke('list-recoverable-backups'),
   restoreFromBackup: (backupPath) => ipcRenderer.invoke('restore-from-backup', backupPath),
   getNotificationPreviewSetting: () => ipcRenderer.invoke('get-notification-preview-setting'),

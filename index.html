@@ -6304,6 +6304,15 @@
           </div>
           <div id="chat-backup-result" class="settings-hint"></div>
         </div>
+        <div class="settings-card">
+          <div class="settings-section-title">저장 공간 정리</div>
+          <p class="settings-hint">
+            손상 복구·초기화 과정에서 보관해둔 예전 데이터베이스 사본과 복구 결과 파일을 삭제합니다.
+            하나에 수백 MB씩 되기 때문에 쌓이면 디스크를 많이 차지합니다. 지금 쓰는 데이터는 그대로 유지됩니다.
+          </p>
+          <button type="button" class="settings-btn-secondary" onclick="cleanupLeftoverDbFilesFromSettings()" id="db-cleanup-btn">안 쓰는 파일 정리하기</button>
+          <div id="db-cleanup-result" class="settings-hint"></div>
+        </div>
         <div class="settings-card" id="db-recover-card" style="display:none;">
           <div class="settings-section-title">데이터베이스 손상 복구</div>
           <p class="settings-hint">
@@ -24902,6 +24911,30 @@
         await appAlert(`적용 실패: ${(res && res.msg) || '알 수 없는 오류'}`);
       }
       // 성공 시 main.js가 곧바로 재시작하므로 여기서 더 할 일은 없다.
+    }
+
+    async function cleanupLeftoverDbFilesFromSettings() {
+      const btn = document.getElementById('db-cleanup-btn');
+      const el = document.getElementById('db-cleanup-result');
+      if (btn) { btn.disabled = true; btn.textContent = '정리 중…'; }
+      if (el) { el.textContent = ''; el.style.color = ''; }
+      try {
+        const res = await window.api.cleanupLeftoverDbFiles();
+        if (!res || !res.success) {
+          if (el) { el.textContent = `정리 실패: ${(res && res.msg) || '알 수 없는 오류'}`; el.style.color = '#b91c1c'; }
+          return;
+        }
+        const mb = Math.round((res.freedBytes || 0) / 1048576);
+        if (el) {
+          el.textContent = res.removed
+            ? `파일 ${res.removed}개를 삭제해 약 ${mb}MB를 확보했습니다.`
+            : '삭제할 파일이 없습니다. 이미 깨끗합니다.';
+        }
+      } catch (e) {
+        if (el) { el.textContent = '정리 중 오류가 발생했습니다.'; el.style.color = '#b91c1c'; }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '안 쓰는 파일 정리하기'; }
+      }
     }
 
     async function resetDatabaseFreshFromSettings() {

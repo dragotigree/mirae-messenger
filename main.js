@@ -3728,6 +3728,41 @@ ipcMain.handle('reset-database-fresh', async () => {
   }
 });
 
+/** userdata 폴더에 쌓인 "안 쓰는 큰 파일"을 정리한다.
+ *  · mirae_messenger.db.corrupted_*  : 손상 시 안전하게 보관해둔 원본 사본(하나에 300MB대)
+ *  · mirae_messenger.recovered_*.db  : 복구 스캔이 만든 결과 파일
+ *  지금 쓰는 mirae_messenger.db(및 -wal/-shm)는 절대 건드리지 않는다. */
+ipcMain.handle('cleanup-leftover-db-files', async () => {
+  try {
+    const dir = path.dirname(dbPath);
+    const base = path.basename(dbPath);
+    const names = await fs.promises.readdir(dir).catch(() => []);
+    const targets = names.filter((n) => {
+      if (n === base || n === `${base}-wal` || n === `${base}-shm`) return false; // 현재 DB 보호
+      if (n.startsWith(`${base}.corrupted_`)) return true;
+      if (/^mirae_messenger\.recovered_\d+\.db(-wal|-shm)?$/.test(n)) return true;
+      return false;
+    });
+    let removed = 0;
+    let freedBytes = 0;
+    for (const name of targets) {
+      const p = path.join(dir, name);
+      const stat = await fs.promises.stat(p).catch(() => null);
+      try {
+        await fs.promises.unlink(p);
+        removed += 1;
+        if (stat) freedBytes += stat.size;
+      } catch (e) {
+        writeToLogFile('warn', `[정리] 삭제 실패: ${name} — ${e && e.message}`);
+      }
+    }
+    writeToLogFile('info', `[정리] 불필요 파일 ${removed}개 삭제, ${Math.round(freedBytes / 1048576)}MB 확보`);
+    return { success: true, removed, freedBytes };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
 ipcMain.handle('recover-corrupt-database', async () => {
   try {
     const { recoveredPath, report } = await recoverReadableRowsFromCorruptDb(dbPath);
@@ -13416,10 +13451,15 @@ function startAutoBackup() {
   cleanupOldLogFiles();
   cleanupOldChatLogFiles();
   cleanupOldPreUpdateBackups();
+  // ⚠️ 실사고: 이 정리는 백업 복원 경로(stashAndReplaceMessengerDb)에서만 호출되고 있어서,
+  // 설정의 「전부 포기하고 새로 시작하기」로 생긴 300MB대 사본은 아무도 안 지웠다 —
+  // 하루 만에 7개, 2GB 넘게 쌓였다. 부팅 때·주기적으로도 정리한다.
+  pruneCorruptedStashCopies();
   setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldChatLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldPreUpdateBackups, 6 * 60 * 60 * 1000);
+  setInterval(pruneCorruptedStashCopies, 6 * 60 * 60 * 1000);
   // 방금 보낸 메시지가 -wal 파일에만 있다가, 앱이 비정상 종료되거나 DB 손상 복구
   // 절차가 WAL을 통째로 지우는 경로를 타면서 사라지는 사고가 있었다(실제 발생).
   // 2분마다 체크포인트해 본 파일에 합쳐두면, 데이터가 노출되는 구간을 최대 2분
