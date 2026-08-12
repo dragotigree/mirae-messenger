@@ -4996,9 +4996,9 @@
            (dm-section-unread-badge)는 각 사용자 카드의 개별 배지로 충분히 대체된다. -->
 
       <div id="sidebar-block-favorites" class="sidebar-main-block" data-sidebar-block="favorites" style="display:none;">
-        <div class="section-label sidebar-block-head" id="favorites-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px; cursor:pointer;">
+        <div class="section-label sidebar-block-head" id="favorites-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
           <span style="display:flex; align-items:center; gap:6px; min-width:0;">
-            <span class="group-chevron" id="favorites-section-chevron">▾</span><span data-ui-icon="star"></span> 즐겨찾기
+            <span data-ui-icon="star"></span> 즐겨찾기
           </span>
           <span style="display:flex; align-items:center; gap:6px;">
             <span class="unread-badge" id="favorites-section-unread-badge" style="display:none;">0</span>
@@ -12694,24 +12694,14 @@
           toggleChannelsSectionCollapse();
         });
       }
-      const favoritesLabel = document.getElementById('favorites-section-label');
-      if (favoritesLabel && favoritesLabel.dataset.collapseBound !== '1') {
-        favoritesLabel.dataset.collapseBound = '1';
-        favoritesLabel.addEventListener('click', () => toggleFavoritesSectionCollapse());
-      }
     }
 
-    function toggleFavoritesSectionCollapse() {
-      const isCollapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
-      localStorage.setItem('favoritesSectionCollapsed', isCollapsed ? '0' : '1');
-      applyFavoritesSectionCollapseState();
-    }
+    // ⚠️ 접기/펼치기 기능 제거됨 — 즐겨찾기는 항상 펼쳐진 채로 보여준다. 다른 곳(스크롤
+    // 이동 등)에서 남아있는 호출을 위해 빈 함수로만 유지한다.
+    function toggleFavoritesSectionCollapse() {}
     function applyFavoritesSectionCollapseState() {
-      const isCollapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
       const body = document.getElementById('favorites-section-body');
-      const label = document.getElementById('favorites-section-label');
-      if (body) body.style.display = isCollapsed ? 'none' : 'block';
-      if (label) label.classList.toggle('is-collapsed', isCollapsed);
+      if (body) body.style.display = 'block';
     }
 
     /** 즐겨찾기 — 「채널 및 대화방」·「사용자」와 같은 독립 섹션으로 표시 */
