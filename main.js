@@ -704,6 +704,8 @@ const Z_BRIDGE_MIRROR_FILES = [
   'toast.html',
   'toast-preload.js',
   'lib/minimal-xlsx.js',
+  'draw-editor.html',
+  'lib/draw-app.js',
   'excalidraw-editor.html',
   'preload-excalidraw.js',
   'lib/excalidraw-app.js',
@@ -5176,7 +5178,10 @@ function openExcalidrawWindow(purpose) {
   const meta = getExcalidrawPurposeMeta(purpose);
   excalidrawSession = { purpose: meta.purpose, title: meta.title, subtitle: meta.subtitle };
 
-  const install = inspectExcalidrawInstall();
+  // 자체 그림판이 있으면 Excalidraw 파일이 없어도 그림 기능을 쓸 수 있으므로 이 검사를 건너뛴다.
+  const hasLightEditor = fs.existsSync(path.join(__dirname, 'draw-editor.html'))
+    && fs.existsSync(path.join(__dirname, 'lib', 'draw-app.js'));
+  const install = hasLightEditor ? { ok: true, details: [] } : inspectExcalidrawInstall();
   if (!install.ok) {
     const msg = [
       '그림 그리기 파일이 아직 이 PC에 없습니다.',
@@ -5199,7 +5204,13 @@ function openExcalidrawWindow(purpose) {
   }
 
   const preloadPath = path.join(__dirname, 'preload-excalidraw.js');
-  const htmlPath = path.join(__dirname, 'excalidraw-editor.html');
+  // 가벼운 자체 그림판(draw-editor.html, 24KB)이 있으면 그것을 쓰고, 아직 안 내려온 PC에서는
+  // 기존 Excalidraw(8MB)로 자동 폴백한다 — 순차 업데이트 중에도 그림 기능이 끊기지 않는다.
+  // 창을 여닫는 통신 방식(excalidrawBridge)은 둘이 완전히 같아서 그대로 재사용한다.
+  const lightHtml = path.join(__dirname, 'draw-editor.html');
+  const lightApp = path.join(__dirname, 'lib', 'draw-app.js');
+  const useLight = fs.existsSync(lightHtml) && fs.existsSync(lightApp);
+  const htmlPath = useLight ? lightHtml : path.join(__dirname, 'excalidraw-editor.html');
 
   excalidrawWindow = new BrowserWindow({
     width: 1180,
@@ -12104,6 +12115,9 @@ async function applyUpdateFiles(opts = {}) {
     // 공지 서식 편집기 번들(약 456KB). 이 파일이 아직 없는 PC에서도 index.html이
     // 자동으로 기존 입력창으로 대체하도록 되어 있어, 순차 업데이트 중에도 안전하다.
     'lib/tiptap-editor.js',
+    // 가벼운 자체 그림판(합쳐서 약 24KB) — Excalidraw(8MB)를 대체한다.
+    'draw-editor.html',
+    'lib/draw-app.js',
     'excalidraw-editor.html',
     'preload-excalidraw.js',
     'mobile_server.js'
