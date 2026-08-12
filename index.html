@@ -611,6 +611,7 @@
     .channel-item:hover { background: var(--sidebar-hover); color: var(--text-primary); }
     .channel-item.active { background: var(--sidebar-active); color: var(--sidebar-text); box-shadow: none; }
     .channel-item.is-drop-hover, #chat-header.is-drop-hover, #dm-section-label.is-drop-hover { background: rgba(33, 150, 243, 0.22) !important; box-shadow: inset 0 0 0 2px rgba(144, 202, 249, 0.75); }
+    .icon-rail-btn.is-drop-hover { background: var(--sidebar-active) !important; color: var(--accent-dark) !important; box-shadow: inset 0 0 0 2px var(--accent); }
     .channel-item.is-channel-dragging { opacity: 0.45; }
     .channel-item.is-channel-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
     .channel-item .channel-reorder-grip { opacity: 0; font-size: 11px; cursor: grab; padding: 0 2px 0 0; flex-shrink: 0; line-height: 1; user-select: none; transition: opacity var(--transition-fast); }
@@ -664,7 +665,7 @@
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-pref-seg-solo { flex: 0 0 auto; margin-left: auto; }
-    .sidebar-pref-seg-solo .sidebar-pref-chip { min-width: 22px; padding: 5px 6px; font-size: 10px; }
+    .sidebar-pref-seg-solo .sidebar-pref-chip { min-width: 18px; padding: 5px 4px; font-size: 10px; }
     .sidebar-block-head {
       white-space: nowrap;
       gap: 8px;
@@ -4939,7 +4940,7 @@
       <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-login-btn" onclick="openOperatorLoginModal()" title="작성자 로그인" data-ui-icon="logIn"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
-      <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="users"></button>
+      <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="settings"></button>
     </div>
   </div>
   <div id="sidebar-left">
@@ -12342,9 +12343,8 @@
     }
 
     function formatDmListDisplayName(u) {
-      const starMark = favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip)) ? '⭐ ' : '';
       const meMark = u.isMe ? ' <span style="color:var(--accent); font-size:11px; font-weight:700;">(나)</span>' : '';
-      const base = `${starMark}${profileDisplayName(u)}`.trim();
+      const base = profileDisplayName(u).trim();
       const emoji = getChannelTitleEmoji(`DM:${u.ip}`);
       const named = emoji ? `${emoji} ${base}` : base;
       return `${named}${meMark}`;
@@ -14422,6 +14422,35 @@
       });
 
       bindUserDropZone(document.getElementById('dm-section-label'), openDmWithUserConfirm);
+
+      // 드래그해서 별표(⭐)에 넣으면 즐겨찾기, #(채널)에 넣으면 그룹채팅 생성 — 드래그한
+      // 카드가 현재 다중 선택에 포함돼 있으면 선택된 전원을 대상으로 한다.
+      bindUserDropZone(document.getElementById('icon-rail-favorites-btn'), async (user) => {
+        favoriteUsersBulk(usersForDrop(user));
+      });
+      bindUserDropZone(document.getElementById('icon-rail-chat-btn'), async (user) => {
+        const users = usersForDrop(user).filter((u) => !(myProfile && u.ip === myProfile.ip));
+        if (!users.length) return;
+        openGroupChatModal(users, { mode: 'new' });
+      });
+    }
+
+    function usersForDrop(user) {
+      if (user && isSidebarIpSelected(user.ip) && sidebarSelectedUserIps.size > 1) {
+        return getSidebarSelectedUsers();
+      }
+      return user ? [user] : [];
+    }
+
+    function favoriteUsersBulk(users) {
+      let changed = false;
+      (users || []).forEach((u) => {
+        if (u && u.ip && !favoriteIps.has(u.ip)) { favoriteIps.add(u.ip); changed = true; }
+      });
+      if (!changed) return;
+      localStorage.setItem('favoriteIps', JSON.stringify([...favoriteIps]));
+      renderUserListTree();
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
     }
 
     /* ⚡ 사용자 카드 빠른 정보 말풍선 — 기본 title 툴팁(OS 딜레이 약 1초+)보다 훨씬 빠르게
