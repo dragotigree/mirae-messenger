@@ -5763,6 +5763,9 @@ function startUdpDiscovery() {
             }
             lastReconnectCascadeAt.set(rinfo.address, nowTs);
             requestNoticeSync(rinfo.address);
+            // 부팅 시 아무도 온라인이 아니었으면 화면 문구를 못 받아온다 —
+            // 동료가 접속하는 이 시점에 한 번 더 요청해 빈틈을 없앤다(위 쿨다운이 폭주를 막는다).
+            sendJsonToPeer(rinfo.address, { type: 'UI_TEXT_SYNC_REQUEST' });
             syncGroupsWithPeer(rinfo.address);
             tryDeliverPendingWipe(rinfo.address);
             maybeSyncServicePauseToPeer(rinfo.address);
