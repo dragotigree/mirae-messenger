@@ -971,7 +971,7 @@
     }
     .privacy-lock-clock-date {
       font-family: 'Pretendard', var(--font-family); font-size: 14px; font-weight: 500;
-      color: rgba(255,255,255,0.7); margin-top: 7px; letter-spacing: -0.005em;
+      color: rgba(255,255,255,0.7); margin-bottom: 7px; letter-spacing: -0.005em;
     }
     .privacy-lock-card {
       width: min(360px, calc(100vw - 40px)); padding: 30px 26px 24px;
@@ -5638,14 +5638,14 @@
   <!-- 🔒 사생활 화면 잠금 (PIN) -->
   <div id="privacy-lock-overlay" aria-modal="true" role="dialog" aria-label="화면 잠금">
     <div class="privacy-lock-clock" id="privacy-lock-clock">
-      <div class="privacy-lock-clock-time" id="privacy-lock-clock-time">--:--</div>
       <div class="privacy-lock-clock-date" id="privacy-lock-clock-date">-</div>
+      <div class="privacy-lock-clock-time" id="privacy-lock-clock-time">--:--</div>
     </div>
     <div class="privacy-lock-card">
       <div class="privacy-lock-icon" data-ui-icon="lock"></div>
       <div class="privacy-lock-title">환자의 소중한 개인정보 보호를 위해 잠겼습니다</div>
       <div class="privacy-lock-sub">잠금을 해제하려면 PIN을 입력해주세요.</div>
-      <input type="password" id="privacy-lock-pin-input" class="privacy-lock-pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyUnlock();}">
+      <input type="password" id="privacy-lock-pin-input" class="privacy-lock-pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmPrivacyUnlock();}">
       <div class="privacy-lock-error" id="privacy-lock-error"></div>
       <div class="privacy-lock-actions">
         <button type="button" class="privacy-lock-unlock-btn" onclick="confirmPrivacyUnlock()">잠금 해제</button>
