@@ -12063,6 +12063,31 @@ ipcMain.handle('set-update-mode', async (event, mode) => {
   return { success: true, mode: next };
 });
 
+/**
+ * ⚠️ 실사고(반복): 업데이트로 "새 파일"을 추가하면, 그 업데이트를 수행하는 쪽은 아직 구버전
+ * main.js다. 구버전은 파일 목록에 새 파일이 없으니 받아오지 않고, 재시작 뒤에는 버전이 이미
+ * 최신이라 「지금 확인」을 눌러도 "최신 버전"이라며 아무것도 받지 않는다. 결국 새 기능 파일이
+ * 영원히 안 내려오고, 버전만 최신인 채로 기능이 빠져 있게 된다(공지 서식 편집기·그림판에서 실제 발생).
+ * 그래서 버전이 같아도 "있어야 할 파일이 없으면" 업데이트가 필요하다고 판단한다.
+ */
+function getMissingLocalUpdateFiles() {
+  const required = [
+    'lib/tiptap-editor.js',
+    'draw-editor.html',
+    'lib/draw-app.js'
+  ];
+  const missing = [];
+  for (const rel of required) {
+    try {
+      const st = fs.statSync(path.join(__dirname, rel));
+      if (!st.isFile() || st.size < 32) missing.push(rel);
+    } catch (e) {
+      missing.push(rel);
+    }
+  }
+  return missing;
+}
+
 ipcMain.handle('check-for-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
@@ -12072,13 +12097,19 @@ ipcMain.handle('check-for-update', async () => {
     if (!best) {
       return { available: false, msg: '업데이트 소스에서 version.json을 찾을 수 없습니다. 경로(Z:\\...\\messenger) 또는 GitHub 연결을 확인해 주세요.' };
     }
-    const available = compareVersions(best.version, APP_VERSION) > 0;
+    const newer = compareVersions(best.version, APP_VERSION) > 0;
+    // 버전이 같아도 있어야 할 파일이 빠져 있으면 받아와야 한다(위 주석 참고).
+    const missing = newer ? [] : getMissingLocalUpdateFiles();
+    const available = newer || missing.length > 0;
     pendingUpdateFetchPath = available ? best.sourcePath : '';
     return {
       available,
       remoteVersion: best.version,
       currentVersion: APP_VERSION,
-      notes: best.notes || '',
+      notes: missing.length && !newer
+        ? `일부 기능 파일이 이 PC에 없어 다시 받아옵니다.\n(${missing.join(', ')})`
+        : (best.notes || ''),
+      repairOnly: !newer && missing.length > 0,
       sourceKind: best.kind,
       sourcePath: best.sourcePath
     };
@@ -12785,13 +12816,21 @@ async function autoCheckAndApplyUpdate() {
   const prevSource = updateSourcePath;
   try {
     const best = await findNewestUpdateCandidate();
-    if (!best || compareVersions(best.version, APP_VERSION) <= 0) return;
+    if (!best) return;
+    // 버전이 같아도 기능 파일이 빠져 있으면 조용히 다시 받아온다(getMissingLocalUpdateFiles 주석 참고).
+    const missingFiles = getMissingLocalUpdateFiles();
+    if (compareVersions(best.version, APP_VERSION) <= 0 && missingFiles.length === 0) return;
+    if (missingFiles.length) {
+      writeToLogFile('warn', `[업데이트] 누락 파일 감지 — 재수신: ${missingFiles.join(', ')}`);
+    }
     // 자동 적용은 GitHub를 우선 (Z hang 회피). GitHub에 새 버전이 있을 때만.
     // findNewestUpdateCandidate가 이미 GitHub를 조회해 뒀으므로 재조회하지 않고 재사용한다
     // (GitHub API 요청은 회당 2건 — 재조회 시 10분마다 PC당 최대 4건까지 늘어나
     // 비인증 API 시간당 한도를 불필요하게 앞당겨 소진시킬 수 있다).
     const gh = (best.candidates || []).find((c) => c.kind === 'github') || (best.kind === 'github' ? best : null);
-    if (!gh || compareVersions(gh.version, APP_VERSION) <= 0) return;
+    // 누락 파일 복구가 목적일 때는 버전이 같아도 진행해야 한다.
+    if (!gh) return;
+    if (compareVersions(gh.version, APP_VERSION) <= 0 && missingFiles.length === 0) return;
     remote = { version: gh.version, notes: gh.notes || '' };
     pendingUpdateFetchPath = gh.sourcePath;
     updateSourcePath = gh.sourcePath;
