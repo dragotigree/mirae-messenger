@@ -24931,7 +24931,15 @@
             : '삭제할 파일이 없습니다. 이미 깨끗합니다.';
         }
       } catch (e) {
-        if (el) { el.textContent = '정리 중 오류가 발생했습니다.'; el.style.color = '#b91c1c'; }
+        // ⚠️ 예전엔 여기서 오류 내용을 숨겨서("정리 중 오류가 발생했습니다") 정작 원인인
+        // "No handler registered"(=본체는 구버전, 창만 새 버전)를 알 수 없었다. 그대로 보여준다.
+        const raw = (e && e.message) ? String(e.message) : '';
+        if (el) {
+          el.textContent = /No handler registered/i.test(raw)
+            ? '이 기능은 프로그램을 완전히 종료한 뒤 다시 실행해야 동작합니다(업데이트가 아직 본체에 적용되지 않았습니다).'
+            : `정리 중 오류가 발생했습니다: ${raw || '알 수 없는 오류'}`;
+          el.style.color = '#b91c1c';
+        }
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = '안 쓰는 파일 정리하기'; }
       }
