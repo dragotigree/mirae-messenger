@@ -706,12 +706,9 @@ const Z_BRIDGE_MIRROR_FILES = [
   'lib/minimal-xlsx.js',
   'draw-editor.html',
   'lib/draw-app.js',
-  'excalidraw-editor.html',
-  'preload-excalidraw.js',
-  'lib/excalidraw-app.js',
-  'lib/excalidraw-app.css'
+  'preload-excalidraw.js'
 ];
-const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png', 'vendor/excalidraw/asset-list.json'];
+const Z_BRIDGE_MIRROR_OPTIONAL = ['assets/splash.png'];
 let pendingRestartTimer = null;
 let pendingUpdateRemoteVersion = '';
 let autoUpdateAlreadyApplied = false;
@@ -858,14 +855,6 @@ async function mirrorLocalInstallToZBridgeInner(opts = {}) {
     }
   }
   const optionalMirror = Z_BRIDGE_MIRROR_OPTIONAL.slice();
-  try {
-    const listRaw = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'vendor', 'excalidraw', 'asset-list.json'), 'utf8'));
-    const files = Array.isArray(listRaw && listRaw.files) ? listRaw.files : [];
-    for (const f of files) {
-      const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
-      if (rel && !optionalMirror.includes(rel)) optionalMirror.push(rel);
-    }
-  } catch (e) { /* optional */ }
   for (const rel of optionalMirror) {
     const src = path.join(__dirname, rel);
     const dst = path.join(destRoot, rel);
@@ -5035,12 +5024,13 @@ function getExcalidrawPurposeMeta(purpose) {
   };
 }
 
+/** 그림 기능에 꼭 필요한 파일 — Excalidraw를 제거하고 자체 그림판으로 완전히 대체했다.
+ *  preload-excalidraw.js는 이름만 excalidraw인 공용 통신 파일이라 계속 필요하다. */
 function getExcalidrawRequiredFiles() {
   return [
-    'excalidraw-editor.html',
-    'preload-excalidraw.js',
-    'lib/excalidraw-app.js',
-    'lib/excalidraw-app.css'
+    'draw-editor.html',
+    'lib/draw-app.js',
+    'preload-excalidraw.js'
   ];
 }
 
@@ -5056,7 +5046,7 @@ function inspectExcalidrawInstall() {
         details.push(`${rel}(비정상 크기)`);
         continue;
       }
-      if (rel.endsWith('excalidraw-app.js') && st.size < 500000) {
+      if (rel.endsWith('draw-app.js') && st.size < 1000) {
         missing.push(rel);
         details.push(`${rel}(용량 부족 ${st.size}B — 업데이트 중 손상 가능)`);
       }
@@ -5183,15 +5173,13 @@ function openExcalidrawWindow(purpose) {
   excalidrawSession = { purpose: meta.purpose, title: meta.title, subtitle: meta.subtitle };
 
   // 자체 그림판이 있으면 Excalidraw 파일이 없어도 그림 기능을 쓸 수 있으므로 이 검사를 건너뛴다.
-  const hasLightEditor = fs.existsSync(path.join(__dirname, 'draw-editor.html'))
-    && fs.existsSync(path.join(__dirname, 'lib', 'draw-app.js'));
-  const install = hasLightEditor ? { ok: true, details: [] } : inspectExcalidrawInstall();
+  const install = inspectExcalidrawInstall();
   if (!install.ok) {
     const msg = [
       '그림 그리기 파일이 아직 이 PC에 없습니다.',
       '',
-      '설정 → 프로그램 업데이트로 최신판을 다시 받아 주세요.',
-      '(lib/excalidraw-app.js 등 용량이 큰 파일이 포함됩니다.)',
+      '설정 → 업데이트 → 「지금 확인」을 눌러 최신판을 받아 주세요.',
+      '(빠진 파일은 자동으로 다시 받아옵니다)',
       '',
       '부족한 파일:',
       ...install.details.slice(0, 8)
@@ -5211,10 +5199,7 @@ function openExcalidrawWindow(purpose) {
   // 가벼운 자체 그림판(draw-editor.html, 24KB)이 있으면 그것을 쓰고, 아직 안 내려온 PC에서는
   // 기존 Excalidraw(8MB)로 자동 폴백한다 — 순차 업데이트 중에도 그림 기능이 끊기지 않는다.
   // 창을 여닫는 통신 방식(excalidrawBridge)은 둘이 완전히 같아서 그대로 재사용한다.
-  const lightHtml = path.join(__dirname, 'draw-editor.html');
-  const lightApp = path.join(__dirname, 'lib', 'draw-app.js');
-  const useLight = fs.existsSync(lightHtml) && fs.existsSync(lightApp);
-  const htmlPath = useLight ? lightHtml : path.join(__dirname, 'excalidraw-editor.html');
+  const htmlPath = path.join(__dirname, 'draw-editor.html');
 
   excalidrawWindow = new BrowserWindow({
     width: 1180,
@@ -12179,18 +12164,8 @@ async function applyUpdateFiles(opts = {}) {
     'assets/fonts/SUIT-Medium.woff2',
     'assets/fonts/SUIT-Regular.woff2'
   ];
-  const optionalAssets = soft ? [...FONT_ASSETS] : ['assets/splash.png', 'vendor/excalidraw/asset-list.json', ...FONT_ASSETS];
-  if (!soft) {
-    try {
-      const remoteListBuf = await readUpdateSourceBytes('vendor/excalidraw/asset-list.json');
-      const remoteList = parseUpdateJsonText(remoteListBuf.toString('utf8'));
-      const remoteFiles = Array.isArray(remoteList && remoteList.files) ? remoteList.files : [];
-      for (const f of remoteFiles) {
-        const rel = `vendor/excalidraw/${String(f || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
-        if (rel && rel !== 'vendor/excalidraw/asset-list.json') optionalAssets.push(rel);
-      }
-    } catch (e) { /* optional fonts/locales */ }
-  }
+  const optionalAssets = soft ? [...FONT_ASSETS] : ['assets/splash.png', ...FONT_ASSETS];
+  // (Excalidraw 폰트·언어팩 자원은 제거됨 — 자체 그림판은 별도 자원이 필요 없다)
   const backupDir = soft ? '' : path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
   if (backupDir) await fs.promises.mkdir(backupDir, { recursive: true });
   const fileResults = [];
