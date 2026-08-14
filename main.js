@@ -3099,13 +3099,38 @@ const schemaHardRepairInProgress = new Set();
  * 경합이 VACUUM 도중과 겹치면 실제 손상으로 이어진 것으로 보인다(2026-08-12 사고 분석).
  * 복구가 진행되는 동안은 이 플래그를 보고 다른 주기 작업들이 스스로 건너뛰게 한다. */
 let dbRepairInProgress = false;
+let dbRepairFailsafeTimer = null;
+
+/**
+ * ⚠️ 실사고 직전에 발견(1.0.693): 복구 시작 후 "재시작하지 않고 끝나는" 경로가 있었다.
+ * (스키마 재생성 실패 → scheduleDbCorruptRecovery → 자동 복구가 꺼져 있어 재시작 없이 반환)
+ * 그 경우 이 플래그가 영원히 true로 남아 예약 메시지 발송·접속 상태 갱신·밀린 메시지
+ * 재전송·자동 백업·WAL 정리가 앱을 끌 때까지 전부 멈춘다.
+ * 그래서 ① 재시작하지 않는 경로에서는 반드시 endDbRepair()를 부르고,
+ *        ② 그걸 빠뜨려도 스스로 풀리도록 안전 타이머를 둔다(어떤 복구도 이보다 오래 걸리지 않는다).
+ */
+const DB_REPAIR_FAILSAFE_MS = 30000;
+
 function beginDbRepair(reason) {
   dbRepairInProgress = true;
   console.error('[DB] 복구 시작 — 다른 주기 작업 일시 중단:', reason || '');
+  writeToLogFile('warn', `[DB] 복구 시작(주기 작업 일시 중단): ${reason || ''}`);
   try { safeWebContentsSend('db-repair-in-progress', { reason: String(reason || '') }); } catch (_) { /* ignore */ }
+  clearTimeout(dbRepairFailsafeTimer);
+  dbRepairFailsafeTimer = setTimeout(() => {
+    if (!dbRepairInProgress) return;
+    console.error('[DB] 복구가 끝나지 않아 안전 타이머로 주기 작업을 재개합니다');
+    writeToLogFile('error', '[DB] 복구 미완료 — 안전 타이머로 주기 작업 재개');
+    endDbRepair();
+  }, DB_REPAIR_FAILSAFE_MS);
 }
+
 function endDbRepair() {
+  clearTimeout(dbRepairFailsafeTimer);
+  dbRepairFailsafeTimer = null;
+  if (!dbRepairInProgress) return;
   dbRepairInProgress = false;
+  writeToLogFile('warn', '[DB] 복구 종료 — 주기 작업 재개');
   try { safeWebContentsSend('db-repair-finished', {}); } catch (_) { /* ignore */ }
 }
 
@@ -3261,6 +3286,9 @@ function tryRepairBenignSchemaConflict(err) {
       // 손상 → 또 고쳤다고 믿고 재시작"이 영원히 반복되어 위의 상한선이 무의미해진다.
       writeToLogFile('error', `[DB] chat_pins 정리 ${ok ? '성공' : '실패'} — 재연결을 위해 재시작합니다`);
       relaunchWithoutBackupRestore();
+    }).catch((e) => {
+      console.error('[DB] chat_pins 정리 중 예외:', e && e.message);
+      endDbRepair();
     });
     return true;
   }
@@ -3289,12 +3317,18 @@ function tryRepairBenignSchemaConflict(err) {
         relaunchWithoutBackupRestore();
         return;
       }
+      // 자동 복구가 꺼져 있으면 여기서 재시작하지 않고 끝나므로, 반드시 플래그를 풀어야
+      // 예약 메시지·접속 갱신 등 주기 작업이 다시 돈다.
       scheduleDbCorruptRecovery(`hard-repair-failed:${table}`);
+      endDbRepair();
       return;
     }
     resetDbRecoveryAttemptCount();
     app.relaunch();
     app.exit(0);
+  }).catch((e) => {
+    console.error('[DB] 스키마 재생성 중 예외:', e && e.message);
+    endDbRepair();
   });
   return true;
 }
