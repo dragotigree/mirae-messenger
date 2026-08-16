@@ -10917,7 +10917,17 @@ function upsertUiTextOverride(key, value, updatedAt) {
       if (err) { logDbErr(err); resolve(false); return; }
       if (row && row.updated_at && String(row.updated_at) > String(updatedAt)) { resolve(false); return; }
       if (value == null || value === '') {
-        db.run(`DELETE FROM ui_text_overrides WHERE key = ?`, [key], (delErr) => { logDbErr(delErr); resolve(true); });
+        // ⚠️ 삭제하지 않고 "빈 값 표식"으로 남긴다.
+        // 행을 지워버리면 "되돌렸다"는 사실이 아무 데도 남지 않아서, 그때 꺼져 있던 PC가
+        // 나중에 켜졌을 때 자기 옛 문구를 그대로 갖고 있다가 다른 PC로 도로 퍼뜨린다
+        // (공지 삭제가 되살아나던 사고와 정확히 같은 구조). 표식이 있으면 시각 비교로
+        // "되돌림"이 이깁니다.
+        db.run(
+          `INSERT INTO ui_text_overrides (key, value, updated_at) VALUES (?, '', ?)
+           ON CONFLICT(key) DO UPDATE SET value = '', updated_at = excluded.updated_at`,
+          [key, String(updatedAt)],
+          (delErr) => { logDbErr(delErr); resolve(true); }
+        );
         return;
       }
       db.run(
@@ -12114,6 +12124,40 @@ function getMissingLocalUpdateFiles() {
   return missing;
 }
 
+/**
+ * ⚠️ 누락 파일 복구는 "받아올 수 없는 파일"이 하나라도 있으면 무한 재시작이 된다.
+ * (부팅 → 누락 감지 → 파일 받기 → 재시작 → 여전히 누락 → …)
+ * 예전에 DB 복구가 같은 구조로 594회 재시작했던 사고가 있었으므로, 시도 횟수에 상한을 둔다.
+ * 진짜 새 버전이 올라오면 그건 별개 경로라 정상적으로 업데이트된다.
+ */
+const MISSING_FILE_REPAIR_MAX = 3;
+function missingRepairCountPath() {
+  return path.join(app.getPath('userData'), 'missing-file-repair-attempts.txt');
+}
+function readMissingRepairCount() {
+  try { return parseInt(fs.readFileSync(missingRepairCountPath(), 'utf8').trim(), 10) || 0; }
+  catch (e) { return 0; }
+}
+function bumpMissingRepairCount() {
+  const next = readMissingRepairCount() + 1;
+  try { fs.writeFileSync(missingRepairCountPath(), String(next), 'utf8'); } catch (e) { /* ignore */ }
+  return next;
+}
+function resetMissingRepairCount() {
+  try { fs.unlinkSync(missingRepairCountPath()); } catch (e) { /* ignore */ }
+}
+
+/** 누락 파일 복구를 더 시도해도 되는가? (상한 초과면 조용히 포기하고 계속 실행) */
+function canRepairMissingFiles(missing) {
+  if (!missing || !missing.length) { resetMissingRepairCount(); return false; }
+  const n = readMissingRepairCount();
+  if (n >= MISSING_FILE_REPAIR_MAX) {
+    writeToLogFile('warn', `[업데이트] 누락 파일 복구 ${n}회 실패 — 더 시도하지 않음: ${missing.join(', ')}`);
+    return false;
+  }
+  return true;
+}
+
 ipcMain.handle('check-for-update', async () => {
   updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
   if (!updateSourcePath) return { available: false, msg: '업데이트 소스가 아직 설정되지 않았습니다.' };
@@ -12125,7 +12169,9 @@ ipcMain.handle('check-for-update', async () => {
     }
     const newer = compareVersions(best.version, APP_VERSION) > 0;
     // 버전이 같아도 있어야 할 파일이 빠져 있으면 받아와야 한다(위 주석 참고).
-    const missing = newer ? [] : getMissingLocalUpdateFiles();
+    // 단, 몇 번 시도해도 안 받아지는 파일이라면 무한 반복이 되므로 상한을 둔다.
+    const missingRaw = newer ? [] : getMissingLocalUpdateFiles();
+    const missing = canRepairMissingFiles(missingRaw) ? missingRaw : [];
     const available = newer || missing.length > 0;
     pendingUpdateFetchPath = available ? best.sourcePath : '';
     return {
@@ -12837,10 +12883,12 @@ async function autoCheckAndApplyUpdate() {
     const best = await findNewestUpdateCandidate();
     if (!best) return;
     // 버전이 같아도 기능 파일이 빠져 있으면 조용히 다시 받아온다(getMissingLocalUpdateFiles 주석 참고).
-    const missingFiles = getMissingLocalUpdateFiles();
+    const missingRaw = getMissingLocalUpdateFiles();
+    const missingFiles = canRepairMissingFiles(missingRaw) ? missingRaw : [];
     if (compareVersions(best.version, APP_VERSION) <= 0 && missingFiles.length === 0) return;
     if (missingFiles.length) {
-      writeToLogFile('warn', `[업데이트] 누락 파일 감지 — 재수신: ${missingFiles.join(', ')}`);
+      const attempt = bumpMissingRepairCount();
+      writeToLogFile('warn', `[업데이트] 누락 파일 감지 — 재수신 ${attempt}회째: ${missingFiles.join(', ')}`);
     }
     // 자동 적용은 GitHub를 우선 (Z hang 회피). GitHub에 새 버전이 있을 때만.
     // findNewestUpdateCandidate가 이미 GitHub를 조회해 뒀으므로 재조회하지 않고 재사용한다

@@ -15886,7 +15886,11 @@
     /** 화면이 다시 그려져도 고친 문구가 유지되게 감시한다.
         ⚠️ 고친 문구가 없으면 감시를 아예 걸지 않는다 — 대부분의 PC에서 비용 0. */
     function ensureUiTextObserver() {
-      const need = Object.keys(uiTextOverrides).length > 0;
+      // 되돌림 표식(빈 값)만 남아 있는 경우는 화면에 입힐 게 없으므로 감시하지 않는다.
+      const need = Object.keys(uiTextOverrides).some((k) => {
+        const r = uiTextOverrides[k];
+        return r && r.value != null && r.value !== '';
+      });
       if (!need) {
         if (uiTextObserver) { uiTextObserver.disconnect(); uiTextObserver = null; }
         return;
