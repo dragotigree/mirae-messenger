@@ -15789,7 +15789,12 @@
       '#chat-messages-area', '#board-list-container', '#board-detail-view', '#board-write-view',
       '#all-logs-list', '#all-logs-body', '#sidebar-main-sections', '#detail-contact-section',
       '#mini-cal-grid', '#sidebar-calendar-day', '#ipmsg-recipient-table', '#board-rich-editor',
-      '#ui-text-edit-banner', '[data-uitext-block]'
+      '#ui-text-edit-banner', '[data-uitext-block]',
+      /* ⚠️ 아래는 코드가 이 요소의 "글자 자체"를 읽어 동작을 판단하는 곳이다.
+         문구를 바꾸면 비교가 어긋나 기능이 깨진다(예: 중복 전송 방지 장치가 풀림). */
+      '#transport-submit-btn',   // '전송 중…' 문구로 중복 전송을 막는다
+      '#quick-phrase-popover',   // 항목 글자를 그대로 입력창에 넣는다
+      '#master-loadsim-log'      // 초기 안내문과 비교해 로그를 쌓는다
     ].join(',');
     var UI_TEXT_BLOCKED_CLASS = /(^|\s)(detail-info-value|detail-name|chat-|board-notice-|sidebar-user|msg-)/;
 
@@ -15896,10 +15901,20 @@
         return;
       }
       if (uiTextObserver) return;
+      /* 대화가 활발하면 화면이 쉬지 않고 바뀌어, 매번 미루기만 하다가 영영 적용되지
+         않을 수 있다(starvation). 최대 1초 안에는 반드시 한 번 적용한다. */
       let timer = null;
+      let firstPendingAt = 0;
       uiTextObserver = new MutationObserver(() => {
+        const now = Date.now();
+        if (!firstPendingAt) firstPendingAt = now;
+        if (now - firstPendingAt >= 1000) {
+          clearTimeout(timer); timer = null; firstPendingAt = 0;
+          applyUiTextOverrides();
+          return;
+        }
         clearTimeout(timer);
-        timer = setTimeout(applyUiTextOverrides, 180);
+        timer = setTimeout(() => { firstPendingAt = 0; applyUiTextOverrides(); }, 180);
       });
       uiTextObserver.observe(document.body, { childList: true, subtree: true });
     }
