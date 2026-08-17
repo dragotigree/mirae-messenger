@@ -151,6 +151,7 @@ contextBridge.exposeInMainWorld('api', {
   resetDatabaseFresh: () => ipcRenderer.invoke('reset-database-fresh'),
   cleanupLeftoverDbFiles: () => ipcRenderer.invoke('cleanup-leftover-db-files'),
   // 🖊 화면 문구 덮어쓰기(마스터 전용 기능이지만, 적용은 모든 PC에서 이뤄진다)
+  logUiError: (message) => ipcRenderer.invoke('log-ui-error', message),
   getUiTextOverrides: () => ipcRenderer.invoke('get-ui-text-overrides'),
   setUiTextOverride: (key, value) => ipcRenderer.invoke('set-ui-text-override', key, value),
   resetAllUiTextOverrides: () => ipcRenderer.invoke('reset-all-ui-text-overrides'),

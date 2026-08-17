@@ -10963,6 +10963,16 @@ async function handleUiTextSync(payload) {
   }
 }
 
+/* 병원 PC에서는 개발자도구를 열 수 없다. 화면(렌더러)에서 난 오류가 콘솔에만 남으면
+   나중에 원인을 추적할 방법이 없으므로(이번 세션에도 실제로 겪음), 로그 파일로 넘겨 받는다. */
+ipcMain.handle('log-ui-error', async (event, message) => {
+  try {
+    const text = String(message == null ? '' : message).slice(0, 2000);
+    if (text) writeToLogFile('error', '[화면] ' + text);
+  } catch (e) { /* 로그 실패가 앱을 막으면 안 된다 */ }
+  return { ok: true };
+});
+
 ipcMain.handle('get-ui-text-overrides', async () => {
   try { return { success: true, overrides: await readUiTextOverrides() }; }
   catch (e) { return { success: false, overrides: {} }; }
