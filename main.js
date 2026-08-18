@@ -1859,7 +1859,7 @@ async function handleFileXferEnd(payload, senderIP) {
           [senderName, senderIP, receiverKey, messageHtml, msgUid],
           (err) => {
             if (err) {
-              logDbErr(err);
+              logDbErrSkipUidConflict(err);
               finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
               return;
             }
@@ -1895,7 +1895,7 @@ async function handleFileXferEnd(payload, senderIP) {
         [senderName, senderIP, MY_IP, messageHtml, msgUid],
         (err) => {
           if (err) {
-            logDbErr(err);
+            logDbErrSkipUidConflict(err);
             if (msgUid && isMsgUidUniqueConflict(err)) {
               finishIncomingChatUid(msgUid, true);
               if (msgUid) sendToIpDirect(senderIP, { type: 'MSG_ACK', msgUid });
@@ -7193,7 +7193,7 @@ function handleIncomingChat(payload, senderIP) {
       [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, uid],
       (err) => {
         if (err) {
-          logDbErr(err);
+          logDbErrSkipUidConflict(err);
           if (uid && isMsgUidUniqueConflict(err)) {
             finishIncomingChatUid(uid, true);
             ackIfUid();
@@ -7306,7 +7306,7 @@ function handleIncomingDeptMessage(payload, senderIP) {
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
         if (err) {
-          logDbErr(err);
+          logDbErrSkipUidConflict(err);
           finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
           return;
         }
@@ -7349,7 +7349,7 @@ function handleIncomingFloorMessage(payload, senderIP) {
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
         if (err) {
-          logDbErr(err);
+          logDbErrSkipUidConflict(err);
           finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
           return;
         }
@@ -7446,6 +7446,16 @@ function finishIncomingChatUid(uid, ok) {
 function isMsgUidUniqueConflict(err) {
   const msg = String((err && err.message) || err || '');
   return /UNIQUE/i.test(msg);
+}
+
+/**
+ * msg_uid UNIQUE 충돌은 "같은 메시지가 두 경로로 도착했다"는 정상 동작이라 오류가 아니다.
+ * ⚠️ 이걸 logDbErr로 흘리면 logDbErr의 10초 중복 억제 창을 이 소음이 차지해서, 같은
+ * 시간대에 난 진짜 DB 오류가 대신 삼켜질 수 있다. 충돌이면 조용히 넘긴다.
+ */
+function logDbErrSkipUidConflict(err) {
+  if (!err || isMsgUidUniqueConflict(err)) return;
+  logDbErr(err);
 }
 
 function shouldSkipDuplicateChannelMessage(msgUid, onUnique) {
@@ -7693,7 +7703,7 @@ function handleIncomingBroadcast(payload, senderIP) {
       [senderName, senderIP, storedMessage, msgUid],
       (err) => {
         if (err) {
-          logDbErr(err);
+          logDbErrSkipUidConflict(err);
           finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
           return;
         }
@@ -9056,7 +9066,7 @@ function handleIncomingGroupMessage(payload, senderIP) {
       [senderName, senderIP, receiverKey, storedMessage, msgUid],
       (err) => {
         if (err) {
-          logDbErr(err);
+          logDbErrSkipUidConflict(err);
           finishIncomingChatUid(msgUid, isMsgUidUniqueConflict(err));
           return;
         }
@@ -9457,6 +9467,22 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       [senderLabelForMe(), MY_IP, targetIP, message, msgUid],
       function (insertErr) {
         if (insertErr) {
+          // ⚠️ 실사고 가능 경로: 루프백 수신이 먼저 같은 msg_uid를 넣어버리면 여기서
+          // UNIQUE 충돌이 난다. 그때 아래 재시도는 "같은 msg_uid"로 다시 INSERT하는
+          // 것이라 반드시 똑같이 실패하고, 이미 저장에 성공한 메시지인데도 사용자에게는
+          // 전송 실패(ERROR)로 보였다. 충돌이면 이미 그 행이 있는 것이므로 그 id를 찾아
+          // 정상 흐름을 계속한다.
+          if (isMsgUidUniqueConflict(insertErr)) {
+            db.get(`SELECT id FROM messages WHERE msg_uid = ? LIMIT 1`, [msgUid], (selErr, row) => {
+              if (!selErr && row) {
+                startTcpSend(row.id);
+                return;
+              }
+              logDbErr(selErr || insertErr);
+              finish({ status: 'ERROR', error: '메시지 저장 확인 실패', uid: msgUid });
+            });
+            return;
+          }
           logDbErr(insertErr);
           // 가짜 PENDING 금지: 실제 PENDING 행을 남기거나 ERROR 반환
           db.run(
