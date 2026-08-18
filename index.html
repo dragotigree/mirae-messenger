@@ -12139,14 +12139,23 @@
     function buildGroupMemberRowsHtml(user) {
       const members = sortGroupMembers(user.groupMembers || []);
       const myIp = myProfile && myProfile.ip;
+      // ⚠️ 실사고: 한 PC가 유·무선 등 여러 IP로 동시에 잡히면 접속 상태가 aliasIps로
+      // 병합되는데(main.js), 그룹방 멤버 목록엔 초대 당시의 IP가 그대로 스냅샷돼 있어서
+      // 그 IP가 나중에 별칭(aliasIps) 쪽으로 밀리면 m.ip === myIp가 항상 거짓이 됐다.
+      // 그 결과 방장 본인 화면에서도 "나"·"방장 위임"·"내보내기" 버튼이 하나도 안 보이는
+      // 문제가 있었다. 내 별칭 IP까지 포함해서 비교한다.
+      const myLive = myIp ? allUsers.find((u) => u.ip === myIp) : null;
+      const myIpSet = new Set([myIp, ...((myLive && myLive.aliasIps) || [])].filter(Boolean));
+      const ipMatchesMe = (ip) => !!ip && myIpSet.has(ip);
       const ownerIp = user.ownerIp || '';
       const noOwner = !ownerIp;
-      const iAmOwner = !!(ownerIp && myIp && ownerIp === myIp);
+      const iAmOwner = ipMatchesMe(ownerIp);
       const rowsHtml = members.map((m) => {
-        const live = allUsers.find((u) => u.ip === m.ip);
+        const live = allUsers.find((u) => u.ip === m.ip || ((u.aliasIps || []).includes(m.ip)));
+        const memberIps = [m.ip, ...((live && live.aliasIps) || []), ...(live ? [live.ip] : [])].filter(Boolean);
         const name = groupMemberDisplayLabel(m);
-        const isMe = myIp && m.ip === myIp;
-        const isOwner = ownerIp && m.ip === ownerIp;
+        const isMe = memberIps.some(ipMatchesMe);
+        const isOwner = !!ownerIp && memberIps.includes(ownerIp);
         const st = groupMemberStatusInfo(m);
         const badgeClass = groupMemberStatusBadgeClass(m);
         const photo = live && live.photo ? live.photo : (m.photo || '');
