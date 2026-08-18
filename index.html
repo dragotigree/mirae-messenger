@@ -18452,8 +18452,9 @@
       activeChatUser = normalizeUserRecord(resolved);
       user = activeChatUser;
       channelReadNotifyWatermark = '';
-      pendingUnreadScrollCount = unreadCounts[user.ip] || 0;
+      pendingUnreadScrollCount = getUnreadForUser(user);
       unreadCounts[user.ip] = 0;
+      (user.aliasIps || []).forEach((ip) => { unreadCounts[ip] = 0; });
       saveUnreadCounts();
       syncSidebarSelectionHighlight();
       refreshUnreadBadges();
