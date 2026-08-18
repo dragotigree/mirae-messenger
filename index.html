@@ -2540,16 +2540,16 @@
     .group-detail-members { width: 100%; margin-top: 10px; text-align: left; display: flex; flex-direction: column; gap: 6px; }
     .group-detail-members-heading { font-size: 11.5px; color: var(--text-secondary); font-weight: var(--font-weight-bold); text-align: center; width: 100%; margin-bottom: 2px; }
     .group-member-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: 12px; box-sizing: border-box; }
-    .group-member-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--sidebar-active), var(--sidebar-active)); color: var(--accent-dark); font-size: 13px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
-    .group-member-avatar.avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .group-member-avatar { position: relative; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--sidebar-active), var(--sidebar-active)); color: var(--accent-dark); font-size: 13px; font-weight: var(--font-weight-bold); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: visible; }
+    .group-member-avatar.avatar-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .group-member-body { flex: 1; min-width: 0; }
     .group-member-name { font-size: 12.5px; font-weight: 700; color: var(--text-primary); line-height: 1.35; word-break: break-word; }
     .group-member-sub { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; line-height: 1.3; }
-    .group-member-status { font-size: 10px; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
-    .group-member-status.is-online { color: #16a34a; }
-    .group-member-status.is-offline { color: #94a3b8; }
+    .group-member-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .group-owner-transfer-btn { flex-shrink: 0; border: 1px solid var(--border-soft); background: var(--surface); color: var(--text-secondary); font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
     .group-owner-transfer-btn:hover { background: var(--sidebar-active); color: var(--accent-dark); }
+    .group-member-kick-btn { flex-shrink: 0; border: 1px solid #fecaca; background: #fef2f2; color: #dc2626; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+    .group-member-kick-btn:hover { background: #fee2e2; }
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
     .sidebar-cal-header {
       display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
@@ -9632,13 +9632,21 @@
       sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users');
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
       if (sidebarRailFilter === 'favorites') {
-        const collapsed = localStorage.getItem('favoritesSectionCollapsed') === '1';
-        if (collapsed && typeof toggleFavoritesSectionCollapse === 'function') toggleFavoritesSectionCollapse();
+        // ⚠️ 실사고: 즐겨찾기가 0명이면 renderFavoritesSection이 블록 자체를
+        // display:none으로 숨겨둔다. 그 상태에서 이 레일 버튼으로 "즐겨찾기만 보기"를
+        // 누르면 다른 블록은 다 숨겨지는데 즐겨찾기 블록은 여전히 display:none이라
+        // 화면이 완전히 빈 채로 보였다. 이 필터를 켤 때는 블록을 강제로 보이게 하고
+        // 안내 문구를 채워 넣는다.
         const body = document.getElementById('favorites-section-body');
         const block = document.getElementById('sidebar-block-favorites');
         if (body && block && block.style.display === 'none') {
-          body.innerHTML = '<div style="padding:16px 12px; text-align:center; color:#94a3b8; font-size:12px; line-height:1.5;">즐겨찾기한 직원이 없습니다.<br>목록에서 우클릭으로 추가할 수 있습니다.</div>';
+          block.style.display = '';
+          body.innerHTML = '<div style="padding:16px 12px; text-align:center; color:#94a3b8; font-size:12px; line-height:1.5;">즐겨찾기한 대상이 없습니다.</div>';
         }
+      } else {
+        // 필터를 벗어날 때는 실제 즐겨찾기 데이터 기준으로 블록 표시 상태를 다시 맞춘다
+        // (위에서 강제로 보이게 했던 빈 즐겨찾기 블록을 원래대로 숨기기 위함).
+        if (typeof renderUserListTree === 'function') renderUserListTree();
       }
       if (sidebarRailFilter !== 'all') {
         sections.classList.add(`rail-filter-${sidebarRailFilter}`);
@@ -10096,8 +10104,20 @@
       syncUnreadInboxBars();
     }
 
+    function anyModalOverlayOpen() {
+      return [...document.querySelectorAll('.modal-overlay')].some((el) => el.style.display === 'flex');
+    }
+    // ⚠️ 실사고: 모달을 닫을 때마다 각 close 함수가 무조건 modal-open을 꺼버렸다. 모달
+    // 위에 또 다른 모달(확인창 등)을 띄운 경우, 위의 것만 닫아도 modal-open이 꺼지면서
+    // 아직 열려 있는 아래쪽 모달 기준으로는 "레이아웃이 갑자기 바뀐" 것처럼 보였다(창
+    // 제목표시줄 드래그 영역 등 modal-open에 걸린 스타일이 부정확한 시점에 풀림).
+    // false로 끌 때는 실제로 열려 있는 모달이 하나도 없을 때만 진짜로 끈다.
     function setModalOpenState(isOpen) {
-      document.body.classList.toggle('modal-open', !!isOpen);
+      if (isOpen) {
+        document.body.classList.add('modal-open');
+        return;
+      }
+      if (!anyModalOverlayOpen()) document.body.classList.remove('modal-open');
     }
 
     let appDialogFinish = null;
@@ -12090,6 +12110,19 @@
       });
     }
 
+    function groupMemberStatusBadgeClass(m) {
+      const live = allUsers.find((u) => u.ip === m.ip);
+      if (!live || !live.online) return 'status-OFFLINE';
+      return normalizeSelectableStatusState(live.statusState) === 'TREATMENT' ? 'status-TREATMENT' : 'status-ONLINE';
+    }
+
+    function showGroupMemberContextMenu(e, ip) {
+      e.preventDefault();
+      const live = allUsers.find((u) => u.ip === ip);
+      const user = live || { ip, username: ip, isMe: !!(myProfile && myProfile.ip === ip) };
+      showUserContextMenu(e, user);
+    }
+
     function buildGroupMemberRowsHtml(user) {
       const members = sortGroupMembers(user.groupMembers || []);
       const myIp = myProfile && myProfile.ip;
@@ -12102,6 +12135,7 @@
         const isMe = myIp && m.ip === myIp;
         const isOwner = ownerIp && m.ip === ownerIp;
         const st = groupMemberStatusInfo(m);
+        const badgeClass = groupMemberStatusBadgeClass(m);
         const photo = live && live.photo ? live.photo : (m.photo || '');
         const seed = m.ip || (live && live.ip) || m.username;
         const cuteCls = cuteAvatarClassFor(m.username, photo, seed);
@@ -12115,14 +12149,16 @@
           : (noOwner && isMe)
             ? `<button type="button" class="group-owner-transfer-btn" onclick="transferGroupOwnerConfirmed(${escapeHtml(JSON.stringify(user.groupUid))}, ${escapeHtml(JSON.stringify(m.ip))}, ${escapeHtml(JSON.stringify(name))})">방장 되기</button>`
             : '';
-        return `<div class="group-member-row">
-          <div class="${avatarClass}">${avatarInner}</div>
+        const kickBtn = (iAmOwner && !isMe)
+          ? `<button type="button" class="group-member-kick-btn" onclick="removeGroupMemberConfirmed(${escapeHtml(JSON.stringify(user.groupUid))}, ${escapeHtml(JSON.stringify(m.ip))}, ${escapeHtml(JSON.stringify(name))})">내보내기</button>`
+          : '';
+        return `<div class="group-member-row" oncontextmenu="showGroupMemberContextMenu(event, ${escapeHtml(JSON.stringify(m.ip))})">
+          <div class="${avatarClass}">${avatarInner}<span class="avatar-status-badge ${badgeClass}"></span></div>
           <div class="group-member-body">
             <div class="group-member-name">${isOwner ? '👑 ' : ''}${escapeHtml(name)}${isMe ? ' <span style="color:var(--accent); font-size:10px;">(나)</span>' : ''}</div>
             ${st.sub ? `<div class="group-member-sub">${escapeHtml(st.sub)}</div>` : ''}
           </div>
-          ${transferBtn}
-          <span class="group-member-status ${st.online ? 'is-online' : 'is-offline'}">${escapeHtml(st.label)}</span>
+          <div class="group-member-actions">${transferBtn}${kickBtn}</div>
         </div>`;
       }).join('');
       return { rowsHtml, count: members.length };
@@ -12161,17 +12197,31 @@
       if (activeChatUser && activeChatUser.isGroup) openGroupMembersModal(activeChatUser);
     }
 
-    async function transferGroupOwnerConfirmed(uid, newOwnerIp, newOwnerName) {
-      const isSelfClaim = myProfile && myProfile.ip === newOwnerIp;
-      const confirmMsg = isSelfClaim ? '이 대화방의 방장이 되시겠습니까?' : `'${newOwnerName}'님에게 방장을 위임하시겠습니까?`;
-      if (!await appConfirm(confirmMsg)) return;
-      const res = await window.api.transferGroupOwner(uid, newOwnerIp);
-      if (!res || !res.success) { await appAlert((res && res.msg) || '방장 위임에 실패했습니다.'); return; }
+    async function refreshOpenGroupMemberViews(uid) {
       await refreshGroupChats();
       if (activeChatUser && activeChatUser.isGroup && activeChatUser.groupUid === uid) {
         syncActiveGroupChatFromList();
         renderGroupDetailPanel(activeChatUser);
+        if (isFlexOverlay('group-members-modal')) openGroupMembersModal(activeChatUser);
       }
+    }
+
+    async function transferGroupOwnerConfirmed(uid, newOwnerIp, newOwnerName) {
+      const isSelfClaim = myProfile && myProfile.ip === newOwnerIp;
+      const confirmMsg = isSelfClaim ? '이 대화방의 방장이 되시겠습니까?' : `'${newOwnerName}'님에게 방장을 위임하시겠습니까?`;
+      if (!await appConfirm(confirmMsg, { title: '방장 위임', confirmText: '위임', cancelText: '취소' })) return;
+      const res = await window.api.transferGroupOwner(uid, newOwnerIp);
+      if (!res || !res.success) { await appAlert((res && res.msg) || '방장 위임에 실패했습니다.'); return; }
+      await refreshOpenGroupMemberViews(uid);
+    }
+
+    async function removeGroupMemberConfirmed(uid, targetIp, targetName) {
+      if (!await appConfirm(`'${targetName}'님을 대화방에서 내보내시겠습니까?\n내보낸 뒤에는 다시 초대해야 참여할 수 있습니다.`, {
+        title: '참여자 내보내기', confirmText: '내보내기', cancelText: '취소', variant: 'danger'
+      })) return;
+      const res = await window.api.removeGroupMember(uid, targetIp);
+      if (!res || !res.success) { await appAlert((res && res.msg) || '내보내기에 실패했습니다.'); return; }
+      await refreshOpenGroupMemberViews(uid);
     }
 
     function makeGroupChannel(g) {

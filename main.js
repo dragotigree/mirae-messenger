@@ -11811,6 +11811,44 @@ ipcMain.handle('transfer-group-owner', async (event, { uid, newOwnerIp }) => {
   });
 });
 
+ipcMain.handle('remove-group-member', async (event, { uid, targetIp }) => {
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM group_chats WHERE uid = ?`, [uid], (err, row) => {
+      if (err || !row) { resolve({ success: false, msg: '대화방을 찾을 수 없습니다.' }); return; }
+      const ownerIp = row.owner_ip || '';
+      if (ownerIp && ownerIp !== MY_IP) {
+        resolve({ success: false, msg: '방장만 내보낼 수 있습니다.' });
+        return;
+      }
+      if (targetIp === MY_IP) {
+        resolve({ success: false, msg: '자기 자신은 내보낼 수 없습니다.' });
+        return;
+      }
+      let members = [];
+      try { members = JSON.parse(row.members); } catch (e) {}
+      const target = members.find((m) => m.ip === targetIp);
+      if (!target) {
+        resolve({ success: false, msg: '대화방 참여자가 아닙니다.' });
+        return;
+      }
+      const remaining = members.filter((m) => m.ip !== targetIp);
+      const membersJson = JSON.stringify(remaining);
+      db.run(`UPDATE group_chats SET members = ? WHERE uid = ?`, [membersJson, uid], (err2) => {
+        if (err2) { logDbErr(err2); resolve({ success: false }); return; }
+        const updated = { ...row, members: membersJson };
+        sendToIps(remaining.map((m) => m.ip), { type: 'GROUP_SYNC', group: updated });
+        // 내보내진 사람에게도 최신(자신이 빠진) 멤버 목록을 보내 로컬에서 방을 정리하게 한다.
+        sendToIps([targetIp], { type: 'GROUP_SYNC', group: updated });
+        const noticeText = `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 ${target.username}님을 내보냈습니다.`;
+        logGroupSystemNotice(uid, row.name, noticeText);
+        pushGroupSystemNoticeLive(uid, noticeText);
+        sendToIps(remaining.map((m) => m.ip).filter((ip) => ip !== MY_IP), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
+        resolve({ success: true });
+      });
+    });
+  });
+});
+
 ipcMain.handle('send-group-message', async (event, { uid, groupName, message }) => {
   if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   return new Promise((resolve) => {
