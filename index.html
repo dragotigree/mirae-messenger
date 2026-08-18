@@ -2812,6 +2812,15 @@
     }
     .mini-cal-day:hover { background: var(--sidebar-active); }
     .mini-cal-day.other-month { color: #d6dce4; }
+    /* 일정 카드를 드래그해서 올려놓은 날짜 칸 강조 */
+    .mini-cal-day.drop-target { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .schedule-board-data-row.is-dragging { opacity: 0.4; }
+    .sb-drag-grip {
+      display: inline-block; cursor: grab; opacity: 0.35; margin-right: 4px;
+      font-size: 11px; user-select: none; transition: opacity var(--transition-fast);
+    }
+    .schedule-board-data-row:hover .sb-drag-grip { opacity: 0.7; }
+    .sb-drag-grip:active { cursor: grabbing; }
     /* 오늘 — 얇은 하늘색 링 (선택과 겹쳐도 구분) */
     .mini-cal-day.today {
       font-weight: 800;
@@ -21723,6 +21732,65 @@
       openScheduleBoardForQuickAdd(dateStr, { editUid: sch.uid, focusQuickAdd: true });
     }
 
+    /** "YYYY-MM-DDTHH:mm" 형태 시간 문자열의 날짜 부분만 바꿔치기 — 시각(HH:mm)은 그대로 둔다.
+     * new Date()로 파싱했다가 다시 조립하면 로컬 타임존 계산이 끼어들 여지가 있어서,
+     * 문자열 그대로 앞 10자리(날짜)만 교체하는 게 가장 안전하다. */
+    function withNewDatePart(timeLikeStr, newDateStr) {
+      if (!timeLikeStr) return timeLikeStr;
+      const tIdx = timeLikeStr.indexOf('T');
+      if (tIdx === -1) return timeLikeStr;
+      return newDateStr + timeLikeStr.slice(tIdx);
+    }
+
+    /** 일정 카드를 미니 달력의 다른 날짜 칸으로 드래그해서 놓았을 때 — 그 일정을
+     * 해당 날짜로 옮긴다. 출발/귀원 시각은 그대로 두고 날짜만 바꾼다. */
+    async function moveScheduleToDate(uid, newDateStr) {
+      if (!uid || !/^\d{4}-\d{2}-\d{2}$/.test(String(newDateStr || ''))) return;
+      const sch = findScheduleByUid(uid);
+      if (!sch) {
+        await appAlert('옮길 일정을 찾을 수 없습니다.');
+        return;
+      }
+      if (!canModifySchedule(sch)) {
+        await appAlert('본인이 작성한 일정만 옮길 수 있습니다. (마스터는 전체 가능)');
+        return;
+      }
+      const oldDateStr = sch.time_str ? String(sch.time_str).slice(0, 10) : '';
+      if (oldDateStr === newDateStr) return;
+      const norm = normalizeSchedulePatient(sch);
+      const patientLabel = scheduleBoardPatientLabel(norm.patient_name) || (sch.title || '이 일정');
+      const confirmed = await appConfirm(
+        `'${patientLabel}' 일정을 ${formatCalendarDayHeader(newDateStr)}(으)로 옮기시겠습니까?`,
+        { title: '일정 날짜 변경', confirmText: '옮기기', cancelText: '취소' }
+      );
+      if (!confirmed) return;
+      const res = await window.api.editSchedule({
+        uid,
+        type: sch.type,
+        title: sch.title,
+        timeStr: withNewDatePart(sch.time_str, newDateStr),
+        remindBefore: !!sch.remind_before,
+        attendingPhysician: sch.attending_physician || '',
+        timeEndStr: sch.time_end_str ? withNewDatePart(sch.time_end_str, newDateStr) : '',
+        timeStartUndecided: !!sch.time_start_undecided,
+        timeEndUndecided: !!sch.time_end_undecided,
+        mealCancelBreakfast: !!sch.meal_cancel_breakfast,
+        mealCancelLunch: !!sch.meal_cancel_lunch,
+        mealCancelDinner: !!sch.meal_cancel_dinner,
+        guardianOnly: !!sch.guardian_only,
+        remark: sch.remark || '',
+        ward: norm.ward,
+        rmTeam: norm.rm_team,
+        roomNo: norm.room_no,
+        patientName: norm.patient_name
+      });
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '일정 이동에 실패했습니다.');
+        return;
+      }
+      renderScheduleBoard();
+    }
+
     function ensureScheduleBoardQuickTypeOption(typeKey) {
       const typeSel = document.getElementById('sb-quick-type');
       if (!typeSel || !typeKey) return;
@@ -23706,7 +23774,22 @@
         if (!cell.other && cell.dateStr === todayStr) el.title = '오늘';
         const marks = (!cell.other && cell.dateStr) ? sidebarCalendarMarksHtml(cell.dateStr) : '';
         el.innerHTML = `${cell.dayNum}${marks}`;
-        if (!cell.other) el.onclick = () => scheduleBoardCalSelectDate(cell.dateStr);
+        if (!cell.other) {
+          el.onclick = () => scheduleBoardCalSelectDate(cell.dateStr);
+          // 일정 카드를 이 날짜 칸으로 드래그해서 놓으면 그 날짜로 옮긴다.
+          el.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            el.classList.add('drop-target');
+          });
+          el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
+          el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            el.classList.remove('drop-target');
+            const uid = e.dataTransfer.getData('text/plain');
+            if (uid) moveScheduleToDate(uid, cell.dateStr);
+          });
+        }
         grid.appendChild(el);
       });
     }
@@ -24590,8 +24673,11 @@
       const doctorHtml = attending
         ? `<span class="schedule-board-doctor" title="주치의">${escapeHtml(attending)}</span>`
         : '—';
+      const dragGripHtml = canRowManage
+        ? `<span class="sb-drag-grip" title="드래그해서 날짜 옮기기" draggable="true">⠿</span>`
+        : '';
       row.innerHTML = [
-        `<td class="schedule-board-room sb-col-room">${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</td>`,
+        `<td class="schedule-board-room sb-col-room">${dragGripHtml}${escapeHtml(scheduleBoardRoomLabel(norm.room_no) || '-')}</td>`,
         `<td class="schedule-board-name sb-col-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '-')}</td>`,
         `<td class="sb-col-doctor">${doctorHtml}</td>`,
         `<td class="sb-col-type">${typeCell}</td>`,
@@ -24605,6 +24691,18 @@
       row.querySelector('.sb-copy')?.addEventListener('click', () => copyScheduleBoardRow(sch.uid));
       row.querySelector('.sb-edit')?.addEventListener('click', () => startEditSchedule(sch));
       row.querySelector('.sb-del')?.addEventListener('click', () => deleteSchedule(sch.uid));
+      // 왼쪽 미니 달력의 날짜 칸으로 드래그해서 놓으면 그 날짜로 옮긴다. 행 전체를
+      // draggable로 하면 환자명 등 텍스트를 드래그로 선택하려 할 때 걸리적거려서,
+      // 채널 목록과 같은 방식으로 작은 그립 아이콘(⠿)만 드래그 가능하게 한다.
+      const gripEl = row.querySelector('.sb-drag-grip');
+      if (gripEl) {
+        gripEl.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', sch.uid);
+          row.classList.add('is-dragging');
+        });
+        gripEl.addEventListener('dragend', () => row.classList.remove('is-dragging'));
+      }
       bindScheduleBoardModifiedHover(row, modMeta);
       bindScheduleBoardRemarkHover(row);
     }
