@@ -12967,6 +12967,11 @@
       const unreadEl = document.getElementById('favorites-section-unread-badge');
       if (!block || !body) return;
       if (!favorites || !favorites.length) {
+        // ⚠️ 실사고: 즐겨찾기 0명일 때 블록만 숨기고 return 해버려서, 배지(countEl/
+        // unreadEl)가 마지막으로 찍혔던 값(예: 1)에 그대로 멈춰 있었다. 즐겨찾기를
+        // 해제해서 0명이 돼도 옆의 숫자 배지가 안 줄어드는 버그라 여기서도 초기화한다.
+        if (countEl) countEl.textContent = '0';
+        if (unreadEl) unreadEl.style.display = 'none';
         block.style.display = 'none';
         return;
       }
