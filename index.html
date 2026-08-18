@@ -614,6 +614,9 @@
     #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
     /* 관리자 창(.modal-overlay z-index:2000) 위에서 열리는 메뉴라 그보다 높아야 함 — 안 그러면 창 뒤에 가려 안 보임 */
     #master-client-menu { z-index: 2100; }
+    /* 참여자 모달(group-members-modal) 안에서 멤버 우클릭 시 dm-context-menu가 뜨는데
+       기본 z-index(300)가 모달(2000)보다 낮아 반투명 배경 뒤에 가려 비쳐 보였다. */
+    #dm-context-menu { z-index: 2100; }
     #master-client-menu .ctx-menu-item.is-danger { color: #b91c1c; }
     #master-client-menu .ctx-menu-item.is-good { color: #15803d; }
     @keyframes menu-pop { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
