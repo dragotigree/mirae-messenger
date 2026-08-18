@@ -93,8 +93,80 @@ process.on('unhandledRejection', (reason) => {
   try { writeToLogFile('error', '처리되지 않은 Promise 거부: ' + (reason && reason.stack ? reason.stack : reason)); } catch (e) { /* ignore */ }
 });
 
+/**
+ * 작성 권한자(notice_operators) 비밀번호 해시.
+ * ⚠️ 이 해시값은 OPERATOR_SYNC로 다른 PC에 그대로 전달돼 저장된다. 알고리즘을 바꾸면
+ * 아직 업데이트 안 된 PC가 새 형식을 검증하지 못해 작성자 로그인이 병원 전체에서
+ * 어긋나므로, 전 PC가 최신 버전이 된 뒤에 별도 롤아웃으로만 교체해야 한다.
+ */
 function hashPassword(pw) {
   return crypto.createHash('sha256').update(String(pw)).digest('hex');
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * 🔐 마스터 비밀번호 저장 형식
+ *
+ * 예전에는 master_config.master_password에 비밀번호를 "평문 그대로" 넣어뒀다.
+ * DB 파일(mirae_messenger.db)만 복사하면 마스터 비밀번호가 그대로 읽히는 상태라,
+ * salt를 붙인 scrypt 해시로 저장하도록 바꾼다.
+ *
+ * ⚠️ master_config는 notice_operators와 달리 네트워크로 동기화되지 않으므로(각 PC가
+ * 자기 값만 씀) 형식을 바꿔도 다른 PC와 어긋나지 않는다. 또 FORCE_UPDATE 등 네트워크
+ * 명령은 여전히 "평문"을 실어 보내고 받는 쪽이 그걸 해시해서 대조하므로, 구버전 PC와
+ * 주고받는 전문(wire) 형식도 그대로 유지된다.
+ *
+ * 옛 평문 값은 부팅 시 1회 자동으로 해시로 승격된다(사용자가 다시 설정할 필요 없음).
+ * ──────────────────────────────────────────────────────────────────────────── */
+const MASTER_PW_HASH_PREFIX = 'scrypt$';
+const MASTER_PW_KEY_LEN = 64;
+/** master_config 행이 없을 때만 쓰는 초기 비밀번호 (기존 값은 절대 덮어쓰지 않음) */
+const DEFAULT_MASTER_PASSWORD = 'alfoalfo12!';
+/** 1.0.706 이전 기본값 — 아직 이 값을 쓰는 PC만 새 기본값으로 승격 */
+const LEGACY_DEFAULT_MASTER_PASSWORD = 'admin1234';
+
+function scryptAsync(password, salt, keylen) {
+  return new Promise((resolve, reject) => {
+    // ⚠️ 동기(scryptSync)는 기본 파라미터로 수십~수백 ms 동안 Electron 메인 프로세스를
+    // 통째로 멈춰 세운다(그동안 모든 창이 "응답 없음"). 반드시 비동기 버전을 쓴다.
+    crypto.scrypt(password, salt, keylen, (err, key) => (err ? reject(err) : resolve(key)));
+  });
+}
+
+function isHashedMasterPassword(stored) {
+  return typeof stored === 'string' && stored.startsWith(MASTER_PW_HASH_PREFIX);
+}
+
+/** 평문 비밀번호 → 'scrypt$<salt hex>$<key hex>' */
+async function hashMasterPassword(pw) {
+  const salt = crypto.randomBytes(16);
+  const key = await scryptAsync(String(pw == null ? '' : pw).trim(), salt, MASTER_PW_KEY_LEN);
+  return `${MASTER_PW_HASH_PREFIX}${salt.toString('hex')}$${key.toString('hex')}`;
+}
+
+/**
+ * 입력 평문이 저장값과 일치하는지 확인. 저장값이 해시든 옛 평문이든 모두 처리한다.
+ * ⚠️ 저장값이 비어 있으면(DB 손상 등) 무조건 false — 빈 비밀번호로 뚫리면 안 된다.
+ */
+async function matchMasterPassword(input, stored) {
+  const pw = String(input == null ? '' : input).trim();
+  const s = String(stored == null ? '' : stored);
+  if (!pw || !s.trim()) return false;
+
+  if (!isHashedMasterPassword(s)) {
+    // 아직 승격 전인 옛 평문 값 — 기존과 동일하게 앞뒤 공백만 무시하고 비교
+    return s.trim() === pw;
+  }
+  const parts = s.split('$');
+  if (parts.length !== 3) return false;
+  try {
+    const salt = Buffer.from(parts[1], 'hex');
+    const expected = Buffer.from(parts[2], 'hex');
+    if (!salt.length || !expected.length) return false;
+    const actual = await scryptAsync(pw, salt, expected.length);
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  } catch (e) {
+    return false;
+  }
 }
 
 
@@ -4117,10 +4189,12 @@ db.serialize(() => {
     db.run(`ALTER TABLE user_profile ADD COLUMN ${colDef}`, () => {});
   });
 
+  // master_password는 scrypt 해시로 저장된다(위 hashMasterPassword 참고). 컬럼 기본값으로
+  // 비밀번호를 박아두면 그 자체가 평문 노출이라, 행을 만드는 쪽에서 항상 해시를 넣어준다.
   db.run(`CREATE TABLE IF NOT EXISTS master_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     master_id TEXT DEFAULT 'admin',
-    master_password TEXT DEFAULT 'alfoalfo12!'
+    master_password TEXT DEFAULT ''
   )`, logDbErr);
   db.run(`ALTER TABLE master_config ADD COLUMN master_id TEXT DEFAULT 'admin'`, () => {});
 
@@ -4583,15 +4657,32 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_hospital_schedules_time ON hospital_schedules(time_str)`, logDbErr);
 
   db.get(`SELECT * FROM master_config WHERE id = 1`, (err, row) => {
+    if (err) return logDbErr(err);
     if (!row) {
-      db.run(`INSERT INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'alfoalfo12!')`, logDbErr);
+      hashMasterPassword(DEFAULT_MASTER_PASSWORD).then((hash) => {
+        db.run(`INSERT INTO master_config (id, master_id, master_password) VALUES (1, 'admin', ?)`, [hash], logDbErr);
+      }, logDbErr);
       return;
     }
-    // 예전 기본값(admin1234)을 아직 그대로 쓰고 있는 PC는 새 기본값으로 맞춰준다.
-    // 마스터가 직접 바꾼 값이면(더 이상 예전 기본값이 아니면) 절대 건드리지 않는다.
-    if (row.master_id === 'admin' && String(row.master_password || '').trim() === 'admin1234') {
-      db.run(`UPDATE master_config SET master_password = 'alfoalfo12!' WHERE id = 1`, logDbErr);
-    }
+    (async () => {
+      // 예전 기본값(admin1234)을 아직 그대로 쓰고 있는 PC는 새 기본값으로 맞춰준다.
+      // 마스터가 직접 바꾼 값이면(더 이상 예전 기본값이 아니면) 절대 건드리지 않는다.
+      if (row.master_id === 'admin' && await matchMasterPassword(LEGACY_DEFAULT_MASTER_PASSWORD, row.master_password)) {
+        const hash = await hashMasterPassword(DEFAULT_MASTER_PASSWORD);
+        db.run(`UPDATE master_config SET master_password = ? WHERE id = 1`, [hash], logDbErr);
+        return;
+      }
+      // 옛 평문 저장값을 해시로 1회 승격 — 사용자는 쓰던 비밀번호를 그대로 계속 쓰면 된다.
+      if (!isHashedMasterPassword(row.master_password)) {
+        const plain = String(row.master_password || '').trim();
+        if (!plain) return; // 빈 값은 승격 대상이 아님 (승격하면 빈 비밀번호가 유효해진다)
+        const hash = await hashMasterPassword(plain);
+        db.run(`UPDATE master_config SET master_password = ? WHERE id = 1`, [hash], (updErr) => {
+          if (updErr) return logDbErr(updErr);
+          writeToLogFile('info', '[마스터] 평문으로 저장돼 있던 비밀번호를 해시로 전환했습니다.');
+        });
+      }
+    })().catch((e) => logDbErr(e));
   });
 
   function onProfileLoadedForPresence() {
@@ -10620,20 +10711,18 @@ ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
 // 기존 호환성을 위해 유지 (아이디 무관, 비밀번호만 확인 — 현재 렌더러에서 호출하는 곳은 없음)
 ipcMain.handle('verify-master-password', async (event, inputPassword) => {
   return new Promise((resolve) => {
+    const done = (ok) => resolve(ok
+      ? { success: true }
+      : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
     db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
       if (!err && row) {
-        const ok = String(row.master_password || '').trim() === String(inputPassword || '').trim();
-        resolve(ok
-          ? { success: true }
-          : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
+        matchMasterPassword(inputPassword, row.master_password).then(done, () => done(false));
         return;
       }
       ensureMasterConfigRow(() => {
         db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err2, row2) => {
-          const ok = row2 && String(row2.master_password || '').trim() === String(inputPassword || '').trim();
-          resolve(ok
-            ? { success: true }
-            : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
+          if (!row2) return done(false);
+          matchMasterPassword(inputPassword, row2.master_password).then(done, () => done(false));
         });
       });
     });
@@ -10659,18 +10748,18 @@ ipcMain.handle('change-master-password', async (event, payload) => {
     return { success: false, msg: '새 비밀번호는 현재 비밀번호와 달라야 합니다.' };
   }
   return new Promise((resolve) => {
-    db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
+    db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, async (err, row) => {
       if (err || !row) {
         resolve({ success: false, msg: '마스터 설정을 찾을 수 없습니다.' });
         return;
       }
-      if (String(row.master_password || '').trim() !== currentPassword) {
+      if (!(await matchMasterPassword(currentPassword, row.master_password))) {
         resolve({ success: false, msg: '현재 비밀번호가 올바르지 않습니다.' });
         return;
       }
       db.run(
         `UPDATE master_config SET master_password = ? WHERE id = 1`,
-        [normalized.password],
+        [await hashMasterPassword(normalized.password)],
         (updErr) => {
           if (updErr) {
             logDbErr(updErr);
@@ -12547,7 +12636,8 @@ function verifyLocalMasterPassword(password) {
       // ⚠️ 실사고: 복사/붙여넣기로 비밀번호 앞뒤에 보이지 않는 공백이 붙으면 이 정확 일치
       // 비교가 계속 실패해서 "비밀번호가 틀렸다"고 나오는데 실제로는 맞는 값이었다.
       // 비밀번호 변경 시에도 항상 trim해서 저장하므로(normalizeNewPassword) 비교도 trim한다.
-      resolve(!!(row && String(row.master_password).trim() === String(password || '').trim()));
+      if (!row) return resolve(false);
+      matchMasterPassword(password, row.master_password).then(resolve, () => resolve(false));
     });
   });
 }
@@ -12557,24 +12647,30 @@ function verifyLocalMasterPassword(password) {
 // 모든 마스터 로그인 화면에서 전부 거부당하는 것처럼 보였다. 행이 없을 때만 기본값(admin/
 // alfoalfo12!)으로 되살리고(기존 값이 있으면 절대 덮어쓰지 않음) 그 값으로 재검사한다.
 function ensureMasterConfigRow(cb) {
-  db.run(`INSERT OR IGNORE INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'alfoalfo12!')`, () => {
-    if (typeof cb === 'function') cb();
-  });
+  hashMasterPassword(DEFAULT_MASTER_PASSWORD).then((hash) => {
+    db.run(
+      `INSERT OR IGNORE INTO master_config (id, master_id, master_password) VALUES (1, 'admin', ?)`,
+      [hash],
+      () => { if (typeof cb === 'function') cb(); }
+    );
+  }, () => { if (typeof cb === 'function') cb(); });
 }
 function verifyLocalMasterAuth(id, password) {
   return new Promise((resolve) => {
+    const check = (row) => {
+      if (!row) return resolve(false);
+      const currentId = row.master_id ? String(row.master_id) : 'admin';
+      if (currentId !== String(id || '').trim()) return resolve(false);
+      matchMasterPassword(password, row.master_password).then(resolve, () => resolve(false));
+    };
     db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
       if (err || !row) {
         ensureMasterConfigRow(() => {
-          db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err2, row2) => {
-            const currentId = row2 && row2.master_id ? String(row2.master_id) : 'admin';
-            resolve(!!(row2 && currentId === String(id || '').trim() && String(row2.master_password).trim() === String(password || '').trim()));
-          });
+          db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err2, row2) => check(row2));
         });
         return;
       }
-      const currentId = row.master_id ? String(row.master_id) : 'admin';
-      resolve(!!(currentId === String(id || '').trim() && String(row.master_password).trim() === String(password || '').trim()));
+      check(row);
     });
   });
 }
@@ -12714,7 +12810,18 @@ let forceUpdateInFlight = false;
 // 업데이트가 필요한 순간(구버전 크래시 등)에 그 PC의 실제 비밀번호를 알 수 없어 막히는
 // 사고가 있었다. 강제 업데이트만은 이 고정값이면 대상 PC의 저장된 비밀번호와 무관하게
 // 항상 통과하도록 별도 우회를 둔다(다른 마스터 기능에는 영향 없음).
-const FORCE_UPDATE_OVERRIDE_PASSWORD = 'alfoalfo12!';
+// ⚠️ 이 저장소는 GitHub에 올라가므로 우회 비밀번호를 소스에 평문으로 두면 저장소를 볼 수
+// 있는 누구나 LAN의 모든 PC에 강제 업데이트를 걸 수 있다. 리터럴 대신 해시만 남긴다.
+// (해시로 바꿔도 "아는 사람은 통과"라는 성질은 그대로다 — 근본 대책은 이 우회 자체를
+//  없애고 대상 PC 비밀번호를 정상화하는 것이며, 전 PC 업데이트가 끝나면 제거해야 한다.)
+const FORCE_UPDATE_OVERRIDE_PW_SHA256 = 'b04d6da8fc9553f951587d04ad070b6430c93c610a013e3fc268f5a1726e1ead';
+function isForceUpdateOverridePassword(pw) {
+  const s = String(pw == null ? '' : pw).trim();
+  if (!s) return false;
+  const digest = Buffer.from(hashPassword(s), 'hex');
+  const expected = Buffer.from(FORCE_UPDATE_OVERRIDE_PW_SHA256, 'hex');
+  return digest.length === expected.length && crypto.timingSafeEqual(digest, expected);
+}
 
 async function handleForceUpdateCommand(payload, senderIP) {
   if (forceUpdateInFlight) {
@@ -12730,7 +12837,7 @@ async function handleForceUpdateCommand(payload, senderIP) {
     return;
   }
   const inputPw = String((payload && payload.masterPassword) || '').trim();
-  const ok = inputPw === FORCE_UPDATE_OVERRIDE_PASSWORD || await verifyLocalMasterPassword(inputPw);
+  const ok = isForceUpdateOverridePassword(inputPw) || await verifyLocalMasterPassword(inputPw);
   if (!ok) {
     if (senderIP) {
       sendToIps([senderIP], {
@@ -12784,7 +12891,7 @@ ipcMain.handle('master-force-update', async (event, payload) => {
   if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
   const p = payload || {};
   const password = String(p.password || '').trim();
-  if (password !== FORCE_UPDATE_OVERRIDE_PASSWORD && !(await verifyLocalMasterPassword(password))) {
+  if (!isForceUpdateOverridePassword(password) && !(await verifyLocalMasterPassword(password))) {
     return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
   }
 
