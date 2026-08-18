@@ -7,6 +7,7 @@
     "rebuild": "electron-rebuild -f -w sqlite3",
     "package": "powershell -ExecutionPolicy Bypass -File build.ps1",
     "installer": "powershell -ExecutionPolicy Bypass -File installer\\build-installer.ps1",
+    "dist:win": "electron-builder --win nsis",
     "publish:github": "powershell -ExecutionPolicy Bypass -File scripts\\publish-to-github.ps1",
     "build:tiptap": "node scripts/build-tiptap.mjs",
     "build:draw": "node scripts/build-draw.mjs"
@@ -24,8 +25,47 @@
     "@tiptap/starter-kit": "^3.30.0",
     "dompurify": "^3.4.13",
     "electron": "28.2.0",
+    "electron-builder": "^24.13.3",
     "electron-packager": "^17.1.2",
     "esbuild": "^0.28.2",
     "perfect-freehand": "^1.2.3"
+  },
+  "build": {
+    "appId": "com.miraehospital.messenger",
+    "productName": "미래병원 메신저",
+    "copyright": "Mirae Hospital",
+    "asar": true,
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "**/*",
+      "!agent-transcripts${/*}",
+      "!installer${/*}",
+      "!dist-installer${/*}",
+      "!MiraeMessenger-Installer${/*}",
+      "!*.md"
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "미래병원 메신저",
+      "menuCategory": false,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "artifactName": "MiraeMessenger-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "language": "1042"
+    }
   }
 }
