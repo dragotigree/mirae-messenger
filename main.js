@@ -10622,7 +10622,7 @@ ipcMain.handle('verify-master-password', async (event, inputPassword) => {
   return new Promise((resolve) => {
     db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
       if (!err && row) {
-        const ok = row.master_password === inputPassword;
+        const ok = String(row.master_password || '').trim() === String(inputPassword || '').trim();
         resolve(ok
           ? { success: true }
           : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
@@ -10630,7 +10630,7 @@ ipcMain.handle('verify-master-password', async (event, inputPassword) => {
       }
       ensureMasterConfigRow(() => {
         db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err2, row2) => {
-          const ok = row2 && row2.master_password === inputPassword;
+          const ok = row2 && String(row2.master_password || '').trim() === String(inputPassword || '').trim();
           resolve(ok
             ? { success: true }
             : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
@@ -12544,7 +12544,10 @@ ipcMain.handle('apply-update', async () => {
 function verifyLocalMasterPassword(password) {
   return new Promise((resolve) => {
     db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
-      resolve(!!(row && String(row.master_password) === String(password || '')));
+      // ⚠️ 실사고: 복사/붙여넣기로 비밀번호 앞뒤에 보이지 않는 공백이 붙으면 이 정확 일치
+      // 비교가 계속 실패해서 "비밀번호가 틀렸다"고 나오는데 실제로는 맞는 값이었다.
+      // 비밀번호 변경 시에도 항상 trim해서 저장하므로(normalizeNewPassword) 비교도 trim한다.
+      resolve(!!(row && String(row.master_password).trim() === String(password || '').trim()));
     });
   });
 }
@@ -12565,13 +12568,13 @@ function verifyLocalMasterAuth(id, password) {
         ensureMasterConfigRow(() => {
           db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err2, row2) => {
             const currentId = row2 && row2.master_id ? String(row2.master_id) : 'admin';
-            resolve(!!(row2 && currentId === String(id || '') && String(row2.master_password) === String(password || '')));
+            resolve(!!(row2 && currentId === String(id || '').trim() && String(row2.master_password).trim() === String(password || '').trim()));
           });
         });
         return;
       }
       const currentId = row.master_id ? String(row.master_id) : 'admin';
-      resolve(!!(currentId === String(id || '') && String(row.master_password) === String(password || '')));
+      resolve(!!(currentId === String(id || '').trim() && String(row.master_password).trim() === String(password || '').trim()));
     });
   });
 }
