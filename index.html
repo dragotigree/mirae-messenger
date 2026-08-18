@@ -1440,6 +1440,16 @@
     #reply-compose-label { font-size: 12px; font-weight: 700; color: var(--accent-dark); }
     #reply-compose-snippet { font-size: 11.5px; color: #64748b; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .reply-compose-cancel { border: none; background: transparent; color: #94a3b8; font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; }
+    .chat-attach-preview { padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+    .chat-attach-preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .chat-attach-preview-count { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
+    .chat-attach-preview-clear { border: 1px solid var(--border-soft); background: var(--surface-muted); color: var(--text-secondary); font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+    .chat-attach-preview-clear:hover { background: var(--sidebar-active); }
+    .chat-attach-preview-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chat-attach-thumb { position: relative; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-soft); flex-shrink: 0; }
+    .chat-attach-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .chat-attach-thumb-remove { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; border: none; background: rgba(15,23,42,0.65); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .chat-attach-thumb-remove:hover { background: rgba(15,23,42,0.85); }
     .reply-input-row { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
     .reply-input-row .reply-input-arrow { flex-shrink: 0; font-size: 16px; color: var(--accent-dark); font-weight: 700; line-height: 1.5; margin-top: 2px; display: none; }
     .input-box-inner.is-reply-mode .reply-input-arrow { display: block; }
@@ -5482,6 +5492,7 @@
             </div>
             <div id="reply-compose-snippet"></div>
           </div>
+          <div id="chat-attach-preview" class="chat-attach-preview" style="display:none;"></div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
             <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
@@ -18464,6 +18475,7 @@
     async function selectUserChat(user) {
       cancelEditMessage();
       cancelReplyMessage();
+      clearChatAttachments();
       const resolved = findUserByIp(user.ip) || user;
       activeChatUser = normalizeUserRecord(resolved);
       user = activeChatUser;
@@ -19298,7 +19310,7 @@
     async function sendChatMessage() {
       const textarea = document.getElementById('chat-textarea');
       const text = textarea.value.trim();
-      if (!text || !activeChatUser) return;
+      if ((!text && !pendingChatAttachments.length) || !activeChatUser) return;
       // ⚠️ 실사고: 상대가 오프라인이면 전송 IPC가 응답(연결 실패 확인)하는 데 최대 900ms
       // 걸리는데, 그동안 입력창이 안 비워져 있어 사용자가 "안 보내졌나?" 하고 Enter를
       // 다시 누르거나 전송 버튼을 한 번 더 누르면 같은 내용이 정말로 두 번 보내졌다.
@@ -19346,7 +19358,11 @@
       // 다만 아직 업데이트 안 된 PC에서 오는 긴급 메시지는 그대로 표시되어야 하므로,
       // 받는 쪽 표시(urgent-badge·is-urgent)는 건드리지 않고 보내는 쪽만 뺀다.
       const replySnapshot = pendingReply;
-      let bodyHtml = textToMessageHtml(text);
+      const attachmentsToSend = pendingChatAttachments;
+      const attachmentsHtml = attachmentsToSend
+        .map((att) => `<img src="${att.dataUrl}" class="chat-img-preview" alt="${escapeHtmlText(att.fileName || '첨부 이미지')}" />`)
+        .join('');
+      let bodyHtml = attachmentsHtml + (text ? textToMessageHtml(text) : '');
       if (replySnapshot) bodyHtml = wrapMessageWithReply(bodyHtml, replySnapshot);
       const contentHtml = bodyHtml;
 
@@ -19377,6 +19393,7 @@
       textarea.value = '';
       resizeChatTextarea();
       cancelReplyMessage();
+      if (attachmentsToSend === pendingChatAttachments) clearChatAttachments();
     }
 
     function startEditMessage(msgUid) {
@@ -25194,13 +25211,69 @@
 
     function handleFileSelect(e) { const f = e.target.files[0]; if (f && activeChatUser) processAndSendFile(f); }
     function handleFileDrop(e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && activeChatUser) processAndSendFile(f); }
+
+    // 붙여넣은 이미지는 바로 보내지 않고, 메시지 입력창 위에 첨부로 쌓아 두었다가
+    // 글과 함께 「보내기」를 누를 때 같이 전송한다(다른 메신저들처럼).
+    let pendingChatAttachments = [];
+
+    function renderChatAttachPreview() {
+      const wrap = document.getElementById('chat-attach-preview');
+      if (!wrap) return;
+      if (!pendingChatAttachments.length) {
+        wrap.style.display = 'none';
+        wrap.innerHTML = '';
+        return;
+      }
+      wrap.style.display = 'block';
+      const sentCount = pendingChatAttachments.length;
+      wrap.innerHTML =
+        `<div class="chat-attach-preview-head">` +
+          `<span class="chat-attach-preview-count">첨부 ${sentCount}개</span>` +
+          `<button type="button" class="chat-attach-preview-clear" onclick="clearChatAttachments()">전체 삭제</button>` +
+        `</div>` +
+        `<div class="chat-attach-preview-list">` +
+          pendingChatAttachments.map((att, idx) =>
+            `<div class="chat-attach-thumb">` +
+              `<img src="${att.dataUrl}" alt="${escapeHtmlText(att.fileName || '첨부 이미지')}">` +
+              `<button type="button" class="chat-attach-thumb-remove" onclick="removeChatAttachment(${idx})" title="삭제">×</button>` +
+            `</div>`
+          ).join('') +
+        `</div>`;
+    }
+
+    function removeChatAttachment(idx) {
+      pendingChatAttachments.splice(idx, 1);
+      renderChatAttachPreview();
+    }
+
+    function clearChatAttachments() {
+      pendingChatAttachments = [];
+      renderChatAttachPreview();
+    }
+
+    async function stageChatPasteImage(file) {
+      try {
+        const rawDataUrl = await readFileAsDataUrl(file);
+        const compressed = await compressImageDataUrlForChat(rawDataUrl, file.name, file.type);
+        if (compressed.bytes > MAX_COMPRESSED_IMAGE_BYTES) {
+          await appAlert(`이미지를 압축해도 너무 큽니다 (${(compressed.bytes / 1024).toFixed(0)}KB).\n공유 폴더 등을 이용해 주세요.`);
+          return;
+        }
+        pendingChatAttachments.push({ dataUrl: compressed.dataUrl, fileName: compressed.fileName || file.name || 'image.jpg' });
+        renderChatAttachPreview();
+      } catch (err) {
+        console.error('이미지 첨부 실패:', err);
+        await appAlert('이미지를 처리하지 못했습니다.');
+      }
+    }
+
     function handleChatPaste(e) {
       const items = (e.clipboardData || e.originalEvent.clipboardData).items;
       for (let i in items) {
         if (items[i].kind === 'file') {
           e.preventDefault();
           const f = items[i].getAsFile();
-          if (f && activeChatUser) processAndSendFile(f);
+          if (f && activeChatUser) stageChatPasteImage(f);
         }
       }
     }
