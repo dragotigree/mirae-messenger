@@ -9196,8 +9196,12 @@
       let savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
       // 오른쪽 폭을 왼쪽(240px)의 황금비인 약 388px로 — 직접 조절한 적 없는 경우만
       if (savedRightWidth === 280) { savedRightWidth = 388; localStorage.setItem('sidebarRightWidth', '388'); }
+      // 예전 기본값(388px)이 필요 이상으로 넓다는 요청으로 300px로 줄임 — 직접 조절한
+      // 적 없는 PC만 해당. applyRightSidebarWidth가 실측 콘텐츠 최소폭 밑으로는 절대
+      // 안 내려가게 clamp하므로(getRightSidebarMinWidth), 제목·버튼 글씨가 잘릴 일은 없다.
+      if (savedRightWidth === 388) { savedRightWidth = 300; localStorage.setItem('sidebarRightWidth', '300'); }
       // 저장된 값이 예전 최소(180)보다 좁아 글씨가 잘렸다면 측정 최소로 끌어올림
-      applyRightSidebarWidth(savedRightWidth || 388);
+      applyRightSidebarWidth(savedRightWidth || 300);
 
       const handle = document.getElementById('sidebar-resize-handle');
       const rightHandle = document.getElementById('sidebar-right-resize-handle');
