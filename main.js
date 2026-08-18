@@ -4047,6 +4047,59 @@ function logDbErr(err) {
   if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('logDbErr');
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * 🧱 스키마 마이그레이션 (컬럼 추가)
+ *
+ * 예전에는 컬럼 추가를 전부 이렇게 적었다:
+ *     alterAddColumn('x', `y ...`);
+ * 부팅마다 무조건 실행하고 콜백에서 오류를 통째로 버리는 방식이라,
+ * "이미 있는 컬럼"이라는 정상적인 실패와 디스크 오류·DB 손상 같은 진짜 실패를
+ * 구분하지 못해 조용히 묻혔다(스키마가 실제로 안 만들어져도 아무도 모름).
+ *
+ * ⚠️ ALTER를 나중으로 미루면 안 된다. 바로 뒤에 오는 CREATE INDEX·SELECT가 그 컬럼을
+ * 전제하고 있어서, PRAGMA table_info로 먼저 확인하는 식으로 바꾸면 순서가 어긋나
+ * "no such column"이 난다. 그래서 실행 순서는 예전 그대로 두고(즉시 db.run),
+ * 오류 처리만 구분한다.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** ALTER ... ADD COLUMN 중 "이미 존재함"만 정상으로 보고, 나머지는 진짜 오류로 남긴다. */
+function isDuplicateColumnError(err) {
+  return !!err && /duplicate column name/i.test(String(err.message || err));
+}
+
+function alterAddColumn(table, colDef, cb) {
+  db.run(`ALTER TABLE ${table} ADD COLUMN ${colDef}`, (err) => {
+    if (err && !isDuplicateColumnError(err)) {
+      const colName = String(colDef).trim().split(/\s+/)[0];
+      const msg = `[DB] 스키마 마이그레이션 실패: ${table}.${colName} — ${String(err.message || err)}`;
+      console.error(msg);
+      try { writeToLogFile('error', msg); } catch (e) { /* ignore */ }
+      if (isSqliteCorruptError(err)) scheduleDbCorruptRecovery('schema-migration');
+    }
+    if (typeof cb === 'function') cb(err);
+  });
+}
+
+/**
+ * 스키마 리비전 스탬프 — PRAGMA user_version에 기록해 둔다.
+ * 값 자체로 동작이 갈리지는 않고(컬럼 추가는 위처럼 매번 안전하게 재시도됨),
+ * "이 DB가 어느 버전 스키마까지 거쳤는가"를 로그·진단에서 확인하기 위한 표식이다.
+ * 컬럼을 새로 추가할 때 이 숫자를 같이 올려두면 사고 조사 때 추적이 쉬워진다.
+ */
+const SCHEMA_REVISION = 1;
+function stampSchemaRevision() {
+  db.get('PRAGMA user_version', (err, row) => {
+    if (err) return;
+    const prev = (row && row.user_version) || 0;
+    if (prev === SCHEMA_REVISION) return;
+    db.run(`PRAGMA user_version = ${SCHEMA_REVISION}`, (setErr) => {
+      if (setErr) return;
+      console.log(`[DB] 스키마 리비전 ${prev} → ${SCHEMA_REVISION}`);
+      try { writeToLogFile('info', `[DB] 스키마 리비전 ${prev} → ${SCHEMA_REVISION}`); } catch (e) { /* ignore */ }
+    });
+  });
+}
+
 let logsDirEnsured = false;
 function getLogsDir() {
   const dir = path.join(app.getPath('userData'), 'logs');
@@ -4164,9 +4217,9 @@ db.serialize(() => {
     status TEXT DEFAULT 'SENT',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`, logDbErr);
-  db.run(`ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'SENT'`, () => {});
+  alterAddColumn('messages', `status TEXT DEFAULT 'SENT'`);
   // ✏️ 메시지 수정/삭제 기능을 위해, 보내는 쪽과 받는 쪽이 같은 메시지를 가리킬 수 있는 공용 ID.
-  db.run(`ALTER TABLE messages ADD COLUMN msg_uid TEXT`, () => {});
+  alterAddColumn('messages', `msg_uid TEXT`);
 
   db.run(`CREATE TABLE IF NOT EXISTS message_reactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4186,7 +4239,7 @@ db.serialize(() => {
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
   // ※ 바로 이 누락 때문에 phone_no 컬럼이 없는 PC에서 프로필 저장이 매번 조용히 실패하고 있었음.
   ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'note TEXT'].forEach(colDef => {
-    db.run(`ALTER TABLE user_profile ADD COLUMN ${colDef}`, () => {});
+    alterAddColumn('user_profile', `${colDef}`);
   });
 
   // master_password는 scrypt 해시로 저장된다(위 hashMasterPassword 참고). 컬럼 기본값으로
@@ -4196,14 +4249,14 @@ db.serialize(() => {
     master_id TEXT DEFAULT 'admin',
     master_password TEXT DEFAULT ''
   )`, logDbErr);
-  db.run(`ALTER TABLE master_config ADD COLUMN master_id TEXT DEFAULT 'admin'`, () => {});
+  alterAddColumn('master_config', `master_id TEXT DEFAULT 'admin'`);
 
   db.run(`CREATE TABLE IF NOT EXISTS known_users (
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
   )`, logDbErr);
   // 예전 DB에는 phone_no 등이 없을 수 있음 — 없으면 INSERT마다 SQLITE_ERROR로 CPU/콘솔 폭주
   ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER', 'note TEXT'].forEach((colDef) => {
-    db.run(`ALTER TABLE known_users ADD COLUMN ${colDef}`, () => {});
+    alterAddColumn('known_users', `${colDef}`);
   });
   // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
   db.run(
@@ -4264,7 +4317,7 @@ db.serialize(() => {
     disabled_by_ip TEXT DEFAULT '',
     reason TEXT DEFAULT ''
   )`, logDbErr);
-  db.run(`ALTER TABLE disabled_clients ADD COLUMN reason TEXT DEFAULT ''`, () => {});
+  alterAddColumn('disabled_clients', `reason TEXT DEFAULT ''`);
 
   db.get(
     `SELECT enabled, title, body, contact, until_label, updated_at, revision, bypass_revision FROM service_pause WHERE id = 1`,
@@ -4333,7 +4386,7 @@ db.serialize(() => {
   // 예전 버전에서 이미 notices 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
   ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT', 'category TEXT'].forEach(colDef => {
-    db.run(`ALTER TABLE notices ADD COLUMN ${colDef}`, () => {});
+    alterAddColumn('notices', `${colDef}`);
   });
   // 카테고리 컬럼 보장 후 빈 값 보정 (기존 PC에서 INSERT 실패 방지)
   setTimeout(() => {
@@ -4354,7 +4407,7 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS notice_operators (
     username TEXT PRIMARY KEY, password_hash TEXT, display_name TEXT, added_at TEXT
   )`, logDbErr);
-  db.run(`ALTER TABLE notice_operators ADD COLUMN can_manage_duty INTEGER DEFAULT 0`, () => {});
+  alterAddColumn('notice_operators', `can_manage_duty INTEGER DEFAULT 0`);
   // 신규 컬럼만 DEFAULT — 부팅마다 0→1로 덮지 않음 (마스터가 끈 권한 유지)
 
   // 당직의 / 의료진 OFF (날짜별)
@@ -4376,7 +4429,7 @@ db.serialize(() => {
     requested_by TEXT, created_at TEXT, status TEXT
   )`, logDbErr);
   ['remote_id TEXT', 'treatment_name TEXT', 'driver_status TEXT', 'processed_by TEXT', 'cancel_reason TEXT'].forEach(colDef => {
-    db.run(`ALTER TABLE transport_requests ADD COLUMN ${colDef}`, () => {});
+    alterAddColumn('transport_requests', `${colDef}`);
   });
 
   db.run(`CREATE TABLE IF NOT EXISTS hospital_schedules (
@@ -4389,23 +4442,23 @@ db.serialize(() => {
     created_at TEXT,
     remind_before INTEGER DEFAULT 0
   )`, logDbErr);
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN remind_before INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN attending_physician TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_end_str TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN ward TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN rm_team TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN room_no TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN patient_name TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_at TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_by_name TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN modified_by_ip TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_start_undecided INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN time_end_undecided INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_breakfast INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_lunch INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN meal_cancel_dinner INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN remark TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE hospital_schedules ADD COLUMN guardian_only INTEGER DEFAULT 0`, () => {});
+  alterAddColumn('hospital_schedules', `remind_before INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `attending_physician TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `time_end_str TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `ward TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `rm_team TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `room_no TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `patient_name TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `modified_at TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `modified_by_name TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `modified_by_ip TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `time_start_undecided INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `time_end_undecided INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `meal_cancel_breakfast INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `meal_cancel_lunch INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `meal_cancel_dinner INTEGER DEFAULT 0`);
+  alterAddColumn('hospital_schedules', `remark TEXT DEFAULT ''`);
+  alterAddColumn('hospital_schedules', `guardian_only INTEGER DEFAULT 0`);
 
   /** 삭제된 일정 UID — 피어 NOTICE_SYNC 가 INSERT OR IGNORE 로 되살리는 것 방지 */
   db.run(`CREATE TABLE IF NOT EXISTS deleted_schedules (
@@ -4476,7 +4529,7 @@ db.serialize(() => {
     created_by TEXT,
     created_at TEXT
   )`, logDbErr);
-  db.run(`ALTER TABLE group_chats ADD COLUMN owner_ip TEXT DEFAULT ''`, () => {
+  alterAddColumn('group_chats', `owner_ip TEXT DEFAULT ''`, () => {
     // 이미 있던 그룹(방장 개념이 없던 시절)은 첫 번째 멤버를 방장으로 지정해 채워 넣는다.
     db.all(`SELECT uid, members, owner_ip FROM group_chats WHERE owner_ip IS NULL OR owner_ip = ''`, [], (err, rows) => {
       if (err || !rows) return;
@@ -4496,7 +4549,7 @@ db.serialize(() => {
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (channel_key, reader_ip)
   )`, logDbErr);
-  db.run(`ALTER TABLE channel_read_cursors ADD COLUMN last_read_msg_uid TEXT NOT NULL DEFAULT ''`, () => {});
+  alterAddColumn('channel_read_cursors', `last_read_msg_uid TEXT NOT NULL DEFAULT ''`);
 
   db.run(`CREATE TABLE IF NOT EXISTS chat_view_clears (
     channel_key TEXT PRIMARY KEY,
@@ -4513,15 +4566,15 @@ db.serialize(() => {
     transport_webapp_url TEXT DEFAULT '',
     download_folder_path TEXT DEFAULT ''
   )`, logDbErr);
-  db.run(`ALTER TABLE app_settings ADD COLUMN update_source_path TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN transport_webapp_url TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN download_folder_path TEXT DEFAULT ''`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN tray_launch_view_mode TEXT DEFAULT 'normal'`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN notify_incoming_messages INTEGER DEFAULT 1`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN notify_read_receipts INTEGER DEFAULT 1`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN toast_duration_seconds INTEGER DEFAULT 7`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN incoming_notify_mode TEXT DEFAULT 'toast'`, () => {});
-  db.run(`ALTER TABLE app_settings ADD COLUMN update_mode TEXT DEFAULT 'manual'`, () => {});
+  alterAddColumn('app_settings', `update_source_path TEXT DEFAULT ''`);
+  alterAddColumn('app_settings', `transport_webapp_url TEXT DEFAULT ''`);
+  alterAddColumn('app_settings', `download_folder_path TEXT DEFAULT ''`);
+  alterAddColumn('app_settings', `tray_launch_view_mode TEXT DEFAULT 'normal'`);
+  alterAddColumn('app_settings', `notify_incoming_messages INTEGER DEFAULT 1`);
+  alterAddColumn('app_settings', `notify_read_receipts INTEGER DEFAULT 1`);
+  alterAddColumn('app_settings', `toast_duration_seconds INTEGER DEFAULT 7`);
+  alterAddColumn('app_settings', `incoming_notify_mode TEXT DEFAULT 'toast'`);
+  alterAddColumn('app_settings', `update_mode TEXT DEFAULT 'manual'`);
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
     if (!row) {
       updateSourcePath = DEFAULT_UPDATE_SOURCE_PATH;
@@ -4734,6 +4787,10 @@ db.serialize(() => {
     }
     onProfileLoadedForPresence();
   });
+
+  // 이 serialize 블록의 스키마 작업이 모두 큐에 들어간 뒤 실행된다 — 어느 리비전까지
+  // 반영된 DB인지 표식만 남긴다(동작에는 영향 없음, 사고 조사용).
+  stampSchemaRevision();
 });
 
 function setTrayLaunchViewMode(mode, persist) {
