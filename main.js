@@ -455,8 +455,8 @@ const FILE_XFER_SEND_TIMEOUT_MS = 6 * 60 * 1000;
 /** DM SENT인데 ACK 없으면 이 시간 후 재전송 (수신측 msg_uid 중복 차단) */
 const SENT_ACK_RETRY_AFTER_MS = 8000;
 /**
- * 재전송 상한. 재전송은 15초 주기 flush에서 일어나므로 20회 ≈ 5분간 시도한다.
- * ⚠️ 이 값은 NETWORK_QUIET_MS(45초, 상대 PC가 막 켜졌을 때 TCP가 아직 안 열린 구간)보다
+ * 재전송 상한. 재전송은 5초 주기 flush에서 일어나므로 20회 ≈ 100초간 시도한다.
+ * ⚠️ 이 값은 NETWORK_QUIET_MS(상대 PC가 막 켜졌을 때 TCP가 아직 안 열린 구간)보다
  * 넉넉히 길어야 한다. 예전 값(4회 ≈ 1분)은 이 구간을 겨우 넘기는 수준이었는데, 상한 자체가
  * 버그로 동작하지 않아서(카운터를 지워 0으로 되돌림) 우연히 계속 재시도되며 가려져 있었다.
  * 상한을 제대로 고치는 이상, 이 값이 quiet 구간을 확실히 덮어야 메시지가 유실되지 않는다.
@@ -530,7 +530,11 @@ let udpDropLoggedAt = 0;
 let networkQuietUntil = 0;
 let tcpActiveConnections = 0;
 const TCP_MAX_CONNECTIONS = 8;
-const NETWORK_QUIET_MS = 45000;
+/** 예전엔 45초였는데, 상대 PC가 켜진 뒤 최대 45초+ 동안 메시지를 못 받는 지연의 원인이었다.
+ * TCP 서버 자체에 이미 연결 수 상한(TCP_MAX_CONNECTIONS)·청크 크기 상한(MAX_TCP_LINE_BUFFER)·
+ * 미완성 라인 버퍼 상한(softCap)이 있어 부팅 직후 열어도 버퍼 폭주로부터 보호되므로,
+ * 대기 시간을 짧게 줄여도 안전하다. */
+const NETWORK_QUIET_MS = 8000;
 
 /** 피어별 수신 트래픽(이 PC 기준) — 마스터 「부하 감시」용 */
 const PEER_TRAFFIC_WINDOW_MS = 60 * 1000;
@@ -5664,7 +5668,7 @@ function startUdpDiscovery() {
         if (globalUdpSocket) broadcastPresence(globalUdpSocket);
       }, PRESENCE_HEARTBEAT_MS);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
-      setInterval(() => flushAllPendingOutboundMessages(), 15000);
+      setInterval(() => flushAllPendingOutboundMessages(), 5000);
     }
   });
 
