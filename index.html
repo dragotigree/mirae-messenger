@@ -12204,6 +12204,10 @@
 
     function openGroupMembersModal(user) {
       if (!user || !user.isGroup) return;
+      // ⚠️ 실사고: 참여자 우클릭 메뉴(dm-context-menu, 즐겨찾기·쪽지·초대 등)를 열어둔
+      // 채로 이 모달을 열면, 반투명 배경 뒤로 그 메뉴가 계속 떠 있는 게 비쳐 보였다.
+      const openCtxMenu = document.getElementById('dm-context-menu');
+      if (openCtxMenu) openCtxMenu.style.display = 'none';
       const { rowsHtml, count } = buildGroupMemberRowsHtml(user);
       document.getElementById('group-members-modal-title').textContent = `👥 참여자 ${count}명`;
       document.getElementById('group-members-modal-list').innerHTML =
