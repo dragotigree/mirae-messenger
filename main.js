@@ -4402,6 +4402,18 @@ db.serialize(() => {
     created_by TEXT,
     created_at TEXT
   )`, logDbErr);
+  db.run(`ALTER TABLE group_chats ADD COLUMN owner_ip TEXT DEFAULT ''`, () => {
+    // 이미 있던 그룹(방장 개념이 없던 시절)은 첫 번째 멤버를 방장으로 지정해 채워 넣는다.
+    db.all(`SELECT uid, members, owner_ip FROM group_chats WHERE owner_ip IS NULL OR owner_ip = ''`, [], (err, rows) => {
+      if (err || !rows) return;
+      rows.forEach((row) => {
+        let members = [];
+        try { members = JSON.parse(row.members); } catch (e) {}
+        const firstIp = members && members[0] && members[0].ip;
+        if (firstIp) db.run(`UPDATE group_chats SET owner_ip = ? WHERE uid = ?`, [firstIp, row.uid], logDbErr);
+      });
+    });
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS channel_read_cursors (
     channel_key TEXT NOT NULL,
@@ -11642,11 +11654,12 @@ ipcMain.handle('create-group-chat', async (event, { name, memberIps }) => {
       name: name || '그룹 대화방',
       members: JSON.stringify([...memberSet.values()]),
       created_by: myProfile.username,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      owner_ip: MY_IP
     };
     db.run(
-      `INSERT INTO group_chats (uid, name, members, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
-      [record.uid, record.name, record.members, record.created_by, record.created_at],
+      `INSERT INTO group_chats (uid, name, members, created_by, created_at, owner_ip) VALUES (?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.name, record.members, record.created_by, record.created_at, record.owner_ip],
       (err) => {
         logDbErr(err);
         if (!err) {
@@ -11747,10 +11760,44 @@ ipcMain.handle('leave-group-chat', async (event, { uid }) => {
         logDbErr(err2);
         if (!err2) {
           // 남은 멤버들에게는 내가 빠진 최신 멤버 목록을 보내 화면에 반영시킨다.
+          // ⚠️ 나가는 사람이 방장이었어도 여기서 승계 처리는 하지 않는다 — owner_ip가
+          // 이미 나간 사람의 IP로 남는다. 필요하면 남은 멤버 중 누군가에게 수동으로
+          // 방장을 다시 지정해야 한다(자동 승계는 범위 밖).
           const updated = { ...row, members: membersJson };
           sendToIps(remainingMembers.map(m => m.ip), { type: 'GROUP_SYNC', group: updated });
         }
         resolve({ success: !err2 });
+      });
+    });
+  });
+});
+
+ipcMain.handle('transfer-group-owner', async (event, { uid, newOwnerIp }) => {
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM group_chats WHERE uid = ?`, [uid], (err, row) => {
+      if (err || !row) { resolve({ success: false, msg: '대화방을 찾을 수 없습니다.' }); return; }
+      const currentOwner = row.owner_ip || '';
+      if (currentOwner && currentOwner !== MY_IP) {
+        resolve({ success: false, msg: '방장만 위임할 수 있습니다.' });
+        return;
+      }
+      let members = [];
+      try { members = JSON.parse(row.members); } catch (e) {}
+      const newOwnerMember = members.find((m) => m.ip === newOwnerIp);
+      if (!newOwnerMember) {
+        resolve({ success: false, msg: '대화방 참여자가 아닙니다.' });
+        return;
+      }
+      db.run(`UPDATE group_chats SET owner_ip = ? WHERE uid = ?`, [newOwnerIp, uid], (err2) => {
+        if (err2) { logDbErr(err2); resolve({ success: false }); return; }
+        const updated = { ...row, owner_ip: newOwnerIp };
+        const memberIps = members.map((m) => m.ip);
+        sendToIps(memberIps, { type: 'GROUP_SYNC', group: updated });
+        const noticeText = `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 ${newOwnerMember.username}님에게 방장을 위임했습니다.`;
+        logGroupSystemNotice(uid, row.name, noticeText);
+        pushGroupSystemNoticeLive(uid, noticeText);
+        sendToIps(memberIps.filter((ip) => ip !== MY_IP), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
+        resolve({ success: true });
       });
     });
   });

@@ -2546,6 +2546,8 @@
     .group-member-status { font-size: 10px; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
     .group-member-status.is-online { color: #16a34a; }
     .group-member-status.is-offline { color: #94a3b8; }
+    .group-owner-transfer-btn { flex-shrink: 0; border: 1px solid var(--border-soft); background: var(--surface); color: var(--text-secondary); font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+    .group-owner-transfer-btn:hover { background: var(--sidebar-active); color: var(--accent-dark); }
     .sidebar-section-title { font-size: 12.5px; font-weight: var(--font-weight-bold); color: var(--accent); display: flex; justify-content: space-between; align-items: center; margin-top: 0; }
     .sidebar-cal-header {
       display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
@@ -12080,22 +12082,29 @@
       sec.style.display = 'flex';
       const members = sortGroupMembers(user.groupMembers || []);
       const myIp = myProfile && myProfile.ip;
+      const ownerIp = user.ownerIp || '';
+      const iAmOwner = !!(ownerIp && myIp && ownerIp === myIp);
       const memberRows = members.map((m) => {
         const live = allUsers.find((u) => u.ip === m.ip);
         const name = groupMemberDisplayLabel(m);
         const isMe = myIp && m.ip === myIp;
+        const isOwner = ownerIp && m.ip === ownerIp;
         const st = groupMemberStatusInfo(m);
         const photo = live && live.photo ? live.photo : (m.photo || '');
         const seed = m.ip || (live && live.ip) || m.username;
         const cuteCls = cuteAvatarClassFor(m.username, photo, seed);
         const avatarClass = photo ? 'group-member-avatar avatar-photo' : `group-member-avatar ${cuteCls}`.trim();
         const avatarInner = avatarInnerHtml(m.username || name, photo, seed);
+        const transferBtn = (iAmOwner && !isMe)
+          ? `<button type="button" class="group-owner-transfer-btn" onclick="transferGroupOwnerConfirmed(${escapeHtml(JSON.stringify(user.groupUid))}, ${escapeHtml(JSON.stringify(m.ip))}, ${escapeHtml(JSON.stringify(name))})">방장 위임</button>`
+          : '';
         return `<div class="group-member-row">
           <div class="${avatarClass}">${avatarInner}</div>
           <div class="group-member-body">
-            <div class="group-member-name">${escapeHtml(name)}${isMe ? ' <span style="color:var(--accent); font-size:10px;">(나)</span>' : ''}</div>
+            <div class="group-member-name">${isOwner ? '👑 ' : ''}${escapeHtml(name)}${isMe ? ' <span style="color:var(--accent); font-size:10px;">(나)</span>' : ''}</div>
             ${st.sub ? `<div class="group-member-sub">${escapeHtml(st.sub)}</div>` : ''}
           </div>
+          ${transferBtn}
           <span class="group-member-status ${st.online ? 'is-online' : 'is-offline'}">${escapeHtml(st.label)}</span>
         </div>`;
       }).join('');
@@ -12110,10 +12119,21 @@
       `;
     }
 
+    async function transferGroupOwnerConfirmed(uid, newOwnerIp, newOwnerName) {
+      if (!await appConfirm(`'${newOwnerName}'님에게 방장을 위임하시겠습니까?`)) return;
+      const res = await window.api.transferGroupOwner(uid, newOwnerIp);
+      if (!res || !res.success) { await appAlert((res && res.msg) || '방장 위임에 실패했습니다.'); return; }
+      await refreshGroupChats();
+      if (activeChatUser && activeChatUser.isGroup && activeChatUser.groupUid === uid) {
+        syncActiveGroupChatFromList();
+        renderGroupDetailPanel(activeChatUser);
+      }
+    }
+
     function makeGroupChannel(g) {
       const key = `GROUP:${g.uid}`;
       const display = getChannelDisplayName(key, g.name);
-      return { ip: key, username: display, rank: '', dept: '그룹 대화방', floor: '', extNo: '', isGroup: true, groupUid: g.uid, groupName: display, serverGroupName: g.name, groupMembers: (() => { try { return JSON.parse(g.members); } catch (e) { return []; } })() };
+      return { ip: key, username: display, rank: '', dept: '그룹 대화방', floor: '', extNo: '', isGroup: true, groupUid: g.uid, groupName: display, serverGroupName: g.name, ownerIp: g.owner_ip || '', groupMembers: (() => { try { return JSON.parse(g.members); } catch (e) { return []; } })() };
     }
 
     function openChatFromToastChannelKey(channelKey) {
