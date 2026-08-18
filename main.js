@@ -97,6 +97,33 @@ function hashPassword(pw) {
   return crypto.createHash('sha256').update(String(pw)).digest('hex');
 }
 
+/** 로그인 무차별 대입 방지 — 계정별 실패 횟수를 세어 5회부터 점점 긴 대기시간을 강제한다.
+ * 렌더러(개발자 도구 포함)가 IPC를 반복 호출해도 초당 수천 번씩 시도할 수 없게 막는 것이
+ * 목적이라, 재시작하면 초기화되는 메모리 카운터로 충분하다. */
+const loginThrottleState = new Map();
+function checkLoginThrottle(bucket, key) {
+  const k = `${bucket}:${String(key || '').toLowerCase()}`;
+  const rec = loginThrottleState.get(k);
+  if (rec && rec.lockedUntil > Date.now()) {
+    const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
+    return { blocked: true, msg: `로그인 시도가 너무 많습니다. ${waitSec}초 후 다시 시도해 주세요.` };
+  }
+  return { blocked: false };
+}
+function recordLoginFailure(bucket, key) {
+  const k = `${bucket}:${String(key || '').toLowerCase()}`;
+  const rec = loginThrottleState.get(k) || { fails: 0, lockedUntil: 0 };
+  rec.fails += 1;
+  if (rec.fails >= 5) {
+    const extra = Math.min(rec.fails - 4, 12); // 상한을 둬서 무한정 늘어나지 않게
+    rec.lockedUntil = Date.now() + Math.min(extra * 10, 120) * 1000; // 10초씩 늘다 최대 2분
+  }
+  loginThrottleState.set(k, rec);
+}
+function recordLoginSuccess(bucket, key) {
+  loginThrottleState.delete(`${bucket}:${String(key || '').toLowerCase()}`);
+}
+
 let mainWindow;
 let scheduleBoardWindow = null;
 let excalidrawWindow = null;
@@ -10594,6 +10621,8 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
 
 // 🔑 마스터 아이디 + 비밀번호 검증 IPC 핸들러
 ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
+  const throttle = checkLoginThrottle('master', 'admin');
+  if (throttle.blocked) return { success: false, msg: throttle.msg };
   const ok = await verifyLocalMasterAuth(id, password);
   if (ok) masterSessionActive = true;
   return ok ? { success: true } : { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
@@ -10601,17 +10630,23 @@ ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
 
 // 기존 호환성을 위해 유지 (아이디 무관, 비밀번호만 확인 — 현재 렌더러에서 호출하는 곳은 없음)
 ipcMain.handle('verify-master-password', async (event, inputPassword) => {
+  const throttle = checkLoginThrottle('master', 'admin');
+  if (throttle.blocked) return { success: false, msg: throttle.msg };
   return new Promise((resolve) => {
     db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err, row) => {
       if (!err && row) {
-        resolve(row.master_password === inputPassword
+        const ok = row.master_password === inputPassword;
+        if (ok) recordLoginSuccess('master', 'admin'); else recordLoginFailure('master', 'admin');
+        resolve(ok
           ? { success: true }
           : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
         return;
       }
       ensureMasterConfigRow(() => {
         db.get(`SELECT master_password FROM master_config WHERE id = 1`, (err2, row2) => {
-          resolve(row2 && row2.master_password === inputPassword
+          const ok = row2 && row2.master_password === inputPassword;
+          if (ok) recordLoginSuccess('master', 'admin'); else recordLoginFailure('master', 'admin');
+          resolve(ok
             ? { success: true }
             : { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' });
         });
@@ -10622,7 +10657,7 @@ ipcMain.handle('verify-master-password', async (event, inputPassword) => {
 
 function normalizeNewPassword(raw) {
   const pw = String(raw == null ? '' : raw).trim();
-  if (pw.length < 4) return { ok: false, msg: '새 비밀번호는 4자 이상이어야 합니다.' };
+  if (pw.length < 6) return { ok: false, msg: '새 비밀번호는 6자 이상이어야 합니다.' };
   if (pw.length > 64) return { ok: false, msg: '새 비밀번호는 64자 이하여야 합니다.' };
   return { ok: true, password: pw };
 }
@@ -11213,9 +11248,12 @@ ipcMain.handle('update-notice-operator-display-name', async (event, { username, 
 
 ipcMain.handle('add-notice-operator', async (event, { username, password, displayName, canManageDuty }) => {
   if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
+  if (!String(username || '').trim()) return { success: false, msg: '아이디를 입력해 주세요.' };
+  const normalizedPw = normalizeNewPassword(password);
+  if (!normalizedPw.ok) return { success: false, msg: normalizedPw.msg };
   return new Promise((resolve) => {
     const added_at = new Date().toISOString();
-    const password_hash = hashPassword(password);
+    const password_hash = hashPassword(normalizedPw.password);
     // 미지정·true → 당직·OFF 포함 (작성 권한자 기본)
     const dutyFlag = (canManageDuty === false || canManageDuty === 0 || canManageDuty === '0') ? 0 : 1;
     const cleanDisplayName = scrubBrokenDisplayChars(displayName);
@@ -11259,11 +11297,15 @@ ipcMain.handle('delete-notice-operator', async (event, username) => {
 ipcMain.handle('notice-operator-login', async (event, { username, password }) => {
   return new Promise((resolve) => {
     const user = String(username || '').trim();
+    const throttle = checkLoginThrottle('operator', user);
+    if (throttle.blocked) { resolve({ success: false, msg: throttle.msg }); return; }
     db.get(`SELECT * FROM notice_operators WHERE username = ?`, [user], (err, row) => {
       if (!row || row.password_hash !== hashPassword(password)) {
+        recordLoginFailure('operator', user);
         resolve({ success: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' });
         return;
       }
+      recordLoginSuccess('operator', user);
       // 작성 권한자 로그인 — 당직·OFF는 DB 플래그 존중
       noticeOperatorSessionActive = true;
       noticeOperatorCanManageDutySession = !!(row.can_manage_duty);
@@ -12455,19 +12497,25 @@ function ensureMasterConfigRow(cb) {
   });
 }
 function verifyLocalMasterAuth(id, password) {
+  const throttle = checkLoginThrottle('master', 'admin');
+  if (throttle.blocked) return Promise.resolve(false);
+  const finish = (ok) => {
+    if (ok) recordLoginSuccess('master', 'admin'); else recordLoginFailure('master', 'admin');
+    return ok;
+  };
   return new Promise((resolve) => {
     db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err, row) => {
       if (err || !row) {
         ensureMasterConfigRow(() => {
           db.get(`SELECT master_id, master_password FROM master_config WHERE id = 1`, (err2, row2) => {
             const currentId = row2 && row2.master_id ? String(row2.master_id) : 'admin';
-            resolve(!!(row2 && currentId === String(id || '') && String(row2.master_password) === String(password || '')));
+            resolve(finish(!!(row2 && currentId === String(id || '') && String(row2.master_password) === String(password || ''))));
           });
         });
         return;
       }
       const currentId = row.master_id ? String(row.master_id) : 'admin';
-      resolve(!!(currentId === String(id || '') && String(row.master_password) === String(password || '')));
+      resolve(finish(!!(currentId === String(id || '') && String(row.master_password) === String(password || ''))));
     });
   });
 }
