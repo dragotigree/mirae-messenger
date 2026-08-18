@@ -5048,8 +5048,8 @@
     <div id="icon-rail-nav">
       <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"><span class="icon-rail-badge" id="icon-rail-users-badge" style="display:none;"></span></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"><span class="icon-rail-badge" id="icon-rail-channels-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기 (Ctrl+4)" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기 (Ctrl+5)" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"><span class="icon-rail-badge" id="icon-rail-channels-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-ipmsg-btn" onclick="openIpmsgSendModal()" title="쪽지 보내기 (채팅방 없이 전송)" data-ui-icon="envelope"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-logs-btn" onclick="openAllLogsModal()" title="전체 대화 기록 (Ctrl+2)" data-ui-icon="logs"></button>
       <button type="button" class="icon-rail-btn" id="toolbar-folder-btn" onclick="window.api.openFilesFolder()" title="주고받은 파일 폴더 열기"></button>
@@ -25312,6 +25312,16 @@
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '3' || e.code === 'Digit3')) {
         e.preventDefault();
         if (!isPrivacyScreenLocked) openScheduleBoardModal();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '4' || e.code === 'Digit4')) {
+        e.preventDefault();
+        if (!isPrivacyScreenLocked) setSidebarRailFilter('favorites');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '5' || e.code === 'Digit5')) {
+        e.preventDefault();
+        if (!isPrivacyScreenLocked) setSidebarRailFilter('channels');
         return;
       }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'w' || e.key === 'W' || e.code === 'KeyW')) {
