@@ -1270,6 +1270,8 @@
       font-size: 12px; color: #64748b; margin-top: 1px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    #chat-header-status-text.is-clickable { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color 0.12s; }
+    #chat-header-status-text.is-clickable:hover { text-decoration-color: currentColor; }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
     .chat-date-sep {
@@ -5269,7 +5271,7 @@
           </div>
           <div class="header-user-text">
             <div class="header-user-name" id="chat-header-title">상대방 이름</div>
-            <div id="chat-header-status-text">10층 · 재활치료부</div>
+            <div id="chat-header-status-text" onclick="onChatHeaderStatusClick()">10층 · 재활치료부</div>
           </div>
         </div>
         <div class="chat-header-actions">
@@ -6849,6 +6851,17 @@
         <button onclick="closeGroupRenameModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button onclick="submitGroupRename()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">✔ 변경</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 👥 그룹 대화방 참여자 목록 -->
+  <div id="group-members-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeGroupMembersModal()">
+    <div class="modal-card" style="width:340px; max-height:80vh; display:flex; flex-direction:column;" onclick="event.stopPropagation()">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size:15px; font-weight:800; color:var(--text-primary);" id="group-members-modal-title">👥 참여자</div>
+        <button type="button" onclick="closeGroupMembersModal()" style="border:none; background:transparent; font-size:16px; color:#94a3b8; cursor:pointer; padding:2px 4px;">✕</button>
+      </div>
+      <div id="group-members-modal-list" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; margin-top:10px; padding-right:2px;"></div>
     </div>
   </div>
 
@@ -10322,6 +10335,7 @@
         { test: () => isFlexOverlay('channel-display-name-modal'), close: () => closeChannelDisplayNameModal(), confirm: false },
         { test: () => isFlexOverlay('channel-title-emoji-modal'), close: () => closeChannelTitleEmojiModal(), confirm: false },
         { test: () => isFlexOverlay('group-rename-modal'), close: () => closeGroupRenameModal(), confirm: false },
+        { test: () => isFlexOverlay('group-members-modal'), close: () => closeGroupMembersModal(), confirm: false },
         { test: () => isFlexOverlay('operator-rename-modal'), close: () => closeOperatorRenameModal(), confirm: false },
         { test: () => isFlexOverlay('password-change-modal'), close: () => closePasswordChangeModal(), confirm: false },
         { test: () => {
@@ -12076,15 +12090,12 @@
       });
     }
 
-    function renderGroupDetailPanel(user) {
-      document.getElementById('detail-contact-section').style.display = 'none';
-      const sec = document.getElementById('detail-broadcast-section');
-      sec.style.display = 'flex';
+    function buildGroupMemberRowsHtml(user) {
       const members = sortGroupMembers(user.groupMembers || []);
       const myIp = myProfile && myProfile.ip;
       const ownerIp = user.ownerIp || '';
       const iAmOwner = !!(ownerIp && myIp && ownerIp === myIp);
-      const memberRows = members.map((m) => {
+      const rowsHtml = members.map((m) => {
         const live = allUsers.find((u) => u.ip === m.ip);
         const name = groupMemberDisplayLabel(m);
         const isMe = myIp && m.ip === myIp;
@@ -12108,15 +12119,40 @@
           <span class="group-member-status ${st.online ? 'is-online' : 'is-offline'}">${escapeHtml(st.label)}</span>
         </div>`;
       }).join('');
+      return { rowsHtml, count: members.length };
+    }
+
+    function renderGroupDetailPanel(user) {
+      document.getElementById('detail-contact-section').style.display = 'none';
+      const sec = document.getElementById('detail-broadcast-section');
+      sec.style.display = 'flex';
+      const { rowsHtml, count } = buildGroupMemberRowsHtml(user);
       sec.innerHTML = `
         <div class="detail-avatar" style="background:linear-gradient(135deg,var(--accent-dark),var(--accent-dark));">👥</div>
         <div class="detail-name">${escapeHtml(user.groupName || '그룹')}</div>
-        <div class="detail-dept-line">그룹 대화방 · 참여자 ${members.length}명</div>
+        <div class="detail-dept-line">그룹 대화방 · 참여자 ${count}명</div>
         <div class="group-detail-members">
           <div class="group-detail-members-heading">참여자 목록</div>
-          ${memberRows || '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:8px;">참여자 정보를 불러오는 중…</div>'}
+          ${rowsHtml || '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:8px;">참여자 정보를 불러오는 중…</div>'}
         </div>
       `;
+    }
+
+    function openGroupMembersModal(user) {
+      if (!user || !user.isGroup) return;
+      const { rowsHtml, count } = buildGroupMemberRowsHtml(user);
+      document.getElementById('group-members-modal-title').textContent = `👥 참여자 ${count}명`;
+      document.getElementById('group-members-modal-list').innerHTML =
+        rowsHtml || '<div style="font-size:11px; color:#94a3b8; text-align:center; padding:8px;">참여자 정보를 불러오는 중…</div>';
+      document.getElementById('group-members-modal').style.display = 'flex';
+      setModalOpenState(true);
+    }
+    function closeGroupMembersModal() {
+      document.getElementById('group-members-modal').style.display = 'none';
+      setModalOpenState(false);
+    }
+    function onChatHeaderStatusClick() {
+      if (activeChatUser && activeChatUser.isGroup) openGroupMembersModal(activeChatUser);
     }
 
     async function transferGroupOwnerConfirmed(uid, newOwnerIp, newOwnerName) {
@@ -18188,6 +18224,7 @@
       hideReadReceiptNote();
 
       const statusBadgeEl = document.getElementById('chat-header-status-badge');
+      document.getElementById('chat-header-status-text').classList.toggle('is-clickable', !!user.isGroup);
 
       if (user.isBroadcast) {
         document.getElementById('chat-header-title').textContent = buildChatHeaderTitleText(user);

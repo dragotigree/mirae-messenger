@@ -11756,15 +11756,21 @@ ipcMain.handle('leave-group-chat', async (event, { uid }) => {
       try { members = JSON.parse(row.members); } catch (e) {}
       const remainingMembers = members.filter(m => m.ip !== MY_IP);
       const membersJson = JSON.stringify(remainingMembers);
+      // 내가 방장이었으면, 남은 멤버 중 가장 먼저 들어온 사람에게 자동으로 승계한다.
+      const wasOwner = !!(row.owner_ip && row.owner_ip === MY_IP);
+      const newOwner = wasOwner && remainingMembers.length ? remainingMembers[0] : null;
+      const nextOwnerIp = newOwner ? newOwner.ip : (row.owner_ip || '');
       db.run(`DELETE FROM group_chats WHERE uid = ?`, [uid], (err2) => {
         logDbErr(err2);
         if (!err2) {
           // 남은 멤버들에게는 내가 빠진 최신 멤버 목록을 보내 화면에 반영시킨다.
-          // ⚠️ 나가는 사람이 방장이었어도 여기서 승계 처리는 하지 않는다 — owner_ip가
-          // 이미 나간 사람의 IP로 남는다. 필요하면 남은 멤버 중 누군가에게 수동으로
-          // 방장을 다시 지정해야 한다(자동 승계는 범위 밖).
-          const updated = { ...row, members: membersJson };
+          const updated = { ...row, members: membersJson, owner_ip: nextOwnerIp };
           sendToIps(remainingMembers.map(m => m.ip), { type: 'GROUP_SYNC', group: updated });
+          if (newOwner) {
+            const noticeText = `${SYSTEM_NOTICE_PREFIX}방장이 대화방을 나가서 ${newOwner.username}님이 새 방장이 되었습니다.`;
+            logGroupSystemNotice(uid, row.name, noticeText);
+            sendToIps(remainingMembers.map(m => m.ip), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
+          }
         }
         resolve({ success: !err2 });
       });
