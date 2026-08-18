@@ -9821,7 +9821,7 @@
       }
     }, IDLE_MS);
 
-    window.api.onUserListUpdate((users) => {
+    function applyUserListUpdate(users) {
       persistContactSnapshotsFromUserList(users);
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
       queueProfilePhotoLoads(users);
@@ -9847,7 +9847,16 @@
           console.error('연락처 상세 패널 갱신 실패:', e);
         }
       }
-    });
+    }
+
+    window.api.onUserListUpdate(applyUserListUpdate);
+    // ⚠️ 실사고: 메인 프로세스가 부팅 중 DB에서 사용자 목록을 읽어 이 리스너가 등록되기
+    // 전에 먼저 푸시해버리면(창 로딩이 오래 걸리는 PC에서 특히), 그 첫 푸시는 조용히
+    // 유실되고 다음 갱신(피어 접속 감지·15초 하트비트 등)이 올 때까지 목록이 안 보였다.
+    // 리스너를 단 직후 현재 목록을 직접 한 번 더 가져와 이 경쟁 상태를 없앤다.
+    if (window.api.getUserList) {
+      window.api.getUserList().then((users) => { if (users) applyUserListUpdate(users); }).catch(() => {});
+    }
 
     window.api.onProfilePhotoUpdate((data) => applyProfilePhotoUpdate(data));
 

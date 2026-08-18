@@ -190,6 +190,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 🔄 유저 새로고침 및 폴더 열기
   refreshUsers: () => ipcRenderer.invoke('refresh-users'),
+  getUserList: () => ipcRenderer.invoke('get-user-list'),
   openUserDataFolder: () => ipcRenderer.invoke('open-user-data-folder'),
   openFilesFolder: () => ipcRenderer.invoke('open-files-folder'),
   getDownloadFolder: () => ipcRenderer.invoke('get-download-folder'),

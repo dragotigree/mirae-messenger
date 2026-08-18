@@ -13791,6 +13791,10 @@ ipcMain.handle('refresh-users', async () => {
   return true;
 });
 
+/** 렌더러가 막 로딩을 마쳤을 때, 부팅 중 이미 지나간 첫 user-list-update 푸시를
+ * 놓쳤을 경우를 대비해 현재 목록을 직접 요청해 받아가는 용도. */
+ipcMain.handle('get-user-list', async () => buildDirectoryUserList());
+
 ipcMain.handle('open-user-data-folder', async () => {
   shell.showItemInFolder(dbPath);
   return true;
