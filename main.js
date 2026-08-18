@@ -1679,12 +1679,12 @@ function resolveFileXferTargets(chatTarget) {
         resolve({ error: '대화 상대를 찾을 수 없습니다.' });
         return;
       }
-      if (!onlineUsers.has(peerIp)) {
-        resolve({ error: '상대가 오프라인이라 큰 파일을 보낼 수 없습니다.' });
-        return;
-      }
+      // ⚠️ 오프라인이어도 더 이상 바로 실패시키지 않는다 — 파일은 로컬에 저장해두고
+      // pending_file_xfers 큐에 넣어, 상대가 온라인이 되면 자동으로 보낸다(텍스트
+      // 메시지의 PENDING 재전송과 동일한 방식). ips를 빈 배열로 주고 offline만 표시한다.
       resolve({
-        ips: [peerIp],
+        ips: onlineUsers.has(peerIp) ? [peerIp] : [],
+        offline: !onlineUsers.has(peerIp),
         receiverKey: peerIp,
         partnerName: (allKnownUsers.get(peerIp) || {}).username || peerIp
       });
@@ -4522,6 +4522,20 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`, logDbErr);
 
+  /** 1:1 대화에서 상대가 오프라인일 때 보낸 큰 파일 — 상대가 온라인이 되면 자동 재전송.
+   * 파일 바이트 자체는 여기 안 담는다(이미 로컬 다운로드 폴더에 stored_name으로 저장돼
+   * 있음) — DB에 큰 BLOB을 또 넣지 않기 위해서다. */
+  db.run(`CREATE TABLE IF NOT EXISTS pending_file_xfers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_uid TEXT NOT NULL,
+    receiver_ip TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    mime TEXT DEFAULT 'application/octet-stream',
+    sender_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, logDbErr);
+
   db.run(`CREATE TABLE IF NOT EXISTS group_chats (
     uid TEXT PRIMARY KEY,
     name TEXT,
@@ -4750,6 +4764,7 @@ db.serialize(() => {
       }, () => notifyUserListNow());
     });
     setTimeout(() => flushAllPendingOutboundMessages(), 1500);
+    setTimeout(() => flushPendingFileXfers(), 1500);
   }
 
   db.get(`SELECT * FROM user_profile WHERE id = 1`, (err, row) => {
@@ -5835,6 +5850,8 @@ function startUdpDiscovery() {
       }, PRESENCE_HEARTBEAT_MS);
       setTimeout(() => flushAllPendingOutboundMessages(), 2500);
       setInterval(() => flushAllPendingOutboundMessages(), 5000);
+      setTimeout(() => flushPendingFileXfers(), 2500);
+      setInterval(() => flushPendingFileXfers(), 5000);
     }
   });
 
@@ -9328,7 +9345,12 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
       await new Promise((r) => setImmediate(r));
     }
 
-    if (okCount === 0) {
+    // 1:1 대화에서 상대가 오프라인이면 즉시 실패시키지 않고 큐에 넣어 나중에 자동 재전송한다
+    // (텍스트 메시지의 PENDING과 동일한 동작). 그룹은 기존과 동일하게 온라인 멤버가
+    // 하나도 없으면 바로 실패로 남긴다 — 대상이 여러 명이라 재전송 범위가 넓어져
+    // 별도 설계가 필요하므로 이번에는 손대지 않는다.
+    const queueForOfflineDm = chatTarget.kind === 'dm' && targets.offline;
+    if (okCount === 0 && !queueForOfflineDm) {
       return { status: 'ERROR', error: '파일 전송에 실패했습니다. 상대가 오프라인이거나 연결할 수 없습니다.' };
     }
 
@@ -9341,11 +9363,12 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
 
     const receiverKey = targets.receiverKey;
     const partnerName = targets.partnerName || receiverKey;
+    const finalStatus = queueForOfflineDm ? 'PENDING' : 'SENT';
 
     const localId = await new Promise((resolve) => {
       db.run(
-        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-        [senderLabelForMe(), MY_IP, receiverKey, messageHtml, msgUid],
+        `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, ?, ?)`,
+        [senderLabelForMe(), MY_IP, receiverKey, messageHtml, finalStatus, msgUid],
         function (err) {
           logDbErr(err);
           if (chatTarget.kind === 'dm') {
@@ -9359,8 +9382,16 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
       );
     });
 
+    if (queueForOfflineDm) {
+      db.run(
+        `INSERT INTO pending_file_xfers (msg_uid, receiver_ip, stored_name, file_name, mime, sender_name) VALUES (?, ?, ?, ?, ?, ?)`,
+        [msgUid, receiverKey, storedName, fileName, mime, senderLabelForMe()],
+        logDbErr
+      );
+    }
+
     return {
-      status: 'SENT',
+      status: finalStatus,
       messageHtml,
       uid: msgUid,
       id: localId,
@@ -10370,6 +10401,62 @@ function flushAllPendingOutboundMessages() {
       });
     }
   );
+}
+
+/** 재전송 중복 실행 방지 — 파일 전송은 수 초가 걸릴 수 있어 5초 주기와 겹칠 수 있다. */
+const fileXferRetryInflight = new Set();
+
+/** 오프라인 상대에게 보내려다 대기 중인 큰 파일 — 상대가 온라인이 되면 자동 재전송.
+ * 텍스트 메시지(flushAllPendingOutboundMessages)와 동일한 주기로 호출된다. */
+function flushPendingFileXfers() {
+  if (!profileLoaded) return;
+  db.all(
+    `SELECT * FROM pending_file_xfers WHERE created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
+    [],
+    (err, rows) => {
+      if (err) { logDbErr(err); return; }
+      (rows || []).forEach((row) => {
+        if (!onlineUsers.has(row.receiver_ip)) return;
+        if (fileXferRetryInflight.has(row.id)) return;
+        fileXferRetryInflight.add(row.id);
+        retryPendingFileXfer(row).finally(() => fileXferRetryInflight.delete(row.id));
+      });
+    }
+  );
+  // 오래(7일 이상) 못 보낸 건 더 기다려도 의미가 없으니 정리 — 텍스트 메시지와 동일한 기준.
+  db.run(`DELETE FROM pending_file_xfers WHERE created_at < datetime('now', '${SENT_ACK_RESEND_WINDOW}')`, [], logDbErr);
+}
+
+async function retryPendingFileXfer(row) {
+  try {
+    const filePath = path.join(getReceivedFilesDir(), row.stored_name);
+    let buf;
+    try {
+      buf = await fs.promises.readFile(filePath);
+    } catch (e) {
+      // 파일이 사라졌으면(로컬에서 지워짐 등) 더 재시도할 수 없다 — 큐에서 제거.
+      db.run(`DELETE FROM pending_file_xfers WHERE id = ?`, [row.id], logDbErr);
+      return;
+    }
+    const xferUid = `${MY_IP}_xf_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const payloads = buildFileXferPayloads(buf, {
+      xferUid,
+      fileName: row.file_name,
+      mime: row.mime,
+      chatTarget: { kind: 'dm' },
+      sender: (myProfile && myProfile.username) || row.sender_name,
+      msgUid: row.msg_uid
+    });
+    const ok = await writeJsonLinesToIp(row.receiver_ip, payloads, FILE_XFER_SEND_TIMEOUT_MS);
+    if (!ok) return; // 다음 5초 주기에 다시 시도
+    db.run(`DELETE FROM pending_file_xfers WHERE id = ?`, [row.id], logDbErr);
+    // 상대가 받으면 handleFileXferEnd가 MSG_ACK를 보내와 handleMsgAck가 DELIVERED로 갱신한다.
+    // 여기서는 일단 PENDING → SENT로만 올려 "전송 대기 중" 표시를 없앤다.
+    db.run(`UPDATE messages SET status = 'SENT' WHERE msg_uid = ? AND status = 'PENDING'`, [row.msg_uid], logDbErr);
+    if (mainWindow) safeWebContentsSend('pending-status-update', { msgUid: row.msg_uid, status: 'SENT' });
+  } catch (e) {
+    console.error('대기 중인 파일 재전송 오류:', e.message || e);
+  }
 }
 
 function isChannelReceiverKey(targetIP) {

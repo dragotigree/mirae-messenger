@@ -24974,7 +24974,7 @@
             res.uid,
             res.id,
             myProfile && myProfile.ip,
-            null,
+            res.status === 'PENDING' ? 'PENDING' : null,
             res.createdAtFull || res.createdAt
           );
           noteDmOutboundJustSent();
