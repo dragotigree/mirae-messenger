@@ -9443,6 +9443,15 @@
     loadNoticeOperatorSession();
 
     const SIDEBAR_RIGHT_COLLAPSED_KEY = 'mirae_sidebar_right_collapsed';
+    // ⚠️ 실사고: 이 두 상수가 예전엔 renderUserListTree 근처(파일 훨씬 아래쪽)에 선언돼
+    // 있었는데, 부팅 시 최상위 동기 코드가 (isCompactMode가 false일 때) 그 지점까지
+    // 실행이 도달하기 전에 setSidebarRailFilter('users')를 호출해 renderUserListTree ->
+    // getOrderedUserGroupKeys -> saveUserGroupOrderList로 이어지며 이 상수를 먼저 참조했다.
+    // const는 선언부까지 실행이 도달하기 전엔 TDZ 상태라 "Cannot access ... before
+    // initialization"으로 시작 화면 자체가 못 떴다(일반 모드 PC 전부 100% 재현). 그래서
+    // 이 최상위 초기화 블록보다 반드시 앞에 선언해야 한다.
+    const USER_DEPT_FLOOR_GROUP_ORDER_KEY = 'userDeptFloorGroupOrder';
+    const SIDEBAR_BLOCK_ORDER_KEY = 'sidebarMainBlockOrder';
     function toggleSidebarRightCollapsed(forceState) {
       const collapsed = typeof forceState === 'boolean' ? forceState : !document.body.classList.contains('sidebar-right-collapsed');
       document.body.classList.toggle('sidebar-right-collapsed', collapsed);
@@ -12533,9 +12542,7 @@
 
     const CHANNEL_DRAG_MIME = 'application/x-mirae-channel-key';
     const USER_GROUP_DRAG_MIME = 'application/x-mirae-user-group-name';
-    const USER_DEPT_FLOOR_GROUP_ORDER_KEY = 'userDeptFloorGroupOrder';
     const SIDEBAR_BLOCK_DRAG_MIME = 'application/x-mirae-sidebar-block';
-    const SIDEBAR_BLOCK_ORDER_KEY = 'sidebarMainBlockOrder';
     const SIDEBAR_BLOCK_DEFAULT_ORDER = ['dm', 'users', 'channels'];
     const SIDEBAR_BLOCK_ID_MAP = { dm: 'sidebar-block-dm', users: 'sidebar-block-users', channels: 'sidebar-block-channels' };
     let channelDragKey = '';
