@@ -5058,7 +5058,7 @@
   <div id="app-body-row">
   <div id="app-icon-rail">
     <div id="icon-rail-nav">
-      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항 (Ctrl+`)" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"><span class="icon-rail-badge" id="icon-rail-users-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기 (Ctrl+4)" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기 (Ctrl+5)" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"><span class="icon-rail-badge" id="icon-rail-channels-badge" style="display:none;"></span></button>
@@ -25427,6 +25427,11 @@
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '5' || e.code === 'Digit5')) {
         e.preventDefault();
         if (!isPrivacyScreenLocked) setSidebarRailFilter('channels');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === '`' || e.code === 'Backquote')) {
+        e.preventDefault();
+        if (!isPrivacyScreenLocked) openBoardModal();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'w' || e.key === 'W' || e.code === 'KeyW')) {
