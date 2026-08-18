@@ -4711,6 +4711,11 @@ function buildTrayContextMenu() {
     },
     { type: 'separator' },
     {
+      label: '지금 업데이트 확인',
+      click: () => { manualUpdateFromTray().catch((e) => dialog.showErrorBox('업데이트 실패', e && e.message ? e.message : String(e))); }
+    },
+    { type: 'separator' },
+    {
       label: '문제 진단 화면 열기',
       click: () => {
         openMainWindowWithViewMode(trayLaunchViewMode);
@@ -13048,6 +13053,72 @@ async function autoCheckAndApplyUpdate() {
     // 파일 복사/검증이 실제로 실패한 경우는 화면에도 알려서 "준비됐다고 떴는데 반영이 안 된다"는
     // 혼란이 생기지 않도록 한다.
     safeWebContentsSend('auto-update-failed', { msg: e.message });
+  } finally {
+    updateApplyInFlight = false;
+  }
+}
+
+/** 트레이 메뉴 "지금 업데이트 확인" — 렌더러가 멈춰 있어도(예: 시작 화면 자체가 안 뜨는
+ * 경우) 메인 프로세스에서 직접 확인·적용·재시작까지 끝낸다. 렌더러 IPC나 자동갱신 설정
+ * (수동 모드)에 기대지 않고, 대화상자로 직접 진행 상황을 안내한다. */
+async function manualUpdateFromTray() {
+  if (updateApplyInFlight) {
+    dialog.showMessageBox({ type: 'info', title: '업데이트', message: '이미 업데이트를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.' });
+    return;
+  }
+  updateSourcePath = normalizeUpdateSourcePath(updateSourcePath);
+  if (!updateSourcePath) {
+    dialog.showMessageBox({ type: 'warning', title: '업데이트', message: '업데이트 소스가 설정되지 않았습니다.' });
+    return;
+  }
+  let best;
+  try {
+    best = await findNewestUpdateCandidate();
+  } catch (e) {
+    dialog.showErrorBox('업데이트 확인 실패', '업데이트 정보를 가져오지 못했습니다. 네트워크 연결을 확인해 주세요.\n' + (e && e.message ? e.message : String(e)));
+    return;
+  }
+  if (!best) {
+    dialog.showErrorBox('업데이트 확인 실패', '업데이트 정보를 가져오지 못했습니다. 네트워크(GitHub) 연결을 확인해 주세요.');
+    return;
+  }
+  const gh = (best.candidates || []).find((c) => c.kind === 'github') || (best.kind === 'github' ? best : null);
+  const target = gh || best;
+  const missingRaw = getMissingLocalUpdateFiles();
+  const missingFiles = canRepairMissingFiles(missingRaw) ? missingRaw : [];
+  const isNewer = compareVersions(target.version, APP_VERSION) > 0;
+  if (!isNewer && missingFiles.length === 0) {
+    dialog.showMessageBox({ type: 'info', title: '업데이트', message: `이미 최신 버전입니다. (현재 ${APP_VERSION})` });
+    return;
+  }
+  const detailLines = [target.notes || ''];
+  if (missingFiles.length) detailLines.push(`(일부 기능 파일 재수신: ${missingFiles.join(', ')})`);
+  const choice = dialog.showMessageBoxSync({
+    type: 'question',
+    buttons: ['업데이트', '취소'],
+    defaultId: 0,
+    cancelId: 1,
+    title: '업데이트 확인됨',
+    message: isNewer
+      ? `새 버전 ${target.version}이(가) 있습니다. 지금 업데이트하고 다시 시작할까요?`
+      : '누락된 파일을 다시 받아옵니다. 지금 업데이트하고 다시 시작할까요?',
+    detail: detailLines.filter(Boolean).join('\n')
+  });
+  if (choice !== 0) return;
+
+  updateApplyInFlight = true;
+  const prevSource = updateSourcePath;
+  updateSourcePath = target.sourcePath;
+  try {
+    await applyUpdateFiles();
+    dialog.showMessageBox({ type: 'info', title: '업데이트 완료', message: '업데이트가 완료됐습니다. 프로그램을 다시 시작합니다.' });
+    broadcastGoodbye();
+    isQuitting = true;
+    app.relaunch();
+    app.exit();
+  } catch (e) {
+    updateSourcePath = prevSource;
+    dialog.showErrorBox('업데이트 실패', e && e.message ? e.message : String(e));
   } finally {
     updateApplyInFlight = false;
   }
