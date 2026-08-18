@@ -2815,9 +2815,12 @@
     /* 일정 카드를 드래그해서 올려놓은 날짜 칸 강조 */
     .mini-cal-day.drop-target { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
     .schedule-board-data-row.is-dragging { opacity: 0.4; }
+    /* 호실 칸이 56px로 좁아서 그립을 글자와 나란히 두면 줄바꿈됐다 — 칸 흐름 밖으로 빼서
+       왼쪽에 겹쳐 놓는다(td에는 .schedule-board-room에 position:relative가 걸려 있음). */
     .sb-drag-grip {
-      display: inline-block; cursor: grab; opacity: 0.35; margin-right: 4px;
-      font-size: 11px; user-select: none; transition: opacity var(--transition-fast);
+      position: absolute; left: 1px; top: 50%; transform: translateY(-50%);
+      cursor: grab; opacity: 0.35; font-size: 10px; user-select: none;
+      transition: opacity var(--transition-fast);
     }
     .schedule-board-data-row:hover .sb-drag-grip { opacity: 0.7; }
     .sb-drag-grip:active { cursor: grabbing; }
@@ -3348,7 +3351,7 @@
       body.schedule-board-printing .sb-main-grid td { border-color: #cbd5e1; }
     }
     .schedule-board-row:hover { background: #f8fafc; }
-    .schedule-board-room { font-weight: 800; color: #0f172a; min-width: 0; font-size: 14.5px; letter-spacing: -0.02em; }
+    .schedule-board-room { position: relative; font-weight: 800; color: #0f172a; min-width: 0; font-size: 14.5px; letter-spacing: -0.02em; }
     .schedule-board-name { font-weight: 700; color: #0f172a; min-width: 0; font-size: 14.5px; letter-spacing: -0.02em; }
     .schedule-board-doctor {
       display: inline-block; box-sizing: border-box; width: auto; max-width: 100%;
