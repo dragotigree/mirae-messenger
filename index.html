@@ -12094,6 +12094,7 @@
       const members = sortGroupMembers(user.groupMembers || []);
       const myIp = myProfile && myProfile.ip;
       const ownerIp = user.ownerIp || '';
+      const noOwner = !ownerIp;
       const iAmOwner = !!(ownerIp && myIp && ownerIp === myIp);
       const rowsHtml = members.map((m) => {
         const live = allUsers.find((u) => u.ip === m.ip);
@@ -12106,9 +12107,14 @@
         const cuteCls = cuteAvatarClassFor(m.username, photo, seed);
         const avatarClass = photo ? 'group-member-avatar avatar-photo' : `group-member-avatar ${cuteCls}`.trim();
         const avatarInner = avatarInnerHtml(m.username || name, photo, seed);
+        // 방장 개념이 생기기 전에 만든 옛날 그룹은 owner_ip가 비어 있을 수 있다 — 이 경우
+        // 아무도 위임 버튼을 볼 수 없어 영영 방장을 못 정하게 되므로, 방장이 없을 때는
+        // 본인 스스로 "방장 되기"를 눌러 첫 방장이 될 수 있게 한다.
         const transferBtn = (iAmOwner && !isMe)
           ? `<button type="button" class="group-owner-transfer-btn" onclick="transferGroupOwnerConfirmed(${escapeHtml(JSON.stringify(user.groupUid))}, ${escapeHtml(JSON.stringify(m.ip))}, ${escapeHtml(JSON.stringify(name))})">방장 위임</button>`
-          : '';
+          : (noOwner && isMe)
+            ? `<button type="button" class="group-owner-transfer-btn" onclick="transferGroupOwnerConfirmed(${escapeHtml(JSON.stringify(user.groupUid))}, ${escapeHtml(JSON.stringify(m.ip))}, ${escapeHtml(JSON.stringify(name))})">방장 되기</button>`
+            : '';
         return `<div class="group-member-row">
           <div class="${avatarClass}">${avatarInner}</div>
           <div class="group-member-body">
@@ -12156,7 +12162,9 @@
     }
 
     async function transferGroupOwnerConfirmed(uid, newOwnerIp, newOwnerName) {
-      if (!await appConfirm(`'${newOwnerName}'님에게 방장을 위임하시겠습니까?`)) return;
+      const isSelfClaim = myProfile && myProfile.ip === newOwnerIp;
+      const confirmMsg = isSelfClaim ? '이 대화방의 방장이 되시겠습니까?' : `'${newOwnerName}'님에게 방장을 위임하시겠습니까?`;
+      if (!await appConfirm(confirmMsg)) return;
       const res = await window.api.transferGroupOwner(uid, newOwnerIp);
       if (!res || !res.success) { await appAlert((res && res.msg) || '방장 위임에 실패했습니다.'); return; }
       await refreshGroupChats();

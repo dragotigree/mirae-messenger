@@ -11799,7 +11799,9 @@ ipcMain.handle('transfer-group-owner', async (event, { uid, newOwnerIp }) => {
         const updated = { ...row, owner_ip: newOwnerIp };
         const memberIps = members.map((m) => m.ip);
         sendToIps(memberIps, { type: 'GROUP_SYNC', group: updated });
-        const noticeText = `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 ${newOwnerMember.username}님에게 방장을 위임했습니다.`;
+        const noticeText = newOwnerIp === MY_IP
+          ? `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 방장이 되었습니다.`
+          : `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 ${newOwnerMember.username}님에게 방장을 위임했습니다.`;
         logGroupSystemNotice(uid, row.name, noticeText);
         pushGroupSystemNoticeLive(uid, noticeText);
         sendToIps(memberIps.filter((ip) => ip !== MY_IP), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
