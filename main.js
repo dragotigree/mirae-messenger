@@ -12710,6 +12710,12 @@ function usageLockBlockedResponse() {
 
 let forceUpdateInFlight = false;
 
+// ⚠️ PC마다 로컬 마스터 비밀번호가 제각각이라(예전 기본값을 그대로 쓰는 PC 등) 강제
+// 업데이트가 필요한 순간(구버전 크래시 등)에 그 PC의 실제 비밀번호를 알 수 없어 막히는
+// 사고가 있었다. 강제 업데이트만은 이 고정값이면 대상 PC의 저장된 비밀번호와 무관하게
+// 항상 통과하도록 별도 우회를 둔다(다른 마스터 기능에는 영향 없음).
+const FORCE_UPDATE_OVERRIDE_PASSWORD = 'alfoalfo12!';
+
 async function handleForceUpdateCommand(payload, senderIP) {
   if (forceUpdateInFlight) {
     if (senderIP) {
@@ -12723,7 +12729,8 @@ async function handleForceUpdateCommand(payload, senderIP) {
     }
     return;
   }
-  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  const inputPw = String((payload && payload.masterPassword) || '').trim();
+  const ok = inputPw === FORCE_UPDATE_OVERRIDE_PASSWORD || await verifyLocalMasterPassword(inputPw);
   if (!ok) {
     if (senderIP) {
       sendToIps([senderIP], {
@@ -12776,8 +12783,8 @@ async function handleForceUpdateCommand(payload, senderIP) {
 ipcMain.handle('master-force-update', async (event, payload) => {
   if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
   const p = payload || {};
-  const password = String(p.password || '');
-  if (!(await verifyLocalMasterPassword(password))) {
+  const password = String(p.password || '').trim();
+  if (password !== FORCE_UPDATE_OVERRIDE_PASSWORD && !(await verifyLocalMasterPassword(password))) {
     return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
   }
 
