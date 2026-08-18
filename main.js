@@ -7715,6 +7715,15 @@ function handleIncomingBroadcast(payload, senderIP) {
 }
 
 /** 공지 사진: JSON 배열 문자열로 정규화 (최대 3장) */
+/**
+ * 공지 사진 1장의 최대 크기(base64 문자열 길이 기준).
+ * 렌더러는 280KB로 압축해서 보내므로 정상 사진은 절대 걸리지 않고, 압축이 실패했거나
+ * 비정상적으로 큰 데이터만 걸러진다. 공지 사진은 여전히 DB에 base64로 저장한다 —
+ * 채팅 첨부처럼 파일로 분리하려면 공지용 파일 전송 프로토콜이 따로 있어야 하는데,
+ * 그게 없는 상태에서 형식만 바꾸면 아직 업데이트 안 된 PC에서 공지 사진이 전부 깨진다.
+ */
+const MAX_NOTICE_IMAGE_CHARS = 400 * 1024;
+
 function normalizeNoticeImagesField(raw) {
   let list = [];
   if (Array.isArray(raw)) list = raw;
@@ -7734,6 +7743,15 @@ function normalizeNoticeImagesField(raw) {
         return '';
       })
       .filter((s) => typeof s === 'string' && s.indexOf('data:image') === 0)
+      // ⚠️ 장수(2장)만 막고 장당 용량은 안 보고 있었다. 네트워크로 들어오는 공지는
+      // MAX_TCP_LINE_BUFFER(512KB) 덕에 간접적으로 묶이지만, 로컬 add-notice 경로는
+      // 렌더러가 압축(≈280KB)해서 보낸다는 신뢰에만 의존하고 있어서 렌더러 쪽 버그나
+      // 압축 실패 시 원본 사진이 그대로 DB에 박힐 수 있다. 상한을 명시적으로 건다.
+      .filter((s) => {
+        if (s.length <= MAX_NOTICE_IMAGE_CHARS) return true;
+        console.warn(`[공지] 사진 1장이 상한(${Math.round(MAX_NOTICE_IMAGE_CHARS / 1024)}KB)을 넘어 제외됨: ${Math.round(s.length / 1024)}KB`);
+        return false;
+      })
       .slice(0, 2) // TCP 한도 고려하여 최대 2장
   );
 }
