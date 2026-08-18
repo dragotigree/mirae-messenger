@@ -5649,6 +5649,7 @@
           <button type="button" class="settings-nav-btn" data-master-tab="traffic" onclick="setMasterAdminTab('traffic')">부하 감시</button>
           <button type="button" class="settings-nav-btn" data-master-tab="pause" onclick="setMasterAdminTab('pause')">전체 일시중지</button>
           <button type="button" class="settings-nav-btn" data-master-tab="security" onclick="setMasterAdminTab('security')">비밀번호</button>
+          <button type="button" class="settings-nav-btn" data-master-tab="uitext" onclick="setMasterAdminTab('uitext')">문구 수정</button>
         </nav>
         <div class="settings-panels">
 
@@ -5804,6 +5805,25 @@
               <div style="font-size:13px; font-weight:700; color:#1e293b;">✍️ 작성 권한자 비밀번호 재설정</div>
               <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">비밀번호를 잊은 작성 권한자 계정을 골라 새 비밀번호를 지정합니다. 「운영자 계정」 목록의 <b>비밀번호</b> 버튼으로도 동일하게 할 수 있습니다.</p>
               <div id="master-operator-reset-hint" style="font-size:11.5px; color:#64748b;">운영자 계정 탭에서 계정을 확인한 뒤 재설정해 주세요.</div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-master-panel="uitext">
+            <h3 class="settings-panel-title">문구 수정</h3>
+            <p class="settings-panel-desc">버튼·메뉴·안내문 같은 화면에 고정된 문구를 직접 고칩니다.</p>
+            <div class="settings-card" id="ui-text-edit-card">
+              <div class="settings-section-title">화면 문구 고치기</div>
+              <p class="settings-hint">
+                버튼·메뉴·안내문 같은 <b>화면에 고정된 문구</b>를 프로그램 안에서 직접 고칠 수 있습니다.
+                고친 문구는 같은 네트워크의 다른 직원 PC에도 자동으로 반영됩니다.
+                <b>Ctrl+Shift+E</b> 로도 켜고 끌 수 있습니다.
+                대화 내용·직원 이름·공지 본문은 물론, 시각·인원수·전화번호처럼 값이 바뀌는 글자도 고칠 수 없게 막혀 있습니다.
+              </p>
+              <div class="settings-btn-row">
+                <button type="button" class="settings-btn-primary" id="ui-text-edit-toggle" onclick="toggleUiTextEditMode()">문구 수정 모드 켜기 (Ctrl+Shift+E)</button>
+                <button type="button" class="settings-btn-secondary" onclick="resetAllUiTextOverrides()">전부 원래대로</button>
+              </div>
+              <div id="ui-text-edit-result" class="settings-hint"></div>
             </div>
           </div>
 
@@ -6354,21 +6374,6 @@
       <div class="settings-panel" data-settings-panel="appearance">
         <h3 class="settings-panel-title">화면·글꼴</h3>
         <p class="settings-panel-desc">화면 모드와 글꼴을 조정합니다.</p>
-        <!-- 🖊 화면 문구 고치기 — 마스터 계정에서만 보인다 -->
-        <div class="settings-card" id="ui-text-edit-card" style="display:none;">
-          <div class="settings-section-title">화면 문구 고치기</div>
-          <p class="settings-hint">
-            버튼·메뉴·안내문 같은 <b>화면에 고정된 문구</b>를 프로그램 안에서 직접 고칠 수 있습니다.
-            고친 문구는 같은 네트워크의 다른 직원 PC에도 자동으로 반영됩니다.
-            <b>Ctrl+Shift+E</b> 로도 켜고 끌 수 있습니다.
-            대화 내용·직원 이름·공지 본문은 물론, 시각·인원수·전화번호처럼 값이 바뀌는 글자도 고칠 수 없게 막혀 있습니다.
-          </p>
-          <div class="settings-btn-row">
-            <button type="button" class="settings-btn-primary" id="ui-text-edit-toggle" onclick="toggleUiTextEditMode()">문구 수정 모드 켜기 (Ctrl+Shift+E)</button>
-            <button type="button" class="settings-btn-secondary" onclick="resetAllUiTextOverrides()">전부 원래대로</button>
-          </div>
-          <div id="ui-text-edit-result" class="settings-hint"></div>
-        </div>
         <div class="settings-card">
           <div class="settings-form-grid settings-form-stack">
             <label class="settings-field">화면 모드
@@ -16103,7 +16108,11 @@
     function toggleUiTextEditMode() {
       if (!isMasterAuthenticated) { appAlert('마스터 계정으로 로그인한 경우에만 사용할 수 있습니다.'); return; }
       const turningOn = !uiTextEditing;
-      if (turningOn) closeSettingsModal();
+      if (turningOn) {
+        const masterModal = document.getElementById('master-admin-modal');
+        if (masterModal && masterModal.style.display !== 'none') closeMasterAdminModal();
+        else closeSettingsModal();
+      }
       setUiTextEditMode(turningOn);
     }
 
@@ -16801,9 +16810,6 @@
       const pathInput = document.getElementById('update-source-path-input');
       pathInput.value = savedPath || '';
       pathInput.disabled = !isMasterAuthenticated;
-      // 문구 고치기는 마스터에게만 노출한다
-      const uiTextCard = document.getElementById('ui-text-edit-card');
-      if (uiTextCard) uiTextCard.style.display = isMasterAuthenticated ? 'block' : 'none';
       document.getElementById('update-save-path-btn').style.display = isMasterAuthenticated ? 'inline-block' : 'none';
       document.getElementById('update-check-result').textContent = '';
       try {
