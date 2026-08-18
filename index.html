@@ -19278,10 +19278,25 @@
       });
     }
 
+    let chatMessageSendInFlight = false;
     async function sendChatMessage() {
       const textarea = document.getElementById('chat-textarea');
       const text = textarea.value.trim();
       if (!text || !activeChatUser) return;
+      // ⚠️ 실사고: 상대가 오프라인이면 전송 IPC가 응답(연결 실패 확인)하는 데 최대 900ms
+      // 걸리는데, 그동안 입력창이 안 비워져 있어 사용자가 "안 보내졌나?" 하고 Enter를
+      // 다시 누르거나 전송 버튼을 한 번 더 누르면 같은 내용이 정말로 두 번 보내졌다.
+      // 온라인일 땐 즉시 끝나서 거의 안 보이던 문제가, 오프라인 상대에게 유독 잘 보였다.
+      if (chatMessageSendInFlight) return;
+      chatMessageSendInFlight = true;
+      try {
+        await sendChatMessageImpl(textarea, text);
+      } finally {
+        chatMessageSendInFlight = false;
+      }
+    }
+
+    async function sendChatMessageImpl(textarea, text) {
 
       if (!editingMessageUid && text.startsWith('/')) {
         const handled = await tryExecuteChatSlashCommand(text);
