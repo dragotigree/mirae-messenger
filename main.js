@@ -4889,6 +4889,12 @@ function createWindow() {
   mainWindow.on('show', forceRepaint);
   mainWindow.on('restore', forceRepaint);
 
+  // ⚠️ 실사고: 아래 'show' 핸들러가 실수로 setBackgroundThrottling(true)를 쓰고 있었다.
+  // 창이 한 번이라도 최소화/숨김됐다 다시 보이면, 위 webPreferences.backgroundThrottling:false로
+  // 켜둔 "숨겨져 있어도 정상 렌더링" 상태가 도로 꺼진 채 계속 유지되어(다시 false로 되돌리는
+  // 코드가 없었다), 그 뒤로는 창이 다시 보여도 렌더링이 계속 절전 상태로 남아 마지막 프레임
+  // (흰 화면)에서 멈춰 있는 원인이 됐다. 작업표시줄로 다시 켜면 잠깐 괜찮아 보이는 건 위
+  // forceRepaint가 한 번 강제로 그려주기 때문일 뿐, throttling 자체는 계속 켜진 채였다.
   mainWindow.on('hide', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
       mainWindow.webContents.setBackgroundThrottling(true);
@@ -4896,7 +4902,7 @@ function createWindow() {
   });
   mainWindow.on('show', () => {
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.setBackgroundThrottling(true);
+      mainWindow.webContents.setBackgroundThrottling(false);
     }
   });
   mainWindow.on('focus', () => { toastUiState.focused = true; });
