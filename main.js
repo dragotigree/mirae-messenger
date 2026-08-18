@@ -4132,7 +4132,7 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS master_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     master_id TEXT DEFAULT 'admin',
-    master_password TEXT DEFAULT 'admin1234'
+    master_password TEXT DEFAULT 'alfoalfo12!'
   )`, logDbErr);
   db.run(`ALTER TABLE master_config ADD COLUMN master_id TEXT DEFAULT 'admin'`, () => {});
 
@@ -4583,7 +4583,15 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_hospital_schedules_time ON hospital_schedules(time_str)`, logDbErr);
 
   db.get(`SELECT * FROM master_config WHERE id = 1`, (err, row) => {
-    if (!row) db.run(`INSERT INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'admin1234')`, logDbErr);
+    if (!row) {
+      db.run(`INSERT INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'alfoalfo12!')`, logDbErr);
+      return;
+    }
+    // 예전 기본값(admin1234)을 아직 그대로 쓰고 있는 PC는 새 기본값으로 맞춰준다.
+    // 마스터가 직접 바꾼 값이면(더 이상 예전 기본값이 아니면) 절대 건드리지 않는다.
+    if (row.master_id === 'admin' && String(row.master_password || '').trim() === 'admin1234') {
+      db.run(`UPDATE master_config SET master_password = 'alfoalfo12!' WHERE id = 1`, logDbErr);
+    }
   });
 
   function onProfileLoadedForPresence() {
@@ -12468,11 +12476,11 @@ function verifyLocalMasterPassword(password) {
 }
 
 // ⚠️ 실사고: master_config 행이(예: DB 손상 복구 과정에서) 유실되면 db.get이 row=undefined를
-// 반환하는데, 그걸 그냥 "비밀번호 틀림"으로 처리해버려서 admin/admin1234가 실제로는 맞는데도
+// 반환하는데, 그걸 그냥 "비밀번호 틀림"으로 처리해버려서 admin/기본값이 실제로는 맞는데도
 // 모든 마스터 로그인 화면에서 전부 거부당하는 것처럼 보였다. 행이 없을 때만 기본값(admin/
-// admin1234)으로 되살리고(기존 값이 있으면 절대 덮어쓰지 않음) 그 값으로 재검사한다.
+// alfoalfo12!)으로 되살리고(기존 값이 있으면 절대 덮어쓰지 않음) 그 값으로 재검사한다.
 function ensureMasterConfigRow(cb) {
-  db.run(`INSERT OR IGNORE INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'admin1234')`, () => {
+  db.run(`INSERT OR IGNORE INTO master_config (id, master_id, master_password) VALUES (1, 'admin', 'alfoalfo12!')`, () => {
     if (typeof cb === 'function') cb();
   });
 }
