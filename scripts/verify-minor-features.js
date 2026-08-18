@@ -274,13 +274,16 @@ async function testWriterLoginOpenAdminFlag() {
 
 async function testMainJsPinAndSyncHooks() {
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  ok('deleted_chat_pins 테이블 존재', /CREATE TABLE IF NOT EXISTS deleted_chat_pins/.test(main));
-  ok('clear-chat-pin await clearChatPinRow', /await clearChatPinRow\(key/.test(main));
+  // 채팅 고정(chat_pins)은 1.0.566에서 제거됨 — 되살아나지 않았는지만 확인한다.
+  ok('chat_pins 기능 제거 유지', !/CREATE TABLE IF NOT EXISTS deleted_chat_pins/.test(main)
+    && /DROP TABLE IF EXISTS deleted_chat_pins/.test(main));
   ok('upsertNoticeFromSync SELECT 후 INSERT', /SELECT uid FROM notices WHERE uid = \?/.test(main)
     && /forbidNewUidOnConflict/.test(main));
-  ok('sync pin 전용 청크 unshift', /chunks\.unshift\(pinChunk\)/.test(main));
   ok('일정 tombstone 본문 우선', /incomingScheduleUids/.test(main));
-  ok('update-notice notices-update 송신', /update-notice[\s\S]*?safeWebContentsSend\('notices-update'\)/.test(main));
+  // 직접 send 호출이 디바운스 래퍼(notifyNoticesChanged)로 리팩터링됨 —
+  // 래퍼 내부에서 safeWebContentsSend('notices-update')를 호출한다.
+  ok('update-notice 공지 갱신 알림', /update-notice[\s\S]*?notifyNoticesChanged\(\)/.test(main)
+    && /function notifyNoticesChanged[\s\S]{0,400}?safeWebContentsSend\('notices-update'\)/.test(main));
 }
 
 async function main() {

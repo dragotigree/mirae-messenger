@@ -62,11 +62,16 @@ function testMessageEditAuth() {
   ok('MESSAGE_EDIT sender_ip 조건 UPDATE', /UPDATE messages SET message = \? WHERE msg_uid = \? AND sender_ip = \?/.test(mainSrc));
 }
 
-function testChatPins() {
-  ok('deleted_chat_pins 테이블', /CREATE TABLE IF NOT EXISTS deleted_chat_pins/.test(mainSrc));
-  ok('clear-chat-pin await', /await clearChatPinRow\(key/.test(mainSrc));
-  ok('피어 clear force:false', /pin\._clear[\s\S]{0,200}?force:\s*false/.test(mainSrc));
-  ok('sync pin 전용 청크', /chunks\.unshift\(pinChunk\)/.test(mainSrc));
+/**
+ * 채팅 고정(chat_pins) 기능은 1.0.566에서 완전히 제거됐다. 예전에는 여기서 그 기능이
+ * 살아있는지 검사했는데, 기능이 사라진 뒤로도 검사가 남아 매번 4건씩 FAIL을 냈다.
+ * 실패가 상시화되면 진짜 회귀가 그 사이에 묻히므로, 검사 방향을 뒤집어
+ * "확실히 제거됐고 다시 살아나지 않았는지"를 확인한다.
+ */
+function testChatPinsRemoved() {
+  ok('chat_pins 테이블 재생성 안 함', !/CREATE TABLE IF NOT EXISTS deleted_chat_pins/.test(mainSrc));
+  ok('부팅 시 잔존 테이블 정리', /DROP TABLE IF EXISTS deleted_chat_pins/.test(mainSrc));
+  ok('스키마 손상 시 비치명 처리', /NON_FATAL_SCHEMA_TABLES/.test(mainSrc));
 }
 
 function testDbCorruptRecovery() {
@@ -74,7 +79,9 @@ function testDbCorruptRecovery() {
   ok('복구 스케줄러', /function scheduleDbCorruptRecovery/.test(mainSrc));
   ok('한국어 corrupt 안내', /로컬 데이터베이스가 손상되었습니다/.test(mainSrc));
   ok('preload onDbCorruptRecovery', /onDbCorruptRecovery/.test(preloadSrc));
-  ok('백업 전 quick_check', /skip auto backup — current DB failed quick_check/.test(mainSrc));
+  // quick_check는 chat_pins류 스키마 카탈로그 손상을 못 잡아 이미 깨진 DB를 정상으로
+  // 백업한 실사고가 있었다. 부팅 검사와 동일한 integrity_check로 교체됨.
+  ok('백업 전 integrity_check', /skip auto backup — current DB failed integrity_check/.test(mainSrc));
 }
 
 function testNoticeSync() {
@@ -241,7 +248,7 @@ async function main() {
   testPreloadIpcParity();
   testNoticeAuthGates();
   testMessageEditAuth();
-  testChatPins();
+  testChatPinsRemoved();
   testDbCorruptRecovery();
   testNoticeSync();
   testDutyFlag();
