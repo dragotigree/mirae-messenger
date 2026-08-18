@@ -10033,7 +10033,7 @@ function resendPendingMessages(targetIP) {
     `SELECT id, sender_name, message, msg_uid, status, created_at FROM messages
      WHERE sender_ip = ? AND receiver_ip = ?
        AND (
-         status = 'PENDING'
+         (status = 'PENDING' AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}'))
          OR (
            status = 'SENT'
            AND msg_uid IS NOT NULL AND trim(msg_uid) != ''
@@ -10054,7 +10054,8 @@ function resendPendingMessages(targetIP) {
 
   db.all(
     `SELECT id, sender_name, message, msg_uid FROM messages
-     WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING' ORDER BY id ASC`,
+     WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'
+       AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}') ORDER BY id ASC`,
     [MY_IP, `BCAST:${targetIP}`],
     (err, rows) => {
       if (err) {
@@ -10068,6 +10069,7 @@ function resendPendingMessages(targetIP) {
   db.all(
     `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
      WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
+       AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
      ORDER BY id ASC`,
     [MY_IP, `DEPTPEER:${targetIP}|%`],
     (err, rows) => {
@@ -10085,6 +10087,7 @@ function resendPendingMessages(targetIP) {
   db.all(
     `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
      WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
+       AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
      ORDER BY id ASC`,
     [MY_IP, `FLOORPEER:${targetIP}|%`],
     (err, rows) => {
@@ -10122,7 +10125,7 @@ function flushAllPendingOutboundMessages() {
     `SELECT DISTINCT receiver_ip FROM messages
      WHERE sender_ip = ?
        AND (
-         status = 'PENDING'
+         (status = 'PENDING' AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}'))
          OR (
            status = 'SENT'
            AND msg_uid IS NOT NULL AND trim(msg_uid) != ''
