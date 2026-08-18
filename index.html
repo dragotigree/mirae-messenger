@@ -9452,6 +9452,10 @@
     // 이 최상위 초기화 블록보다 반드시 앞에 선언해야 한다.
     const USER_DEPT_FLOOR_GROUP_ORDER_KEY = 'userDeptFloorGroupOrder';
     const SIDEBAR_BLOCK_ORDER_KEY = 'sidebarMainBlockOrder';
+    // ⚠️ 실사고: renderUserListTree()도 이 최상위 동기 블록에서(setSidebarRailFilter('users')
+    // 경유) 곧바로 호출되는데, 그 안에서 lastUserListStructureKey(원래 렌더 함수들 사이,
+    // 훨씬 아래쪽)를 참조해 위와 똑같은 TDZ ReferenceError가 났다. 같은 이유로 여기로 옮긴다.
+    let lastUserListStructureKey = '';
     function toggleSidebarRightCollapsed(forceState) {
       const collapsed = typeof forceState === 'boolean' ? forceState : !document.body.classList.contains('sidebar-right-collapsed');
       document.body.classList.toggle('sidebar-right-collapsed', collapsed);
@@ -14702,8 +14706,6 @@
       bindUserDragSource(card, u);
       return card;
     }
-
-    let lastUserListStructureKey = '';
 
     function buildUserListStructureKey(favorites, sortedGroupKeys, groups, groupingKey) {
       const favIps = favorites.map((u) => u.ip).join(',');
