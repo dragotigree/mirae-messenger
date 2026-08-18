@@ -9501,8 +9501,9 @@
       else setScheduleBoardQuickAddPanelVisible(false);
     }
 
-    function toggleScheduleBoardQuickAddPanel() {
+    async function toggleScheduleBoardQuickAddPanel() {
       if (!canWriteScheduleBoard()) {
+        await appAlert('일정 등록·수정은 작성 권한자 로그인 후 가능합니다.\n(마스터가 발급한 아이디·비밀번호)');
         openOperatorLoginModal();
         return;
       }
@@ -9523,10 +9524,13 @@
         (document.getElementById('schedule-board-modal')?.style.display === 'flex');
       if (!sbVisible) return;
       const canWrite = canWriteScheduleBoard();
-      if (addBtn) addBtn.style.display = canWrite ? 'inline-block' : 'none';
+      // ⚠️ 로그인 안 해도 "+ 빠른 등록" 버튼은 항상 보이게 하고, 안내 배너는 없앤다 —
+      // 로그인 없이 누르면 toggleScheduleBoardQuickAddPanel()이 안내 문구를 띄우고
+      // 작성자 로그인 창을 열어준다.
+      if (addBtn) addBtn.style.display = 'inline-block';
       if (loginBtn) loginBtn.style.display = canWrite ? 'none' : 'inline-block';
       if (logoutBtn) logoutBtn.style.display = canWrite ? 'inline-block' : 'none';
-      if (loginHint) loginHint.style.display = canWrite ? 'none' : 'block';
+      if (loginHint) loginHint.style.display = 'none';
       if (authUserEl) {
         if (canWrite) {
           const name = getScheduleBoardAuthDisplayName();
