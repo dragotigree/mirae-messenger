@@ -30,8 +30,6 @@
       max-height: calc(100vh - 16px);
     }
     .toast.is-urgent { --accent: #EF4444; --accent-soft: #FEE2E2; }
-    .toast.is-code-blue { --accent: #2563EB; --accent-soft: #DBEAFE; }
-    .toast.is-code-red { --accent: #DC2626; --accent-soft: #FEE2E2; }
     .toast-main {
       display: flex;
       gap: 10px;
@@ -123,19 +121,14 @@
     }
     const params = new URLSearchParams(window.location.search);
     const urgent = params.get('urgent') === '1';
-    const codeType = params.get('codeType') === 'blue' || params.get('codeType') === 'red'
-      ? params.get('codeType')
-      : '';
     const title = truncateText(params.get('title') || '새 메시지', 48);
     const body = truncateText(params.get('body') || '', 72);
     document.getElementById('title').textContent = title;
     document.getElementById('body').textContent = body;
     document.getElementById('body').title = params.get('body') || '';
-    document.getElementById('icon').textContent = codeType === 'blue' ? '💙' : (codeType === 'red' ? '❤️' : (urgent ? '🚨' : '💬'));
+    document.getElementById('icon').textContent = urgent ? '🚨' : '💬';
     const el = document.getElementById('toast');
     if (urgent) el.classList.add('is-urgent');
-    if (codeType === 'blue') el.classList.add('is-code-blue');
-    if (codeType === 'red') el.classList.add('is-code-red');
     document.getElementById('btn-open').addEventListener('click', (e) => {
       e.stopPropagation();
       if (window.toastApi) window.toastApi.open();

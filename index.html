@@ -225,10 +225,8 @@
     }
     #icon-rail-account-btn .icon-glyph { width: 17px; height: 17px; }
     #icon-rail-account-btn:hover { filter: brightness(0.94); }
-    #icon-rail-code-alert-btn { color: #ef4444; }
-    #icon-rail-code-alert-btn:hover { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
     /* 아이콘 레일로 이동한 채널들은 사이드바 목록에서 숨김 */
-    #transport-channel-item, #code-alert-channel-item { display: none !important; }
+    #transport-channel-item { display: none !important; }
 
     /* 🏷️ 아이콘 레일 전용 말풍선 툴팁 — 브라우저 기본 title 툴팁 대신 사용.
        paintUiIcons()에서 title을 data-tooltip으로 옮기고 title은 지운다. */
@@ -389,16 +387,13 @@
       display: flex; align-items: stretch; gap: 6px;
       padding: 2px 10px 8px 10px; flex-shrink: 0;
     }
-    .sidebar-quick-actions .sidebar-ipmsg-btn,
-    .sidebar-quick-actions .sidebar-code-alert-btn {
+    .sidebar-quick-actions .sidebar-ipmsg-btn {
       flex: 1 1 0; min-width: 0;
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       padding: 7px 8px; border-radius: var(--radius-md);
       font-size: 12px; font-weight: 700; letter-spacing: -0.02em;
       white-space: nowrap; cursor: pointer;
       transition: background 0.12s, border-color 0.12s, transform 0.12s, box-shadow 0.12s;
-    }
-    .sidebar-quick-actions .sidebar-ipmsg-btn {
       border: 1px solid rgba(255,255,255,0.16);
       background: rgba(255,255,255,0.08);
       color: rgba(255,255,255,0.94);
@@ -407,18 +402,7 @@
       background: rgba(255,255,255,0.15);
       border-color: rgba(255,255,255,0.28);
     }
-    .sidebar-quick-actions .sidebar-code-alert-btn {
-      border: 1px solid rgba(248,113,113,0.4);
-      background: rgba(239,68,68,0.16);
-      color: #fecaca;
-    }
-    .sidebar-quick-actions .sidebar-code-alert-btn:hover {
-      background: rgba(239,68,68,0.26);
-      border-color: rgba(252,165,165,0.65);
-      color: #fff;
-    }
-    .sidebar-quick-actions .sidebar-ipmsg-btn:active,
-    .sidebar-quick-actions .sidebar-code-alert-btn:active {
+    .sidebar-quick-actions .sidebar-ipmsg-btn:active {
       transform: translateY(1px);
     }
 
@@ -2171,85 +2155,7 @@
 
     /* 🚨 긴급 메시지 표시 */
     .urgent-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #dc2626; font-size: 11px; font-weight: var(--font-weight-bold); padding: 2px 8px; border-radius: var(--radius-md); margin-bottom: 4px; }
-    .urgent-badge.code-blue-badge { background: var(--sidebar-active); color: var(--accent-dark); }
-    .urgent-badge.code-red-badge { background: #fee2e2; color: #b91c1c; }
     .msg-row.is-urgent .msg-text, .is-urgent .chat-bubble { background: #fff1f2 !important; border: 1px solid #fecdd3 !important; }
-    .msg-row.is-code-blue .msg-text, .is-code-blue .chat-bubble {
-      background: linear-gradient(160deg, var(--sidebar-active) 0%, var(--sidebar-active) 100%) !important;
-      border: 2px solid var(--accent) !important;
-      color: var(--accent-dark) !important;
-      font-weight: 600;
-    }
-    .msg-row.is-code-red .msg-text, .is-code-red .chat-bubble {
-      background: linear-gradient(160deg, #fee2e2 0%, #fef2f2 100%) !important;
-      border: 2px solid #ef4444 !important;
-      color: #7f1d1d !important;
-      font-weight: 600;
-    }
-    .code-alert-line { line-height: 1.55; }
-    .code-alert-line strong { font-weight: 800; letter-spacing: -0.02em; }
-
-    /* 💙❤️ 코드 발령 모달 */
-    #code-alert-modal .modal-card.code-alert-card { width: min(420px, 94vw); padding: 0; overflow: hidden; }
-    /* 이 모달만 색을 직접 박아 쓰고 있어서 앱의 다른 화면과 따로 놀았다(헤더가 혼자 검은
-       남색이었고, 발송 버튼도 다른 곳의 기본 버튼보다 어두웠다). 다른 모달 헤더
-       (.chat-cal-hero, .schedule-msg-hero)와 같은 방식으로 디자인 토큰을 쓰도록 맞춘다. */
-    .code-alert-hero {
-      display: flex; align-items: center; gap: 12px;
-      padding: 16px 18px 14px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 45%, var(--accent-dark) 100%);
-      color: #fff;
-    }
-    .code-alert-hero-icon {
-      width: 40px; height: 40px; border-radius: var(--radius-md);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; background: rgba(255,255,255,0.2); flex-shrink: 0;
-    }
-    .code-alert-hero h2 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
-    .code-alert-hero p { margin: 4px 0 0; font-size: 11.5px; opacity: 0.9; line-height: 1.4; font-weight: 500; }
-    .code-alert-body { padding: 16px 18px 8px; display: flex; flex-direction: column; gap: 14px; }
-    .code-alert-field-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.02em; margin-bottom: 6px; }
-    .code-type-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .code-type-btn {
-      border: 2px solid var(--border); background: var(--surface-muted); border-radius: var(--radius-md);
-      padding: 12px 10px; cursor: pointer; font-family: inherit; text-align: center;
-      transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
-    }
-    .code-type-btn .code-type-name { display: block; font-size: 14px; font-weight: 800; color: var(--text-primary); }
-    .code-type-btn .code-type-desc { display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 600; }
-    .code-type-btn.is-blue.is-active {
-      border-color: var(--accent); background: var(--sidebar-active); box-shadow: 0 0 0 3px var(--accent-soft);
-    }
-    .code-type-btn.is-blue.is-active .code-type-name { color: var(--accent-dark); }
-    .code-type-btn.is-red.is-active {
-      border-color: var(--danger); background: #fef2f2; box-shadow: 0 0 0 3px rgba(239,68,68,0.2);
-    }
-    .code-type-btn.is-red.is-active .code-type-name { color: #b91c1c; }
-    .code-alert-select, .code-alert-input {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
-      font-size: 13px; font-family: inherit; background: var(--surface); color: var(--text-primary); box-sizing: border-box;
-    }
-    .code-alert-input { margin-top: 8px; }
-    .code-alert-preview {
-      border-radius: var(--radius-md); padding: 12px 14px; font-size: 13px; line-height: 1.55;
-      border: 2px solid var(--border); background: var(--surface-muted); color: var(--text-primary); white-space: pre-wrap;
-      min-height: 64px; font-weight: 600;
-    }
-    .code-alert-preview.is-blue { border-color: var(--accent); background: var(--sidebar-active); color: var(--accent-dark); }
-    .code-alert-preview.is-red { border-color: var(--danger); background: #fef2f2; color: #7f1d1d; }
-    .code-alert-footer {
-      display: flex; justify-content: flex-end; gap: 8px;
-      padding: 12px 18px 16px; border-top: 1px solid var(--border-soft);
-    }
-    .code-alert-btn-ghost {
-      padding: 9px 14px; border: none; border-radius: var(--radius-md); background: var(--border-soft);
-      color: var(--text-secondary); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit;
-    }
-    .code-alert-btn-send {
-      padding: 9px 18px; border: none; border-radius: var(--radius-md); background: var(--accent);
-      color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; font-family: inherit;
-    }
-    .code-alert-btn-send.is-red { background: var(--danger); }
     /* ✍️ 작성자 로그인 — 로고 없이 입력 폼 한 단으로 */
     #operator-login-modal .modal-card.signin-card {
       width: min(400px, 94vw); padding: 0; overflow: hidden;
@@ -2296,13 +2202,6 @@
       .signin-panel { padding: 26px 22px 20px; }
     }
 
-    .sidebar-code-alert-btn {
-      padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(248,113,113,0.45);
-      background: rgba(239,68,68,0.18); color: #fecaca; font-size: 11.5px; font-weight: 700;
-      cursor: pointer; letter-spacing: 0; transition: background 0.12s, border-color 0.12s;
-    }
-    .sidebar-code-alert-btn:hover { background: rgba(239,68,68,0.28); border-color: rgba(252,165,165,0.7); color: #fff; }
-    .compact-avatar-code-alert { background: var(--accent-dark); color: #fff; font-size: 14px; }
 
     /* ✅ 읽음 표시 */
     .read-receipt-note { text-align: right; font-size: 11px; color: var(--accent-dark); font-weight: 600; padding: 4px 18px 6px 0; flex-shrink: 0; background: linear-gradient(180deg, rgba(240,249,255,0.9), transparent); }
@@ -4430,12 +4329,10 @@
       from { opacity: 0; transform: translateY(6px) translateX(4px) scale(0.985); }
       to { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
     }
-    .sidebar-quick-actions .sidebar-ipmsg-btn,
-    .sidebar-quick-actions .sidebar-code-alert-btn {
+    .sidebar-quick-actions .sidebar-ipmsg-btn {
       transition: background 0.14s, border-color 0.14s, transform 0.14s, box-shadow 0.14s;
     }
-    .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
-    .sidebar-quick-actions .sidebar-code-alert-btn:hover {
+    .sidebar-quick-actions .sidebar-ipmsg-btn:hover {
       transform: translateY(-1px);
     }
     .sidebar-pref-chip {
@@ -4494,7 +4391,6 @@
       .btn-send:hover,
       .chat-header-tool-btn:hover,
       .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
-      .sidebar-quick-actions .sidebar-code-alert-btn:hover,
       .settings-nav-btn.active,
       .sidebar-pref-chip.is-active {
         transform: none !important;
@@ -4525,7 +4421,6 @@
     html.ui-animations-off .btn-send:hover,
     html.ui-animations-off .chat-header-tool-btn:hover,
     html.ui-animations-off .sidebar-quick-actions .sidebar-ipmsg-btn:hover,
-    html.ui-animations-off .sidebar-quick-actions .sidebar-code-alert-btn:hover,
     html.ui-animations-off .settings-nav-btn.active,
     html.ui-animations-off .sidebar-pref-chip.is-active,
     html.ui-animations-off .log-card-item:hover,
@@ -5155,7 +5050,6 @@
     <div id="icon-rail-bottom">
       <button type="button" class="icon-rail-btn" onclick="toggleCompactMode()" id="compact-mode-btn" title="미니 모드로 전환"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-transport-btn" onclick="openTransportRequestModal()" title="이동기사 요청" data-ui-icon="transportCar"></button>
-      <button type="button" class="icon-rail-btn" id="icon-rail-code-alert-btn" onclick="openCodeAlertModal()" title="코드 발령" data-ui-icon="alertTriangle"></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-login-btn" onclick="openOperatorLoginModal()" title="작성자 로그인" data-ui-icon="logIn"></button>
       <button type="button" class="icon-rail-btn" id="privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc · 사생활 보호)" data-ui-icon="lock"></button>
       <button type="button" id="icon-rail-account-btn" onclick="openSettingsModal()" title="환경 설정 · 관리자화면 · 프로필" data-ui-icon="settings"></button>
@@ -5327,7 +5221,6 @@
               <button type="button" class="compact-more-cell" onclick="window.api.openFilesFolder()"><span class="compact-more-cell-icon" data-ui-icon="folder"></span>파일</button>
               <button type="button" class="compact-more-cell" onclick="openAllLogsModal()"><span class="compact-more-cell-icon" data-ui-icon="logs"></span>기록</button>
               <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
-              <button type="button" class="compact-more-cell" onclick="openCodeAlertModal()"><span class="compact-more-cell-icon" style="font-size:20px;line-height:1;">🚨</span>코드</button>
               <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
               <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
             </div>
@@ -7087,49 +6980,6 @@
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
         <button type="button" onclick="closeShareMessageModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: var(--radius-lg); font-size:12px; cursor:pointer;">✕ 취소</button>
         <button type="button" onclick="submitShareMessageModal()" style="padding:8px 18px; background:var(--accent); color:white; border:none; border-radius: var(--radius-lg); font-size:12px; font-weight:700; cursor:pointer;">전달</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 💙❤️ 코드블루 / 코드레드 긴급 발령 -->
-  <div id="code-alert-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) closeCodeAlertModal()">
-    <div class="modal-card code-alert-card" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="code-alert-title">
-      <div class="code-alert-hero">
-        <div class="code-alert-hero-icon" aria-hidden="true">🚨</div>
-        <div>
-          <h2 id="code-alert-title">긴급 코드 발령</h2>
-          <p>코드 선택 → 장소 선택 → 발송 (전 직원 전체공지)</p>
-        </div>
-      </div>
-      <div class="code-alert-body">
-        <div>
-          <div class="code-alert-field-label">1. 코드 선택</div>
-          <div class="code-type-seg" role="group" aria-label="코드 종류">
-            <button type="button" class="code-type-btn is-blue is-active" id="code-type-blue" onclick="setCodeAlertType('blue')">
-              <span class="code-type-name">💙 코드블루</span>
-              <span class="code-type-desc">심정지 · CPR 팀 출동</span>
-            </button>
-            <button type="button" class="code-type-btn is-red" id="code-type-red" onclick="setCodeAlertType('red')">
-              <span class="code-type-name">❤️ 코드레드</span>
-              <span class="code-type-desc">화재 · 대피 수칙</span>
-            </button>
-          </div>
-        </div>
-        <div>
-          <div class="code-alert-field-label">2. 장소 선택</div>
-          <select id="code-alert-location-select" class="code-alert-select" aria-label="장소 선택" onchange="onCodeAlertLocationChange()">
-            <option value="">장소를 선택하세요</option>
-          </select>
-          <input type="text" id="code-alert-location-custom" class="code-alert-input" style="display:none;" placeholder="예: 5층 502호, 본관 3층 재활치료실" oninput="updateCodeAlertPreview()" onkeydown="if(event.key==='Enter') submitCodeAlert()">
-        </div>
-        <div>
-          <div class="code-alert-field-label">미리보기</div>
-          <div id="code-alert-preview" class="code-alert-preview is-blue" aria-live="polite"></div>
-        </div>
-      </div>
-      <div class="code-alert-footer">
-        <button type="button" class="code-alert-btn-ghost" onclick="closeCodeAlertModal()">취소</button>
-        <button type="button" class="code-alert-btn-send" id="code-alert-send-btn" onclick="submitCodeAlert()">🚨 발송</button>
       </div>
     </div>
   </div>
@@ -10472,7 +10322,6 @@
         { test: () => isFlexOverlay('schedule-msg-modal'), close: () => closeScheduleMessageModal(), confirm: true, name: '예약 메시지' },
         { test: () => isChatQuickSwitcherOpen(), close: () => closeChatQuickSwitcher(), confirm: false },
         { test: () => isFlexOverlay('ipmsg-send-modal'), close: () => closeIpmsgSendModal(), confirm: true, name: '쪽지 보내기' },
-        { test: () => isFlexOverlay('code-alert-modal'), close: () => closeCodeAlertModal(), confirm: true, name: '코드 발령' },
         { test: () => isFlexOverlay('transport-request-modal'), close: () => closeTransportRequestModal(), confirm: true, name: '이동기사 요청' },
         { test: () => isFlexOverlay('schedule-board-modal') || document.body.classList.contains('schedule-board-standalone'), close: () => closeScheduleBoardModal(), confirm: true, name: '병동 일정 현황판' },
         { test: () => isFlexOverlay('master-force-update-modal'), close: () => closeMasterForceUpdateModal(), confirm: false },
@@ -10591,12 +10440,8 @@
     });
 
     window.api.onReceiveBroadcast((data) => {
-      const codeType = (data && (data.codeType === 'blue' || data.codeType === 'red'))
-        ? data.codeType
-        : detectCodeAlertType(data && data.message);
-      const urgent = !!(data && data.urgent) || !!codeType;
-      if (codeType) playCodeAlertSound();
-      else if (urgent) playUrgentSound();
+      const urgent = !!(data && data.urgent);
+      if (urgent) playUrgentSound();
       if (activeChatUser && activeChatUser.isBroadcast) {
         appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), urgent, data.msgUid, data.messageId, data.senderIP);
         afterChannelMessageVisible(data.msgUid);
@@ -11823,22 +11668,6 @@
       container.appendChild(item);
     }
 
-    function appendCompactCodeAlertShortcut(container) {
-      const item = document.createElement('div');
-      item.className = 'compact-list-item compact-list-item-channel';
-      item.innerHTML = `
-        <div class="compact-avatar compact-avatar-code-alert">🚨</div>
-        <div class="compact-item-body">
-          <div class="compact-item-top">
-            <span class="compact-item-name">코드 발령</span>
-          </div>
-          <div class="compact-item-bottom"><span class="compact-item-preview">코드블루 · 코드레드</span></div>
-        </div>
-      `;
-      item.onclick = () => openCodeAlertModal();
-      container.appendChild(item);
-    }
-
     async function renderCompactChatConversations(container) {
       const recent = await loadCompactRecentConversations(true);
       let rows = buildCompactConversationRows(recent);
@@ -11858,7 +11687,6 @@
 
       container.innerHTML = '';
       if (compactListFilter === 'all' && !userFilterKeyword) {
-        appendCompactCodeAlertShortcut(container);
         appendCompactTransportShortcut(container);
       }
 
@@ -12173,9 +12001,6 @@
       if (entry.key === 'TRANSPORT') {
         return { avatarClass: 'compact-avatar-transport', avatarHtml: icon, name, sub: '환자 이동 요청', activeKey: null, groupUid: null, groupName: null };
       }
-      if (entry.key === 'CODE_ALERT') {
-        return { avatarClass: 'compact-avatar-code-alert', avatarHtml: icon, name, sub: '코드블루·코드레드', activeKey: null, groupUid: null, groupName: null };
-      }
       return {
         avatarClass: 'compact-avatar-group', avatarHtml: icon, name, sub: '그룹 대화방',
         activeKey: entry.key, groupUid: entry.group.uid, groupName: entry.group.name
@@ -12341,7 +12166,7 @@
       };
 
       getOrderedChannelEntries().forEach((entry) => {
-        if (entry.key === 'TRANSPORT' || entry.key === 'CODE_ALERT') return;
+        if (entry.key === 'TRANSPORT') return;
         const label = getChannelDisplayName(entry.key, entry.defaultName);
         const kind = entry.key === 'BROADCAST' ? 'channel' : (entry.key.startsWith('GROUP:') ? 'group' : 'channel');
         push({
@@ -12359,7 +12184,7 @@
       const recent = buildCompactConversationRows(await loadCompactRecentConversations(true));
       recent.forEach((row) => {
         if (!row || !row.key) return;
-        if (row.key === 'TRANSPORT' || row.key === 'CODE_ALERT') return;
+        if (row.key === 'TRANSPORT') return;
         const meta = resolveCompactConversationMeta(row.key);
         if (!meta) return;
         const section = meta.kind === 'dm' ? '최근 대화' : '채널 및 대화방';
@@ -13176,15 +13001,6 @@
           isActive: false,
           onClick: () => openTransportRequestModal(),
           group: null
-        },
-        {
-          key: 'CODE_ALERT',
-          icon: '🚨',
-          defaultName: '코드 발령',
-          unread: 0,
-          isActive: false,
-          onClick: () => openCodeAlertModal(),
-          group: null
         }
       ];
       (myGroupChats || []).forEach((g) => {
@@ -13362,7 +13178,7 @@
       let entries = getOrderedChannelEntries();
       if (sidebarUnreadOnly) {
         entries = entries.filter((entry) => {
-          if (entry.key === 'TRANSPORT' || entry.key === 'CODE_ALERT') return false;
+          if (entry.key === 'TRANSPORT') return false;
           return (entry.unread || 0) > 0;
         });
       }
@@ -13377,7 +13193,7 @@
         const iconClass = getChannelTitleEmoji(entry.key) ? 'channel-hash is-custom-emoji' : 'channel-hash';
         const el = document.createElement('div');
         el.className = `channel-item${entry.isActive ? ' active' : ''}`;
-        el.id = entry.key === 'BROADCAST' ? 'broadcast-channel-item' : (entry.key === 'TRANSPORT' ? 'transport-channel-item' : (entry.key === 'CODE_ALERT' ? 'code-alert-channel-item' : ''));
+        el.id = entry.key === 'BROADCAST' ? 'broadcast-channel-item' : (entry.key === 'TRANSPORT' ? 'transport-channel-item' : '');
         if (entry.group) {
           el.dataset.dropGroupUid = entry.group.uid;
           el.dataset.dropGroupName = entry.group.name;
@@ -13517,161 +13333,6 @@
     }
     function closeGroupRenameModal() {
       document.getElementById('group-rename-modal').style.display = 'none';
-    }
-
-    // 💙❤️ 코드블루 / 코드레드 긴급 발령
-    let codeAlertSelectedType = 'blue';
-    const CODE_ALERT_LOCATION_PRESETS = [
-      '응급실', '중환자실(ICU)', '수술실', '재활치료실', '외래', '로비',
-      '영상의학과', '검사실', '약국', '주차장', '본관', '별관'
-    ];
-
-    function buildCodeAlertPlainText(codeType, location) {
-      const place = String(location || '').trim();
-      if (codeType === 'red') {
-        return `[코드레드] ${place} 화재 발생\n초기 진화 및 대피 안내 수칙을 이행하세요. (엘리베이터 이용 금지)`;
-      }
-      return `[코드블루] ${place}\n즉시 심폐소생술(CPR) 팀 출동 바랍니다.`;
-    }
-
-    function buildCodeAlertMessageHtml(codeType, location) {
-      const plain = buildCodeAlertPlainText(codeType, location);
-      const lines = plain.split('\n');
-      const title = escapeHtmlText(lines[0] || '');
-      const body = escapeHtmlText(lines.slice(1).join('\n'));
-      const flag = codeType === 'red' ? 'code-red-flag' : 'code-blue-flag';
-      return `<span class="${flag}" style="display:none"></span><span class="urgent-flag" style="display:none"></span>` +
-        `<div class="code-alert-line"><strong>${title}</strong><br>${body.replace(/\n/g, '<br>')}</div>`;
-    }
-
-    function fillCodeAlertLocationSelect() {
-      const select = document.getElementById('code-alert-location-select');
-      if (!select) return;
-      const floors = getOrderedUserGroupKeys('floor', collectUserGroupKeys('floor', allUsers || []))
-        .filter((f) => f && f !== '기타 층');
-      const opts = ['<option value="">장소를 선택하세요</option>'];
-      if (floors.length) {
-        opts.push('<optgroup label="층">');
-        floors.forEach((f) => {
-          opts.push(`<option value="${escapeHtmlText(f)}">${escapeHtmlText(f)}</option>`);
-        });
-        opts.push('</optgroup>');
-      }
-      opts.push('<optgroup label="주요 장소">');
-      CODE_ALERT_LOCATION_PRESETS.forEach((p) => {
-        opts.push(`<option value="${escapeHtmlText(p)}">${escapeHtmlText(p)}</option>`);
-      });
-      opts.push('</optgroup>');
-      opts.push('<option value="__custom__">직접 입력…</option>');
-      select.innerHTML = opts.join('');
-    }
-
-    function getCodeAlertLocationValue() {
-      const select = document.getElementById('code-alert-location-select');
-      const custom = document.getElementById('code-alert-location-custom');
-      if (!select) return '';
-      if (select.value === '__custom__') return (custom && custom.value || '').trim();
-      return String(select.value || '').trim();
-    }
-
-    function setCodeAlertType(type) {
-      codeAlertSelectedType = type === 'red' ? 'red' : 'blue';
-      const blueBtn = document.getElementById('code-type-blue');
-      const redBtn = document.getElementById('code-type-red');
-      const sendBtn = document.getElementById('code-alert-send-btn');
-      if (blueBtn) blueBtn.classList.toggle('is-active', codeAlertSelectedType === 'blue');
-      if (redBtn) redBtn.classList.toggle('is-active', codeAlertSelectedType === 'red');
-      if (sendBtn) sendBtn.classList.toggle('is-red', codeAlertSelectedType === 'red');
-      updateCodeAlertPreview();
-    }
-
-    function onCodeAlertLocationChange() {
-      const select = document.getElementById('code-alert-location-select');
-      const custom = document.getElementById('code-alert-location-custom');
-      if (!select || !custom) return;
-      if (select.value === '__custom__') {
-        custom.style.display = 'block';
-        custom.focus();
-      } else {
-        custom.style.display = 'none';
-        custom.value = '';
-      }
-      updateCodeAlertPreview();
-    }
-
-    function updateCodeAlertPreview() {
-      const preview = document.getElementById('code-alert-preview');
-      if (!preview) return;
-      const location = getCodeAlertLocationValue();
-      preview.classList.toggle('is-blue', codeAlertSelectedType === 'blue');
-      preview.classList.toggle('is-red', codeAlertSelectedType === 'red');
-      if (!location) {
-        preview.textContent = codeAlertSelectedType === 'red'
-          ? '[코드레드] {장소} 화재 발생\n초기 진화 및 대피 안내 수칙을 이행하세요. (엘리베이터 이용 금지)'
-          : '[코드블루] {장소}\n즉시 심폐소생술(CPR) 팀 출동 바랍니다.';
-        return;
-      }
-      preview.textContent = buildCodeAlertPlainText(codeAlertSelectedType, location);
-    }
-
-    function openCodeAlertModal() {
-      fillCodeAlertLocationSelect();
-      setCodeAlertType(codeAlertSelectedType || 'blue');
-      const custom = document.getElementById('code-alert-location-custom');
-      if (custom) {
-        custom.style.display = 'none';
-        custom.value = '';
-      }
-      updateCodeAlertPreview();
-      bindModalEditableFocus(document.getElementById('code-alert-modal'));
-      document.getElementById('code-alert-modal').style.display = 'flex';
-      setModalOpenState(true);
-    }
-
-    function closeCodeAlertModal() {
-      document.getElementById('code-alert-modal').style.display = 'none';
-      setModalOpenState(false);
-    }
-
-    async function submitCodeAlert() {
-      const location = getCodeAlertLocationValue();
-      if (!location) {
-        await appAlert('장소를 선택하거나 직접 입력해 주세요.');
-        return;
-      }
-      const label = codeAlertSelectedType === 'red' ? '코드레드(화재)' : '코드블루(심정지·CPR)';
-      const preview = buildCodeAlertPlainText(codeAlertSelectedType, location);
-      if (!await appConfirm(`${label}를 전 직원에게 발령하시겠습니까?\n\n${preview}`, {
-        title: '긴급 코드 발령',
-        confirmText: '발령',
-        cancelText: '취소',
-        variant: 'danger',
-        icon: '🚨'
-      })) return;
-
-      const html = buildCodeAlertMessageHtml(codeAlertSelectedType, location);
-      const sendBtn = document.getElementById('code-alert-send-btn');
-      if (sendBtn) sendBtn.disabled = true;
-      try {
-        const res = await window.api.sendBroadcastMessage({
-          message: html,
-          urgent: true,
-          codeType: codeAlertSelectedType
-        });
-        if (res && res.status === 'ERROR') {
-          await appAlert(res.error || '코드 발령에 실패했습니다.');
-          return;
-        }
-        closeCodeAlertModal();
-        invalidateCompactRecentConversations();
-        await selectUserChat(BROADCAST_CHANNEL);
-        await appAlert(`${label}가 발령되었습니다.`);
-      } catch (e) {
-        console.error('코드 발령 실패', e);
-        await appAlert('코드 발령 중 오류가 발생했습니다.');
-      } finally {
-        if (sendBtn) sendBtn.disabled = false;
-      }
     }
 
     // 🚑 이동기사 요청 (mirae-transport 연동)
@@ -18705,10 +18366,7 @@
             divider.innerHTML = `<div style="flex:1; height:1px; background:#fecaca;"></div><span>여기부터 안읽은 메시지</span><div style="flex:1; height:1px; background:#fecaca;"></div>`;
             msgsEl.appendChild(divider);
           }
-          const codeType = detectCodeAlertType(row.message);
-          const urgent = codeType
-            ? true
-            : (typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1);
+          const urgent = typeof row.message === 'string' && row.message.indexOf('class="urgent-flag"') !== -1;
           const pendingStatus = row.isMe && row.status === 'PENDING' && isDirectMessagePeerKey(activeChatUser.ip) ? 'PENDING' : null;
           const dateKey = row.date_key || (String(row.sent_at_full || '').match(/^(\d{4}-\d{2}-\d{2})/) || [])[1] || '';
           appendMessageRow(row.message, row.created_time, row.sender_name, !!row.isMe, urgent, row.msg_uid, row.id, row.sender_ip, pendingStatus, row.sent_at_full, { skipStatusUpdate: true, skipEnterAnim: true, dateKey });
@@ -19192,7 +18850,6 @@
         { keys: ['phrase', '문구'], label: '/문구', desc: '빠른 문구' },
         { keys: ['settings', '설정'], label: '/설정', desc: '환경 설정' },
         { keys: ['board', '현황판'], label: '/현황판', desc: '병동 일정 현황판' },
-        { keys: ['code', '코드'], label: '/코드', desc: '코드블루·코드레드 발령' },
         { keys: ['clear', '비우기'], label: '/비우기', desc: '이 PC 대화창만 비우기' },
         { keys: ['draw', '그림'], label: '/그림', desc: '그림 그리기 (Excalidraw)' }
       ];
@@ -19223,7 +18880,6 @@
         if (['phrase', '문구'].includes(cmd)) { toggleQuickPhrasePopover(); return; }
         if (['settings', '설정'].includes(cmd)) { await openSettingsModal(); return; }
         if (['board', '현황판'].includes(cmd)) { openScheduleBoardModal(); return; }
-        if (['code', '코드'].includes(cmd)) { openCodeAlertModal(); return; }
         if (['clear', '비우기'].includes(cmd)) { await clearActiveChatView(); return; }
         if (['draw', '그림'].includes(cmd)) { openExcalidrawForChat(); return; }
         await appAlert(`알 수 없는 명령어: /${cmd}\n입력창에 「/」만 치면 사용할 수 있는 명령어가 표시됩니다.`);
@@ -19360,9 +19016,9 @@
         return;
       }
 
-      // 「긴급 메시지」 표시 기능은 없앴다(코드블루·코드레드 발령이 그 역할을 대신한다).
-      // 다만 아직 업데이트 안 된 PC에서 오는 긴급 메시지는 그대로 표시되어야 하므로,
-      // 받는 쪽 표시(urgent-badge·is-urgent)는 건드리지 않고 보내는 쪽만 뺀다.
+      // 「긴급 메시지」 표시 기능은 없앴다. 다만 아직 업데이트 안 된 PC에서 오는 긴급
+      // 메시지는 그대로 표시되어야 하므로, 받는 쪽 표시(urgent-badge·is-urgent)는
+      // 건드리지 않고 보내는 쪽만 뺀다.
       const replySnapshot = pendingReply;
       const attachmentsToSend = pendingChatAttachments;
       const attachmentsHtml = attachmentsToSend
@@ -21311,13 +20967,8 @@
       if (reactionKey) row.setAttribute('data-reaction-key', reactionKey);
       const displayName = resolveMessageSenderDisplay(senderName, isMe, senderIP) || (isMe ? '나' : '상대방');
       const compact = document.body.classList.contains('compact-mode');
-      const codeType = detectCodeAlertType(msg);
-      const isUrgentMsg = !!urgent || !!codeType;
-      const urgentBadgeHtml = codeType === 'blue'
-        ? `<div class="urgent-badge code-blue-badge">💙 코드블루</div>`
-        : (codeType === 'red'
-          ? `<div class="urgent-badge code-red-badge">❤️ 코드레드</div>`
-          : (isUrgentMsg ? `<div class="urgent-badge">🚨 긴급</div>` : ''));
+      const isUrgentMsg = !!urgent;
+      const urgentBadgeHtml = isUrgentMsg ? `<div class="urgent-badge">🚨 긴급</div>` : '';
       // 보냄/읽음: 미확인은 보냄, 읽음은 마지막만 (updateMineOutboundStatusLabels)
       const sendStatusHtml = '';
       // 텍스트는 수정·삭제, 사진·파일은 삭제만 (msg_uid 필요)
@@ -21369,7 +21020,7 @@
         : '';
 
       if (useBubbleLayout) {
-        row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
+        row.className = `msg-row-bubble ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
         if (!skipEnterAnim) row.classList.add('is-live-enter');
         const showName = !isMe && isGroupChannel;
@@ -21390,7 +21041,7 @@
           </div>
         `;
       } else {
-        row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''} ${codeType === 'blue' ? 'is-code-blue' : ''} ${codeType === 'red' ? 'is-code-red' : ''}`.trim();
+        row.className = `msg-row ${isMe ? 'is-me is-mine-msg' : 'is-other'} ${isUrgentMsg ? 'is-urgent' : ''}`.trim();
         if (isMe) row.classList.add('is-mine-msg');
         if (!skipEnterAnim) row.classList.add('is-live-enter');
         const avatarClass = isMe ? 'avatar-me' : (isGroupChannel ? 'avatar-broadcast' : 'avatar-other');
@@ -21594,28 +21245,6 @@
         audio.volume = 0.6;
         audio.play().catch(() => {});
       } catch (e) {}
-    }
-
-    /** 코드블루/레드: 경보음을 여러 번 강제 재생 */
-    function playCodeAlertSound() {
-      try {
-        const src = 'data:audio/wav;base64,UklGRoQJAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YWAJAAAAAMso3T4UOI8XOuz3yYLAMdT8+50l/D3oOT8bFvA6zCHAWdH790oi3TyAO9QeA/SxzgHAsc4D9NQegDvdPEoi+/dZ0SHAOswW8D8b6Dn8PZ0l/Psx1ILA98k67I8XFDjdPssoAAA11yPB7Mdx6MYTCTZ+P88rBARj2gTCGMbB5OoPxjPfP6cuBQi23SPDgMQs4f0LTzH/P08x/Qss4YDEI8O23QUIpy7fP8Yz6g/B5BjGBMJj2gQEzyt+Pwk2xhNx6OzHI8E11wAAyyjdPhQ4jxc67PfJgsAx1Pz7nSX8Peg5PxsW8DrMIcBZ0fv3SiLdPIA71B4D9LHOAcCxzgP01B6AO908SiL791nRIcA6zBbwPxvoOfw9nSX8+zHUgsD3yTrsjxcUON0+yygAADXXI8Hsx3HoxhMJNn4/zysEBGPaBMIYxsHk6g/GM98/py4FCLbdI8OAxCzh/QtPMf8/TzH9CyzhgMQjw7bdBQinLt8/xjPqD8HkGMYEwmPaBATPK34/CTbGE3Ho7McjwTXXAADLKN0+FDiPFzrs98mCwDHU/PudJfw96Dk/GxbwOswhwFnR+/dKIt08gDvUHgP0sc4BwLHOA/TUHoA73TxKIvv3WdEhwDrMFvA/G+g5/D2dJfz7MdSCwPfJOuyPFxQ43T7LKAAANdcjwezHcejGEwk2fj/PKwQEY9oEwhjGweTqD8Yz3z+nLgUItt0jw4DELOH9C08x/Qss4YDEI8O23QUIpy7fP8Yz6g/B5BjGBMJj2gQEzyt+Pwk2xhNx6OzHI8E11wAAyyjdPhQ4jxc67PfJgsAx1Pz7nSX8Peg5PxsW8DrMIcBZ0fv3SiLdPIA71B4D9LHOAcCxzgP01B6AO908SiL791nRIcA6zBbwPxvoOfw9nSX8+zHUgsD3yTrsjxcUON0+yygAADXXI8Hsx3HoxhMJNn4/zysEBGPaBMIYxsHk6g/GM98/py4FCLbdI8OAxCzh/QtPMf8/TzH9CyzhgMQjw7bdBQinLt8/xjPqD8HkGMYEwmPaBATPK34/CTbGE3Ho7McjwTXX=';
-        const playOnce = () => {
-          const audio = new Audio(src);
-          audio.volume = 0.95;
-          return audio.play().catch(() => {});
-        };
-        playOnce();
-        setTimeout(playOnce, 700);
-        setTimeout(playOnce, 1400);
-      } catch (e) {}
-    }
-
-    function detectCodeAlertType(message) {
-      const s = String(message || '');
-      if (s.indexOf('code-blue-flag') !== -1 || s.indexOf('[코드블루]') !== -1) return 'blue';
-      if (s.indexOf('code-red-flag') !== -1 || s.indexOf('[코드레드]') !== -1) return 'red';
-      return null;
     }
 
     function showReadReceiptNote(_text) {
@@ -25547,7 +25176,6 @@
           case 'open-board': openBoardModal(); break;
           case 'open-broadcast': selectUserChat(BROADCAST_CHANNEL); break;
           case 'open-transport': openTransportRequestModal(); break;
-          case 'open-code-alert': openCodeAlertModal(); break;
           case 'open-group-chat': openGroupChatModal(); break;
           case 'open-all-logs': openAllLogsModal(); break;
           case 'open-settings': openSettingsModal(); break;

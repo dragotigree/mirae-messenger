@@ -1285,14 +1285,6 @@ function previewBody(rawMessage) {
   return '메시지가 도착했습니다. 확인해 주세요.';
 }
 
-/** 코드블루/코드레드 메시지 판별 (플래그 또는 본문 표기) */
-function detectCodeAlertType(message) {
-  const s = String(message || '');
-  if (s.indexOf('code-blue-flag') !== -1 || s.indexOf('[코드블루]') !== -1) return 'blue';
-  if (s.indexOf('code-red-flag') !== -1 || s.indexOf('[코드레드]') !== -1) return 'red';
-  return null;
-}
-
 function shouldSuppressMessageToast(channelKey) {
   const key = String(channelKey || '').trim();
   if (!key || !toastUiState.focused) return false;
@@ -1327,7 +1319,7 @@ function truncateToastText(text, maxLen) {
   return `${s.slice(0, limit - 1)}…`;
 }
 
-function showMessageToast({ title, body, urgent, channelKey, codeType, force }) {
+function showMessageToast({ title, body, urgent, channelKey, force }) {
   if (!force && !notifyIncomingMessages) return;
   const display = getDisplayForIncomingToast();
   const work = display.workArea || display.bounds;
@@ -1366,12 +1358,10 @@ function showMessageToast({ title, body, urgent, channelKey, codeType, force }) 
     }
   });
 
-  const code = codeType === 'blue' || codeType === 'red' ? codeType : '';
   const q = new URLSearchParams({
     title: truncateToastText(title || '새 메시지', 48),
     body: truncateToastText(body || '', 72),
-    urgent: urgent || code ? '1' : '0',
-    codeType: code
+    urgent: urgent ? '1' : '0'
   });
 
   toastWindow.loadFile(path.join(__dirname, 'toast.html'), { search: `?${q.toString()}` });
@@ -1381,7 +1371,7 @@ function showMessageToast({ title, body, urgent, channelKey, codeType, force }) 
   toastWindow.on('closed', () => { toastWindow = null; });
 
   const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
-  const ms = (code ? Math.max(secs + 8, 15) : urgent ? secs + 2 : secs) * 1000;
+  const ms = (urgent ? secs + 2 : secs) * 1000;
   toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
 }
 
@@ -1410,18 +1400,15 @@ function notifyIncomingMessageNotification(opts) {
   const o = opts || {};
   const force = !!o.force;
   if (!force && !notifyIncomingMessages) return;
-  // 코드 발령은 해당 채널을 보고 있어도 토스트·알림을 숨기지 않음
   if (!force && shouldSuppressMessageToast(o.channelKey)) return;
   const key = String(o.channelKey || '').trim() || '__unknown__';
   const now = Date.now();
   const until = activeIncomingNotifyUntil.get(key) || 0;
   // 동일 발신/채널: 알림 유지 시간 동안은 추가 알림 없음 (토스트·데스크탑 공통)
-  // 코드 발령은 매번 알림 (생명·안전)
   if (!force && until > now) return;
 
   const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
-  const code = o.codeType === 'blue' || o.codeType === 'red' ? o.codeType : '';
-  const ms = (code ? Math.max(secs + 8, 15) : (o.urgent ? secs + 2 : secs)) * 1000;
+  const ms = (o.urgent ? secs + 2 : secs) * 1000;
   activeIncomingNotifyUntil.set(key, now + ms);
 
   const mode = incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
@@ -1429,7 +1416,7 @@ function notifyIncomingMessageNotification(opts) {
     showDesktopNotification({
       title: o.title || '새 메시지',
       body: o.body || '메시지가 도착했습니다.',
-      urgent: !!o.urgent || !!code,
+      urgent: !!o.urgent,
       channelKey: o.channelKey
     });
   } else {
@@ -4770,7 +4757,6 @@ function setupJumpList() {
           buildJumpListTask('원내 공지', '원내 공지사항을 엽니다', 'open-board'),
           buildJumpListTask('전체 공지 채널', '전체 공지 채널을 엽니다', 'open-broadcast'),
           buildJumpListTask('이동기사 요청', '이동기사 요청을 엽니다', 'open-transport'),
-          buildJumpListTask('코드 발령', '코드 발령을 엽니다', 'open-code-alert'),
           buildJumpListTask('병동 일정 현황판', '병동 일정 현황판을 엽니다', 'open-schedule-board'),
           buildJumpListTask('그룹 만들기', '새 그룹 채팅을 만듭니다', 'open-group-chat'),
           buildJumpListTask('전체 대화 기록', '전체 대화 기록을 엽니다', 'open-all-logs'),
@@ -7514,10 +7500,7 @@ function handleIncomingBroadcast(payload, senderIP) {
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const senderName = formatSenderDisplay(payload.sender, senderIP);
   const msgUid = payload.msgUid || null;
-  const codeType = (payload.codeType === 'blue' || payload.codeType === 'red')
-    ? payload.codeType
-    : detectCodeAlertType(payload.message);
-  const urgent = !!payload.urgent || !!codeType;
+  const urgent = !!payload.urgent;
 
   shouldSkipDuplicateChannelMessage(msgUid, () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
@@ -7529,23 +7512,14 @@ function handleIncomingBroadcast(payload, senderIP) {
         createdAt: currentTime,
         msgUid,
         messageId: null,
-        urgent,
-        codeType: codeType || null
+        urgent
       });
     }
-    if (codeType) {
-      try { showAndFocusWindow(); } catch (e) {}
-    }
-    const codeTitle = codeType === 'blue'
-      ? `💙 [코드블루] ${senderName}`
-      : (codeType === 'red' ? `❤️ [코드레드] ${senderName}` : `📢 전체공지 - ${senderName}`);
     notifyIncomingMessageNotification({
-      title: codeTitle,
+      title: `📢 전체공지 - ${senderName}`,
       body: previewBody(payload.message),
       channelKey: 'BROADCAST',
-      urgent,
-      codeType: codeType || undefined,
-      force: !!codeType
+      urgent
     });
 
     db.run(
@@ -9348,14 +9322,10 @@ ipcMain.handle('send-broadcast-message', async (event, messageOrOpts) => {
   if (typeof message !== 'string') {
     return { status: 'ERROR', error: '메시지 내용이 없습니다.' };
   }
-  const codeType = (opts.codeType === 'blue' || opts.codeType === 'red')
-    ? opts.codeType
-    : detectCodeAlertType(message);
-  const urgent = !!opts.urgent || !!codeType;
+  const urgent = !!opts.urgent;
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const wire = { type: 'BROADCAST', sender: myProfile.username, message, msgUid, urgent };
-  if (codeType) wire.codeType = codeType;
   broadcastToOnlinePeers(wire);
   allKnownUsers.forEach((u, ip) => {
     if (ip === MY_IP) return;
@@ -9375,7 +9345,7 @@ ipcMain.handle('send-broadcast-message', async (event, messageOrOpts) => {
         logDbErr(err);
         appendChatLog('BROADCAST', '전체공지', myProfile.username, message);
         if (!err) compactMessageRowById(this.lastID, msgUid, message);
-        resolve({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID, codeType: codeType || null, urgent });
+        resolve({ status: 'SENT', createdAt, uid: msgUid, id: this.lastID, urgent });
       }
     );
   });
