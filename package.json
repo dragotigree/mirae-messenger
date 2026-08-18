@@ -63,6 +63,8 @@
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico",
       "installerHeaderIcon": "icon.ico",
+      "installerSidebar": "installer/assets/sidebar.bmp",
+      "uninstallerSidebar": "installer/assets/sidebar-uninstall.bmp",
       "artifactName": "MiraeMessenger-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false,
       "language": "1042"
