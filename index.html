@@ -627,6 +627,14 @@
     #sidebar-left .subsection-label { font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); padding: 4px 10px 3px 10px; margin-top: 2px; line-height: 1.25; }
     .subsection-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); padding: 5px 10px 3px 10px; letter-spacing: -0.01em; border-bottom: 1px solid var(--border-soft); margin-top: 2px; margin-bottom: 0; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; line-height: 1.35; }
     .subsection-label:hover { background: var(--surface-muted); }
+    /* 부서·층 그룹마다 옅은 파스텔 색을 달아 스크롤할 때 경계가 한눈에 보이게 한다.
+       --group-hue는 그룹 이름을 해시해 자바스크립트에서 지정한다(항상 같은 이름 = 같은 색). */
+    .subsection-label.has-group-color {
+      background: hsl(var(--group-hue, 210), 62%, 96%);
+      border-left: 3px solid hsl(var(--group-hue, 210), 55%, 78%);
+      padding-left: 7px;
+    }
+    .subsection-label.has-group-color:hover { background: hsl(var(--group-hue, 210), 62%, 92%); }
     .subsection-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 4px; font-size: 10px; opacity: .75; }
     .subsection-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
     .subsection-label.user-group-header { cursor: default; }
@@ -746,9 +754,10 @@
     }
     #user-list-tree::-webkit-scrollbar:horizontal { height: 0; display: none; }
 
-    #sidebar-left .avatar-wrapper { flex-shrink: 0; width: 34px; height: 34px; position: relative; }
-    #sidebar-left .avatar-circle { width: 34px; height: 34px; font-size: 13px; border-radius: 50%; box-shadow: none; }
-    #sidebar-left .avatar-status-badge { width: 7px; height: 7px; border-width: 1.5px; bottom: -1px; right: -1px; }
+    #sidebar-left .avatar-wrapper { flex-shrink: 0; width: 26px; height: 26px; position: relative; }
+    #sidebar-left .avatar-circle { width: 26px; height: 26px; font-size: 11px; border-radius: 50%; box-shadow: none; }
+    #sidebar-left .avatar-circle .avatar-emoji { font-size: 12px; }
+    #sidebar-left .avatar-status-badge { width: 6px; height: 6px; border-width: 1.5px; bottom: -1px; right: -1px; }
 
     #sidebar-left .user-card-item {
       gap: 8px; padding: 7px 8px; margin: 0 2px 2px 2px; align-items: center; min-height: 0;
@@ -5172,6 +5181,7 @@
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
           </span>
@@ -9475,6 +9485,29 @@
       renderUserListTree();
     }
 
+    /** 부서·층 이름마다 항상 같은 색이 나오도록 이름을 해시해 0~359 색상값(hue)을 만든다. */
+    function hueForGroupName(name) {
+      const s = String(name || '');
+      let hash = 0;
+      for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+      return hash % 360;
+    }
+
+    /** 사용자 목록 헤더의 「전체 접기/펴기」 버튼 — 지금 보이는 부서·층 그룹 중
+     *  하나라도 펼쳐져 있으면 전부 접고, 전부 접혀 있으면 전부 편다. */
+    function toggleAllUserGroupsCollapse() {
+      const treeEl = document.getElementById('user-list-tree');
+      if (!treeEl) return;
+      const blocks = [...treeEl.querySelectorAll('.user-group-block[data-group-name]')];
+      if (!blocks.length) return;
+      const groupingKey = appSettings.userGrouping || 'floor';
+      const keys = blocks.map((b) => `${groupingKey}:${b.dataset.groupName}`);
+      const allCollapsed = keys.every((k) => collapsedGroups.has(k));
+      keys.forEach((k) => { if (allCollapsed) collapsedGroups.delete(k); else collapsedGroups.add(k); });
+      localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups]));
+      renderUserListTree();
+    }
+
     function toggleChannelsSectionCollapse() {
       const isCollapsed = localStorage.getItem('channelsSectionCollapsed') === '1';
       localStorage.setItem('channelsSectionCollapsed', isCollapsed ? '0' : '1');
@@ -9799,11 +9832,14 @@
         // (위에서 강제로 보이게 했던 빈 즐겨찾기 블록을 원래대로 숨기기 위함).
         if (typeof renderUserListTree === 'function') renderUserListTree();
       }
+      // ⚠️ 실사고: 필터가 모두 풀린 'all' 상태에서도 「채널 및 대화방」 아이콘을 계속
+      // 파랗게 활성 표시해왔다 — 전체를 나타내는 별도 아이콘이 없어서 채널 아이콘을
+      // 대신 쓴 흔적으로 보이는데, 실제로는 아무 것도 눌리지 않은 상태와 헷갈렸다
+      // ("사용자만 보기를 두 번 눌렀더니 채널 아이콘이 켜져 있다"). 필터가 없을 땐
+      // 아이콘 중 어느 것도 활성 표시하지 않는다.
       if (sidebarRailFilter !== 'all') {
         sections.classList.add(`rail-filter-${sidebarRailFilter}`);
         document.getElementById(SIDEBAR_RAIL_FILTER_BTN_IDS[sidebarRailFilter])?.classList.add('is-active');
-      } else {
-        document.getElementById('icon-rail-chat-btn')?.classList.add('is-active');
       }
       const target = document.getElementById(SIDEBAR_RAIL_FILTER_BLOCK_IDS[sidebarRailFilter] || 'sidebar-block-users');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -15264,7 +15300,8 @@
         block.dataset.groupName = groupName;
 
         const label = document.createElement('div');
-        label.className = `subsection-label ${isCollapsed ? 'is-collapsed' : ''}`;
+        label.className = `subsection-label has-group-color ${isCollapsed ? 'is-collapsed' : ''}`;
+        label.style.setProperty('--group-hue', String(hueForGroupName(groupName)));
         const icon = getUserGroupSidebarIcon(groupingKey, groupName);
 
         label.innerHTML = `
