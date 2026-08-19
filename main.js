@@ -5745,8 +5745,29 @@ ipcMain.handle('set-tray-launch-view-mode', async (event, mode) => {
 ipcMain.handle('get-tray-launch-view-mode', async () => trayLaunchViewMode);
 
 function registerGlobalShortcuts() {
-  globalShortcut.register('CommandOrControl+Alt+S', () => {
+  // ⚠️ globalShortcut.register()는 다른 프로그램이 같은 조합을 이미 선점했으면
+  // 예외 없이 조용히 false를 반환한다 — 예전엔 반환값을 확인하지 않아서 단축키가
+  // 안 먹혀도 로그에 아무 흔적이 남지 않았다("Ctrl+Alt+S가 안 되는 것 같다"는
+  // 신고를 받아도 원인을 알 수 없었음). 등록 성공 여부를 로그로 남긴다.
+  const tryRegister = (accelerator, handler) => {
+    let ok = false;
+    try { ok = globalShortcut.register(accelerator, handler); } catch (e) { ok = false; }
+    if (!ok) {
+      console.warn(`[전역 단축키] ${accelerator} 등록 실패 — 다른 프로그램이 이미 사용 중일 수 있음`);
+      try { writeToLogFile('warn', `전역 단축키 등록 실패: ${accelerator} (다른 프로그램이 선점했을 수 있음)`); } catch (e) { /* ignore */ }
+    }
+    return ok;
+  };
+
+  tryRegister('CommandOrControl+Alt+S', () => {
     openMainWindowWithViewMode(trayLaunchViewMode);
+  });
+  // 트레이 메뉴에는 "전체 대화 기록 열기 (Ctrl+Alt+E)"라고 안내가 있었지만, 정작 이
+  // 단축키를 실제로 등록하는 코드가 없었다 — 메뉴를 클릭할 때만 동작하고, 단축키를
+  // 누르면 아무 일도 일어나지 않는 상태였다.
+  tryRegister('CommandOrControl+Alt+E', () => {
+    openMainWindowWithViewMode(trayLaunchViewMode);
+    safeWebContentsSend('trigger-open-all-logs');
   });
   // 🛠️ 문제 진단 화면은 Alt 조합 전역 단축키(Ctrl+Alt+D)로 열도록 했었으나,
   // Alt가 들어간 전역 단축키가 한글 IME와 충돌해 가끔 입력이 먹통이 되는 문제를 일으켜 제거함.
