@@ -6013,7 +6013,7 @@
       </div>
 
       <!-- 글쓰기/수정 화면 -->
-      <div id="board-write-view" style="flex:1; overflow-y:auto;" ondragover="handleBoardWriteDragOver(event)" ondrop="handleBoardWriteDrop(event)">
+      <div id="board-write-view" style="flex:1; overflow-y:auto;" ondragover="handleBoardWriteDragOver(event)" ondrop="handleBoardWriteDrop(event)" onpaste="handleBoardWritePaste(event)">
         <input type="hidden" id="board-write-uid">
         <div class="board-write-category-row">
           <label class="board-write-category-label" id="board-write-category-label" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;">부서</label>
@@ -6069,7 +6069,7 @@
         <div class="board-photo-toolbar">
           <button type="button" class="board-photo-attach-btn" onclick="document.getElementById('board-write-photo-input').click()">🖼️ 사진 추가</button>
           <button type="button" class="board-photo-attach-btn" onclick="openExcalidrawForNotice()">✏️ 그림 그리기</button>
-          <span class="board-photo-hint" id="board-photo-hint">최대 2장 · JPG/PNG · 드래그 앤 드롭 가능</span>
+          <span class="board-photo-hint" id="board-photo-hint">최대 2장 · JPG/PNG · 드래그 앤 드롭·붙여넣기 가능</span>
           <input type="file" id="board-write-photo-input" accept="image/*" multiple style="display:none;" onchange="handleBoardPhotoSelect(event)">
         </div>
         <div class="board-photo-preview-row" id="board-photo-preview-row"></div>
@@ -15505,6 +15505,23 @@
       event.preventDefault();
       const dt = event.dataTransfer;
       const files = dt ? [...(dt.files || [])] : [];
+      await handleBoardPhotoFiles(files);
+    }
+
+    async function handleBoardWritePaste(event) {
+      const writeView = document.getElementById('board-write-view');
+      if (!writeView || writeView.style.display === 'none') return;
+      const clipboardData = event.clipboardData || (event.originalEvent && event.originalEvent.clipboardData);
+      if (!clipboardData || !clipboardData.items) return;
+      const files = [];
+      for (const item of clipboardData.items) {
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f && f.type && f.type.startsWith('image/')) files.push(f);
+        }
+      }
+      if (!files.length) return;
+      event.preventDefault();
       await handleBoardPhotoFiles(files);
     }
 
