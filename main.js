@@ -6197,7 +6197,14 @@ function startUdpDiscovery() {
               return;
             }
             lastReconnectCascadeAt.set(rinfo.address, nowTs);
-            requestNoticeSync(rinfo.address);
+            // ⚠️ 실사고 대비: 새 PC 한 대가 켜지면, 이미 온라인이던 PC들이 "동시에" 이
+            // requestNoticeSync를 그 새 PC로 쏜다. 온라인 인원이 많을수록(출근 시간대
+            // 수십~백여 대) 신참 PC 한 대가 같은 순간 수십 건의 전체 동기화 요청을 한꺼번에
+            // 받아 한동안 느려진다. 로직은 그대로 두고 발신 타이밍만 0~4초 무작위로 흩뿌려
+            // 신참 PC 입장에서 요청이 몰리지 않고 순차적으로 도착하게 한다.
+            setTimeout(() => {
+              requestNoticeSync(rinfo.address);
+            }, Math.floor(Math.random() * 4000));
             // 부팅 시 아무도 온라인이 아니었으면 화면 문구를 못 받아온다 —
             // 동료가 접속하는 이 시점에 한 번 더 요청해 빈틈을 없앤다(위 쿨다운이 폭주를 막는다).
             sendJsonToPeer(rinfo.address, { type: 'UI_TEXT_SYNC_REQUEST' });
