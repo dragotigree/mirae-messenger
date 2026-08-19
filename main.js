@@ -4869,7 +4869,10 @@ function buildTrayContextMenu() {
   return Menu.buildFromTemplate([
     {
       label: '메시지 보내기 (Ctrl+Alt+S)',
-      click: () => openMainWindowKeepingMode()
+      click: () => {
+        openMainWindowKeepingMode();
+        safeWebContentsSend('trigger-focus-people-search');
+      }
     },
     {
       label: '전체 대화 기록 열기 (Ctrl+Alt+E)',
@@ -5844,6 +5847,7 @@ function registerGlobalShortcuts() {
 
   tryRegister('CommandOrControl+Alt+S', () => {
     openMainWindowKeepingMode();
+    safeWebContentsSend('trigger-focus-people-search');
   });
   // 트레이 메뉴에는 "전체 대화 기록 열기 (Ctrl+Alt+E)"라고 안내가 있었지만, 정작 이
   // 단축키를 실제로 등록하는 코드가 없었다 — 메뉴를 클릭할 때만 동작하고, 단축키를

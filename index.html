@@ -5477,16 +5477,16 @@
             <path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01M7 18l-3 2V7a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H9l-2 2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <h2 class="empty-title">오늘도 좋은 하루 되세요 ☀️</h2>
-        <p class="empty-desc">왼쪽에서 동료나 채널을 고르면 대화가 시작돼요.<br>아래에서 바로 시작할 수도 있어요.</p>
+        <h2 class="empty-title">대화를 시작해 보세요</h2>
+        <p class="empty-desc">왼쪽에서 대화할 상대나 채널을 고르면 대화가 시작됩니다.<br>아래에서 바로 시작할 수도 있습니다.</p>
         <div class="empty-quick-cards">
           <button type="button" class="empty-quick-card" onclick="startNewDirectChatFromEmptyState()">
             <span class="empty-quick-card-icon eq-blue">💬</span>
             <span class="empty-quick-card-label">새 1:1 대화</span>
           </button>
-          <button type="button" class="empty-quick-card" onclick="selectUserChat(BROADCAST_CHANNEL)">
-            <span class="empty-quick-card-icon eq-purple">#</span>
-            <span class="empty-quick-card-label">공지 채널</span>
+          <button type="button" class="empty-quick-card" onclick="openBoardModal()">
+            <span class="empty-quick-card-icon eq-purple">📢</span>
+            <span class="empty-quick-card-label">공지사항</span>
           </button>
           <button type="button" class="empty-quick-card" onclick="openIpmsgSendModal()">
             <span class="empty-quick-card-icon eq-green">✉️</span>
@@ -26376,6 +26376,15 @@
     window.api.onTriggerOpenAllLogs(() => {
       openAllLogsModal();
     });
+
+    if (window.api.onTriggerFocusPeopleSearch) {
+      window.api.onTriggerFocusPeopleSearch(() => {
+        // Ctrl+Alt+S(메시지 보내기)로 창을 열었을 때, Ctrl+Shift+F를 누른 것처럼
+        // 바로 직원 검색창에 포커스를 준다.
+        if (isBlockingOverlayOpenForSearchShortcut()) return;
+        focusPeopleSearchForShortcut();
+      });
+    }
 
     window.api.onTriggerOpenSettings(() => {
       openSettingsModal();
