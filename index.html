@@ -5363,8 +5363,8 @@
         <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
       </div>
       <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
-        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터(직급 없음) 표시">공용</button>
-        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터(직급 없음) 숨김">숨김</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터 표시">공용</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터 숨김">숨김</button>
       </div>
       <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
         <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">N</button>
@@ -16012,8 +16012,9 @@
           helpItem('chatBubble', '왼쪽 목록에서 대화하고 싶은 직원 이름이나 채널, 그룹을 마우스로 클릭하면, 그 대화 내용이 화면 가운데에 나타나고 여기서 메시지를 입력해 대화를 주고받을 수 있습니다. 아직 아무것도 선택하지 않은 상태라면 화면 가운데에 「1:1 메시지」·「공지채널」·「그룹대화」라고 적힌 버튼이 보이는데, 이 버튼들을 눌러도 바로 대화를 시작할 수 있습니다.')
         ].join('')),
         helpSection('📅 오른쪽 병동 일정 패널', [
-          helpItem('clipboardList', '화면 오른쪽 위에 있는 <b>현황판</b> / <b>일정등록</b> 두 개의 탭을 눌러서 원하는 화면으로 바꿀 수 있습니다.'),
-          helpItem('clipboardList', '가운데에 있는 달력에서 날짜를 하나 클릭하면, 그 날짜에 등록된 병동 일정이 달력 바로 아래에 목록으로 나타납니다. 달력 위쪽의 「현황판」 버튼을 누르면 병동별·주치의별 일정을 표 형태의 훨씬 큰 화면(별도 창)으로 자세히 볼 수 있습니다.')
+          helpItem('clipboardList', '<b>현황판</b> 버튼을 누르면 병동별·주치의별 일정을 표 형태의 훨씬 큰 화면(별도 창)으로 자세히 볼 수 있습니다.'),
+          helpItem('calendarPlus', '<b>일정등록</b> 버튼을 누르면 「주치의 OFF」와 「당직의」를 입력하는 작은 창이 새로 뜹니다. 이 창은 로그인이 되어 있어야 사용할 수 있으며, 로그인이 안 되어 있다면 먼저 아이디·비밀번호를 입력하는 화면이 나타납니다. 창이 열리면 아래 순서로 사용합니다: ① 창 위쪽에 표시된 날짜를 확인합니다 — 이 날짜는 지금 달력에서 선택되어 있는 날짜이며, 다른 날짜에 등록하고 싶으면 창을 닫고 아래 달력에서 원하는 날짜를 먼저 클릭한 뒤 다시 「일정등록」을 눌러야 합니다. ② 「주치의 OFF」 칸에는 그날 쉬는 주치의를 입력합니다. 예시로 적혀 있는 것처럼 <b>RM4, RM6</b>과 같이 병동 번호를 쉼표(,)로 구분해서 여러 명을 한 번에 입력할 수 있습니다. ③ 「당직의」 칸에는 그날 당직을 서는 의료진을 같은 방식으로 입력합니다. ④ 두 칸 모두 필수는 아니며, 필요한 칸만 채워도 됩니다. 입력을 마쳤으면 아래쪽의 「저장」 버튼을 눌러 반영합니다. ⑤ 이미 입력된 내용을 지우고 싶다면, 글자를 모두 지워 칸을 빈 상태로 만든 뒤 저장하면 그 날짜의 기록이 삭제됩니다. 여기서 저장한 내용은 오른쪽 달력의 그 날짜와 「현황판」 화면 모두에 함께 반영됩니다.'),
+          helpItem('clipboardList', '가운데에 있는 작은 달력에서 날짜를 하나 클릭하면, 그 날짜에 등록된 병동 일정이 달력 바로 아래에 목록으로 나타납니다.')
         ].join('')),
         commonShortcutsHelpHtml()
       ].join('');
