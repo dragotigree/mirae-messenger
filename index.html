@@ -5324,6 +5324,11 @@
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <select id="sidebar-grouping-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); setDirectoryListPref('grouping', this.value)" title="사용자 목록 묶음 기준" style="font-size:11px; padding:2px 4px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+              <option value="floor">층별</option>
+              <option value="dept">부서별</option>
+            </select>
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
             <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
@@ -8572,6 +8577,8 @@
     function syncDirectoryListPrefsForm() {
       const groupingEl = document.getElementById('setting-user-grouping');
       if (groupingEl) groupingEl.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
+      const sidebarGroupingEl = document.getElementById('sidebar-grouping-select');
+      if (sidebarGroupingEl) sidebarGroupingEl.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
       const offlineEl = document.getElementById('setting-show-offline-users');
       if (offlineEl) offlineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
       const sharedEl = document.getElementById('setting-show-shared-pcs');
@@ -8695,6 +8702,8 @@
     }
 
     function applyAppSettingsToUI() {
+      const sidebarGroupingSelect = document.getElementById('sidebar-grouping-select');
+      if (sidebarGroupingSelect) sidebarGroupingSelect.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
       document.documentElement.style.setProperty('--chat-font-size', appSettings.fontSize || '14px');
       const systemPreset = resolveSystemFontPreset(appSettings.fontFamily);
       const chatPreset = resolveChatFontPreset(appSettings.chatFontFamily);
@@ -13679,6 +13688,20 @@
       const map = loadUserGroupOrderMap();
       map[groupingKey] = order;
       localStorage.setItem(USER_DEPT_FLOOR_GROUP_ORDER_KEY, JSON.stringify(map));
+    }
+
+    /** 사이드바 "↺" — 손으로 끌어서 바꿔둔 부서·층 묶음 순서를 지우고 원래(가나다/숫자) 순서로 되돌린다.
+     *  내 컴퓨터 화면 표시 설정만 지우는 것이라 다른 PC·데이터에는 영향이 없다. */
+    function resetUserGroupOrder() {
+      const grouping = appSettings.userGrouping || 'floor';
+      const map = loadUserGroupOrderMap();
+      delete map[grouping];
+      localStorage.setItem(USER_DEPT_FLOOR_GROUP_ORDER_KEY, JSON.stringify(map));
+      lastUserListStructureKey = '';
+      renderUserListTree(true);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { renderCompactList(); } catch (e) { /* ignore */ }
+      }
     }
 
     function defaultSortGroupKeys(keys) {
