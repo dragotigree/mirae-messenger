@@ -4511,6 +4511,23 @@ db.serialize(() => {
   });
   db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_notices_at ON deleted_notices(deleted_at)`, () => {});
 
+  /** 삭제된 운영자 아이디 — 오프라인 상태였던 피어가 재접속 후 NOTICE_SYNC_RESPONSE로
+     예전 목록을 보내 삭제된 계정을 되살리는 것 방지 (deleted_notices와 동일 패턴) */
+  db.run(`CREATE TABLE IF NOT EXISTS deleted_notice_operators (
+    username TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL
+  )`, (err) => {
+    logDbErr(err);
+    db.all(`SELECT username FROM deleted_notice_operators`, (loadErr, rows) => {
+      if (loadErr) {
+        logDbErr(loadErr);
+        return;
+      }
+      rememberOperatorTombstones((rows || []).map((r) => r && r.username).filter(Boolean));
+    });
+  });
+  db.run(`CREATE INDEX IF NOT EXISTS idx_deleted_notice_operators_at ON deleted_notice_operators(deleted_at)`, () => {});
+
   /** 오프라인 PC 원격 로그 삭제 예약 — 대상이 켜져 접속하면 즉시 전달 */
   db.run(`CREATE TABLE IF NOT EXISTS pending_remote_wipes (
     target_ip TEXT PRIMARY KEY,
@@ -7151,7 +7168,7 @@ function routeIncomingPayloadInner(payload, senderIP) {
       break;
     }
     case 'NOTICE_SYNC_REQUEST': handleNoticeSyncRequest(senderIP); break;
-    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids); break;
+    case 'NOTICE_SYNC_RESPONSE': handleNoticeSyncResponse(payload.notices, payload.operators, payload.schedules, payload.updateSourcePath, payload.profileOverrides, payload.dutyRoster, payload.deletedScheduleUids, payload.deletedNoticeUids, payload.deletedOperatorUsernames); break;
     case 'OPERATOR_ADD': handleOperatorAdd(payload.operator); break;
     case 'OPERATOR_DELETE': handleOperatorDelete(payload.username); break;
     case 'SCHEDULE_ADD': handleScheduleAdd(payload.schedule); break;
@@ -8355,7 +8372,7 @@ function tcpWriteJsonLines(targetIP, payloads) {
   client.on('timeout', () => client.destroy());
 }
 
-function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows, deletedScheduleUids, deletedNoticeUids) {
+function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOverridesRows, deletedScheduleUids, deletedNoticeUids, deletedOperatorUsernames) {
   const chunks = [];
   const baseMeta = {
     type: 'NOTICE_SYNC_RESPONSE',
@@ -8365,6 +8382,7 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     profileOverrides: [],
     deletedScheduleUids: [],
     deletedNoticeUids: [],
+    deletedOperatorUsernames: [],
     updateSourcePath: updateSourcePath || ''
   };
 
@@ -8383,13 +8401,15 @@ function buildNoticeSyncPayloadChunks(notices, operators, schedules, profileOver
     operators: operators || [],
     profileOverrides: profileOverridesRows || [],
     deletedScheduleUids: deletedScheduleUids || [],
-    deletedNoticeUids: deletedNoticeUids || []
+    deletedNoticeUids: deletedNoticeUids || [],
+    deletedOperatorUsernames: deletedOperatorUsernames || []
   };
   if (!tryPush(head)) {
     if ((operators || []).length) tryPush({ ...baseMeta, operators });
     if ((profileOverridesRows || []).length) tryPush({ ...baseMeta, profileOverrides: profileOverridesRows });
     if ((deletedScheduleUids || []).length) tryPush({ ...baseMeta, deletedScheduleUids });
     if ((deletedNoticeUids || []).length) tryPush({ ...baseMeta, deletedNoticeUids });
+    if ((deletedOperatorUsernames || []).length) tryPush({ ...baseMeta, deletedOperatorUsernames });
   }
 
   // 1b) 공지 — 사진 포함 시 단건 청크로 나눠 전송 (한도 초과면 사진 제외하고라도 본문은 전달)
@@ -8529,33 +8549,42 @@ function handleNoticeSyncRequest(senderIP) {
                   `SELECT uid FROM deleted_notices ORDER BY deleted_at DESC LIMIT 5000`,
                   [],
                   (err8, deletedNoticeRows) => {
-                    try {
-                      const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
-                      const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
-                      const chunks = buildNoticeSyncPayloadChunks(
-                        slimNotices,
-                        operators || [],
-                        schedules || [],
-                        profileOverridesRows || [],
-                        deletedScheduleUids,
-                        deletedNoticeUids
-                      );
-                      const dutyChunk = {
-                        type: 'NOTICE_SYNC_RESPONSE',
-                        notices: [],
-                        operators: [],
-                        schedules: [],
-                        profileOverrides: [],
-                        deletedScheduleUids: [],
-                        deletedNoticeUids: [],
-                        dutyRoster: dutyRoster || [],
-                        updateSourcePath: updateSourcePath || ''
-                      };
-                      chunks.unshift(dutyChunk);
-                      tcpWriteJsonLines(senderIP, chunks);
-                    } finally {
-                      finishSync();
-                    }
+                    db.all(
+                      `SELECT username FROM deleted_notice_operators ORDER BY deleted_at DESC LIMIT 5000`,
+                      [],
+                      (err9, deletedOperatorRows) => {
+                        try {
+                          const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
+                          const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
+                          const deletedOperatorUsernames = (deletedOperatorRows || []).map((r) => r.username).filter(Boolean);
+                          const chunks = buildNoticeSyncPayloadChunks(
+                            slimNotices,
+                            operators || [],
+                            schedules || [],
+                            profileOverridesRows || [],
+                            deletedScheduleUids,
+                            deletedNoticeUids,
+                            deletedOperatorUsernames
+                          );
+                          const dutyChunk = {
+                            type: 'NOTICE_SYNC_RESPONSE',
+                            notices: [],
+                            operators: [],
+                            schedules: [],
+                            profileOverrides: [],
+                            deletedScheduleUids: [],
+                            deletedNoticeUids: [],
+                            deletedOperatorUsernames: [],
+                            dutyRoster: dutyRoster || [],
+                            updateSourcePath: updateSourcePath || ''
+                          };
+                          chunks.unshift(dutyChunk);
+                          tcpWriteJsonLines(senderIP, chunks);
+                        } finally {
+                          finishSync();
+                        }
+                      }
+                    );
                   }
                 );
               }
@@ -8567,7 +8596,7 @@ function handleNoticeSyncRequest(senderIP) {
   });
 }
 
-function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, dutyRoster, deletedScheduleUids, deletedNoticeUids) {
+function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSourcePath, remoteProfileOverrides, dutyRoster, deletedScheduleUids, deletedNoticeUids, deletedOperatorUsernames) {
   // 같은 응답에 공지 본문이 있는 UID는 삭제 목록보다 우선 (방금 작성·재동기화 건 보호)
   const incomingNoticeUids = new Set(
     (Array.isArray(notices) ? notices : []).map((n) => n && n.uid).filter(Boolean).map(String)
@@ -8586,9 +8615,25 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
   } else if (Array.isArray(deletedNoticeUids) && deletedNoticeUids.length) {
     notifyNoticesChanged();
   }
+  // 운영자 삭제 목록을 INSERT보다 먼저 적용해 되살림 방지 (공지/일정과 동일 패턴)
+  const incomingOperatorUsernames = new Set(
+    (Array.isArray(operators) ? operators : []).map((o) => o && o.username).filter(Boolean).map(String)
+  );
+  if (Array.isArray(deletedOperatorUsernames) && deletedOperatorUsernames.length) {
+    const toDelete = deletedOperatorUsernames.filter((u) => u && !incomingOperatorUsernames.has(String(u)));
+    rememberOperatorTombstones(toDelete);
+    toDelete.forEach((username) => {
+      recordOperatorTombstone(username, () => {
+        db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], () => {
+          if (mainWindow) safeWebContentsSend('notice-operators-update');
+        });
+      });
+    });
+  }
   if (Array.isArray(operators)) {
     operators.forEach(o => {
       if (!o || !o.username) return;
+      if (operatorTombstoneMemory.has(String(o.username))) return;
       db.get(`SELECT can_manage_duty, display_name, password_hash FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
         let dutyFlag = 0;
         if (o.can_manage_duty === 1 || o.can_manage_duty === true || o.can_manage_duty === '1') dutyFlag = 1;
@@ -8664,6 +8709,13 @@ function handleConfigSync(payload) {
 
 function handleOperatorAdd(o) {
   if (!o || !o.username) return;
+  isOperatorTombstoned(o.username, (tombstoned) => {
+    if (tombstoned) return;
+    handleOperatorAddInner(o);
+  });
+}
+
+function handleOperatorAddInner(o) {
   db.get(`SELECT can_manage_duty, display_name, password_hash, added_at FROM notice_operators WHERE username = ?`, [o.username], (err, row) => {
     // 원격에 필드가 없으면(구버전 동기화) 기존 권한을 덮어쓰지 않음
     let dutyFlag = 0;
@@ -8803,8 +8855,10 @@ function handleDutyRosterSync(payload) {
 
 function handleOperatorDelete(username) {
   if (!username) return;
-  db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], () => {
-    if (mainWindow) safeWebContentsSend('notice-operators-update');
+  recordOperatorTombstone(username, () => {
+    db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], () => {
+      if (mainWindow) safeWebContentsSend('notice-operators-update');
+    });
   });
 }
 
@@ -8949,6 +9003,56 @@ function rememberScheduleTombstones(uids) {
 function rememberNoticeTombstones(uids) {
   (uids || []).forEach((uid) => {
     if (uid) noticeTombstoneMemory.add(String(uid));
+  });
+}
+
+const operatorTombstoneMemory = new Set();
+const OPERATOR_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
+
+function pruneOperatorTombstones(done) {
+  const cutoff = new Date(Date.now() - OPERATOR_TOMBSTONE_KEEP_MS).toISOString();
+  db.all(`SELECT username FROM deleted_notice_operators WHERE deleted_at < ?`, [cutoff], (err, rows) => {
+    if (!err && rows) rows.forEach((r) => operatorTombstoneMemory.delete(String(r.username)));
+    db.run(`DELETE FROM deleted_notice_operators WHERE deleted_at < ?`, [cutoff], () => {
+      if (typeof done === 'function') done();
+    });
+  });
+}
+
+function recordOperatorTombstone(username, done) {
+  if (!username) {
+    if (typeof done === 'function') done();
+    return;
+  }
+  const key = String(username);
+  operatorTombstoneMemory.add(key);
+  const at = new Date().toISOString();
+  db.run(
+    `INSERT OR REPLACE INTO deleted_notice_operators (username, deleted_at) VALUES (?, ?)`,
+    [key, at],
+    () => pruneOperatorTombstones(done)
+  );
+}
+
+function isOperatorTombstoned(username, cb) {
+  if (!username) {
+    cb(false);
+    return;
+  }
+  const key = String(username);
+  if (operatorTombstoneMemory.has(key)) {
+    cb(true);
+    return;
+  }
+  db.get(`SELECT 1 AS x FROM deleted_notice_operators WHERE username = ?`, [key], (err, row) => {
+    if (!err && row) operatorTombstoneMemory.add(key);
+    cb(!err && !!row);
+  });
+}
+
+function rememberOperatorTombstones(usernames) {
+  (usernames || []).forEach((u) => {
+    if (u) operatorTombstoneMemory.add(String(u));
   });
 }
 
@@ -11655,9 +11759,11 @@ ipcMain.handle('set-notice-operator-duty-perm', async (event, { username, canMan
 ipcMain.handle('delete-notice-operator', async (event, username) => {
   if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
   return new Promise((resolve) => {
-    db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], (err) => {
-      if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DELETE', username });
-      resolve({ success: !err });
+    recordOperatorTombstone(username, () => {
+      db.run(`DELETE FROM notice_operators WHERE username = ?`, [username], (err) => {
+        if (!err) broadcastToOnlinePeers({ type: 'OPERATOR_DELETE', username });
+        resolve({ success: !err });
+      });
     });
   });
 });
