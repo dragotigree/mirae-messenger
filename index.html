@@ -5255,6 +5255,9 @@
     <!-- 🗨 미니 모드 전용: 대화상대 없을 때 보이는 간단한 목록 화면 -->
     <div id="compact-list-view">
       <aside class="compact-rail" aria-label="미니 모드 메뉴">
+        <button type="button" class="compact-rail-btn" onclick="openBoardModal()" title="공지">
+          <span class="compact-rail-icon" data-ui-icon="notice"></span>
+        </button>
         <button type="button" class="compact-rail-btn" data-rail="friends" onclick="setCompactRailTab('friends')" title="직원">
           <span class="compact-rail-icon" data-ui-icon="users"></span>
         </button>
@@ -5262,27 +5265,24 @@
           <span class="compact-rail-icon" data-ui-icon="chatBubble"></span>
           <span class="unread-badge compact-rail-badge" id="compact-rail-chat-badge" style="display:none;">0</span>
         </button>
-        <div class="compact-rail-spacer"></div>
         <button type="button" class="compact-rail-btn" onclick="openScheduleBoardModal()" title="병동 일정 현황판">
           <span class="compact-rail-icon" data-ui-icon="clipboardList"></span>
         </button>
-        <button type="button" class="compact-rail-btn" onclick="openBoardModal()" title="공지">
-          <span class="compact-rail-icon" data-ui-icon="notice"></span>
+        <button type="button" class="compact-rail-btn" onclick="openIpmsgSendModal()" title="쪽지">
+          <span class="compact-rail-icon" data-ui-icon="ipmsg"></span>
         </button>
+        <button type="button" class="compact-rail-btn" onclick="openAllLogsModal()" title="기록">
+          <span class="compact-rail-icon" data-ui-icon="logs"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" onclick="window.api.openFilesFolder()" title="파일">
+          <span class="compact-rail-icon" data-ui-icon="folder"></span>
+        </button>
+        <div class="compact-rail-spacer"></div>
         <button type="button" class="compact-rail-btn" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="관리">
           <span class="compact-rail-icon" id="compact-master-lock-icon" data-ui-icon="shieldUser"></span>
         </button>
         <button type="button" class="compact-rail-btn" id="compact-privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc)">
           <span class="compact-rail-icon" data-ui-icon="lock"></span>
-        </button>
-        <button type="button" class="compact-rail-btn" onclick="window.api.openFilesFolder()" title="파일">
-          <span class="compact-rail-icon" data-ui-icon="folder"></span>
-        </button>
-        <button type="button" class="compact-rail-btn" onclick="openAllLogsModal()" title="기록">
-          <span class="compact-rail-icon" data-ui-icon="logs"></span>
-        </button>
-        <button type="button" class="compact-rail-btn" onclick="openIpmsgSendModal()" title="쪽지">
-          <span class="compact-rail-icon" data-ui-icon="ipmsg"></span>
         </button>
         <button type="button" class="compact-rail-btn" id="compact-rail-expand-btn" onclick="toggleCompactMode()" title="기본 화면">
           <span class="compact-rail-icon" data-ui-icon="monitor"></span>
