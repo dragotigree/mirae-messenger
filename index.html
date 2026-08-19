@@ -4373,6 +4373,21 @@
     .help-item-icon .icon-glyph { width: 18px; height: 18px; }
     .help-item-text { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
     .help-item-text b { color: var(--text-primary); font-weight: 700; }
+    .help-shortcut-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 7px 10px; border-radius: var(--radius-md); background: var(--surface-muted);
+    }
+    .help-shortcut-keys { display: flex; align-items: center; gap: 3px; flex-shrink: 0; width: 148px; }
+    .help-shortcut-plus { font-size: 11px; color: var(--text-muted); }
+    .help-shortcut-key {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 24px; height: 22px; padding: 0 6px;
+      font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+      font-size: 11px; font-weight: 700; color: var(--text-primary);
+      background: #fff; border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 6px; box-shadow: 0 1px 0 rgba(15,23,42,0.04);
+    }
+    .help-shortcut-desc { font-size: 12.5px; color: var(--text-secondary); }
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.35); /* backdrop-filter removed (Win CPU) */ z-index: 2000; justify-content: center; align-items: center; -webkit-app-region: no-drag; pointer-events: auto; animation: overlay-in 0.22s var(--ease-out); }
     @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
@@ -15915,6 +15930,38 @@
     function helpSection(title, itemsHtml) {
       return `<div class="help-section"><div class="help-section-title">${title}</div>${itemsHtml}</div>`;
     }
+    function helpShortcut(keys, desc) {
+      const keysHtml = keys
+        .map((k) => `<span class="help-shortcut-key">${escapeHtml(k)}</span>`)
+        .join('<span class="help-shortcut-plus">+</span>');
+      return `<div class="help-shortcut-row"><span class="help-shortcut-keys">${keysHtml}</span><span class="help-shortcut-desc">${desc}</span></div>`;
+    }
+    function commonShortcutsHelpHtml() {
+      return helpSection('⌨️ 자주 쓰는 단축키', [
+        helpShortcut(['Ctrl', 'Alt', 'S'], '메시지 보내기 창 열기 (다른 프로그램 사용 중에도 동작)'),
+        helpShortcut(['Ctrl', 'Alt', 'E'], '전체 대화 기록 열기 (다른 프로그램 사용 중에도 동작)'),
+        helpShortcut(['Ctrl', 'Shift', 'F'], '직원 · 대화 검색'),
+        helpShortcut(['Ctrl', 'F'], '지금 보는 대화 내용 검색'),
+        helpShortcut(['Ctrl', '1'], '대화 빠른 전환'),
+        helpShortcut(['Ctrl', '2'], '전체 대화 기록'),
+        helpShortcut(['Ctrl', '3'], '병동 일정 현황판 열기'),
+        helpShortcut(['Ctrl', '4'], '즐겨찾기만 보기'),
+        helpShortcut(['Ctrl', '5'], '채널 및 대화방만 보기'),
+        helpShortcut(['Ctrl', '`'], '공지사항 열기'),
+        helpShortcut(['Ctrl', 'U'], '다음 안읽은 대화 열기'),
+        helpShortcut(['Ctrl', 'W'], '트레이로 숨기기'),
+        helpShortcut(['Esc'], '화면 잠금 · 열린 창 닫기')
+      ].join(''));
+    }
+    function scheduleBoardShortcutsHelpHtml() {
+      return helpSection('⌨️ 자주 쓰는 단축키', [
+        helpShortcut(['Ctrl', '1'], '메인 탭'),
+        helpShortcut(['Ctrl', '2'], '병동/주치의별 탭'),
+        helpShortcut(['Ctrl', '3'], '입/퇴원/전실 탭'),
+        helpShortcut(['Ctrl', 'R'], '빠른 등록 열기 · 닫기'),
+        helpShortcut(['Esc'], '창 닫기')
+      ].join(''));
+    }
 
     function buildNormalModeHelpHtml() {
       return [
@@ -15937,7 +15984,8 @@
         helpSection('오른쪽 — 병동 일정 패널', [
           helpItem('clipboardList', '<b>현황판 / 일정등록</b> 탭으로 화면을 바꿉니다.'),
           helpItem('clipboardList', '달력에서 날짜를 고르면 그날 등록된 일정이 아래에 나열됩니다. 상단 「현황판」 아이콘을 누르면 병동·주치의별 일정을 큰 화면(별도 창)으로 볼 수 있습니다.')
-        ].join(''))
+        ].join('')),
+        commonShortcutsHelpHtml()
       ].join('');
     }
 
@@ -15958,7 +16006,8 @@
         ].join('')),
         helpSection('위쪽 — 필터·검색', [
           helpItem('chatBubble', '<b>전체 · 안읽음 · 온라인 · 즐겨찾기</b> 칩으로 목록을 좁혀볼 수 있고, 검색창(Ctrl+Shift+F)으로 이름을 바로 찾을 수 있습니다.')
-        ].join(''))
+        ].join('')),
+        commonShortcutsHelpHtml()
       ].join('');
     }
 
@@ -15976,7 +16025,8 @@
         ].join('')),
         helpSection('가운데 — 일정 표', [
           helpItem('clipboardList', '병동(RM)별·날짜별로 일정이 표에 표시됩니다. 칸을 클릭하면 상세·수정이 가능합니다.')
-        ].join(''))
+        ].join('')),
+        scheduleBoardShortcutsHelpHtml()
       ].join('');
     }
 
@@ -15987,6 +16037,9 @@
           helpItem('pencil', '<b>글쓰기</b> — 새 공지를 작성합니다 (로그인 필요).'),
           helpItem('search', '<b>검색</b> — 제목·내용으로 공지를 찾습니다.'),
           helpItem('chatBubble', '<b>모두 · 안읽음</b> — 필터로 안 읽은 공지만 골라볼 수 있습니다.')
+        ].join('')),
+        helpSection('⌨️ 자주 쓰는 단축키', [
+          helpShortcut(['Esc'], '창 닫기')
         ].join(''))
       ].join('');
     }
