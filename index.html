@@ -6420,6 +6420,13 @@
                 <span class="settings-toggle-desc">미니 모드에서 직원·대화방을 클릭하면 대화가 별도 창으로 열립니다(여러 명 동시 가능). 기본 화면(3단)에서는 지금처럼 오른쪽 대화창에서 열리며, 위의 「직원 클릭」이 쪽지 보내기여도 이 설정이 우선합니다.</span>
               </span>
             </label>
+            <label class="settings-toggle-row span-2" for="setting-sidebar-right-start-collapsed">
+              <input type="checkbox" id="setting-sidebar-right-start-collapsed" onchange="setSidebarRightStartCollapsed(this.checked)">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">우측 사이드바 접어서 시작</span>
+                <span class="settings-toggle-desc">켜면 앱을 시작할 때마다 오른쪽 병원 일정 패널이 접힌 채로 시작합니다. 상단의 펼치기 버튼을 눌러야 보이며, 지난번에 펼쳐 둔 채로 껐어도 다음 시작 때는 다시 접힌 채로 시작합니다.</span>
+              </span>
+            </label>
             <label class="settings-field">시스템 폰트
               <select id="setting-font-family" class="settings-select">
                 <option value="suit">수트 (SUIT)</option>
@@ -9635,7 +9642,10 @@
       if (btn) btn.title = collapsed ? '병원 달력 패널 펼치기' : '병원 달력 패널 접기';
       try { localStorage.setItem(SIDEBAR_RIGHT_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) {}
     }
-    if (localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1') {
+    // 「펼치기 전까지는 접어두기」가 켜져 있으면, 지난번에 펼쳐 둔 채로 껐어도
+    // 매번 새로 시작할 땐 항상 접힌 채로 시작한다 — 눌러야만 열리게 하려는 게
+    // 원래 의도라, "마지막 상태 기억"보다 이 설정이 우선한다.
+    if (localStorage.getItem('sidebarRightStartCollapsed') === 'true' || localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1') {
       toggleSidebarRightCollapsed(true);
     }
 
@@ -9955,6 +9965,18 @@
       if (!stayEl || !durEl) return;
       durEl.disabled = stayEl.checked;
       durEl.style.opacity = stayEl.checked ? '0.45' : '';
+    }
+
+    /** 우측 사이드바(병원 일정 패널)를 매번 시작할 때 접힌 채로 둘지 — 기본 꺼짐
+     *  (꺼져 있으면 지금처럼 지난번 펼침·접힘 상태를 그대로 기억한다). */
+    function isSidebarRightStartCollapsed() {
+      return localStorage.getItem('sidebarRightStartCollapsed') === 'true';
+    }
+
+    function setSidebarRightStartCollapsed(on) {
+      localStorage.setItem('sidebarRightStartCollapsed', on ? 'true' : 'false');
+      const el = document.getElementById('setting-sidebar-right-start-collapsed');
+      if (el) el.checked = !!on;
     }
 
     function isChatWindowFeatureEnabled() {
@@ -26412,6 +26434,8 @@
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
         const chatWinEl = document.getElementById('setting-open-chat-in-new-window');
         if (chatWinEl) chatWinEl.checked = isChatWindowFeatureEnabled();
+        const sidebarRightStartEl = document.getElementById('setting-sidebar-right-start-collapsed');
+        if (sidebarRightStartEl) sidebarRightStartEl.checked = isSidebarRightStartCollapsed();
         const autoAwayEl = document.getElementById('setting-auto-away');
         if (autoAwayEl) autoAwayEl.checked = isAutoAwayEnabled();
         const denseEl = document.getElementById('setting-compact-dense-list');
