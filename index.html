@@ -4883,17 +4883,39 @@
       background: #fff;
       border-top: 1px solid #e8edf2;
     }
+    /* 좁은 창(미니 모드 등) — 왼쪽 세로 메뉴를 위쪽 가로 메뉴로 바꾼다.
+       예전에는 한 줄로 두고 가로 스크롤을 시켰는데, 오른쪽 항목이 잘린 채 보이고
+       스크롤이 가능한지도 알기 어려워 「작성 로그인」·「데이터」 같은 뒤쪽 메뉴를
+       찾지 못했다. 이제 여러 줄로 접어 모든 항목이 한눈에 보이게 한다. */
     @media (max-width: 820px) {
       .settings-modal-shell { grid-template-columns: 1fr; }
       .settings-nav {
         flex-direction: row;
-        flex-wrap: nowrap;
-        overflow-x: auto;
+        flex-wrap: wrap;
+        overflow-x: visible;
+        overflow-y: visible;
+        gap: 5px;
         border-right: none;
         border-bottom: 1px solid #e8edf2;
-        padding: 8px;
+        padding: 10px 12px;
       }
-      .settings-nav-btn { width: auto; white-space: nowrap; flex-shrink: 0; }
+      .settings-nav-btn {
+        width: auto; white-space: nowrap; flex-shrink: 0;
+        padding: 6px 11px; font-size: 12px; border-radius: 99px;
+        background: #fff; border: 1px solid var(--border-soft);
+      }
+      .settings-nav-btn.active {
+        background: var(--accent); color: #fff; border-color: var(--accent);
+      }
+      /* 세로 메뉴에서 맨 아래로 밀어 두던 「관리자화면」은 가로 메뉴에선 그냥 마지막 칩 */
+      .settings-nav-btn-admin {
+        margin-top: 0; padding-top: 6px;
+        border-top: 1px solid var(--border-soft);
+        border-radius: 99px;
+      }
+      .settings-panels { padding: 16px 14px 24px; }
+      .settings-panel-title { font-size: 16px; }
+      .settings-modal-header { padding: 12px 16px; }
     }
 
     /* 설정 폼 공통 */
@@ -6208,11 +6230,13 @@
             </select>
           </label>
           <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">다른 직원들의 목록에 내 상태가 이렇게 표시됩니다. 「자리비움」으로 해도 메시지는 그대로 받습니다 — 단지 지금 바로 응대하기 어렵다는 표시입니다.</p>
-          <label class="settings-field" style="flex-direction:row; align-items:center; gap:8px; margin-top:10px;">
+          <label class="settings-toggle-row" for="setting-auto-away" style="margin-top:10px;">
             <input type="checkbox" id="setting-auto-away" onchange="setAutoAwayEnabled(this.checked)">
-            <span>5분간 조작이 없으면 자동으로 자리비움</span>
+            <span class="settings-toggle-text">
+              <span class="settings-toggle-title">5분간 조작이 없으면 자동으로 자리비움</span>
+              <span class="settings-toggle-desc">꺼두면(기본값) 자리를 비워도 계속 「온라인」으로 표시됩니다. 자리비움으로 바꾸려면 위에서 직접 고르면 됩니다.</span>
+            </span>
           </label>
-          <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">꺼두면(기본값) 자리를 비워도 계속 「온라인」으로 표시됩니다. 자리비움으로 바꾸고 싶을 때는 위에서 직접 고르면 됩니다.</p>
         </div>
         <div class="settings-card">
           <div class="settings-form-grid settings-form-stack">
@@ -6352,11 +6376,13 @@
               </select>
             </label>
             <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">미니 모드 목록에서 직원 이름을 클릭했을 때 「쪽지 보내기」 창을 열지, 그 사람과의 「채팅창」을 열지 정합니다.</p>
-            <label class="settings-field" style="flex-direction:row; align-items:center; gap:8px;">
+            <label class="settings-toggle-row span-2" for="setting-open-chat-in-new-window">
               <input type="checkbox" id="setting-open-chat-in-new-window" onchange="setChatWindowFeatureEnabled(this.checked)">
-              <span>대화를 새 창으로 열기</span>
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">대화를 새 창으로 열기</span>
+                <span class="settings-toggle-desc">미니 모드에서 직원·대화방을 클릭하면 대화가 별도 창으로 열립니다(여러 명 동시 가능). 기본 화면(3단)에서는 지금처럼 오른쪽 대화창에서 열리며, 위의 「직원 클릭」이 쪽지 보내기여도 이 설정이 우선합니다.</span>
+              </span>
             </label>
-            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">켜면 <b>미니 모드에서만</b> 직원·대화방을 클릭했을 때 그 대화가 별도 창으로 열립니다(여러 명과 동시에 창을 띄울 수 있습니다). 기본 화면(3단)에서는 지금처럼 오른쪽 대화창에서 열립니다. 위의 「미니 모드에서 직원 클릭」이 쪽지 보내기로 되어 있어도 이 설정이 우선합니다.</p>
             <label class="settings-field">시스템 폰트
               <select id="setting-font-family" class="settings-select">
                 <option value="suit">수트 (SUIT)</option>
