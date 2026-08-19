@@ -5513,7 +5513,7 @@
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
         </div>
       </div>
-      <div id="all-logs-container" class="all-logs-list"></div>
+      <div id="all-logs-container" class="all-logs-list" onscroll="onAllLogsScroll()"></div>
     </div>
   </div>
 
@@ -9386,6 +9386,11 @@
     applyChannelsSectionCollapseState();
     let allLogsSearchDebounce = null;
     let allLogsFilter = 'all';
+    let allLogsOffset = 0;
+    let allLogsHasMore = true;
+    let allLogsLoadingMore = false;
+    let allLogsLastDateKey = '';
+    let allLogsKeyword = '';
     let cachedNoticesList = [];
     let boardCategoryFilter = localStorage.getItem('boardCategoryFilter') || '__all__';
     let chatSearchDebounce = null;
@@ -15175,12 +15180,19 @@
 
     async function loadAllChatLogs(keyword) {
       const container = document.getElementById('all-logs-container');
-      const countEl = document.getElementById('all-logs-count');
       if (!container) return;
 
+      allLogsKeyword = keyword || '';
+      allLogsOffset = 0;
+      allLogsHasMore = true;
+      allLogsLastDateKey = '';
+      allLogsLoadingMore = false;
+
       const kind = allLogsFilter || 'all';
-      const logs = await window.api.getAllChatHistory({ keyword: keyword || '', kind });
-      if (countEl) countEl.textContent = String(logs ? logs.length : 0);
+      const logs = await window.api.getAllChatHistory({ keyword: allLogsKeyword, kind, offset: 0 });
+      const pageSize = kind === 'all' ? 300 : 500;
+      allLogsHasMore = !!(logs && logs.length === pageSize);
+      allLogsOffset = logs ? logs.length : 0;
 
       const emptyByKind = {
         all: keyword ? '검색어에 일치하는 대화 내역이 없습니다.' : '아직 기록된 대화 내역이 없습니다.',
@@ -15195,11 +15207,50 @@
             <div class="all-logs-empty-icon">📭</div>
             ${emptyByKind[kind] || emptyByKind.all}
           </div>`;
+        updateAllLogsCount(0);
         return;
       }
 
       container.innerHTML = '';
-      let lastDateKey = '';
+      container.scrollTop = 0;
+      appendAllLogItems(container, logs, allLogsKeyword, kind);
+      updateAllLogsCount(container.querySelectorAll('.log-card-item').length);
+    }
+
+    function updateAllLogsCount(n) {
+      const countEl = document.getElementById('all-logs-count');
+      if (countEl) countEl.textContent = String(n);
+    }
+
+    async function loadMoreAllChatLogs() {
+      if (allLogsLoadingMore || !allLogsHasMore) return;
+      const container = document.getElementById('all-logs-container');
+      if (!container) return;
+      allLogsLoadingMore = true;
+      const kind = allLogsFilter || 'all';
+      try {
+        const logs = await window.api.getAllChatHistory({ keyword: allLogsKeyword, kind, offset: allLogsOffset });
+        const pageSize = kind === 'all' ? 300 : 500;
+        allLogsHasMore = !!(logs && logs.length === pageSize);
+        allLogsOffset += logs ? logs.length : 0;
+        if (logs && logs.length) {
+          appendAllLogItems(container, logs, allLogsKeyword, kind);
+          updateAllLogsCount(container.querySelectorAll('.log-card-item').length);
+        }
+      } finally {
+        allLogsLoadingMore = false;
+      }
+    }
+
+    function onAllLogsScroll() {
+      const container = document.getElementById('all-logs-container');
+      if (!container) return;
+      const remaining = container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (remaining < 200) loadMoreAllChatLogs();
+    }
+
+    function appendAllLogItems(container, logs, keyword, kind) {
+      let lastDateKey = allLogsLastDateKey;
       logs.forEach((item, idx) => {
         const typeMeta = getLogTypeMeta(item.receiver_ip || '');
         const isSent = item.isMe === true || isMessageFromMe(item.sender_ip, item.sender_name);
@@ -15276,6 +15327,7 @@
 
         container.appendChild(card);
       });
+      allLogsLastDateKey = lastDateKey;
     }
 
     function openBoardModal() {

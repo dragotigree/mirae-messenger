@@ -10813,6 +10813,7 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
   return new Promise((resolve) => {
     const keyword = typeof opts === 'string' ? opts : ((opts && opts.keyword) || '');
     const kind = typeof opts === 'object' && opts && opts.kind ? String(opts.kind) : 'all';
+    const offset = (typeof opts === 'object' && opts && Number.isFinite(opts.offset)) ? Math.max(0, opts.offset | 0) : 0;
     const clauses = [];
     const params = [];
 
@@ -10830,7 +10831,8 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
 
     let sql = `SELECT id, sender_name, sender_ip, receiver_ip, message, status, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_time FROM messages`;
     if (clauses.length) sql += ` WHERE ` + clauses.join(' AND ');
-    sql += ` ORDER BY id DESC LIMIT ${kind === 'all' ? 300 : 500}`;
+    const pageSize = kind === 'all' ? 300 : 500;
+    sql += ` ORDER BY id DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
     db.all(sql, params, (err, rows) => {
       if (err) { logDbErr(err); resolve([]); return; }
