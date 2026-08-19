@@ -1612,34 +1612,39 @@
        같이 있어 산만했다. 배경은 순백으로 비우고, 카드 하나에 아이콘·제목·설명·버튼만
        가지런히 놓는다. */
     .empty-chat-state { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--surface); }
-    .empty-welcome { text-align: center; padding: 32px 28px; max-width: 340px; animation: empty-fade-in 0.4s var(--ease-out); }
+    .empty-welcome { text-align: center; padding: 32px 28px; max-width: 400px; animation: empty-fade-in 0.4s var(--ease-out); }
     @keyframes empty-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .empty-icon-ring {
-      width: 68px; height: 68px; margin: 0 auto 22px; border-radius: var(--radius-xl);
-      background: var(--sidebar-active);
+      width: 72px; height: 72px; margin: 0 auto 24px; border-radius: 26px;
+      background: linear-gradient(150deg, #eef2ff, #f5f3ff);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255,255,255,0.6);
       display: flex; align-items: center; justify-content: center;
     }
-    .empty-state-illustration { width: 32px; height: 32px; color: var(--accent); }
-    .empty-title { font-size: 18px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 8px; line-height: 1.35; }
-    .empty-desc { font-size: 13px; font-weight: 400; color: var(--text-secondary); line-height: 1.65; }
-    .empty-hints { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
-    .empty-hint {
-      display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px 6px 7px;
-      background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: 99px;
-      font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+    .empty-state-illustration { width: 32px; height: 32px; color: #6366f1; }
+    .empty-title { font-size: 19px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 9px; line-height: 1.35; }
+    .empty-desc { font-size: 13px; font-weight: 400; color: var(--text-secondary); line-height: 1.7; }
+    .empty-quick-cards { display: flex; gap: 10px; justify-content: center; margin-top: 26px; }
+    .empty-quick-card {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 9px;
+      padding: 16px 8px; border: 1px solid var(--border-soft); border-radius: 18px;
+      background: #fff; cursor: pointer;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      transition: transform 0.14s, box-shadow 0.14s, border-color 0.14s;
     }
-    .empty-hint-icon {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: var(--surface); color: var(--accent-dark);
-      font-size: 10px; line-height: 1;
+    .empty-quick-card:hover {
+      transform: translateY(-3px);
+      border-color: transparent;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
     }
-    .empty-ipmsg-cta {
-      margin-top: 22px; width: 100%; padding: 11px 18px; border: none; border-radius: var(--radius-md); cursor: pointer;
-      background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700;
-      transition: background 0.15s;
+    .empty-quick-card-icon {
+      width: 38px; height: 38px; border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
     }
-    .empty-ipmsg-cta:hover { background: var(--accent-dark); }
+    .empty-quick-card-icon.eq-blue { background: #e0edff; }
+    .empty-quick-card-icon.eq-purple { background: #efe6ff; }
+    .empty-quick-card-icon.eq-green { background: #dcf7e8; }
+    .empty-quick-card-label { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
 
     /* ⏰ 예약 메시지 */
     #scheduled-indicator { display: none; padding: 0 20px; flex-shrink: 0; background: linear-gradient(180deg, rgba(240, 249, 255, 0.95), rgba(255, 255, 255, 0.98)); border-top: 1px solid rgba(33, 150, 243, 0.12); }
@@ -2978,10 +2983,12 @@
     .schedule-board-top-bar-actions {
       display: flex; gap: 6px; align-items: center; flex-shrink: 0;
     }
+    .sb-summary-title-row { display: flex; align-items: center; gap: 8px; }
+    .schedule-board-day-nav-group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .schedule-board-day-nav-btn {
-      flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
       border: 1px solid var(--border); background: #fff; color: var(--text-secondary);
-      font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer;
+      font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.12s, color 0.12s, border-color 0.12s;
     }
@@ -4512,8 +4519,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .empty-icon-ring,
-      .empty-hint,
-      .empty-ipmsg-cta,
+      .empty-quick-card,
       .settings-panel.active,
       #active-chat-container.is-chat-open,
       .msg-row.is-live-enter,
@@ -4535,8 +4541,7 @@
       }
     }
     html.ui-animations-off .empty-icon-ring,
-    html.ui-animations-off .empty-hint,
-    html.ui-animations-off .empty-ipmsg-cta,
+    html.ui-animations-off .empty-quick-card,
     html.ui-animations-off .settings-panel.active,
     html.ui-animations-off #active-chat-container.is-chat-open,
     html.ui-animations-off .msg-row.is-live-enter,
@@ -5141,6 +5146,7 @@
     }
     .settings-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .settings-version-line { font-size: 13px; color: #475569; }
+    .settings-rams-quote { margin: 10px 0 0; font-size: 10.5px; color: var(--text-muted); opacity: 0.45; text-align: right; font-style: italic; letter-spacing: 0.01em; user-select: none; }
     .net-status-list { display: flex; flex-direction: column; gap: 2px; }
     .settings-path-input {
       flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-md);
@@ -5471,14 +5477,22 @@
             <path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01M7 18l-3 2V7a2 2 0 012-2h10a2 2 0 012 2v7a2 2 0 01-2 2H9l-2 2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <h2 class="empty-title">대화를 시작해 보세요</h2>
-        <p class="empty-desc">왼쪽 목록에서 동료, 채널, 그룹 대화방을<br>선택하면 메시지를 주고받을 수 있습니다</p>
-        <div class="empty-hints">
-          <span class="empty-hint"><span class="empty-hint-icon">💬</span>1:1 메시지</span>
-          <span class="empty-hint"><span class="empty-hint-icon">#</span>공지 채널</span>
-          <span class="empty-hint"><span class="empty-hint-icon">👥</span>그룹 대화</span>
+        <h2 class="empty-title">오늘도 좋은 하루 되세요 ☀️</h2>
+        <p class="empty-desc">왼쪽에서 동료나 채널을 고르면 대화가 시작돼요.<br>아래에서 바로 시작할 수도 있어요.</p>
+        <div class="empty-quick-cards">
+          <button type="button" class="empty-quick-card" onclick="startNewDirectChatFromEmptyState()">
+            <span class="empty-quick-card-icon eq-blue">💬</span>
+            <span class="empty-quick-card-label">새 1:1 대화</span>
+          </button>
+          <button type="button" class="empty-quick-card" onclick="selectUserChat(BROADCAST_CHANNEL)">
+            <span class="empty-quick-card-icon eq-purple">#</span>
+            <span class="empty-quick-card-label">공지 채널</span>
+          </button>
+          <button type="button" class="empty-quick-card" onclick="openIpmsgSendModal()">
+            <span class="empty-quick-card-icon eq-green">✉️</span>
+            <span class="empty-quick-card-label">쪽지 쓰기</span>
+          </button>
         </div>
-        <button type="button" class="empty-ipmsg-cta" onclick="openIpmsgSendModal()">✉️ 채팅방 없이 쪽지 보내기</button>
       </div>
     </div>
 
@@ -6777,6 +6791,7 @@
             <button type="button" class="settings-btn-secondary" onclick="window.api.openUserDataFolder()">토큰 폴더 열기</button>
           </div>
           <div id="update-check-result" class="settings-hint"></div>
+          <p class="settings-rams-quote">“Less, but better.” — Dieter Rams</p>
         </div>
       </div>
 
@@ -6795,10 +6810,8 @@
     <div class="modal-card schedule-board-modal-card">
       <div class="schedule-board-top-bar">
         <div class="schedule-board-top-bar-main">
-          <button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(-1)" title="전날">‹</button>
           <div class="schedule-board-top-icon" aria-hidden="true">📋</div>
           <div class="schedule-board-top-summary" id="schedule-board-day-summary">날짜를 선택하세요.</div>
-          <button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(1)" title="다음날">›</button>
         </div>
         <div class="schedule-board-top-bar-actions">
           <span id="schedule-board-auth-user" class="schedule-board-auth-user" title=""></span>
@@ -12629,6 +12642,19 @@
       if (input && input.value) return;
       if (box) box.classList.remove('is-visible');
     }
+    /** 빈 화면의 "새 1:1 대화" 카드 — 직원만 보이게 좁히고 검색창에 바로 입력할 수 있게 포커스한다 */
+    function startNewDirectChatFromEmptyState() {
+      if (document.body.classList.contains('compact-mode')) {
+        setCompactRailTab('friends');
+        requestAnimationFrame(() => document.getElementById('compact-search-input-friends')?.focus());
+        return;
+      }
+      setSidebarRailFilter('users');
+      const box = document.getElementById('user-search-box');
+      if (box && !box.classList.contains('is-visible')) box.classList.add('is-visible');
+      requestAnimationFrame(() => document.getElementById('user-search-input')?.focus());
+    }
+
     function toggleUserSearchBox() {
       const box = document.getElementById('user-search-box');
       if (!box) return;
@@ -24748,7 +24774,13 @@
         .filter(m => m.count > 0);
       const breakdown = typeCounts.length ? typeCounts.map(m => `${m.label} ${m.count}`).join(' · ') : '등록된 병동 일정 없음';
       el.innerHTML =
-        `<div class="sb-summary-title">${escapeHtml(formatCalendarDayHeader(scheduleBoardDateStr))}</div>` +
+        `<div class="sb-summary-title-row">` +
+          `<span class="sb-summary-title">${escapeHtml(formatCalendarDayHeader(scheduleBoardDateStr))}</span>` +
+          `<span class="schedule-board-day-nav-group">` +
+            `<button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(-1)" title="전날">‹</button>` +
+            `<button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(1)" title="다음날">›</button>` +
+          `</span>` +
+        `</div>` +
         `<div class="sb-summary-meta">당일 <b>${dayAll.length}</b>건 · 화면 <b>${filteredCount}</b>건 · ${escapeHtml(breakdown)}</div>`;
     }
 
