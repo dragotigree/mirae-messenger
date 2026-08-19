@@ -11018,6 +11018,21 @@
       syncUnreadInboxBars();
     }
 
+    /** 일반(비압축) 레이아웃에서 Esc로 대화창을 닫아 "대화를 시작해 보세요" 초기 화면으로 되돌린다. */
+    function closeActiveChatToEmptyState() {
+      if (!activeChatUser) return;
+      try { closeOpenMsgActions(); } catch (_) {}
+      try { clearSidebarUserSelection(); } catch (_) {}
+      try { cancelEditMessage(); } catch (_) {}
+      try { cancelReplyMessage(); } catch (_) {}
+      try { closeChatSearchBar(); } catch (_) {}
+      try { closeChatSharedDrawer(); } catch (_) {}
+      activeChatUser = null;
+      renderUserListTree();
+      updateMainPanelVisibility();
+      syncUnreadInboxBars();
+    }
+
     /** 창을 닫아 트레이로 숨길 때 마지막 대화방을 복원하지 않음 (보안) */
     function leaveActiveChatForPrivacy() {
       try { closeOpenMsgActions(); } catch (_) {}
@@ -25468,6 +25483,13 @@
           closeChatSearchBar();
           const ta = document.getElementById('chat-textarea');
           if (ta && activeChatUser) ta.focus();
+          return;
+        }
+        // 화면 잠금이 켜져 있으면 tryPrivacyLockOnEscape가 먼저 대화를 정리하고
+        // 잠금 화면으로 넘어가야 하므로, 그 경우엔 여기서 빈 화면으로만 되돌리지 않는다.
+        if (!document.body.classList.contains('compact-mode') && activeChatUser && !isPrivacyLockEnabled()) {
+          e.preventDefault();
+          closeActiveChatToEmptyState();
           return;
         }
         if (tryPrivacyLockOnEscape(e)) return;
