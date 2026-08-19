@@ -172,6 +172,7 @@ async function matchMasterPassword(input, stored) {
 
 let mainWindow;
 let scheduleBoardWindow = null;
+let noticeBoardWindow = null;
 /** 💬 별도 채팅창: 상대(채널) 키 → BrowserWindow. 파일 앞쪽 함수들도 참조하므로 상단에 선언한다. */
 const chatWindows = new Map();
 let excalidrawWindow = null;
@@ -5027,6 +5028,22 @@ function showAndFocusWindow() {
   }
 }
 
+/** 다른 창(메인창 포함) 위로 확실히 끌어올린다 — win.focus()만으로는 Windows에서
+ *  다른 이미 떠 있는 자기 프로세스 창 뒤에 가려진 채로 남는 경우가 있어(OS의 포커스
+ *  스틸링 방지 정책), always-on-top을 순간적으로 켰다 끄는 방식으로 강제로 맨 앞에
+ *  둔다. (예: 미니 모드 메신저 위로 현황판 창이 안 올라오던 문제) */
+function bringWindowToFront(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.moveTop();
+    win.setAlwaysOnTop(true);
+    win.setAlwaysOnTop(false);
+  } catch (e) { /* ignore */ }
+}
+
 function initSpellCheckerSession() {
   const ses = session.defaultSession;
   if (!ses) return;
@@ -5186,8 +5203,7 @@ async function openScheduleBoardWindow(payload) {
         scheduleBoardWindow.setSize(Math.max(cw, 1480), Math.max(ch, 920));
       }
     } catch (e) { /* ignore */ }
-    scheduleBoardWindow.show();
-    scheduleBoardWindow.focus();
+    bringWindowToFront(scheduleBoardWindow);
     sendOpenPayload(scheduleBoardWindow);
     return;
   }
@@ -5215,6 +5231,7 @@ async function openScheduleBoardWindow(payload) {
   attachEditableContextMenu(scheduleBoardWindow.webContents);
   scheduleBoardWindow.loadFile('index.html', { hash: 'schedule-board' });
   scheduleBoardWindow.webContents.once('did-finish-load', () => {
+    bringWindowToFront(scheduleBoardWindow);
     setTimeout(() => sendOpenPayload(scheduleBoardWindow), 150);
   });
   const sendScheduleBoardMaximizedState = () => {
@@ -5227,6 +5244,44 @@ async function openScheduleBoardWindow(payload) {
   scheduleBoardWindow.on('unmaximize', sendScheduleBoardMaximizedState);
   scheduleBoardWindow.on('closed', () => {
     scheduleBoardWindow = null;
+  });
+}
+
+/** 미니 모드에서 공지 게시판을 누르면, 미니 모드 창(폭이 좁음)이 아니라 기본 화면처럼
+ *  넓은 별도 창으로 띄운다 — 병동 일정 현황판과 동일한 패턴. */
+async function openNoticeBoardWindow() {
+  if (noticeBoardWindow && !noticeBoardWindow.isDestroyed()) {
+    bringWindowToFront(noticeBoardWindow);
+    return;
+  }
+
+  await refreshPreloadScriptCacheIfNeeded();
+
+  noticeBoardWindow = new BrowserWindow({
+    width: 1000,
+    height: 880,
+    minWidth: 640,
+    minHeight: 560,
+    title: '공지사항 게시판 — Mirae Messenger',
+    icon: getAppNativeIcon(),
+    frame: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: getMainPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      backgroundThrottling: false
+    }
+  });
+  noticeBoardWindow.setMenu(null);
+  attachEditableContextMenu(noticeBoardWindow.webContents);
+  noticeBoardWindow.loadFile('index.html', { hash: 'notice-board' });
+  noticeBoardWindow.webContents.once('did-finish-load', () => {
+    bringWindowToFront(noticeBoardWindow);
+  });
+  noticeBoardWindow.on('closed', () => {
+    noticeBoardWindow = null;
   });
 }
 
@@ -5347,6 +5402,11 @@ ipcMain.handle('focus-main-window', () => { showAndFocusWindow(); });
 ipcMain.handle('open-schedule-board-window', async (event, payload = {}) => {
   const data = typeof payload === 'string' ? { dateStr: payload } : payload;
   openScheduleBoardWindow(data);
+  return { success: true };
+});
+
+ipcMain.handle('open-notice-board-window', async () => {
+  openNoticeBoardWindow();
   return { success: true };
 });
 

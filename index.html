@@ -4771,6 +4771,60 @@
       body.schedule-board-printing #custom-titlebar { display: none !important; }
     }
 
+    /* 📋 미니 모드에서 별도 창으로 여는 공지사항 게시판 — 병동 일정 현황판과 동일한 방식 */
+    body.notice-board-standalone {
+      margin: 0; overflow: hidden; background: var(--border-soft);
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    body.notice-board-standalone #custom-titlebar {
+      display: flex !important;
+      flex-shrink: 0;
+    }
+    body.notice-board-standalone #app-body-row,
+    body.notice-board-standalone #splash-screen { display: none !important; }
+    body.notice-board-standalone #titlebar-sidebar-accent {
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      padding: 0 16px;
+      box-shadow: none;
+    }
+    body.notice-board-standalone #titlebar-app-label {
+      text-transform: none;
+      letter-spacing: -0.02em;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    body.notice-board-standalone #titlebar-drag-region .titlebar-app-label-compact {
+      display: none !important;
+    }
+    body.notice-board-standalone #board-modal {
+      display: flex !important;
+      position: relative;
+      inset: auto;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      z-index: 1;
+      background: var(--border-soft);
+      padding: 0;
+    }
+    body.notice-board-standalone #board-modal .board-modal-card {
+      width: 100% !important;
+      height: 100% !important;
+      max-height: none;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+    }
+    body.notice-board-standalone #operator-login-modal.modal-overlay {
+      z-index: 5000;
+    }
+    body.notice-board-standalone #app-dialog-overlay {
+      z-index: 6000;
+    }
+
     /* 💬 별도 채팅창(#chat-window) — 대화 영역만 남기고 사이드바·아이콘레일을 숨긴다 */
     body.chat-window-standalone #splash-screen { display: none !important; }
     body.chat-window-standalone #app-icon-rail,
@@ -5278,6 +5332,9 @@
           <span class="compact-rail-icon" data-ui-icon="folder"></span>
         </button>
         <div class="compact-rail-spacer"></div>
+        <button type="button" class="compact-rail-btn" onclick="openOperatorLoginModal()" title="작성자 로그인">
+          <span class="compact-rail-icon" data-ui-icon="logIn"></span>
+        </button>
         <button type="button" class="compact-rail-btn" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="관리">
           <span class="compact-rail-icon" id="compact-master-lock-icon" data-ui-icon="shieldUser"></span>
         </button>
@@ -10083,6 +10140,38 @@
       });
     }
 
+    /** 미니 모드는 창 폭이 좁아 공지 게시판을 그 안에서 열면 답답하다 — 기본 화면
+     *  처럼 넓은 별도 창으로 띄운다 (병동 일정 현황판과 동일한 방식). */
+    function isNoticeBoardStandalone() {
+      return (location.hash || '').replace(/^#/, '') === 'notice-board';
+    }
+
+    function initNoticeBoardStandaloneShell() {
+      document.body.classList.add('notice-board-standalone');
+      document.title = '공지사항 게시판 — Mirae Messenger';
+      const splash = document.getElementById('splash-screen');
+      if (splash) splash.classList.add('is-hidden');
+      const titlebar = document.getElementById('custom-titlebar');
+      const appRow = document.getElementById('app-body-row');
+      if (titlebar) {
+        titlebar.style.display = '';
+        const label = document.getElementById('titlebar-app-label');
+        if (label) label.textContent = '공지사항 게시판';
+        const closeBtn = document.getElementById('titlebar-close-btn');
+        if (closeBtn) closeBtn.title = '닫기';
+      }
+      if (appRow) appRow.style.display = 'none';
+      const modal = document.getElementById('board-modal');
+      if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+      ['operator-login-modal', 'app-dialog-overlay'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.parentElement !== document.body) document.body.appendChild(el);
+      });
+      openBoardModal();
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       try {
       loadNoticeOperatorSession();
@@ -10119,6 +10208,7 @@
         }
       });
       if (isScheduleBoardStandalone()) initScheduleBoardStandaloneShell();
+      if (isNoticeBoardStandalone()) initNoticeBoardStandaloneShell();
       if (isChatWindowStandalone()) initChatWindowStandaloneShell();
       applyCompactDenseListClass();
       paintUiIcons();
@@ -15747,6 +15837,14 @@
     }
 
     function openBoardModal() {
+      if (
+        document.body.classList.contains('compact-mode')
+        && !isNoticeBoardStandalone()
+        && window.api && typeof window.api.openNoticeBoardWindow === 'function'
+      ) {
+        window.api.openNoticeBoardWindow().catch(() => {});
+        return;
+      }
       document.getElementById('board-modal').style.display = 'flex';
       // 지난번 검색어가 남아 있으면 목록이 비어 보인다 — 열 때마다 초기화한다.
       const searchInput = document.getElementById('board-search-input');
@@ -15768,6 +15866,10 @@
       } catch (_) { /* ignore */ }
     }
     function closeBoardModal() {
+      if (isNoticeBoardStandalone()) {
+        window.api.closeNoticeBoardWindow?.();
+        return;
+      }
       document.getElementById('board-modal').style.display = 'none';
     }
 

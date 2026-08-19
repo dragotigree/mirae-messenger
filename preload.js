@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('open-schedule-board-window', p);
   },
   closeScheduleBoardWindow: () => ipcRenderer.invoke('close-schedule-board-window'),
+  openNoticeBoardWindow: () => ipcRenderer.invoke('open-notice-board-window'),
+  closeNoticeBoardWindow: () => ipcRenderer.invoke('close-schedule-board-window'),
   // 💬 별도 채팅창
   openChatWindow: (payload) => ipcRenderer.invoke('open-chat-window', payload || {}),
   onChatWindowOpen: (callback) => ipcRenderer.on('chat-window-open', (e, data) => callback(data)),
