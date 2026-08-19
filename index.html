@@ -2337,6 +2337,24 @@
     .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
     .compact-filter-chip.is-active { background: var(--accent); color: #fff; }
+    /* 미니 모드 직원 탭 — 부서·층 필터 */
+    .compact-filter-row-select { padding-top: 6px; gap: 6px; align-items: center; }
+    .compact-filter-select {
+      flex: 1 1 0; min-width: 0; max-width: 50%;
+      padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--border-soft); background: var(--surface-muted);
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; font-family: inherit;
+    }
+    .compact-filter-select:focus { outline: none; border-color: var(--accent); color: var(--text-primary); }
+    .compact-filter-select.is-active { border-color: var(--accent); background: var(--sidebar-active); color: var(--accent-dark); }
+    .compact-filter-reset {
+      flex-shrink: 0; padding: 6px 10px; border-radius: 8px; border: none;
+      background: var(--surface-muted); font-size: 12px; font-weight: 700;
+      color: var(--text-secondary); cursor: pointer; font-family: inherit;
+    }
+    .compact-filter-reset:hover { background: var(--border-soft); color: var(--text-primary); }
+    .compact-filter-reset[hidden] { display: none !important; }
 
     .compact-inbox-bar {
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
@@ -5236,6 +5254,15 @@
             <button type="button" class="compact-filter-chip" data-compact-filter-friends="online" onclick="setCompactListFilter('online')">온라인</button>
             <button type="button" class="compact-filter-chip" data-compact-filter-friends="favorite" onclick="setCompactListFilter('favorite')">즐겨찾기</button>
           </div>
+          <div class="compact-filter-row compact-filter-row-select">
+            <select class="compact-filter-select" id="compact-dept-filter" title="부서로 거르기" onchange="setCompactDeptFilter(this.value)">
+              <option value="">부서 전체</option>
+            </select>
+            <select class="compact-filter-select" id="compact-floor-filter" title="층으로 거르기" onchange="setCompactFloorFilter(this.value)">
+              <option value="">층 전체</option>
+            </select>
+            <button type="button" class="compact-filter-reset" id="compact-filter-reset" onclick="clearCompactDeptFloorFilter()" title="부서·층 필터 해제" hidden>해제</button>
+          </div>
           <div class="compact-search">
             <span class="compact-search-icon" data-ui-icon="search"></span>
             <input type="text" id="compact-search-input-friends" placeholder="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
@@ -6182,6 +6209,11 @@
             </select>
           </label>
           <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">다른 직원들의 목록에 내 상태가 이렇게 표시됩니다. 「자리비움」으로 해도 메시지는 그대로 받습니다 — 단지 지금 바로 응대하기 어렵다는 표시입니다.</p>
+          <label class="settings-field" style="flex-direction:row; align-items:center; gap:8px; margin-top:10px;">
+            <input type="checkbox" id="setting-auto-away" onchange="setAutoAwayEnabled(this.checked)">
+            <span>5분간 조작이 없으면 자동으로 자리비움</span>
+          </label>
+          <p class="settings-field-hint" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">꺼두면(기본값) 자리를 비워도 계속 「온라인」으로 표시됩니다. 자리비움으로 바꾸고 싶을 때는 위에서 직접 고르면 됩니다.</p>
         </div>
         <div class="settings-card">
           <div class="settings-form-grid settings-form-stack">
@@ -6325,7 +6357,7 @@
               <input type="checkbox" id="setting-open-chat-in-new-window" onchange="setChatWindowFeatureEnabled(this.checked)">
               <span>대화를 새 창으로 열기</span>
             </label>
-            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">켜면 직원·대화방을 클릭했을 때 그 대화가 별도 창으로 열립니다(여러 명과 동시에 창을 띄울 수 있습니다). 미니 모드에서도 적용되며, 위의 「미니 모드에서 직원 클릭」이 쪽지 보내기로 되어 있어도 이 설정이 우선합니다. 문제가 생기면 이 설정을 끄면 예전처럼 한 창에서만 동작합니다.</p>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">켜면 <b>미니 모드에서만</b> 직원·대화방을 클릭했을 때 그 대화가 별도 창으로 열립니다(여러 명과 동시에 창을 띄울 수 있습니다). 기본 화면(3단)에서는 지금처럼 오른쪽 대화창에서 열립니다. 위의 「미니 모드에서 직원 클릭」이 쪽지 보내기로 되어 있어도 이 설정이 우선합니다.</p>
             <label class="settings-field">시스템 폰트
               <select id="setting-font-family" class="settings-select">
                 <option value="suit">수트 (SUIT)</option>
@@ -8187,6 +8219,9 @@
     }
     let userFilterKeyword = '';
     let compactListFilter = localStorage.getItem('compactListFilter') || 'all';
+    // 미니 모드 직원 탭의 부서·층 필터 (빈 문자열 = 전체)
+    let compactDeptFilter = localStorage.getItem('compactDeptFilter') || '';
+    let compactFloorFilter = localStorage.getItem('compactFloorFilter') || '';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
     let sidebarUnreadOnly = localStorage.getItem('sidebarUnreadOnly') === 'true';
 
@@ -9835,6 +9870,9 @@
     function tryOpenChatInNewWindow(user) {
       if (!user || !user.ip) return false;
       if (isChatWindowStandalone() || isScheduleBoardStandalone()) return false;
+      // 새 창으로 열기는 미니 모드에서만 동작한다. 3단(기본) 화면은 이미 오른쪽에 대화창이
+      // 넓게 있어서 새 창이 오히려 방해가 된다 — 예전처럼 같은 창에서 연다.
+      if (!document.body.classList.contains('compact-mode')) return false;
       if (!isChatWindowFeatureEnabled()) return false;
       if (!window.api || typeof window.api.openChatWindow !== 'function') return false;
       try {
@@ -9970,17 +10008,39 @@
       }
     });
 
-    function resetIdleTimer() {
-      markUserActivityForReadReceipt();
-      if (autoAwayTriggered) {
-        autoAwayTriggered = false;
-        window.api.saveMyProfile({ statusState: 'ONLINE' }).then(() => updateMyStatusBadge('ONLINE'));
+    /* 🟢 자리비움 자동 전환 — 기본 꺼짐.
+       예전에는 5분만 안 만져도 자동으로 「자리비움」이 되어, 병원처럼 자리를 자주 비우지만
+       메신저는 계속 켜 두는 환경에서는 거의 모든 직원이 자리비움으로 보였다(상태 표시가
+       의미를 잃음). 이제 기본 상태는 「온라인」으로 유지되고, 원하는 사람만 설정에서 켠다.
+       직접 「자리비움」을 고른 경우에는 이 설정과 무관하게 그대로 유지된다. */
+    function isAutoAwayEnabled() {
+      return localStorage.getItem('autoAwayEnabled') === 'true';
+    }
+
+    function setAutoAwayEnabled(on) {
+      localStorage.setItem('autoAwayEnabled', on ? 'true' : 'false');
+      const el = document.getElementById('setting-auto-away');
+      if (el) el.checked = !!on;
+      if (!on) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+        // 자동으로 자리비움이 된 상태였다면 곧바로 온라인으로 되돌린다.
+        if (autoAwayTriggered) {
+          autoAwayTriggered = false;
+          window.api.saveMyProfile({ statusState: 'ONLINE' }).then(() => updateMyStatusBadge('ONLINE')).catch(() => {});
+        }
+      } else {
+        scheduleAutoAway();
       }
-      // 화면보호기/다른 화면에서 돌아온 뒤, 실제 조작이 있을 때만 읽음 전송
-      flushPendingDmReadReceipts();
+    }
+
+    function scheduleAutoAway() {
       clearTimeout(idleTimer);
+      idleTimer = null;
+      if (!isAutoAwayEnabled()) return;
       idleTimer = setTimeout(async () => {
         try {
+          if (!isAutoAwayEnabled()) return;
           const p = await window.api.getMyProfile();
           if (p.statusState === 'ONLINE') {
             autoAwayTriggered = true;
@@ -9991,25 +10051,42 @@
           console.error('자리비움 전환 실패:', e);
         }
       }, IDLE_MS);
+    }
+
+    function resetIdleTimer() {
+      markUserActivityForReadReceipt();
+      if (autoAwayTriggered) {
+        autoAwayTriggered = false;
+        window.api.saveMyProfile({ statusState: 'ONLINE' }).then(() => updateMyStatusBadge('ONLINE'));
+      }
+      // 화면보호기/다른 화면에서 돌아온 뒤, 실제 조작이 있을 때만 읽음 전송
+      flushPendingDmReadReceipts();
+      scheduleAutoAway();
       try { resetPrivacyIdleTimer(); } catch (_) {}
     }
     ['mousemove', 'mousedown', 'click', 'keydown', 'wheel'].forEach(evt => {
       window.addEventListener(evt, resetIdleTimer, { passive: true });
     });
     // 최초 기동 시에는 입력으로 치지 않음 (읽음 오발송 방지)
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(async () => {
+    scheduleAutoAway();
+
+    /* 업그레이드 1회 보정: 예전 버전의 자동 전환 때문에 「자리비움」인 채로 DB에 저장돼
+       있던 PC는, 자동 전환을 끈 뒤에도 계속 자리비움으로 남는다. 이 버전을 처음 실행할 때
+       한 번만 온라인으로 되돌린다(이후에는 사용자가 직접 고른 값을 존중). */
+    setTimeout(async () => {
       try {
+        if (localStorage.getItem('autoAwayResetDone') === 'true') return;
+        localStorage.setItem('autoAwayResetDone', 'true');
+        if (isAutoAwayEnabled()) return;
         const p = await window.api.getMyProfile();
-        if (p.statusState === 'ONLINE') {
-          autoAwayTriggered = true;
-          await window.api.saveMyProfile({ statusState: 'TREATMENT' });
-          updateMyStatusBadge('TREATMENT');
+        if (p && p.statusState === 'TREATMENT') {
+          await window.api.saveMyProfile({ statusState: 'ONLINE' });
+          updateMyStatusBadge('ONLINE');
         }
       } catch (e) {
-        console.error('자리비움 전환 실패:', e);
+        console.error('자리비움 초기화 실패:', e);
       }
-    }, IDLE_MS);
+    }, 3000);
 
     function applyUserListUpdate(users) {
       persistContactSnapshotsFromUserList(users);
@@ -11512,6 +11589,59 @@
       renderCompactList();
     }
 
+    function setCompactDeptFilter(value) {
+      compactDeptFilter = String(value || '');
+      localStorage.setItem('compactDeptFilter', compactDeptFilter);
+      renderCompactList();
+    }
+
+    function setCompactFloorFilter(value) {
+      compactFloorFilter = String(value || '');
+      localStorage.setItem('compactFloorFilter', compactFloorFilter);
+      renderCompactList();
+    }
+
+    function clearCompactDeptFloorFilter() {
+      compactDeptFilter = '';
+      compactFloorFilter = '';
+      localStorage.setItem('compactDeptFilter', '');
+      localStorage.setItem('compactFloorFilter', '');
+      renderCompactList();
+    }
+
+    /** 부서·층 선택 상자의 항목을 실제 직원 목록에서 다시 만든다.
+     *  현재 고른 값이 목록에서 사라졌더라도(그 부서에 아무도 없어짐) 선택지로 남겨 둔다 —
+     *  갑자기 「전체」로 되돌아가 필터가 풀린 것처럼 보이지 않게 하기 위함. */
+    function syncCompactDeptFloorFilterUi() {
+      const deptEl = document.getElementById('compact-dept-filter');
+      const floorEl = document.getElementById('compact-floor-filter');
+      if (!deptEl || !floorEl) return;
+      const pool = (allUsers || []).filter((u) => isUserVisibleInDirectory(u));
+      const collect = (getter, current) => {
+        const set = new Set();
+        pool.forEach((u) => {
+          const v = String(getter(u) || '').trim();
+          if (v) set.add(v);
+        });
+        if (current) set.add(current);
+        return [...set].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      };
+      const fill = (el, values, current, allLabel) => {
+        const signature = `${allLabel}|${values.join('')}`;
+        if (el.dataset.optionSignature !== signature) {
+          el.dataset.optionSignature = signature;
+          el.innerHTML = `<option value="">${allLabel}</option>` +
+            values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        }
+        if (el.value !== current) el.value = current;
+        el.classList.toggle('is-active', !!current);
+      };
+      fill(deptEl, collect((u) => u.dept, compactDeptFilter), compactDeptFilter, '부서 전체');
+      fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '층 전체');
+      const resetBtn = document.getElementById('compact-filter-reset');
+      if (resetBtn) resetBtn.hidden = !(compactDeptFilter || compactFloorFilter);
+    }
+
     function updateCompactOnlineCount() {
       const el = document.getElementById('compact-online-count');
       if (!el || compactRailTab === 'more') return;
@@ -11948,6 +12078,9 @@
         (u.rank || '').toLowerCase().includes(userFilterKeyword)
         )
       );
+      // 부서·층 필터 (선택 안 하면 빈 문자열 = 전체)
+      if (compactDeptFilter) filtered = filtered.filter((u) => String(u.dept || '').trim() === compactDeptFilter);
+      if (compactFloorFilter) filtered = filtered.filter((u) => String(u.floor || '').trim() === compactFloorFilter);
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
       if (compactListFilter === 'online') filtered = filtered.filter(u => u.online);
       if (compactListFilter === 'favorite') filtered = filtered.filter(isFavoriteUser);
@@ -11979,7 +12112,9 @@
       if (sortedGroupKeys.length === 0 && favorites.length === 0) {
         emptyHintEl = document.createElement('div');
         emptyHintEl.className = 'compact-empty-hint';
-        emptyHintEl.textContent = compactListFilter === 'online' ? '현재 온라인인 직원이 없습니다.' :
+        emptyHintEl.textContent = (compactDeptFilter || compactFloorFilter)
+          ? `${[compactDeptFilter, compactFloorFilter].filter(Boolean).join(' · ')}에 해당하는 직원이 없습니다.\n「해제」를 눌러 부서·층 필터를 풀 수 있습니다.` :
+          compactListFilter === 'online' ? '현재 온라인인 직원이 없습니다.' :
           compactListFilter === 'favorite' ? '즐겨찾기한 직원이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.' :
           !showOfflineUsersInDirectory() ? '현재 온라인인 직원이 없습니다.' :
           !showSharedPcsInDirectory() && !userFilterKeyword ? '표시할 직원이 없습니다.\n(공용 컴퓨터가 숨겨져 있을 수 있습니다)' :
@@ -12015,6 +12150,7 @@
 
       setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
       syncCompactFilterChipUi();
+      syncCompactDeptFloorFilterUi();
       pruneSidebarUserSelection();
       syncCompactInboxBar();
     }
@@ -26159,6 +26295,8 @@
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
         const chatWinEl = document.getElementById('setting-open-chat-in-new-window');
         if (chatWinEl) chatWinEl.checked = isChatWindowFeatureEnabled();
+        const autoAwayEl = document.getElementById('setting-auto-away');
+        if (autoAwayEl) autoAwayEl.checked = isAutoAwayEnabled();
         document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
         const nameOrderEl = document.getElementById('setting-name-order');
         if (nameOrderEl) nameOrderEl.value = appSettings.nameOrder || 'rankFirst';
