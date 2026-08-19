@@ -6348,6 +6348,13 @@
                 <span>초</span>
               </span>
             </label>
+            <label class="settings-toggle-row" for="setting-toast-stay">
+              <input type="checkbox" id="setting-toast-stay" onchange="syncToastStaySettingUi()">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">확인할 때까지 토스트 유지</span>
+                <span class="settings-toggle-desc">켜면 위 표시 시간과 무관하게, 「닫기」·「읽기」를 누르기 전까지 알림이 화면에 계속 떠 있습니다.</span>
+              </span>
+            </label>
             <div class="settings-divider"></div>
             <div class="settings-section-title">병원 일정 알람</div>
             <label class="settings-toggle-row" for="setting-schedule-alarm-enabled">
@@ -9932,6 +9939,16 @@
       const el = document.getElementById('setting-compact-dense-list');
       if (el) el.checked = !!on;
       applyCompactDenseListClass();
+    }
+
+    /** 「확인할 때까지 토스트 유지」를 켜면 표시 시간(초) 입력이 의미가 없어지므로
+     *  흐리게 비활성화해 헷갈리지 않게 한다. 저장된 값 자체는 건드리지 않는다. */
+    function syncToastStaySettingUi() {
+      const stayEl = document.getElementById('setting-toast-stay');
+      const durEl = document.getElementById('setting-toast-duration');
+      if (!stayEl || !durEl) return;
+      durEl.disabled = stayEl.checked;
+      durEl.style.opacity = stayEl.checked ? '0.45' : '';
     }
 
     function isChatWindowFeatureEnabled() {
@@ -26429,6 +26446,9 @@
           const secs = parseInt(msgNotify.toastDurationSeconds, 10);
           toastDurEl.value = String(Number.isFinite(secs) ? Math.max(2, Math.min(60, secs)) : 7);
         }
+        const toastStayEl = document.getElementById('setting-toast-stay');
+        if (toastStayEl) toastStayEl.checked = !!msgNotify.toastStayUntilDismissed;
+        syncToastStaySettingUi();
         const spellEl = document.getElementById('setting-spellcheck');
         if (spellEl) spellEl.checked = appSettings.spellcheck === true;
 
@@ -26480,6 +26500,9 @@
     const n = parseInt(toastDurEl.value, 10);
     if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
   }
+  const toastStayUntilDismissed = document.getElementById('setting-toast-stay')
+    ? document.getElementById('setting-toast-stay').checked
+    : false;
   const notifyModeEl = document.querySelector('input[name="incoming-notify-mode"]:checked');
   const incomingNotifyMode = (notifyModeEl && notifyModeEl.value === 'desktop') ? 'desktop' : 'toast';
   const updateModeEl = document.querySelector('input[name="update-mode"]:checked');
@@ -26590,6 +26613,7 @@
     notifyIncomingMessages,
     notifyReadReceipts,
     toastDurationSeconds,
+    toastStayUntilDismissed,
     incomingNotifyMode
   });
   await syncSpellcheckEngine();

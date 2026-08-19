@@ -759,6 +759,8 @@ let notifyReadReceipts = true;
 let incomingNotifyMode = 'toast';
 /** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
 let toastDurationSeconds = 7;
+/** 켜면 토스트가 자동으로 안 사라지고, 「닫기」·「읽기」·X를 눌러야만 없어진다. 기본 꺼짐. */
+let toastStayUntilDismissed = false;
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -1445,9 +1447,13 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
   });
   toastWindow.on('closed', () => { toastWindow = null; });
 
-  const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
-  const ms = (urgent ? secs + 2 : secs) * 1000;
-  toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
+  // 「확인할 때까지 유지」가 켜져 있으면 자동으로 닫는 타이머를 아예 걸지 않는다 —
+  // 사용자가 「닫기」·「읽기」·X를 눌러야만(또는 새 메시지가 이 토스트를 대체할 때) 사라진다.
+  if (!toastStayUntilDismissed) {
+    const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
+    const ms = (urgent ? secs + 2 : secs) * 1000;
+    toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
+  }
 }
 
 function showDesktopNotification({ title, body, urgent, channelKey }) {
@@ -4589,6 +4595,7 @@ db.serialize(() => {
   alterAddColumn('app_settings', `notify_incoming_messages INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `notify_read_receipts INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `toast_duration_seconds INTEGER DEFAULT 7`);
+  alterAddColumn('app_settings', `toast_stay_until_dismissed INTEGER DEFAULT 0`);
   alterAddColumn('app_settings', `incoming_notify_mode TEXT DEFAULT 'toast'`);
   alterAddColumn('app_settings', `update_mode TEXT DEFAULT 'manual'`);
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
@@ -4606,6 +4613,7 @@ db.serialize(() => {
         const n = parseInt(row.toast_duration_seconds, 10);
         if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
       }
+      if (row.toast_stay_until_dismissed != null) toastStayUntilDismissed = !!row.toast_stay_until_dismissed;
       if (row.incoming_notify_mode === 'desktop' || row.incoming_notify_mode === 'toast') {
         incomingNotifyMode = row.incoming_notify_mode;
       } else {
@@ -12500,6 +12508,7 @@ ipcMain.handle('get-message-notification-settings', async () => ({
   notifyIncomingMessages,
   notifyReadReceipts,
   toastDurationSeconds,
+  toastStayUntilDismissed,
   incomingNotifyMode
 }));
 
@@ -12514,15 +12523,18 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
     const n = parseInt(settings.toastDurationSeconds, 10);
     if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
   }
+  if (settings && typeof settings.toastStayUntilDismissed === 'boolean') {
+    toastStayUntilDismissed = settings.toastStayUntilDismissed;
+  }
   if (settings && (settings.incomingNotifyMode === 'toast' || settings.incomingNotifyMode === 'desktop')) {
     incomingNotifyMode = settings.incomingNotifyMode;
   }
   db.run(
-    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ?, incoming_notify_mode = ? WHERE id = 1`,
-    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds, incomingNotifyMode],
+    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ?, toast_stay_until_dismissed = ?, incoming_notify_mode = ? WHERE id = 1`,
+    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds, toastStayUntilDismissed ? 1 : 0, incomingNotifyMode],
     logDbErr
   );
-  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds, incomingNotifyMode };
+  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds, toastStayUntilDismissed, incomingNotifyMode };
 });
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);
