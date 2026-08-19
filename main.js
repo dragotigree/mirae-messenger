@@ -761,7 +761,7 @@ let incomingNotifyMode = 'toast';
 /** 새 메시지 토스트 표시 시간(초). 기본 7초, 긴급은 +2초 */
 let toastDurationSeconds = 7;
 /** 켜면 토스트가 자동으로 안 사라지고, 「닫기」·「읽기」·X를 눌러야만 없어진다. 기본 꺼짐. */
-let toastStayUntilDismissed = false;
+let toastStayUntilDismissed = true;
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -4613,7 +4613,7 @@ db.serialize(() => {
   alterAddColumn('app_settings', `notify_incoming_messages INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `notify_read_receipts INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `toast_duration_seconds INTEGER DEFAULT 7`);
-  alterAddColumn('app_settings', `toast_stay_until_dismissed INTEGER DEFAULT 0`);
+  alterAddColumn('app_settings', `toast_stay_until_dismissed INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `incoming_notify_mode TEXT DEFAULT 'toast'`);
   alterAddColumn('app_settings', `update_mode TEXT DEFAULT 'manual'`);
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
