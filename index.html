@@ -13696,6 +13696,11 @@
     }
 
     function getOrderedUserGroupKeys(groupingKey, groupKeys) {
+      // 층 그룹은 항상 1층→10층 숫자 순서로 고정한다 — 예전에 마우스로 끌어서 순서를
+      // 바꿨던 기록이 저장되어 있으면 그 순서가 계속 우선돼 숫자 순서가 흐트러졌었다.
+      if (groupingKey === 'floor') {
+        return defaultSortGroupKeys(groupKeys);
+      }
       const byName = {};
       groupKeys.forEach((k) => { byName[k] = true; });
       const saved = loadUserGroupOrderList(groupingKey);
