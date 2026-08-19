@@ -2317,7 +2317,6 @@
     .compact-header { flex-shrink: 0; height: 52px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); background: #fff; }
     .compact-header-title-wrap { min-width: 0; }
     .compact-header-title { font-size: 20px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.03em; line-height: 1.2; }
-    .compact-header-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
     .compact-header-actions { display: flex; gap: 2px; flex-shrink: 0; }
     .compact-header-actions .icon-btn-compact { width: 36px; height: 36px; color: var(--text-secondary); background: transparent; border-radius: var(--radius-sm); opacity: 1; }
     .compact-header-actions .icon-btn-compact:hover { background: var(--surface-muted); color: var(--text-primary); }
@@ -2428,6 +2427,17 @@
     .compact-item-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
     .compact-item-sub, .compact-item-preview { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; line-height: 1.25; }
     .compact-empty-hint { text-align: center; padding: 48px 24px; color: var(--text-muted); font-size: 13px; line-height: 1.65; white-space: pre-line; background: #fff; margin: 0; }
+
+    /* 📋 촘촘하게 보기 — 한 화면에 더 많은 직원이 보이도록 여백·사진 크기만 줄인다.
+       글자 크기는 거의 그대로 두어 읽기 어려워지지 않게 했다(이름 14 → 13.5px). */
+    body.compact-dense-list .compact-list-item { min-height: 40px; padding: 5px 14px; gap: 9px; }
+    body.compact-dense-list .compact-avatar { width: 32px; height: 32px; font-size: 12px; }
+    body.compact-dense-list .compact-item-body { gap: 1px; }
+    body.compact-dense-list .compact-item-name { font-size: 13.5px; }
+    body.compact-dense-list .compact-item-sub,
+    body.compact-dense-list .compact-item-preview { font-size: 11.5px; }
+    body.compact-dense-list .compact-section-label { padding: 8px 14px 3px; }
+    body.compact-dense-list .compact-list-item .unread-badge { min-width: 18px; height: 18px; }
 
     .compact-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; }
     .compact-more-profile { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: #fff; }
@@ -5244,7 +5254,6 @@
         <header class="compact-header">
           <div class="compact-header-title-wrap">
             <div class="compact-header-title" id="compact-header-title">채팅</div>
-            <div class="compact-header-sub" id="compact-online-count">접속 0명</div>
           </div>
           <div class="compact-header-actions">
             <button class="icon-btn-compact" id="toolbar-settings-btn-compact" onclick="openSettingsModal()" title="설정" style="display:none;"></button>
@@ -6272,6 +6281,13 @@
               <span class="settings-toggle-text">
                 <span class="settings-toggle-title">목록에 프로필 사진 표시</span>
                 <span class="settings-toggle-desc">끄면 사이드바·미니 모드에서 아바타를 숨깁니다</span>
+              </span>
+            </label>
+            <label class="settings-toggle-row span-2" for="setting-compact-dense-list">
+              <input type="checkbox" id="setting-compact-dense-list" onchange="setCompactDenseList(this.checked)">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">미니 모드 목록 촘촘하게 보기</span>
+                <span class="settings-toggle-desc">여백과 프로필 사진 크기를 줄여 한 화면에 더 많은 직원이 보입니다(글자 크기는 거의 그대로).</span>
               </span>
             </label>
             <p class="settings-field-hint span-2" style="margin:0;font-size:12px;opacity:.72;line-height:1.45;">공용 컴퓨터는 직급이 비어 있는 계정입니다. 숨기면 좌측 직원 목록에서 제외됩니다.</p>
@@ -9864,6 +9880,24 @@
     }
 
     /** 미니모드 등에서 상대를 클릭했을 때 띄울 별도 채팅창 — 설정이 켜져 있을 때만 사용 */
+    /* 📋 미니 모드 목록 촘촘하게 보기 — 기본 켜짐.
+       한 화면에 보이는 직원 수를 늘려 달라는 요청으로 추가했다. 여백·사진 크기만
+       줄이고 글자 크기는 거의 그대로라, 끄면 예전 간격으로 바로 돌아간다. */
+    function isCompactDenseList() {
+      return localStorage.getItem('compactDenseList') !== 'false';
+    }
+
+    function applyCompactDenseListClass() {
+      document.body.classList.toggle('compact-dense-list', isCompactDenseList());
+    }
+
+    function setCompactDenseList(on) {
+      localStorage.setItem('compactDenseList', on ? 'true' : 'false');
+      const el = document.getElementById('setting-compact-dense-list');
+      if (el) el.checked = !!on;
+      applyCompactDenseListClass();
+    }
+
     function isChatWindowFeatureEnabled() {
       return localStorage.getItem('openChatInNewWindow') === 'true';
     }
@@ -10001,6 +10035,7 @@
       });
       if (isScheduleBoardStandalone()) initScheduleBoardStandaloneShell();
       if (isChatWindowStandalone()) initChatWindowStandaloneShell();
+      applyCompactDenseListClass();
       paintUiIcons();
       initUserDragAndDrop();
       initSidebarBlockReorder();
@@ -11562,10 +11597,7 @@
       const titles = { chat: '대화기록', friends: '', more: '더보기' };
       const titleEl = document.getElementById('compact-header-title');
       if (titleEl) titleEl.textContent = titles[tab] ?? '대화기록';
-      const subEl = document.getElementById('compact-online-count');
-      if (subEl) subEl.style.display = tab === 'more' ? 'none' : '';
       if (tab === 'more') updateCompactMoreProfile();
-      else updateCompactOnlineCount();
       syncCompactFilterChipUi();
       if (tab !== 'more') renderCompactList();
       syncCompactInboxBar();
@@ -11665,17 +11697,10 @@
       fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '층');
     }
 
-    function updateCompactOnlineCount() {
-      const el = document.getElementById('compact-online-count');
-      if (!el || compactRailTab === 'more') return;
-      const staff = (allUsers || []).filter((u) => !isSharedPcUser(u) || isDirectorySelfUser(u));
-      const online = staff.filter((u) => u.online).length;
-      if (compactRailTab === 'friends') {
-        el.textContent = `접속 ${online}명 · 전체 ${staff.length}명`;
-      } else {
-        el.textContent = `미래병원 · 접속 ${online}명`;
-      }
-    }
+    /* 미니 모드 헤더의 「접속 N명 · 전체 N명」 줄은 제거했다(자리만 차지하고
+       실제로 잘 보지 않는 정보). 호출부를 모두 지우는 대신 빈 함수로 남겨,
+       혹시 놓친 호출이 있어도 오류가 나지 않게 한다. */
+    function updateCompactOnlineCount() { /* 표시 항목 제거됨 */ }
 
     function isCompactChatActive(key) {
       if (!activeChatUser || !key) return false;
@@ -26320,6 +26345,8 @@
         if (chatWinEl) chatWinEl.checked = isChatWindowFeatureEnabled();
         const autoAwayEl = document.getElementById('setting-auto-away');
         if (autoAwayEl) autoAwayEl.checked = isAutoAwayEnabled();
+        const denseEl = document.getElementById('setting-compact-dense-list');
+        if (denseEl) denseEl.checked = isCompactDenseList();
         document.getElementById('setting-user-grouping').value = appSettings.userGrouping || 'floor';
         const nameOrderEl = document.getElementById('setting-name-order');
         if (nameOrderEl) nameOrderEl.value = appSettings.nameOrder || 'rankFirst';
