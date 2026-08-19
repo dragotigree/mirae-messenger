@@ -107,7 +107,7 @@
       box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
     }
     #titlebar-sidebar-accent {
-      width: var(--sidebar-width, 240px);
+      width: var(--sidebar-width, 225px);
       flex-shrink: 0;
       background: transparent;
       -webkit-app-region: drag;
@@ -261,7 +261,7 @@
     }
 
     #sidebar-left {
-      width: var(--sidebar-width, 240px);
+      width: var(--sidebar-width, 225px);
       background: var(--sidebar-bg);
       border-right: 1px solid var(--border);
       display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; position: relative;
@@ -641,7 +641,16 @@
     .subsection-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
     .subsection-label.user-group-header { cursor: default; }
     .subsection-label.user-group-header .channel-reorder-grip { cursor: grab; }
-    .subsection-label .channel-reorder-grip { opacity: 0; font-size: 11px; padding: 0 4px 0 0; flex-shrink: 0; line-height: 1; user-select: none; transition: opacity var(--transition-fast); }
+    /* ⚠️ 실사고: opacity:0으로만 숨겨서 안 보일 때도 폭(글자+패딩)을 그대로 차지해,
+       화살표(▾) 앞에 늘 눈에 띄는 빈 칸이 있는 것처럼 보였다("화살표 앞 공백이 길다").
+       드래그는 이 손잡이가 아니라 줄 전체(label)에 걸려 있어 손잡이가 안 보여도
+       드래그 기능에는 영향이 없다 — 안 보일 때는 폭도 0으로 접어 공백 자체를 없앤다. */
+    .subsection-label .channel-reorder-grip {
+      opacity: 0; width: 0; font-size: 11px; padding: 0; flex-shrink: 0; line-height: 1;
+      overflow: hidden; white-space: nowrap; user-select: none;
+      transition: opacity var(--transition-fast), width var(--transition-fast), padding var(--transition-fast);
+    }
+    .subsection-label:hover .channel-reorder-grip { width: 11px; padding: 0 4px 0 0; }
     .user-group-block.is-user-group-dragging { opacity: 0.45; }
     .user-group-block.is-user-group-drop-target .subsection-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
     .subsection-label:hover .channel-reorder-grip { opacity: 0.5; }
@@ -762,7 +771,7 @@
     #sidebar-left .avatar-status-badge { width: 6px; height: 6px; border-width: 1.5px; bottom: -1px; right: -1px; }
 
     #sidebar-left .user-card-item {
-      gap: 7px; padding: 1px 8px; margin: 0 2px 0 2px; align-items: center; min-height: 0;
+      gap: 8px; padding: 3px 8px; margin: 0 2px 1px 2px; align-items: center; min-height: 0;
       border-radius: var(--radius-md);
     }
     #sidebar-left .user-card-item.is-offline { opacity: 0.52; }
@@ -772,7 +781,7 @@
       font-size: var(--sidebar-item-font-size);
       font-weight: var(--sidebar-item-font-weight);
       letter-spacing: -0.02em;
-      line-height: 1.05;
+      line-height: 1.15;
     }
     #sidebar-left .user-card-item.active .user-name-text,
     #sidebar-left .user-card-item.is-multi-selected .user-name-text {
@@ -786,7 +795,7 @@
     #sidebar-left .user-card-item.active:not(.is-multi-selected) .user-sub-text {
       color: var(--sidebar-text-dim);
     }
-    #sidebar-left .user-sub-text { font-size: var(--sidebar-meta-font-size); font-weight: 400; color: var(--text-secondary); margin-top: 0; line-height: 1; }
+    #sidebar-left .user-sub-text { font-size: var(--sidebar-meta-font-size); font-weight: 400; color: var(--text-secondary); margin-top: 1px; line-height: 1.2; }
     #sidebar-left .user-sub-text .user-status-offline { color: var(--text-muted); font-weight: 600; }
     #sidebar-left .user-card-item.is-offline .user-name-text { color: var(--text-secondary); }
 
@@ -9080,7 +9089,7 @@
     // ↔️ 좌·우 사이드바 크기 조절
     (function initSidebarResize() {
       // 목록 글씨는 nowrap+ellipsis. 고정 UI(쪽지·코드·필터칩)가 깨지지 않는 폭까지만 축소.
-      const SIDEBAR_MIN_FLOOR = 240;
+      const SIDEBAR_MIN_FLOOR = 225;
       const SIDEBAR_MAX = 480;
       // 우측: 버튼·제목 글씨가 잘리지 않는 실제 최소 너비를 동적으로 측정 (아래 floor는 하한)
       const SIDEBAR_RIGHT_MIN_FLOOR = 220;
@@ -9332,8 +9341,11 @@
       // 기본값을 260→230으로 줄였지만 콘텐츠 최소 폭(240)보다 좁아 항상 240으로 올려붙던 문제가
       // 있었음 — 좌/우 사이드바 폭을 황금비(1:1.618)로 맞추며 왼쪽은 최소 폭인 240으로 고정
       if (savedWidth === 260 || savedWidth === 230) { savedWidth = 240; localStorage.setItem('sidebarWidth', '240'); }
+      // 기본값을 240→225로 한 번 더 줄임(직원 목록이 너무 빽빽·넓어 보인다는 요청) — 역시
+      // 예전 기본값(240)을 그대로 쓰던 경우만 옮기고, 직접 조절해둔 폭은 그대로 둔다.
+      if (savedWidth === 240) { savedWidth = 225; localStorage.setItem('sidebarWidth', '225'); }
       // 저장된 값이 예전 최소(200)보다 좁아 버튼·필터가 깨졌다면 측정 최소로 끌어올림
-      applySidebarWidth(savedWidth || 240);
+      applySidebarWidth(savedWidth || 225);
       refreshRightSidebarMinWidth();
       let savedRightWidth = parseInt(localStorage.getItem('sidebarRightWidth'), 10);
       // 오른쪽 폭을 왼쪽(240px)의 황금비인 약 388px로 — 직접 조절한 적 없는 경우만
