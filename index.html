@@ -10485,6 +10485,33 @@
           if (!host) return;
           host.innerHTML = unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : '';
         });
+        // ⚠️ 실사고: 위에서 카드 하나하나의 배지는 갱신하지만, 부서·층 그룹 "제목" 옆의
+        // 합계 배지(예: 재활치료부 옆 빨간 2)는 건드리지 않고 있었다. 그 합계는
+        // renderUserListTree()의 patch 경로(접기/펼치기 등으로 다시 그릴 때)에서만
+        // 갱신되고 있어서, 실제로 메시지를 읽어도 숫자가 안 사라지고 한 번 접었다
+        // 펼쳐야만(=강제로 다시 그려야만) 사라지는 것처럼 보였다. 여기서도 그룹 제목
+        // 배지를 같이 갱신한다.
+        const groupingKey = appSettings.userGrouping || 'floor';
+        treeEl.querySelectorAll('.user-group-block[data-group-name]').forEach((block) => {
+          const groupName = block.dataset.groupName;
+          const groupUsers = [...block.querySelectorAll('.user-card-item[data-user-ip]')]
+            .map((card) => findUserByIp(card.getAttribute('data-user-ip')))
+            .filter(Boolean);
+          const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
+          const trail = block.querySelector('.subsection-label > span:last-child');
+          if (!trail) return;
+          let unreadEl = trail.querySelector('.unread-badge');
+          if (groupUnread > 0) {
+            if (!unreadEl) {
+              unreadEl = document.createElement('span');
+              unreadEl.className = 'unread-badge';
+              trail.appendChild(unreadEl);
+            }
+            unreadEl.textContent = formatUnreadBadge(groupUnread);
+          } else if (unreadEl) {
+            unreadEl.remove();
+          }
+        });
       } else {
         renderUserListTree();
       }
