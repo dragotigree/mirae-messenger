@@ -2347,7 +2347,7 @@
     .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .compact-pane[hidden] { display: none !important; }
 
-    .compact-filter-row { display: flex; gap: 6px; padding: 10px 14px 0; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
+    .compact-filter-row { display: flex; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
     .compact-filter-row::-webkit-scrollbar { display: none; }
     .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
@@ -5262,10 +5262,25 @@
           <span class="compact-rail-icon" data-ui-icon="chatBubble"></span>
           <span class="unread-badge compact-rail-badge" id="compact-rail-chat-badge" style="display:none;">0</span>
         </button>
-        <button type="button" class="compact-rail-btn" data-rail="more" onclick="setCompactRailTab('more')" title="더보기">
-          <span class="compact-rail-icon" data-ui-icon="moreDots"></span>
-        </button>
         <div class="compact-rail-spacer"></div>
+        <button type="button" class="compact-rail-btn" onclick="openBoardModal()" title="공지">
+          <span class="compact-rail-icon" data-ui-icon="notice"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="관리">
+          <span class="compact-rail-icon" id="compact-master-lock-icon" data-ui-icon="shieldUser"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" id="compact-privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc)">
+          <span class="compact-rail-icon" data-ui-icon="lock"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" onclick="window.api.openFilesFolder()" title="파일">
+          <span class="compact-rail-icon" data-ui-icon="folder"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" onclick="openAllLogsModal()" title="기록">
+          <span class="compact-rail-icon" data-ui-icon="logs"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" onclick="openIpmsgSendModal()" title="쪽지">
+          <span class="compact-rail-icon" data-ui-icon="ipmsg"></span>
+        </button>
         <button type="button" class="compact-rail-btn" id="compact-rail-expand-btn" onclick="toggleCompactMode()" title="기본 화면">
           <span class="compact-rail-icon" data-ui-icon="monitor"></span>
         </button>
@@ -5274,14 +5289,6 @@
         </button>
       </aside>
       <div class="compact-main">
-        <header class="compact-header">
-          <div class="compact-header-title-wrap">
-            <div class="compact-header-title" id="compact-header-title">채팅</div>
-          </div>
-          <div class="compact-header-actions">
-            <button class="icon-btn-compact" id="toolbar-settings-btn-compact" onclick="openSettingsModal()" title="설정" style="display:none;"></button>
-          </div>
-        </header>
         <div class="compact-pane" data-compact-pane="chat">
           <div class="compact-filter-row" id="compact-filter-row">
             <button type="button" class="compact-filter-chip is-active" data-compact-filter="all" onclick="setCompactListFilter('all')">전체</button>
@@ -5320,32 +5327,6 @@
             <input type="text" id="compact-search-input-friends" placeholder="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
           </div>
           <div id="compact-friends-list-items"></div>
-        </div>
-        <div class="compact-pane" data-compact-pane="more" hidden>
-          <div class="compact-more-scroll">
-            <div class="compact-more-profile">
-              <div class="compact-more-profile-top">
-                <div>
-                  <div class="compact-more-profile-name" id="compact-more-profile-name">나</div>
-                  <div class="compact-more-profile-sub" id="compact-more-profile-sub"></div>
-                </div>
-              </div>
-            </div>
-            <div class="compact-more-grid">
-              <button type="button" class="compact-more-cell" onclick="openBoardModal()"><span class="compact-more-cell-icon" data-ui-icon="notice"></span>공지</button>
-              <button type="button" class="compact-more-cell" id="compact-master-lock-btn" onclick="handleMasterLockClick()" title="마스터 인증"><span class="compact-more-cell-icon" id="compact-master-lock-icon" data-ui-icon="shieldUser"></span>관리</button>
-              <button type="button" class="compact-more-cell" id="compact-privacy-lock-btn" onclick="manualPrivacyLock()" title="화면 잠금 (Esc)"><span class="compact-more-cell-icon" data-ui-icon="lock"></span>잠금</button>
-              <button type="button" class="compact-more-cell" onclick="window.api.openFilesFolder()"><span class="compact-more-cell-icon" data-ui-icon="folder"></span>파일</button>
-              <button type="button" class="compact-more-cell" onclick="openAllLogsModal()"><span class="compact-more-cell-icon" data-ui-icon="logs"></span>기록</button>
-              <button type="button" class="compact-more-cell" onclick="openIpmsgSendModal()"><span class="compact-more-cell-icon" data-ui-icon="ipmsg"></span>쪽지</button>
-              <button type="button" class="compact-more-cell" onclick="manualRefreshUsers()"><span class="compact-more-cell-icon" data-ui-icon="refresh"></span>새로고침</button>
-              <button type="button" class="compact-more-cell" onclick="toggleCompactMode()"><span class="compact-more-cell-icon" data-ui-icon="monitor"></span>일반화면</button>
-            </div>
-            <div class="compact-more-footer">
-              <span>Mirae Messenger</span>
-              <span id="compact-more-version"></span>
-            </div>
-          </div>
         </div>
         <div id="compact-multi-select-bar" class="compact-multi-select-bar" aria-live="polite">
           <span class="ums-count" id="compact-multi-select-count">0명 선택</span>
@@ -8297,6 +8278,7 @@
     let compactDeptFilter = localStorage.getItem('compactDeptFilter') || '';
     let compactFloorFilter = localStorage.getItem('compactFloorFilter') || '';
     let compactRailTab = localStorage.getItem('compactRailTab') || 'chat';
+    if (compactRailTab === 'more') compactRailTab = 'chat';
     let sidebarUnreadOnly = localStorage.getItem('sidebarUnreadOnly') === 'true';
 
     let appSettings = JSON.parse(localStorage.getItem('appSettings') || '{"fileMode": "auto", "fontSize": "14px", "fontFamily": "pretendard", "chatFontFamily": "suit", "autoLaunch": false, "userGrouping": "floor", "defaultViewMode": "normal", "spellcheck": false, "showUserListAvatars": true, "showOfflineUsers": true, "showSharedPcs": true, "compactPersonClickMode": "ipmsg", "privacyLockEnabled": false, "privacyLockOnHide": true, "privacyLockIdleMinutes": 0, "nameOrder": "rankFirst"}');
@@ -11716,6 +11698,7 @@
     }
 
     function setCompactRailTab(tab) {
+      if (tab === 'more') tab = 'chat';
       compactRailTab = tab;
       localStorage.setItem('compactRailTab', tab);
       if (tab === 'friends' && compactListFilter === 'unread') {
@@ -11728,12 +11711,10 @@
       document.querySelectorAll('.compact-pane').forEach((pane) => {
         pane.hidden = pane.dataset.compactPane !== tab;
       });
-      const titles = { chat: '대화기록', friends: '', more: '더보기' };
       const titleEl = document.getElementById('compact-header-title');
-      if (titleEl) titleEl.textContent = titles[tab] ?? '대화기록';
-      if (tab === 'more') updateCompactMoreProfile();
+      if (titleEl) titleEl.textContent = '';
       syncCompactFilterChipUi();
-      if (tab !== 'more') renderCompactList();
+      renderCompactList();
       syncCompactInboxBar();
     }
 
@@ -11749,27 +11730,6 @@
       document.querySelectorAll('[data-compact-filter-friends]').forEach((el) => {
         el.classList.toggle('is-active', el.dataset.compactFilterFriends === compactListFilter);
       });
-    }
-
-    function updateCompactMoreProfile() {
-      const nameEl = document.getElementById('compact-more-profile-name');
-      const subEl = document.getElementById('compact-more-profile-sub');
-      if (nameEl) {
-        nameEl.textContent = profileDisplayName(myProfile);
-      }
-      if (subEl) {
-        const p = myProfile;
-        subEl.textContent = p ? [p.dept, p.floor].filter(Boolean).join(' · ') || (p.extNo ? `내선 ${p.extNo}` : '') : '';
-      }
-      const verEl = document.getElementById('compact-more-version');
-      if (verEl && !verEl.dataset.loaded) {
-        fetch('version.json').then((r) => r.json()).then((j) => {
-          if (j && j.version) {
-            verEl.textContent = `ver. ${j.version}`;
-            verEl.dataset.loaded = '1';
-          }
-        }).catch(() => {});
-      }
     }
 
     function setCompactListFilter(filter) {
@@ -12227,9 +12187,6 @@
       }
 
       container.innerHTML = '';
-      if (compactListFilter === 'all' && !userFilterKeyword) {
-        appendCompactTransportShortcut(container);
-      }
 
       if (!rows.length) {
         const emptyHintEl = document.createElement('div');
@@ -12316,10 +12273,6 @@
     }
 
     async function renderCompactList() {
-      if (compactRailTab === 'more') {
-        updateCompactMoreProfile();
-        return;
-      }
       const container = document.getElementById(compactRailTab === 'friends' ? 'compact-friends-list-items' : 'compact-list-items');
       if (!container) return;
       updateCompactOnlineCount();
