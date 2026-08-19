@@ -7298,6 +7298,11 @@ function handleIncomingChat(payload, senderIP) {
   if (contentKey && wasRecentIncomingChatContent(contentKey)) {
     return;
   }
+  // ⚠️ 여기서 바로 마킹해야 한다. 예전엔 DB 조회(비동기) 후 persist()에서만 마킹했는데,
+  // 구버전 피어가 짧은 간격으로 여러 통을 몰아서 재전송하면 첫 통의 DB 조회가 끝나기 전에
+  // 다음 통들이 먼저 도착해 전부 "아직 DB에 없음"으로 보여 중복 저장됐다(TOCTOU 경쟁).
+  // 도착 즉시 동기적으로 마킹해 같은 내용의 뒤이은 재전송을 여기서 바로 걸러낸다.
+  if (contentKey) markRecentIncomingChatContent(contentKey);
 
   // ACK·영구 remember는 INSERT 성공 후. inflight는 재전송 레이스의 UI 중복만 막음.
   // 처리 중 재전송에는 즉시 ACK를 보내 발신측 재시도를 멈춘다.
