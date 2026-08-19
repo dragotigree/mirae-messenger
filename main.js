@@ -13335,22 +13335,12 @@ function usageLockBlockedResponse() {
 
 let forceUpdateInFlight = false;
 
-// ⚠️ PC마다 로컬 마스터 비밀번호가 제각각이라(예전 기본값을 그대로 쓰는 PC 등) 강제
-// 업데이트가 필요한 순간(구버전 크래시 등)에 그 PC의 실제 비밀번호를 알 수 없어 막히는
-// 사고가 있었다. 강제 업데이트만은 이 고정값이면 대상 PC의 저장된 비밀번호와 무관하게
-// 항상 통과하도록 별도 우회를 둔다(다른 마스터 기능에는 영향 없음).
-// ⚠️ 이 저장소는 GitHub에 올라가므로 우회 비밀번호를 소스에 평문으로 두면 저장소를 볼 수
-// 있는 누구나 LAN의 모든 PC에 강제 업데이트를 걸 수 있다. 리터럴 대신 해시만 남긴다.
-// (해시로 바꿔도 "아는 사람은 통과"라는 성질은 그대로다 — 근본 대책은 이 우회 자체를
-//  없애고 대상 PC 비밀번호를 정상화하는 것이며, 전 PC 업데이트가 끝나면 제거해야 한다.)
-const FORCE_UPDATE_OVERRIDE_PW_SHA256 = 'b04d6da8fc9553f951587d04ad070b6430c93c610a013e3fc268f5a1726e1ead';
-function isForceUpdateOverridePassword(pw) {
-  const s = String(pw == null ? '' : pw).trim();
-  if (!s) return false;
-  const digest = Buffer.from(hashPassword(s), 'hex');
-  const expected = Buffer.from(FORCE_UPDATE_OVERRIDE_PW_SHA256, 'hex');
-  return digest.length === expected.length && crypto.timingSafeEqual(digest, expected);
-}
+// ⚠️ 보안: 예전엔 강제 업데이트에 한해 고정 비밀번호(해시)로 대상 PC의 실제 마스터
+// 비밀번호를 몰라도 통과하는 우회가 있었다. 이 저장소가 공개(GitHub)라 그 해시를
+// 누구나 가져가 오프라인으로 원문을 복원할 수 있었고, 복원되면 LAN의 모든 PC에
+// 강제 업데이트(=임의 코드 배포)를 걸 수 있는 취약점이었다. 우회를 완전히 제거하고,
+// 강제 업데이트도 다른 마스터 기능과 동일하게 대상 PC의 실제 마스터 비밀번호로만
+// 인증한다.
 
 async function handleForceUpdateCommand(payload, senderIP) {
   if (forceUpdateInFlight) {
@@ -13366,7 +13356,7 @@ async function handleForceUpdateCommand(payload, senderIP) {
     return;
   }
   const inputPw = String((payload && payload.masterPassword) || '').trim();
-  const ok = isForceUpdateOverridePassword(inputPw) || await verifyLocalMasterPassword(inputPw);
+  const ok = await verifyLocalMasterPassword(inputPw);
   if (!ok) {
     if (senderIP) {
       sendToIps([senderIP], {
@@ -13420,7 +13410,7 @@ ipcMain.handle('master-force-update', async (event, payload) => {
   if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
   const p = payload || {};
   const password = String(p.password || '').trim();
-  if (!isForceUpdateOverridePassword(password) && !(await verifyLocalMasterPassword(password))) {
+  if (!(await verifyLocalMasterPassword(password))) {
     return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
   }
 
