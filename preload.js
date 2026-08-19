@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('open-schedule-board-window', p);
   },
   closeScheduleBoardWindow: () => ipcRenderer.invoke('close-schedule-board-window'),
+  // 💬 별도 채팅창
+  openChatWindow: (payload) => ipcRenderer.invoke('open-chat-window', payload || {}),
+  onChatWindowOpen: (callback) => ipcRenderer.on('chat-window-open', (e, data) => callback(data)),
   openExcalidrawEditor: (purpose) => ipcRenderer.invoke('open-excalidraw-editor', purpose || 'chat'),
   onExcalidrawPngReady: (callback) => ipcRenderer.on('excalidraw-png-ready', (e, data) => callback(data)),
   onScheduleBoardOpen: (callback) => ipcRenderer.on('schedule-board-open', (e, data) => callback(data)),

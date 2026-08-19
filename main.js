@@ -172,6 +172,8 @@ async function matchMasterPassword(input, stored) {
 
 let mainWindow;
 let scheduleBoardWindow = null;
+/** 💬 별도 채팅창: 상대(채널) 키 → BrowserWindow. 파일 앞쪽 함수들도 참조하므로 상단에 선언한다. */
+const chatWindows = new Map();
 let excalidrawWindow = null;
 let excalidrawSession = null;
 /** 렌더러 작성자/공지 작성 권한 로그인 — 타인 일정 수정·삭제 허용 */
@@ -1839,7 +1841,7 @@ async function handleFileXferEnd(payload, senderIP) {
       const groupName = entry.chatTarget.groupName || '그룹';
       shouldSkipDuplicateChannelMessage(msgUid, () => {
         if (mainWindow) {
-          safeWebContentsSend('receive-group-message', {
+          sendChatEvent('receive-group-message', {
             uid: entry.chatTarget.groupUid,
             senderName,
             senderIP,
@@ -1875,7 +1877,7 @@ async function handleFileXferEnd(payload, senderIP) {
     if (senderIP === MY_IP) return;
     const persistDm = ({ showUi }) => {
       if (showUi && mainWindow) {
-        safeWebContentsSend('receive-message', {
+        sendChatEvent('receive-message', {
           senderName,
           senderIP,
           message: messageHtml,
@@ -5192,6 +5194,94 @@ async function openScheduleBoardWindow(payload) {
   });
 }
 
+/* 💬 별도 채팅창 — 상대(채널) 키별로 창을 하나씩 관리한다.
+   ⚠️ 설계 원칙: 기존 메인창 경로(safeWebContentsSend)는 한 글자도 바꾸지 않는다.
+   채팅 이벤트는 sendChatEvent()로 "메인창에 보내던 그대로 보낸 뒤 + 채팅창에도 추가 전달"
+   하는 방식이라, 채팅창이 하나도 열려 있지 않으면 동작이 기존과 완전히 동일하다.
+   (chatWindows 선언은 TDZ를 피하려고 파일 상단 scheduleBoardWindow 옆에 둔다 —
+    아래 sendChatEvent()는 이 파일 앞쪽 함수들에서도 호출되기 때문.) */
+
+function getChatWindowFor(peerKey) {
+  const win = chatWindows.get(peerKey);
+  if (win && !win.isDestroyed()) return win;
+  if (win) chatWindows.delete(peerKey);
+  return null;
+}
+
+/** 열려 있는 별도 채팅창들에만 보낸다(메인창은 건드리지 않음). */
+function notifyChatWindows(channel, ...args) {
+  if (!chatWindows.size) return;
+  [...chatWindows.entries()].forEach(([key, win]) => {
+    if (!win || win.isDestroyed()) { chatWindows.delete(key); return; }
+    try {
+      const wc = win.webContents;
+      if (wc && !wc.isDestroyed()) wc.send(channel, ...args);
+    } catch (e) { /* ignore */ }
+  });
+}
+
+/** 메인창(기존 그대로) + 별도 채팅창(추가)에 모두 전달하는 채팅 이벤트 전용 헬퍼 */
+function sendChatEvent(channel, ...args) {
+  safeWebContentsSend(channel, ...args);
+  notifyChatWindows(channel, ...args);
+}
+
+async function openChatWindow(payload) {
+  const data = payload || {};
+  const peerKey = String(data.peerKey || '').trim();
+  if (!peerKey) return { success: false, msg: '대화 상대를 찾을 수 없습니다.' };
+  const title = String(data.title || peerKey);
+
+  const existing = getChatWindowFor(peerKey);
+  if (existing) {
+    try {
+      if (existing.isMinimized()) existing.restore();
+      existing.show();
+      existing.focus();
+    } catch (e) { /* ignore */ }
+    return { success: true, reused: true };
+  }
+
+  await refreshPreloadScriptCacheIfNeeded();
+
+  const win = new BrowserWindow({
+    width: 720,
+    height: 760,
+    minWidth: 420,
+    minHeight: 480,
+    title: `${title} — Mirae Messenger`,
+    icon: getAppNativeIcon(),
+    frame: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: getMainPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      backgroundThrottling: false
+    }
+  });
+  chatWindows.set(peerKey, win);
+  win.setMenu(null);
+  attachEditableContextMenu(win.webContents);
+  win.loadFile('index.html', { hash: 'chat-window' });
+
+  const sendOpenPayload = () => {
+    if (!win || win.isDestroyed()) return;
+    try { win.webContents.send('chat-window-open', { peerKey, title }); } catch (e) { /* ignore */ }
+  };
+  win.webContents.once('did-finish-load', () => setTimeout(sendOpenPayload, 150));
+
+  const sendChatWinMaximizedState = () => {
+    if (!win || win.isDestroyed()) return;
+    try { win.webContents.send('window-maximized-state', win.isMaximized()); } catch (e) { /* ignore */ }
+  };
+  win.on('maximize', sendChatWinMaximizedState);
+  win.on('unmaximize', sendChatWinMaximizedState);
+  win.on('closed', () => { chatWindows.delete(peerKey); });
+  return { success: true };
+}
+
 function browserWindowFromEvent(event) {
   try {
     return BrowserWindow.fromWebContents(event.sender);
@@ -5223,6 +5313,8 @@ ipcMain.handle('open-schedule-board-window', async (event, payload = {}) => {
   openScheduleBoardWindow(data);
   return { success: true };
 });
+
+ipcMain.handle('open-chat-window', async (event, payload = {}) => openChatWindow(payload));
 
 function getExcalidrawPurposeMeta(purpose) {
   const p = String(purpose || 'chat');
@@ -6812,8 +6904,10 @@ function notifyUserList(force) {
     notifyUserListTimer = null;
     const forced = notifyUserListForce;
     notifyUserListForce = false;
+    const list = buildDirectoryUserList();
+    notifyChatWindows('user-list-update', list);
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    safeWebContentsSend('user-list-update', buildDirectoryUserList());
+    safeWebContentsSend('user-list-update', list);
     notifyNetworkStatus();
     if (forced) { /* keep API compatible */ }
   }, USER_LIST_NOTIFY_DEBOUNCE_MS);
@@ -6825,8 +6919,10 @@ function notifyUserListNow() {
     notifyUserListTimer = null;
   }
   notifyUserListForce = false;
+  const list = buildDirectoryUserList();
+  notifyChatWindows('user-list-update', list);
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  safeWebContentsSend('user-list-update', buildDirectoryUserList());
+  safeWebContentsSend('user-list-update', list);
   notifyNetworkStatus();
 }
 
@@ -7192,7 +7288,7 @@ function handleIncomingChat(payload, senderIP) {
         uid
       };
       if (mainWindow) {
-        safeWebContentsSend('receive-message', uiPayload);
+        sendChatEvent('receive-message', uiPayload);
         notifyIncomingMessageNotification({
           title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
           body: previewBody(payload.message),
@@ -7302,7 +7398,7 @@ function handleIncomingDeptMessage(payload, senderIP) {
   shouldSkipDuplicateChannelMessage(msgUid, () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
     if (mainWindow) {
-      safeWebContentsSend('receive-dept-message', {
+      sendChatEvent('receive-dept-message', {
         dept: payload.dept,
         senderName,
         senderIP: senderIP,
@@ -7345,7 +7441,7 @@ function handleIncomingFloorMessage(payload, senderIP) {
   shouldSkipDuplicateChannelMessage(msgUid, () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
     if (mainWindow) {
-      safeWebContentsSend('receive-floor-message', {
+      sendChatEvent('receive-floor-message', {
         floor: payload.floor,
         senderName,
         senderIP: senderIP,
@@ -7529,7 +7625,7 @@ function handleReadReceipt(payload, senderIP) {
   if (notifyRead) dmReadReceiptDesktopShown.add(senderIP);
 
   if (mainWindow) {
-    safeWebContentsSend('read-receipt', {
+    sendChatEvent('read-receipt', {
       readerIP: senderIP,
       readerName: readerLabel,
       readAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -7681,7 +7777,7 @@ async function handleChannelRead(payload, senderIP) {
   if (!channelKey || !lastReadMsgUid || !senderIP) return;
   await upsertChannelReadCursorMaxUid(channelKey, senderIP, lastReadMsgUid);
   if (mainWindow) {
-    safeWebContentsSend('channel-read-update', {
+    sendChatEvent('channel-read-update', {
       channelKey,
       readerIP: senderIP,
       lastReadMsgUid
@@ -7698,7 +7794,7 @@ function handleIncomingBroadcast(payload, senderIP) {
   shouldSkipDuplicateChannelMessage(msgUid, () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
     if (mainWindow) {
-      safeWebContentsSend('receive-broadcast', {
+      sendChatEvent('receive-broadcast', {
         senderName,
         senderIP: senderIP,
         message: payload.message,
@@ -9080,7 +9176,7 @@ function handleIncomingGroupMessage(payload, senderIP) {
   shouldSkipDuplicateChannelMessage(msgUid, () => {
     const storedMessage = compactStoredMessageHtml(payload.message);
     if (mainWindow) {
-      safeWebContentsSend('receive-group-message', {
+      sendChatEvent('receive-group-message', {
         uid: payload.uid,
         senderName,
         senderIP: senderIP,
@@ -9123,7 +9219,7 @@ function handleGroupRenameNotice(payload) {
   appendChatLog(receiverKey, payload.newName || '그룹', '시스템', noticeText);
   if (mainWindow) {
     const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    safeWebContentsSend('receive-group-message', {
+    sendChatEvent('receive-group-message', {
       uid: payload.uid,
       senderName: '시스템',
       senderIP: MY_IP,
@@ -10453,7 +10549,7 @@ async function retryPendingFileXfer(row) {
     // 상대가 받으면 handleFileXferEnd가 MSG_ACK를 보내와 handleMsgAck가 DELIVERED로 갱신한다.
     // 여기서는 일단 PENDING → SENT로만 올려 "전송 대기 중" 표시를 없앤다.
     db.run(`UPDATE messages SET status = 'SENT' WHERE msg_uid = ? AND status = 'PENDING'`, [row.msg_uid], logDbErr);
-    if (mainWindow) safeWebContentsSend('pending-status-update', { msgUid: row.msg_uid, status: 'SENT' });
+    if (mainWindow) sendChatEvent('pending-status-update', { msgUid: row.msg_uid, status: 'SENT' });
   } catch (e) {
     console.error('대기 중인 파일 재전송 오류:', e.message || e);
   }
@@ -11110,7 +11206,7 @@ function logGroupSystemNotice(uid, groupName, noticeText) {
 
 function pushGroupSystemNoticeLive(uid, noticeText) {
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  safeWebContentsSend('receive-group-message', {
+  sendChatEvent('receive-group-message', {
     uid,
     senderName: '시스템',
     senderIP: MY_IP,
@@ -12020,7 +12116,7 @@ ipcMain.handle('rename-group-chat', async (event, { uid, name }) => {
           logGroupSystemNotice(uid, newName, noticeText);
           if (mainWindow) {
             const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            safeWebContentsSend('receive-group-message', {
+            sendChatEvent('receive-group-message', {
               uid, senderName: '시스템', senderIP: MY_IP, message: noticeText, createdAt: currentTime
             });
           }
@@ -12237,7 +12333,7 @@ function handleIncomingMessageEdit(payload, senderIP) {
       }
       if (!this || !this.changes) return;
       if (mainWindow) {
-        safeWebContentsSend('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
+        sendChatEvent('message-edited', { msgUid: payload.msgUid, newMessage: payload.newMessage });
       }
     }
   );
@@ -12313,7 +12409,7 @@ function handleIncomingMessageReaction(payload, senderIP) {
       logDbErr(err);
       fetchReactionSummariesForKeys([payload.msgKey], (map) => {
         if (mainWindow) {
-          safeWebContentsSend('message-reaction-update', { msgKey: payload.msgKey, summary: map[payload.msgKey] || { chips: [], myEmoji: null } });
+          sendChatEvent('message-reaction-update', { msgKey: payload.msgKey, summary: map[payload.msgKey] || { chips: [], myEmoji: null } });
         }
       });
     });
@@ -12327,7 +12423,7 @@ function handleIncomingMessageReaction(payload, senderIP) {
       logDbErr(err);
       fetchReactionSummariesForKeys([payload.msgKey], (map) => {
         if (mainWindow) {
-          safeWebContentsSend('message-reaction-update', { msgKey: payload.msgKey, summary: map[payload.msgKey] || { chips: [], myEmoji: null } });
+          sendChatEvent('message-reaction-update', { msgKey: payload.msgKey, summary: map[payload.msgKey] || { chips: [], myEmoji: null } });
         }
       });
     }
@@ -12353,7 +12449,7 @@ ipcMain.handle('toggle-message-reaction', async (event, { msgKey, emoji, targetI
           broadcastReactionSync({ msgKey, action: 'remove', reactorIP: MY_IP, reactorName: senderLabelForMe() }, targetIP, groupUid);
           fetchReactionSummariesForKeys([msgKey], (map) => {
             const summary = map[msgKey] || { chips: [], myEmoji: null };
-            if (mainWindow) safeWebContentsSend('message-reaction-update', { msgKey, summary });
+            if (mainWindow) sendChatEvent('message-reaction-update', { msgKey, summary });
             resolve({ success: true, msgKey, reactions: summary });
           });
         });
@@ -12367,7 +12463,7 @@ ipcMain.handle('toggle-message-reaction', async (event, { msgKey, emoji, targetI
           broadcastReactionSync({ msgKey, action: 'set', emoji, reactorIP: MY_IP, reactorName: senderLabelForMe() }, targetIP, groupUid);
           fetchReactionSummariesForKeys([msgKey], (map) => {
             const summary = map[msgKey] || { chips: [], myEmoji: null };
-            if (mainWindow) safeWebContentsSend('message-reaction-update', { msgKey, summary });
+            if (mainWindow) sendChatEvent('message-reaction-update', { msgKey, summary });
             resolve({ success: true, msgKey, reactions: summary });
           });
         }
@@ -12389,8 +12485,8 @@ function handleMsgAck(payload) {
     }
   );
   if (mainWindow) {
-    safeWebContentsSend('message-delivered', { msgUid: payload.msgUid });
-    safeWebContentsSend('pending-status-update', { msgUid: payload.msgUid, status: 'DELIVERED' });
+    sendChatEvent('message-delivered', { msgUid: payload.msgUid });
+    sendChatEvent('pending-status-update', { msgUid: payload.msgUid, status: 'DELIVERED' });
   }
 }
 
