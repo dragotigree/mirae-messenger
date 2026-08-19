@@ -2978,6 +2978,14 @@
     .schedule-board-top-bar-actions {
       display: flex; gap: 6px; align-items: center; flex-shrink: 0;
     }
+    .schedule-board-day-nav-btn {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+      border: 1px solid var(--border); background: #fff; color: var(--text-secondary);
+      font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .schedule-board-day-nav-btn:hover { background: var(--sidebar-active); color: var(--accent-dark); border-color: var(--accent); }
     .schedule-board-auth-user {
       display: none; align-items: center; gap: 6px;
       max-width: 200px; padding: 5px 10px; border-radius: 999px;
@@ -4389,12 +4397,6 @@
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
       transform: translateY(-1px);
     }
-    .help-item-icon {
-      flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-      color: var(--accent-dark); border-radius: 50%;
-      background: linear-gradient(145deg, var(--sidebar-active), var(--surface-muted));
-    }
-    .help-item-icon .icon-glyph { width: 17px; height: 17px; }
     .help-item-text { font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
     .help-item-text b { color: var(--text-primary); font-weight: 700; }
     .help-shortcut-row {
@@ -6793,8 +6795,10 @@
     <div class="modal-card schedule-board-modal-card">
       <div class="schedule-board-top-bar">
         <div class="schedule-board-top-bar-main">
+          <button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(-1)" title="전날">‹</button>
           <div class="schedule-board-top-icon" aria-hidden="true">📋</div>
           <div class="schedule-board-top-summary" id="schedule-board-day-summary">날짜를 선택하세요.</div>
+          <button type="button" class="schedule-board-day-nav-btn" onclick="moveScheduleBoardDay(1)" title="다음날">›</button>
         </div>
         <div class="schedule-board-top-bar-actions">
           <span id="schedule-board-auth-user" class="schedule-board-auth-user" title=""></span>
@@ -6978,7 +6982,7 @@
         <button type="button" class="signin-submit" onclick="submitOperatorLogin()">로그인</button>
         <p class="signin-help">
           작성을 위해 ID가 필요하거나 기존 비밀번호가 기억나지 않는다면<br>
-          10층 물리치료실장(내선번호 <strong>1010</strong>)으로 연락해주세요.
+          10층 물리치료실장(내선번호 <strong>1010</strong>)으로 메세지 주세요.
         </p>
         <button type="button" class="signin-cancel" onclick="closeOperatorLoginModal()">취소</button>
       </section>
@@ -15955,7 +15959,7 @@
     /** ❓ 타이틀바 도움말 — 현재 열려 있는 화면(기본/미니/현황판/공지 게시판)에 맞춰
      *  아이콘·구역 설명을 보여준다. 화면마다 아이콘 배치가 달라서 내용을 분리했다. */
     function helpItem(icon, html) {
-      return `<div class="help-item"><span class="help-item-icon">${uiIcon(icon)}</span><span class="help-item-text">${html}</span></div>`;
+      return `<div class="help-item"><span class="help-item-text">${html}</span></div>`;
     }
     function helpSection(title, itemsHtml) {
       return `<div class="help-section"><div class="help-section-title">${title}</div>${itemsHtml}</div>`;
@@ -24582,6 +24586,22 @@
       const dateInput = document.getElementById('schedule-board-date');
       if (dateInput) dateInput.value = dateStr;
       onScheduleBoardDateChange(dateStr);
+    }
+
+    /** 현황판 상단 제목 옆 ‹ › 버튼 — 전날/다음날로 하루씩 이동
+     *  ⚠️ new Date('YYYY-MM-DD')로 바로 파싱하면 UTC 자정으로 해석돼 시간대에 따라
+     *  하루 밀릴 수 있다 — onScheduleBoardDateChange와 같은 방식으로 연/월/일을
+     *  분리해 로컬 날짜로 만든다. */
+    function moveScheduleBoardDay(delta) {
+      let base;
+      if (scheduleBoardDateStr) {
+        const parts = scheduleBoardDateStr.split('-').map(Number);
+        base = new Date(parts[0], parts[1] - 1, parts[2]);
+      } else {
+        base = new Date();
+      }
+      base.setDate(base.getDate() + delta);
+      scheduleBoardCalSelectDate(formatDateStr(base));
     }
 
     function scheduleBoardDatesWithEvents() {
