@@ -12185,6 +12185,11 @@ ipcMain.handle('edit-message', async (event, { msgUid, targetIP, groupUid, newMe
         resolve({ success: false, msg: '메시지를 찾을 수 없습니다. (오래된 메시지이거나 다른 PC에서 보낸 경우 수정할 수 없습니다.)' });
         return;
       }
+      // ⚠️ 실사고: 상대가 오프라인이라 파일 전송이 pending_file_xfers 대기열에 들어간 뒤
+      // 메시지를 삭제(수정)해도 이 대기열은 정리되지 않아, 상대가 나중에 온라인이 되면
+      // 이미 지운 줄 알았던 파일이 뒤늦게 그대로 재전송되는 문제가 있었다. 메시지 내용이
+      // 바뀌면(삭제 포함) 그 메시지에 걸린 재전송 대기도 함께 취소한다.
+      db.run(`DELETE FROM pending_file_xfers WHERE msg_uid = ?`, [msgUid], logDbErr);
       const editPayload = { type: 'MESSAGE_EDIT', msgUid, newMessage };
       const resolvedGroupUid = groupUid || (typeof targetIP === 'string' && targetIP.startsWith('GROUP:') ? targetIP.slice(6) : null);
       if (resolvedGroupUid) {
