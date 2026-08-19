@@ -630,11 +630,13 @@
     /* 부서·층 그룹마다 옅은 파스텔 색을 달아 스크롤할 때 경계가 한눈에 보이게 한다.
        --group-hue는 그룹 이름을 해시해 자바스크립트에서 지정한다(항상 같은 이름 = 같은 색). */
     .subsection-label.has-group-color {
-      background: hsl(var(--group-hue, 210), 62%, 96%);
-      border-left: 3px solid hsl(var(--group-hue, 210), 55%, 78%);
-      padding-left: 7px;
+      background: hsl(var(--group-hue, 205), 55%, 95%);
+      /* border 대신 box-shadow로 왼쪽 색 띠를 넣는다 — border-left는 레이아웃 폭을
+         차지해서 앞에 눈에 띄는 "빈 칸"이 생겨 보기 안 좋았다(실사용자 피드백).
+         box-shadow는 폭을 차지하지 않고 기존 여백 위에 겹쳐 그려져 그런 틈이 안 생긴다. */
+      box-shadow: inset 3px 0 0 hsl(var(--group-hue, 205), 60%, 76%);
     }
-    .subsection-label.has-group-color:hover { background: hsl(var(--group-hue, 210), 62%, 92%); }
+    .subsection-label.has-group-color:hover { background: hsl(var(--group-hue, 205), 55%, 91%); }
     .subsection-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 4px; font-size: 10px; opacity: .75; }
     .subsection-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
     .subsection-label.user-group-header { cursor: default; }
@@ -9495,11 +9497,13 @@
     }
 
     /** 부서·층 이름마다 항상 같은 색이 나오도록 이름을 해시해 0~359 색상값(hue)을 만든다. */
+    /** 부서·층 그룹 색상 — 무지개색 대신 하늘색~파란색 범위 안에서만 살짝 다르게 낸다
+     *  (전체 톤을 통일해 달라는 요청). 이름이 같으면 항상 같은 색이 나온다. */
     function hueForGroupName(name) {
       const s = String(name || '');
       let hash = 0;
       for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-      return hash % 360;
+      return 196 + (hash % 34); // 196(하늘색) ~ 230(파란색)
     }
 
     /** 사용자 목록 헤더의 「전체 접기/펴기」 버튼 — 지금 보이는 부서·층 그룹 중
