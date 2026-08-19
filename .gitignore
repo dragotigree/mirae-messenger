@@ -45,3 +45,8 @@ desktop.ini
 # Local caches
 .cache/
 AppData/
+
+# 보안 감사 산출물 — 절대 공개 저장소에 올리지 말 것
+# (미패치 취약점의 재현·악용 절차가 그대로 담겨 있음. 이 저장소는 public 이다.)
+SECURITY_AUDIT.md
+보안감사보고서_*.zip
