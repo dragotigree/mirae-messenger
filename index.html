@@ -2337,24 +2337,32 @@
     .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
     .compact-filter-chip.is-active { background: var(--accent); color: #fff; }
-    /* 미니 모드 직원 탭 — 부서·층 필터 */
-    .compact-filter-row-select { padding-top: 6px; gap: 6px; align-items: center; }
+    /* 미니 모드 직원 탭 — 부서·층 필터를 칩과 같은 알약 모양으로 통일해 한 줄에 둔다 */
+    .compact-filter-row { align-items: center; }
+    .compact-filter-divider {
+      flex-shrink: 0; width: 1px; height: 16px; margin: 0 2px;
+      background: var(--border-soft);
+    }
     .compact-filter-select {
-      flex: 1 1 0; min-width: 0; max-width: 50%;
-      padding: 6px 8px; border-radius: 8px;
-      border: 1px solid var(--border-soft); background: var(--surface-muted);
+      flex-shrink: 0; max-width: 108px;
+      padding: 7px 22px 7px 12px; border-radius: 99px; border: none;
+      background-color: var(--surface-muted);
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+      background-size: 11px 11px;
       font-size: 12px; font-weight: 600; color: var(--text-secondary);
-      cursor: pointer; font-family: inherit;
+      font-family: inherit; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+      text-overflow: ellipsis; white-space: nowrap;
     }
-    .compact-filter-select:focus { outline: none; border-color: var(--accent); color: var(--text-primary); }
-    .compact-filter-select.is-active { border-color: var(--accent); background: var(--sidebar-active); color: var(--accent-dark); }
-    .compact-filter-reset {
-      flex-shrink: 0; padding: 6px 10px; border-radius: 8px; border: none;
-      background: var(--surface-muted); font-size: 12px; font-weight: 700;
-      color: var(--text-secondary); cursor: pointer; font-family: inherit;
+    .compact-filter-select:hover { background-color: var(--border-soft); color: var(--text-primary); }
+    .compact-filter-select:focus { outline: none; }
+    .compact-filter-select.is-active {
+      background-color: var(--accent); color: #fff; font-weight: 700;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
-    .compact-filter-reset:hover { background: var(--border-soft); color: var(--text-primary); }
-    .compact-filter-reset[hidden] { display: none !important; }
+    .compact-filter-select option { color: var(--text-primary); background: #fff; font-weight: 600; }
 
     .compact-inbox-bar {
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
@@ -5253,15 +5261,13 @@
             <button type="button" class="compact-filter-chip is-active" data-compact-filter-friends="all" onclick="setCompactListFilter('all')">전체</button>
             <button type="button" class="compact-filter-chip" data-compact-filter-friends="online" onclick="setCompactListFilter('online')">온라인</button>
             <button type="button" class="compact-filter-chip" data-compact-filter-friends="favorite" onclick="setCompactListFilter('favorite')">즐겨찾기</button>
-          </div>
-          <div class="compact-filter-row compact-filter-row-select">
+            <span class="compact-filter-divider" aria-hidden="true"></span>
             <select class="compact-filter-select" id="compact-dept-filter" title="부서로 거르기" onchange="setCompactDeptFilter(this.value)">
-              <option value="">부서 전체</option>
+              <option value="">부서</option>
             </select>
             <select class="compact-filter-select" id="compact-floor-filter" title="층으로 거르기" onchange="setCompactFloorFilter(this.value)">
-              <option value="">층 전체</option>
+              <option value="">층</option>
             </select>
-            <button type="button" class="compact-filter-reset" id="compact-filter-reset" onclick="clearCompactDeptFloorFilter()" title="부서·층 필터 해제" hidden>해제</button>
           </div>
           <div class="compact-search">
             <span class="compact-search-icon" data-ui-icon="search"></span>
@@ -11636,10 +11642,8 @@
         if (el.value !== current) el.value = current;
         el.classList.toggle('is-active', !!current);
       };
-      fill(deptEl, collect((u) => u.dept, compactDeptFilter), compactDeptFilter, '부서 전체');
-      fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '층 전체');
-      const resetBtn = document.getElementById('compact-filter-reset');
-      if (resetBtn) resetBtn.hidden = !(compactDeptFilter || compactFloorFilter);
+      fill(deptEl, collect((u) => u.dept, compactDeptFilter), compactDeptFilter, '부서');
+      fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '층');
     }
 
     function updateCompactOnlineCount() {
@@ -12113,7 +12117,7 @@
         emptyHintEl = document.createElement('div');
         emptyHintEl.className = 'compact-empty-hint';
         emptyHintEl.textContent = (compactDeptFilter || compactFloorFilter)
-          ? `${[compactDeptFilter, compactFloorFilter].filter(Boolean).join(' · ')}에 해당하는 직원이 없습니다.\n「해제」를 눌러 부서·층 필터를 풀 수 있습니다.` :
+          ? `${[compactDeptFilter, compactFloorFilter].filter(Boolean).join(' · ')}에 해당하는 직원이 없습니다.\n부서·층을 「부서」·「층」으로 되돌리면 전체가 보입니다.` :
           compactListFilter === 'online' ? '현재 온라인인 직원이 없습니다.' :
           compactListFilter === 'favorite' ? '즐겨찾기한 직원이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.' :
           !showOfflineUsersInDirectory() ? '현재 온라인인 직원이 없습니다.' :
