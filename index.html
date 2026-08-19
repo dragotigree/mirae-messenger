@@ -9576,7 +9576,6 @@
         updateMyStatusBadge(p.statusState || 'ONLINE');
         refreshScheduleBoardEntryUi();
         renderSchedules();
-        if (document.body.classList.contains('compact-mode')) updateCompactMoreProfile();
       } catch (e) {
         console.error('프로필을 불러오지 못했습니다:', e);
       }

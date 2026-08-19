@@ -4850,6 +4850,17 @@ function openMainWindowWithViewMode(mode) {
   safeWebContentsSend('apply-tray-view-mode', resolved);
 }
 
+// ⚠️ "메시지 보내기(Ctrl+Alt+S)" 등 평소에 창을 다시 꺼내는 동작들은 예전엔 매번
+// trayLaunchViewMode(트레이·단축키 기본 화면 설정)로 강제 전환했다. 그런데 사용자
+// 입장에서는 "지금까지 쓰던 모드(기본/미니) 그대로 다시 열리길" 기대하는데, 설정이
+// 다른 값으로 되어 있으면 매번 원치 않게 모드가 바뀌어 버렸다. 창은 끄지 않고 트레이로
+// 숨기기만 하므로 이미 원하는 모드로 떠 있다 — 그냥 보여주고 포커스만 주면 된다.
+// (「기본 화면으로 열기」/「미니 화면으로 열기」처럼 명시적으로 모드를 고르는 메뉴는
+// 여전히 openMainWindowWithViewMode로 강제 전환한다.)
+function openMainWindowKeepingMode() {
+  showAndFocusWindow();
+}
+
 // ⚠️ 이모지를 메뉴 라벨에 넣으면 Windows 네이티브 트레이 메뉴 폰트에서 깨진 사각형(□)으로
 // 나오거나 다른 항목과 정렬이 흐트러져 "아이콘이 깨져 보인다"는 지적을 받음 — 순수 텍스트만 사용.
 // 트레이·단축키 기본 화면 선택은 흐름을 끊는 비활성 라벨 대신 하위 메뉴로 묶어 정리했다.
@@ -4857,19 +4868,19 @@ function buildTrayContextMenu() {
   return Menu.buildFromTemplate([
     {
       label: '메시지 보내기 (Ctrl+Alt+S)',
-      click: () => openMainWindowWithViewMode(trayLaunchViewMode)
+      click: () => openMainWindowKeepingMode()
     },
     {
       label: '전체 대화 기록 열기 (Ctrl+Alt+E)',
       click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
+        openMainWindowKeepingMode();
         safeWebContentsSend('trigger-open-all-logs');
       }
     },
     {
       label: '환경 설정',
       click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
+        openMainWindowKeepingMode();
         safeWebContentsSend('trigger-open-settings');
       }
     },
@@ -4908,7 +4919,7 @@ function buildTrayContextMenu() {
     {
       label: '문제 진단 화면 열기',
       click: () => {
-        openMainWindowWithViewMode(trayLaunchViewMode);
+        openMainWindowKeepingMode();
         if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
           mainWindow.webContents.openDevTools({ mode: 'right' });
         }
@@ -4925,7 +4936,7 @@ function createTray() {
 
   tray.setToolTip('미래병원 사내 메신저');
   tray.setContextMenu(buildTrayContextMenu());
-  tray.on('double-click', () => openMainWindowWithViewMode(trayLaunchViewMode));
+  tray.on('double-click', () => openMainWindowKeepingMode());
 }
 
 /** Windows 작업표시줄 아이콘 우클릭 시 뜨는 점프리스트 — 화면 모드/빠른 실행/작업 3개 그룹 */
@@ -5760,13 +5771,13 @@ function registerGlobalShortcuts() {
   };
 
   tryRegister('CommandOrControl+Alt+S', () => {
-    openMainWindowWithViewMode(trayLaunchViewMode);
+    openMainWindowKeepingMode();
   });
   // 트레이 메뉴에는 "전체 대화 기록 열기 (Ctrl+Alt+E)"라고 안내가 있었지만, 정작 이
   // 단축키를 실제로 등록하는 코드가 없었다 — 메뉴를 클릭할 때만 동작하고, 단축키를
   // 누르면 아무 일도 일어나지 않는 상태였다.
   tryRegister('CommandOrControl+Alt+E', () => {
-    openMainWindowWithViewMode(trayLaunchViewMode);
+    openMainWindowKeepingMode();
     safeWebContentsSend('trigger-open-all-logs');
   });
   // 🛠️ 문제 진단 화면은 Alt 조합 전역 단축키(Ctrl+Alt+D)로 열도록 했었으나,
