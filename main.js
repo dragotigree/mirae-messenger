@@ -5034,14 +5034,26 @@ function showAndFocusWindow() {
  *  둔다. (예: 미니 모드 메신저 위로 현황판 창이 안 올라오던 문제) */
 function bringWindowToFront(win) {
   if (!win || win.isDestroyed()) return;
-  try {
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-    win.moveTop();
-    win.setAlwaysOnTop(true);
-    win.setAlwaysOnTop(false);
-  } catch (e) { /* ignore */ }
+  const doRaise = () => {
+    if (!win || win.isDestroyed()) return;
+    try {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      // ⚠️ 실사고: show()+focus()만으로는 미니 모드 메신저(자기 프로세스의 다른 창) 뒤에
+      // 계속 가려진 채로 남는 게 실제로 재현됐다(사용자 스크린샷으로 확인) — Windows가
+      // 다른 창에서 이미 포커스를 쥐고 있으면 프로그램적인 focus() 요청을 무시하는
+      // "포커스 스틸링 방지" 정책 때문으로 보인다. 'screen-saver' 레벨로 순간적으로
+      // 최상단에 고정했다 풀어주는 방식이 이 정책을 우회하는 가장 확실한 방법이다.
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.focus();
+      win.setAlwaysOnTop(false);
+      win.moveTop();
+    } catch (e) { /* ignore */ }
+  };
+  doRaise();
+  // 첫 시도가 창이 아직 완전히 매핑되기 전(생성 직후 등) 타이밍에 걸려 무시될 수 있어
+  // 한 번 더 시도한다.
+  setTimeout(doRaise, 120);
 }
 
 function initSpellCheckerSession() {
