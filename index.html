@@ -5323,12 +5323,11 @@
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
           <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <select id="sidebar-grouping-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); setDirectoryListPref('grouping', this.value)" title="사용자 목록 묶음 기준" style="font-size:11px; padding:2px 4px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
-              <option value="floor">층별</option>
-              <option value="dept">부서별</option>
+            <select id="sidebar-floor-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('floor', this.value); this.value='';" title="층별로 보기 · 해당 층으로 이동" style="font-size:11px; padding:2px 4px; max-width:80px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+              <option value="">층별</option>
             </select>
-            <select id="sidebar-group-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroup(this.value)" title="해당 층·부서로 바로 이동" style="font-size:11px; padding:2px 4px; max-width:90px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
-              <option value="">전체</option>
+            <select id="sidebar-dept-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('dept', this.value); this.value='';" title="부서별로 보기 · 해당 부서로 이동" style="font-size:11px; padding:2px 4px; max-width:80px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+              <option value="">부서별</option>
             </select>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
             <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
@@ -8586,8 +8585,6 @@
     function syncDirectoryListPrefsForm() {
       const groupingEl = document.getElementById('setting-user-grouping');
       if (groupingEl) groupingEl.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
-      const sidebarGroupingEl = document.getElementById('sidebar-grouping-select');
-      if (sidebarGroupingEl) sidebarGroupingEl.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
       const offlineEl = document.getElementById('setting-show-offline-users');
       if (offlineEl) offlineEl.value = showOfflineUsersInDirectory() ? 'all' : 'online';
       const sharedEl = document.getElementById('setting-show-shared-pcs');
@@ -8711,8 +8708,6 @@
     }
 
     function applyAppSettingsToUI() {
-      const sidebarGroupingSelect = document.getElementById('sidebar-grouping-select');
-      if (sidebarGroupingSelect) sidebarGroupingSelect.value = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
       document.documentElement.style.setProperty('--chat-font-size', appSettings.fontSize || '14px');
       const systemPreset = resolveSystemFontPreset(appSettings.fontFamily);
       const chatPreset = resolveChatFontPreset(appSettings.chatFontFamily);
@@ -13721,27 +13716,46 @@
 
     /** 사이드바 상단 "이동" 선택상자를 현재 묶음 기준(층별/부서별)에 맞는 실제 층·부서
      *  이름들로 채운다. 목록이 다시 그려질 때마다(renderUserListTree) 함께 갱신한다. */
-    function syncSidebarGroupJumpSelect(groupingKey, groupKeys) {
-      const el = document.getElementById('sidebar-group-jump-select');
-      if (!el) return;
-      const prevValue = el.value;
-      el.innerHTML = '<option value="">전체</option>' +
-        groupKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-      el.value = groupKeys.includes(prevValue) ? prevValue : '';
+    /** 왼쪽 "층별" 선택상자와 오른쪽 "부서별" 선택상자를 채운다. 둘 다 지금 화면이 어느
+     *  기준으로 묶여 있는지와 상관없이 항상 각각 실제 층 이름 전체 / 부서 이름 전체를
+     *  보여준다 — 하단의 기존 "층·부서" 토글 버튼(사용자 목록 묶음 자체를 바꾸는 버튼)과는
+     *  역할이 겹치지 않도록, 이 두 선택상자는 고르는 즉시 그 기준으로 바꾸고 그 자리로
+     *  이동만 하는 "바로가기" 용도로만 쓴다. */
+    function syncSidebarFloorDeptJumpSelects() {
+      const floorEl = document.getElementById('sidebar-floor-jump-select');
+      const deptEl = document.getElementById('sidebar-dept-jump-select');
+      if (!floorEl && !deptEl) return;
+      const restAll = allUsers || [];
+      if (floorEl) {
+        const floorKeys = getOrderedUserGroupKeys('floor', collectUserGroupKeys('floor', restAll));
+        floorEl.innerHTML = '<option value="">층별</option>' +
+          floorKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      }
+      if (deptEl) {
+        const deptKeys = getOrderedUserGroupKeys('dept', collectUserGroupKeys('dept', restAll));
+        deptEl.innerHTML = '<option value="">부서별</option>' +
+          deptKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      }
     }
 
-    /** 사이드바 "이동" 선택상자 — 고른 층·부서로 화면을 스크롤하고, 접혀 있었으면 펼친다. */
-    function jumpToUserGroup(groupName) {
+    /** 사이드바 상단 "층별"/"부서별" 바로가기 선택상자 — 고른 기준으로 목록을 묶어 보여주고
+     *  (기존 setDirectoryListPref 재사용, 하단 토글 버튼과 완전히 같은 동작), 고른 층·부서
+     *  자리로 화면을 스크롤한다. 접혀 있었으면 펼친다. */
+    function jumpToUserGroupWithMode(groupingKey, groupName) {
       if (!groupName) return;
-      const groupingKey = appSettings.userGrouping || 'floor';
+      if ((appSettings.userGrouping || 'floor') !== groupingKey) {
+        setDirectoryListPref('grouping', groupingKey);
+      }
       const collapseKey = `${groupingKey}:${groupName}`;
       if (collapsedGroups.has(collapseKey)) {
         collapsedGroups.delete(collapseKey);
         localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups]));
         renderUserListTree(true);
       }
-      const block = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"]`);
-      if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      requestAnimationFrame(() => {
+        const block = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"]`);
+        if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     }
 
     /** 사이드바 "↺" — 손으로 끌어서 바꿔둔 부서·층 묶음 순서를 지우고 원래(가나다/숫자) 순서로 되돌린다.
@@ -15597,7 +15611,7 @@
       const restAll = allUsers || [];
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
-      syncSidebarGroupJumpSelect(groupingKey, sortedGroupKeys);
+      syncSidebarFloorDeptJumpSelects();
       renderFavoritesSection(favorites);
 
       const structureKey = buildUserListStructureKey([], sortedGroupKeys, groups, groupingKey);
