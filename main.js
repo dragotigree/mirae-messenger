@@ -5909,11 +5909,16 @@ function closeCaptureOverlayAndRestoreMain() {
   captureOverlayMainWasHidden = false;
 }
 
-/** 모니터마다 자기 화면의 스크린샷을 짝지어 준다. Windows에서는 desktopCapturer가 주는
- *  display_id로 정확히 짝짓고, display_id가 비어 있는 환경(일부 Linux 등)에서는 모니터
- *  수와 화면 소스 수가 같을 때에 한해 순서대로 짝짓는다. */
+/** 모니터마다 자기 화면의 스크린샷을 짝지어 준다.
+ *  ⚠️ 실사고: 듀얼 모니터에서 "왼쪽 모니터 화면만 보인다"는 신고가 있었다. 원인은 짝짓기
+ *  실패 시 모든 모니터가 screenSources[0](=주로 왼쪽/주 모니터)을 함께 쓰도록 폴백해서,
+ *  두 오버레이가 똑같은 화면을 보여준 것이었다. 이제 (1) display_id로 먼저 정확히 짝짓고,
+ *  (2) 남은 모니터는 아직 안 쓴 소스만 순서대로 나눠 갖고, (3) 그래도 짝이 없으면 그
+ *  모니터는 아예 건너뛴다 — 엉뚱한 화면을 보여주느니 안 띄우는 게 낫다. */
 async function captureAllScreenSourcesForOverlay() {
-  const displays = screen.getAllDisplays();
+  // 모니터를 화면 배치 순서(왼→오, 위→아래)로 정렬해 두면, display_id가 없는 환경에서도
+  // desktopCapturer가 주는 소스 순서와 자연스럽게 맞아떨어진다.
+  const displays = screen.getAllDisplays().slice().sort((a, b) => (a.bounds.x - b.bounds.x) || (a.bounds.y - b.bounds.y));
   let maxW = 640, maxH = 480;
   displays.forEach((d) => {
     maxW = Math.max(maxW, Math.round(d.size.width * d.scaleFactor));
@@ -5930,12 +5935,25 @@ async function captureAllScreenSourcesForOverlay() {
   const byDisplayId = new Map();
   screenSources.forEach((s) => { if (s.display_id) byDisplayId.set(String(s.display_id), s); });
 
-  return displays.map((d, idx) => {
-    let source = byDisplayId.get(String(d.id));
-    if (!source && screenSources.length === displays.length) source = screenSources[idx];
-    if (!source) source = screenSources[0];
-    return { display: d, source };
+  const used = new Set();
+  const pairs = displays.map((d) => {
+    const source = byDisplayId.get(String(d.id));
+    if (source) used.add(source);
+    return { display: d, source: source || null };
   });
+  // display_id로 못 찾은 모니터에는 아직 아무도 안 쓴 소스를 순서대로 배정한다.
+  const leftovers = screenSources.filter((s) => !used.has(s));
+  let li = 0;
+  pairs.forEach((p) => {
+    if (p.source) return;
+    if (li < leftovers.length) { p.source = leftovers[li++]; }
+  });
+
+  const matched = pairs.filter((p) => p.source).length;
+  if (matched < displays.length) {
+    writeToLogFile('warn', `[영역캡처] 모니터 ${displays.length}대 중 ${matched}대만 화면을 찾았습니다 (화면 소스 ${screenSources.length}개).`);
+  }
+  return pairs;
 }
 
 ipcMain.handle('open-region-capture-overlay', async () => {
@@ -5974,12 +5992,17 @@ ipcMain.handle('open-region-capture-overlay', async () => {
       if (!source || !source.thumbnail || source.thumbnail.isEmpty()) continue;
       const overlay = captureOverlayWindows.get(String(display.id));
       if (!overlay || overlay.isDestroyed()) continue;
-      overlay.setBounds({ x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height });
+      const bounds = { x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height };
+      overlay.setBounds(bounds);
       const jpeg = source.thumbnail.toJPEG(88);
       const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
       overlay.webContents.send('capture-overlay-init', dataUrl);
       overlay.setAlwaysOnTop(true, 'screen-saver');
       overlay.show();
+      // ⚠️ 프레임 없는 창은 show() 시점에 Windows가 주 모니터 쪽으로 위치를 되돌리는 경우가
+      // 있어, 보여준 뒤 한 번 더 자기 모니터 위치로 확정한다(듀얼 모니터에서 두 오버레이가
+      // 같은 화면에 겹쳐 뜨던 문제 방지).
+      overlay.setBounds(bounds);
       anyShown = true;
     }
 
