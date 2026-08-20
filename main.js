@@ -833,10 +833,14 @@ async function probeUpdateVersionFromSource(sourcePath) {
     const remote = parseUpdateJsonText(raw);
     const ver = String((remote && remote.version) || '');
     if (!ver) return { ok: false, error: new Error('version.json에 version 없음') };
+    // stable 필드가 아예 없으면(예전 버전) 기존처럼 안정 버전으로 취급 — false로 명시된
+    // 경우에만 "아직 배포 준비 중"으로 본다.
+    const stable = !(remote && remote.stable === false);
     return {
       ok: true,
       version: ver,
       notes: (remote && remote.notes) || '',
+      stable,
       sourcePath: normalized,
       kind: parseUpdateSource(normalized).kind
     };
@@ -12982,6 +12986,19 @@ ipcMain.handle('check-for-update', async () => {
       return { available: false, msg: '업데이트 소스에서 version.json을 찾을 수 없습니다. 경로(Z:\\...\\messenger) 또는 GitHub 연결을 확인해 주세요.' };
     }
     const newer = compareVersions(best.version, APP_VERSION) > 0;
+    // 새 버전이 있어도 version.json에 stable:false로 표시돼 있으면(아직 배포 준비 중)
+    // 수동으로도 받을 수 없게 막는다 — 파일 누락 복구(같은 버전에서 빠진 파일만 다시
+    // 받는 것)는 새 버전으로 올라가는 게 아니므로 이 제한과 무관하게 그대로 허용한다.
+    if (newer && best.stable === false) {
+      pendingUpdateFetchPath = '';
+      return {
+        available: false,
+        remoteVersion: best.version,
+        currentVersion: APP_VERSION,
+        msg: `새 버전(${best.version})이 있지만 아직 배포 준비 중이라 받을 수 없습니다. 준비가 끝나면 자동으로 받을 수 있게 됩니다.`,
+        pendingStable: false
+      };
+    }
     // 버전이 같아도 있어야 할 파일이 빠져 있으면 받아와야 한다(위 주석 참고).
     // 단, 몇 번 시도해도 안 받아지는 파일이라면 무한 반복이 되므로 상한을 둔다.
     const missingRaw = newer ? [] : getMissingLocalUpdateFiles();
@@ -13231,6 +13248,13 @@ ipcMain.handle('apply-update', async () => {
     } else {
       const best = await findNewestUpdateCandidate();
       if (best && compareVersions(best.version, APP_VERSION) > 0) {
+        // ⚠️ 안전장치: check-for-update에서 pendingUpdateFetchPath를 비워뒀어도(=배포 준비
+        // 중이라 막았어도) 이 fallback 경로로 다시 들어와 새 버전을 그대로 받아버리면
+        // 위의 차단이 무력화된다. 여기서도 한 번 더 stable 여부를 확인한다.
+        if (best.stable === false) {
+          updateApplyInFlight = false;
+          return { success: false, msg: `새 버전(${best.version})이 아직 배포 준비 중이라 적용할 수 없습니다.` };
+        }
         updateSourcePath = best.sourcePath;
       }
     }
