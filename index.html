@@ -5715,7 +5715,7 @@
             <div class="chat-tool-row">
               <label class="chat-tool-btn" title="파일 첨부">
                 <span data-ui-icon="paperclip"></span>
-                <input type="file" id="chat-file-input" style="display:none;" onchange="handleFileSelect(event)">
+                <input type="file" id="chat-file-input" multiple style="display:none;" onchange="handleFileSelect(event)">
               </label>
               <button class="btn-capture chat-tool-btn" type="button" onclick="toggleScreenCapturePopover(event)" title="화면 캡처" data-ui-icon="camera"></button>
               <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)" data-ui-icon="pencil"></button>
@@ -26644,8 +26644,25 @@
       }
     }
 
-    function handleFileSelect(e) { const f = e.target.files[0]; if (f && activeChatUser) processAndSendFile(f); }
-    function handleFileDrop(e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && activeChatUser) processAndSendFile(f); }
+    // ⚠️ 실사고: 예전엔 files[0]만 봐서, 사진과 파일을 한 번에 고르거나 같이 끌어다 놓으면
+    // 목록의 첫 번째 것만 보내지고 나머지는 아무 안내 없이 그냥 사라졌다("파일만 전송된다"의
+    // 원인). 이제 고른/끌어다 놓은 파일 전부를 순서대로 하나씩 보낸다.
+    async function processAndSendFiles(files) {
+      for (const f of files) {
+        if (!f) continue;
+        await processAndSendFile(f);
+      }
+    }
+    function handleFileSelect(e) {
+      const files = Array.from(e.target.files || []);
+      if (files.length && activeChatUser) processAndSendFiles(files);
+      e.target.value = '';
+    }
+    function handleFileDrop(e) {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length && activeChatUser) processAndSendFiles(files);
+    }
 
     // 붙여넣은 이미지는 바로 보내지 않고, 메시지 입력창 위에 첨부로 쌓아 두었다가
     // 글과 함께 「보내기」를 누를 때 같이 전송한다(다른 메신저들처럼).
