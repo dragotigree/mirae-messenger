@@ -7352,8 +7352,9 @@
     </div>
   </div>
 
-  <div id="image-lightbox" class="modal-overlay" style="background:rgba(0,0,0,0.85); backdrop-filter:none;" onclick="closeImageLightbox()">
-    <img id="image-lightbox-img" src="" style="max-width:90vw; max-height:90vh; border-radius: 12px; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+  <div id="image-lightbox" class="modal-overlay" style="background:rgba(0,0,0,0.85); backdrop-filter:none; overflow:hidden;" onclick="closeImageLightbox()">
+    <img id="image-lightbox-img" src="" onwheel="onLightboxWheel(event)" onmousedown="onLightboxImgMouseDown(event)" onclick="onLightboxImgClick(event)" style="max-width:90vw; max-height:90vh; border-radius: 12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); transform-origin:center center; user-select:none; -webkit-user-drag:none; touch-action:none;">
+    <div id="image-lightbox-zoom-hint" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.65); font-size:12px; pointer-events:none;">마우스 휠로 확대·축소 · 드래그로 이동</div>
     <button onclick="closeImageLightbox()" style="position:fixed; top:20px; right:20px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); color:#fff; border:none; font-size:20px; cursor:pointer;">✕</button>
   </div>
 
@@ -21772,14 +21773,89 @@
       }, 0);
     }
 
+    let lightboxZoomLevel = 1;
+    let lightboxPanX = 0;
+    let lightboxPanY = 0;
+    let lightboxDragging = false;
+    let lightboxDragMoved = false;
+    let lightboxDragStartX = 0;
+    let lightboxDragStartY = 0;
+
     function openImageLightbox(src) {
       document.getElementById('image-lightbox-img').src = src;
+      lightboxZoomLevel = 1;
+      lightboxPanX = 0;
+      lightboxPanY = 0;
+      applyLightboxTransform();
       document.getElementById('image-lightbox').style.display = 'flex';
     }
     function closeImageLightbox() {
       document.getElementById('image-lightbox').style.display = 'none';
       document.getElementById('image-lightbox-img').src = '';
+      lightboxZoomLevel = 1;
+      lightboxPanX = 0;
+      lightboxPanY = 0;
+      lightboxDragging = false;
     }
+
+    /** 사진 확대창 — 마우스 휠로 확대·축소, 확대된 상태에서 드래그로 이동.
+     *  기존엔 창 크기만큼만 보였는데(90vw/90vh 고정), transform: scale로 그 위에
+     *  더 키우는 것뿐이라 사진 파일 자체나 다른 화면에는 영향이 없다. */
+    function applyLightboxTransform() {
+      const img = document.getElementById('image-lightbox-img');
+      if (!img) return;
+      img.style.transform = `translate(${lightboxPanX}px, ${lightboxPanY}px) scale(${lightboxZoomLevel})`;
+      img.style.cursor = lightboxZoomLevel > 1 ? 'grab' : 'zoom-in';
+      const hint = document.getElementById('image-lightbox-zoom-hint');
+      if (hint) hint.style.display = lightboxZoomLevel > 1.02 ? 'none' : '';
+    }
+
+    function onLightboxWheel(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+      const next = Math.min(6, Math.max(1, lightboxZoomLevel * factor));
+      lightboxZoomLevel = next;
+      if (lightboxZoomLevel <= 1) {
+        lightboxZoomLevel = 1;
+        lightboxPanX = 0;
+        lightboxPanY = 0;
+      }
+      applyLightboxTransform();
+    }
+
+    function onLightboxImgMouseDown(e) {
+      if (lightboxZoomLevel <= 1) return;
+      e.preventDefault();
+      e.stopPropagation();
+      lightboxDragging = true;
+      lightboxDragMoved = false;
+      lightboxDragStartX = e.clientX - lightboxPanX;
+      lightboxDragStartY = e.clientY - lightboxPanY;
+      const img = document.getElementById('image-lightbox-img');
+      if (img) img.style.cursor = 'grabbing';
+    }
+
+    function onLightboxImgClick(e) {
+      // 드래그로 이동한 직후의 클릭이 확대창을 닫아버리지 않게 막는다.
+      if (lightboxDragMoved) {
+        e.stopPropagation();
+        lightboxDragMoved = false;
+      }
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      if (!lightboxDragging) return;
+      lightboxPanX = e.clientX - lightboxDragStartX;
+      lightboxPanY = e.clientY - lightboxDragStartY;
+      lightboxDragMoved = true;
+      applyLightboxTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (!lightboxDragging) return;
+      lightboxDragging = false;
+      applyLightboxTransform();
+    });
     const chatSharedBodyEl = document.getElementById('chat-shared-body');
     if (chatSharedBodyEl) {
       chatSharedBodyEl.addEventListener('click', async (e) => {
