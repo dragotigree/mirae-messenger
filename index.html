@@ -755,12 +755,13 @@
     #sidebar-block-channels #channels-section-body {
       overflow-y: auto; max-height: min(36vh, 320px);
     }
-    /* 왼쪽 아이콘 레일의 #(채널)·⭐(즐겨찾기) 버튼으로 목록을 해당 블록만 보이게 필터링.
-       「최근 대화」(data-sidebar-block="recent")는 어느 필터를 골라도 항상 보이는
-       빠른 확인용 패널이라 세 규칙 모두에서 예외로 뺐다. */
-    #sidebar-main-sections.rail-filter-channels [data-sidebar-block]:not([data-sidebar-block="channels"]):not([data-sidebar-block="recent"]) { display: none !important; }
-    #sidebar-main-sections.rail-filter-favorites [data-sidebar-block]:not([data-sidebar-block="favorites"]):not([data-sidebar-block="recent"]) { display: none !important; }
-    #sidebar-main-sections.rail-filter-users [data-sidebar-block]:not([data-sidebar-block="users"]):not([data-sidebar-block="recent"]) { display: none !important; }
+    /* 왼쪽 아이콘 레일의 🕓(최근 대화)·#(채널)·⭐(즐겨찾기)·👤(사용자) 버튼으로 목록을
+       해당 블록만 보이게 필터링. 「최근 대화」와 「사용자」가 겹쳐 보인다는 요청으로
+       "최근 대화"도 다른 블록처럼 필터 전용으로 바꿨다(항상 보이던 예외를 없앰). */
+    #sidebar-main-sections.rail-filter-channels [data-sidebar-block]:not([data-sidebar-block="channels"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-favorites [data-sidebar-block]:not([data-sidebar-block="favorites"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-users [data-sidebar-block]:not([data-sidebar-block="users"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-recent [data-sidebar-block]:not([data-sidebar-block="recent"]) { display: none !important; }
     .rail-filter-channels #sidebar-block-channels #channels-section-body,
     .rail-filter-favorites #sidebar-block-favorites #favorites-section-body {
       max-height: none;
@@ -5290,6 +5291,7 @@
   <div id="app-icon-rail">
     <div id="icon-rail-nav">
       <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항 (Ctrl+`)" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-recent-btn" title="최근 대화만 보기" onclick="setSidebarRailFilter('recent')" data-ui-icon="history"><span class="icon-rail-badge" id="icon-rail-recent-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="chatBubble"><span class="icon-rail-badge" id="icon-rail-users-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기 (Ctrl+4)" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-chat-btn" title="채널 및 대화방만 보기 (Ctrl+5)" onclick="setSidebarRailFilter('channels')" data-ui-icon="hash"><span class="icon-rail-badge" id="icon-rail-channels-badge" style="display:none;"></span></button>
@@ -7709,7 +7711,9 @@
       userRound: _uiSvg('<path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/>'),
       hash: _uiSvg('<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>'),
       layers: _uiSvg('<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>'),
-      buildingDept: _uiSvg('<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>')
+      buildingDept: _uiSvg('<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>'),
+      /* 최근 대화 — 시계+되돌아가는 화살표 */
+      history: _uiSvg('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -10024,8 +10028,8 @@
 
     /* # / ⭐ / 💬 레일 버튼: 사이드바를 채널만 · 즐겨찾기만 · 사용자만 보이도록 필터링 (다시 누르면 전체 보기로 복귀) */
     let sidebarRailFilter = 'all';
-    const SIDEBAR_RAIL_FILTER_BTN_IDS = { channels: 'icon-rail-chat-btn', favorites: 'icon-rail-favorites-btn', users: 'icon-rail-users-btn' };
-    const SIDEBAR_RAIL_FILTER_BLOCK_IDS = { channels: 'sidebar-block-channels', favorites: 'sidebar-block-favorites', users: 'sidebar-block-users' };
+    const SIDEBAR_RAIL_FILTER_BTN_IDS = { channels: 'icon-rail-chat-btn', favorites: 'icon-rail-favorites-btn', users: 'icon-rail-users-btn', recent: 'icon-rail-recent-btn' };
+    const SIDEBAR_RAIL_FILTER_BLOCK_IDS = { channels: 'sidebar-block-channels', favorites: 'sidebar-block-favorites', users: 'sidebar-block-users', recent: 'sidebar-block-recent' };
     function setSidebarRailFilter(kind) {
       const sections = document.getElementById('sidebar-main-sections');
       if (!sections) return;
@@ -10033,7 +10037,7 @@
       // (예전엔 다시 누르면 'all'로 풀렸는데, "사용자만 보기"를 유지하고 싶은데
       // 실수로 두 번 눌러 채널·대화방까지 다시 보이는 게 혼란스럽다는 요청으로 변경)
       sidebarRailFilter = kind;
-      sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users');
+      sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users', 'rail-filter-recent');
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
       if (sidebarRailFilter === 'favorites') {
         // ⚠️ 실사고: 즐겨찾기가 0명이면 renderFavoritesSection이 블록 자체를
