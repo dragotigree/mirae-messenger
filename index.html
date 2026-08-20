@@ -656,6 +656,10 @@
     .user-group-block.is-user-group-dragging { opacity: 0.45; }
     .user-group-block.is-user-group-drop-target .subsection-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
     .subsection-label:hover .channel-reorder-grip { opacity: 0.5; }
+    /* 부서별 보기에서 "소부서"가 있는 사람만 그 밑에 한 단 더 묶어 보여준다. 소부서를 안
+       쓰는 부서는 지금처럼 그대로 보인다(이 스타일은 .user-subdept-block이 있을 때만 적용). */
+    .user-subdept-block { margin-left: 10px; border-left: 2px solid var(--border-soft); }
+    .user-subdept-block .subsection-label.sub-dept-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 4px 10px 3px 8px; border-bottom: none; }
     .sidebar-group-icon { display: inline-flex; width: 12px; height: 12px; vertical-align: -2px; color: var(--sidebar-text-dim); margin-right: 1px; }
     .sidebar-group-icon .icon-glyph { width: 100%; height: 100%; }
     .group-count-badge { font-size: 11px; opacity: 0.72; font-weight: 600; }
@@ -6419,6 +6423,7 @@
                 <label class="settings-field">성명<input type="text" id="setting-name" placeholder="예: 물리치료실1"></label>
                 <label class="settings-field">층<input type="text" id="setting-floor" placeholder="선택"></label>
                 <label class="settings-field">부서<input type="text" id="setting-dept" placeholder="선택"></label>
+                <label class="settings-field">소부서 (선택)<input type="text" id="setting-sub-dept" placeholder="예: 5병동 1팀"></label>
                 <label class="settings-field">직급 (선택)<input type="text" id="setting-rank" placeholder="없으면 비움"></label>
                 <label class="settings-field">내선 (선택)<input type="text" id="setting-ext" placeholder="없으면 비움"></label>
                 <label class="settings-field">휴대폰 (선택)<input type="text" id="setting-phone" placeholder="없으면 비움"></label>
@@ -15621,11 +15626,56 @@
       return card;
     }
 
+    /** 부서별 보기에서, 그 부서 사람들 중 프로필에 "소부서"를 적어둔 사람만 그 소부서
+     *  이름으로 한 번 더 묶어서 보여준다. 소부서가 없는 사람은 지금까지처럼 부서 헤더
+     *  바로 아래에 그대로 나온다 — 소부서를 안 쓰는 부서는 화면이 전혀 안 바뀐다. */
+    function renderDeptGroupMembers(block, groupingKey, groupName, groupUsers) {
+      const flatUsers = [];
+      const subGroups = {};
+      groupUsers.forEach((u) => {
+        const sub = (u.subDept && String(u.subDept).trim()) || '';
+        if (!sub) { flatUsers.push(u); return; }
+        if (!subGroups[sub]) subGroups[sub] = [];
+        subGroups[sub].push(u);
+      });
+      flatUsers.forEach((u) => block.appendChild(buildUserCard(u)));
+      const subNames = defaultSortGroupKeys(Object.keys(subGroups));
+      subNames.forEach((subName) => {
+        const subUsers = subGroups[subName];
+        const subCollapseKey = `${groupingKey}:${groupName}::sub:${subName}`;
+        const subCollapsed = collapsedGroups.has(subCollapseKey);
+        const subBlock = document.createElement('div');
+        subBlock.className = 'user-subdept-block';
+        subBlock.dataset.subDeptName = subName;
+
+        const subLabel = document.createElement('div');
+        subLabel.className = `subsection-label sub-dept-label ${subCollapsed ? 'is-collapsed' : ''}`;
+        subLabel.innerHTML = `
+          <span style="display:flex; align-items:center; min-width:0; flex:1; gap:2px;">
+            <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span class="group-chevron">▾</span> 소속 ${escapeHtml(subName)}</span>
+          </span>
+          <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <span class="group-count-badge">${groupStaffCountBadge(subUsers)}</span>
+          </span>
+        `;
+        subLabel.onclick = () => toggleGroupCollapse(subCollapseKey);
+        subBlock.appendChild(subLabel);
+        if (!subCollapsed) {
+          subUsers.forEach((u) => subBlock.appendChild(buildUserCard(u)));
+        }
+        block.appendChild(subBlock);
+      });
+    }
+
     function buildUserListStructureKey(favorites, sortedGroupKeys, groups, groupingKey) {
       const favIps = favorites.map((u) => u.ip).join(',');
       const parts = sortedGroupKeys.map((g) => {
         const collapseKey = `${groupingKey}:${g}`;
-        const ips = (groups[g] || []).map((u) => u.ip).join(',');
+        // 부서별 보기에서는 소부서 값도 키에 넣어야, 소부서를 새로 적거나 지웠을 때
+        // (아이피는 그대로라서) 구조가 안 바뀐 걸로 착각해 다시 그리기를 건너뛰지 않는다.
+        const ips = (groups[g] || [])
+          .map((u) => (groupingKey === 'dept' && u.subDept ? `${u.ip}:${u.subDept}` : u.ip))
+          .join(',');
         return `${g}|${collapsedGroups.has(collapseKey) ? 1 : 0}|${ips}`;
       });
       return [
@@ -15641,6 +15691,13 @@
     function patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey) {
       const treeEl = document.getElementById('user-list-tree');
       if (!treeEl || !treeEl.querySelector('.user-card-item[data-user-ip]')) return false;
+      // 부서별 보기에서 소부서를 쓰는 사람이 하나라도 있으면, 이 "제자리 패치" 경로는
+      // 소부서 하위 묶음(user-subdept-block)을 새로 만들거나 없애는 걸 처리하지 못해서
+      // 안전하게 매번 통째로 다시 그리는 쪽(renderUserListTree의 전체 렌더)으로 넘긴다.
+      // 소부서를 안 쓰면(대부분의 부서) 이 조건에 안 걸려서 기존 빠른 경로 그대로 유지된다.
+      if (groupingKey === 'dept' && Object.values(groups).some((list) => (list || []).some((u) => u.subDept && String(u.subDept).trim()))) {
+        return false;
+      }
 
       let ok = true;
       treeEl.querySelectorAll('.user-card-item[data-user-ip]').forEach((card) => {
@@ -15839,7 +15896,11 @@
         bindUserGroupReorderDrag(block, label, groupingKey, groupName);
 
         if (!isCollapsed) {
-          groupUsers.forEach(u => block.appendChild(buildUserCard(u)));
+          if (groupingKey === 'dept') {
+            renderDeptGroupMembers(block, groupingKey, groupName, groupUsers);
+          } else {
+            groupUsers.forEach(u => block.appendChild(buildUserCard(u)));
+          }
         }
         treeEl.appendChild(block);
       });
@@ -27227,6 +27288,7 @@
 
         document.getElementById('setting-floor').value = p.floor || '';
         document.getElementById('setting-dept').value = p.dept || '';
+        document.getElementById('setting-sub-dept').value = p.subDept || '';
         document.getElementById('setting-rank').value = p.rank || '';
 
         document.getElementById('setting-ext').value = p.extNo || '';
@@ -27409,6 +27471,7 @@
   // 추가된 항목 값 가져오기 (직급·내선·휴대폰은 비워 두어도 됨)
   const floor = document.getElementById('setting-floor').value.trim();
   const dept = document.getElementById('setting-dept').value.trim();
+  const subDept = document.getElementById('setting-sub-dept').value.trim();
   const rank = document.getElementById('setting-rank').value.trim();
 
   const extNo = document.getElementById('setting-ext').value.trim();
@@ -27471,7 +27534,7 @@
   await window.api.setTrayLaunchViewMode(defaultViewMode);
 
   // 저장 함수 파라미터에 floor, dept, rank, photo 추가
-  myProfile = await window.api.saveMyProfile({ username, floor, dept, rank, extNo, phone, note, statusState, photo: currentProfilePhotoValue });
+  myProfile = await window.api.saveMyProfile({ username, floor, dept, subDept, rank, extNo, phone, note, statusState, photo: currentProfilePhotoValue });
   
   await window.api.setAutoLaunch(autoLaunch);
   await window.api.setNotificationPreviewSetting(notificationPreview);

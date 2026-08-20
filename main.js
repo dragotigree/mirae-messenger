@@ -740,6 +740,7 @@ let myProfile = {
   username: '',
   rank: '',
   dept: '',
+  subDept: '',
   floor: '',
   extNo: '',
   phone: '',
@@ -4257,7 +4258,7 @@ db.serialize(() => {
   // 예전 버전에서 이미 user_profile 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
   // ※ 바로 이 누락 때문에 phone_no 컬럼이 없는 PC에서 프로필 저장이 매번 조용히 실패하고 있었음.
-  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'note TEXT'].forEach(colDef => {
+  ['username TEXT', 'rank TEXT', 'dept TEXT', 'sub_dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'note TEXT'].forEach(colDef => {
     alterAddColumn('user_profile', `${colDef}`);
   });
 
@@ -4274,7 +4275,7 @@ db.serialize(() => {
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
   )`, logDbErr);
   // 예전 DB에는 phone_no 등이 없을 수 있음 — 없으면 INSERT마다 SQLITE_ERROR로 CPU/콘솔 폭주
-  ['username TEXT', 'rank TEXT', 'dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER', 'note TEXT'].forEach((colDef) => {
+  ['username TEXT', 'rank TEXT', 'dept TEXT', 'sub_dept TEXT', 'floor TEXT', 'ext_no TEXT', 'phone_no TEXT', 'status_state TEXT', 'photo TEXT', 'last_seen_at INTEGER', 'note TEXT'].forEach((colDef) => {
     alterAddColumn('known_users', `${colDef}`);
   });
   // 과거 버그: BCAST:/DEPTPEER: 등 pending receiver 키가 known_users에 들어가 사이드바에 가짜 유저로 표시됨
@@ -4818,6 +4819,7 @@ db.serialize(() => {
         })(),
         rank: strOrEmpty(row.rank),
         dept: strOrEmpty(row.dept),
+        subDept: strOrEmpty(row.sub_dept),
         floor: strOrEmpty(row.floor),
         extNo: strOrEmpty(row.ext_no),
         phone: strOrEmpty(row.phone_no),
@@ -6125,6 +6127,7 @@ function startUdpDiscovery() {
         if (!wasOffline && previouslyKnown) {
           const rank = data.rank || '';
           const dept = data.dept || '';
+          const subDept = data.subDept || '';
           const floor = data.floor || '';
           const extNo = data.extNo || '';
           const phone = data.phone || '';
@@ -6135,6 +6138,7 @@ function startUdpDiscovery() {
             previouslyKnown.username === data.username &&
             previouslyKnown.rank === rank &&
             previouslyKnown.dept === dept &&
+            previouslyKnown.subDept === subDept &&
             previouslyKnown.floor === floor &&
             previouslyKnown.extNo === extNo &&
             previouslyKnown.phone === phone &&
@@ -6160,6 +6164,7 @@ function startUdpDiscovery() {
           username: data.username,
           rank: data.rank || '',
           dept: data.dept || '',
+          subDept: data.subDept || '',
           floor: data.floor || '',
           extNo: data.extNo || '',
           phone: data.phone || '',
@@ -6182,6 +6187,7 @@ function startUdpDiscovery() {
           || previouslyKnown.username !== userObj.username
           || previouslyKnown.rank !== userObj.rank
           || previouslyKnown.dept !== userObj.dept
+          || previouslyKnown.subDept !== userObj.subDept
           || previouslyKnown.floor !== userObj.floor
           || previouslyKnown.extNo !== userObj.extNo
           || previouslyKnown.phone !== userObj.phone
@@ -6281,6 +6287,7 @@ function registerSelf() {
     username: myProfile.username,
     rank: myProfile.rank,
     dept: myProfile.dept,
+    subDept: myProfile.subDept || '',
     floor: myProfile.floor,
     extNo: myProfile.extNo,
     phone: myProfile.phone,
@@ -6357,6 +6364,7 @@ function broadcastPresence(socket) {
     username: myProfile.username,
     rank: myProfile.rank,
     dept: myProfile.dept,
+    subDept: myProfile.subDept || '',
     floor: myProfile.floor,
     extNo: myProfile.extNo,
     phone: myProfile.phone,
@@ -6400,6 +6408,7 @@ function sendPresencePingUnicast(ip) {
     username: myProfile.username,
     rank: myProfile.rank,
     dept: myProfile.dept,
+    subDept: myProfile.subDept || '',
     floor: myProfile.floor,
     extNo: myProfile.extNo,
     phone: myProfile.phone,
@@ -6612,10 +6621,10 @@ function mergeUserProfile(base, overlay, online) {
     merged.online = !!online;
     return merged;
   }
-  const fields = ['username', 'rank', 'dept', 'floor', 'extNo', 'phone', 'note', 'statusState', 'photo', 'appVersion'];
+  const fields = ['username', 'rank', 'dept', 'subDept', 'floor', 'extNo', 'phone', 'note', 'statusState', 'photo', 'appVersion'];
   // 접속 중(PING)일 때는 빈 직급도 "의도적으로 비움"으로 반영한다.
   // 비우지 않으면 known_users / 스냅샷에 남은 "실장" 등이 영원히 되살아난다.
-  const clearableWhenOnline = new Set(['rank', 'dept', 'floor', 'extNo', 'phone', 'note']);
+  const clearableWhenOnline = new Set(['rank', 'dept', 'subDept', 'floor', 'extNo', 'phone', 'note']);
   fields.forEach((f) => {
     const o = overlay[f];
     if (o == null) return;
@@ -6661,6 +6670,7 @@ function userObjFromKnownUsersRow(row) {
     username: row.username || '알 수 없음',
     rank: row.rank || '',
     dept: row.dept || '',
+    subDept: row.sub_dept || '',
     floor: row.floor || '',
     extNo: row.ext_no || '',
     phone: row.phone_no || '',
@@ -6697,12 +6707,13 @@ function persistKnownUserSnapshot(u) {
       lastSeen = Math.max(lastSeen, existing.lastSeen);
     }
     db.run(
-    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO known_users (ip, username, rank, dept, sub_dept, floor, ext_no, phone_no, status_state, photo, last_seen_at, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(ip) DO UPDATE SET
        username = excluded.username,
        rank = excluded.rank,
        dept = CASE WHEN excluded.dept != '' THEN excluded.dept ELSE known_users.dept END,
+       sub_dept = CASE WHEN excluded.sub_dept != '' THEN excluded.sub_dept ELSE known_users.sub_dept END,
        floor = CASE WHEN excluded.floor != '' THEN excluded.floor ELSE known_users.floor END,
        ext_no = CASE WHEN excluded.ext_no != '' THEN excluded.ext_no ELSE known_users.ext_no END,
        phone_no = CASE WHEN excluded.phone_no != '' THEN excluded.phone_no ELSE known_users.phone_no END,
@@ -6715,6 +6726,7 @@ function persistKnownUserSnapshot(u) {
       mergedForStore.username || '',
       mergedForStore.rank || '',
       mergedForStore.dept || '',
+      mergedForStore.subDept || '',
       mergedForStore.floor || '',
       mergedForStore.extNo || '',
       mergedForStore.phone || '',
@@ -11248,8 +11260,8 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
   myProfile = { ...myProfile, ...incoming };
   console.log('[프로필] 저장:', myProfile.username || '(이름 미설정)', myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo);
   logToRendererConsole('info', `[프로필] 저장: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
-  db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || '', myProfile.note || ''], logDbErr);
+  db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, sub_dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.subDept || '', myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || '', myProfile.note || ''], logDbErr);
   registerSelf();
   if (globalUdpSocket) broadcastPresence(globalUdpSocket);
   if (photoChanged) {
