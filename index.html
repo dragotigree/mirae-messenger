@@ -2283,8 +2283,9 @@
       max-height: 100vh; height: 100vh; border-radius: 0; overflow: hidden;
     }
     body.capture-overlay-standalone #screen-capture-crop-img { max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; object-fit: contain; }
-    body.capture-overlay-standalone #screen-capture-crop-modal .modal-card > div:last-child {
+    body.capture-overlay-standalone #screen-capture-crop-actions {
       position: fixed; right: 24px; bottom: 24px; z-index: 5;
+      transition: left 0.08s linear, top 0.08s linear;
     }
     #screen-capture-source-modal .capture-source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; max-height: 55vh; overflow-y: auto; padding: 4px 0; }
     .capture-source-card { border: 2px solid var(--border); border-radius: 12px; padding: 8px; cursor: pointer; background: #fff; transition: border-color 0.12s, box-shadow 0.12s; }
@@ -7400,7 +7401,7 @@
         <div id="screen-capture-crop-shade"></div>
         <div id="screen-capture-crop-rect"></div>
       </div>
-      <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <div id="screen-capture-crop-actions" style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" onclick="cancelScreenCrop()" style="padding:8px 16px; background:var(--border-soft); border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:600;">취소</button>
         <button type="button" id="screen-capture-crop-send-btn" onclick="confirmScreenCrop()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:12px; cursor:pointer; font-weight:700;">선택 영역 보내기</button>
       </div>
@@ -21494,55 +21495,111 @@
       };
     }
 
-    function updateScreenCropRectVisual() {
+    /** 드래그로 영역을 고를 때 마다 「선택 영역 보내기」 버튼이 그 근처(선택 영역 바로
+     *  아래)로 따라오게 한다 — 화면 구석에만 있으면 잘 안 보인다는 요청. 화면 밖으로
+     *  나가지 않게 화면 안쪽으로 잘라 붙인다(아래 공간이 없으면 위로 붙인다). */
+    function updateCaptureOverlayActionsPosition(selPixel) {
+      const actions = document.getElementById('screen-capture-crop-actions');
+      if (!actions) return;
+      if (!isCaptureOverlayStandalone() || !selPixel) {
+        actions.style.left = '';
+        actions.style.top = '';
+        actions.style.right = '24px';
+        actions.style.bottom = '24px';
+        return;
+      }
+      const margin = 12;
+      const actionsRect = actions.getBoundingClientRect();
+      const aw = actionsRect.width || 220;
+      const ah = actionsRect.height || 40;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = selPixel.left + selPixel.w - aw;
+      let top = selPixel.top + selPixel.h + margin;
+      if (left < margin) left = margin;
+      if (left + aw > vw - margin) left = vw - margin - aw;
+      if (top + ah > vh - margin) top = selPixel.top - ah - margin;
+      if (top < margin) top = margin;
+      actions.style.right = 'auto';
+      actions.style.bottom = 'auto';
+      actions.style.left = `${left}px`;
+      actions.style.top = `${top}px`;
+    }
+
+    function applyScreenCropRectVisual(boxLeft, boxTop) {
       const rectEl = document.getElementById('screen-capture-crop-rect');
       const sel = screenCropState.sel;
-      const box = getScreenCropImgBox();
       if (!sel || sel.w < 2 || sel.h < 2) {
         rectEl.style.display = 'none';
+        updateCaptureOverlayActionsPosition(null);
         return;
       }
       rectEl.style.display = 'block';
-      rectEl.style.left = `${box.left + sel.x}px`;
-      rectEl.style.top = `${box.top + sel.y}px`;
+      rectEl.style.left = `${boxLeft + sel.x}px`;
+      rectEl.style.top = `${boxTop + sel.y}px`;
       rectEl.style.width = `${sel.w}px`;
       rectEl.style.height = `${sel.h}px`;
+      updateCaptureOverlayActionsPosition({ left: boxLeft + sel.x, top: boxTop + sel.y, w: sel.w, h: sel.h });
     }
 
+    function updateScreenCropRectVisual() {
+      const box = getScreenCropImgBox();
+      applyScreenCropRectVisual(box.left, box.top);
+    }
+
+    /** ⚠️ 실사고: 예전엔 마우스가 움직일 때마다(마우스 이동 이벤트가 초당 수십~백여 번
+     *  들어옴) getBoundingClientRect를 이미지·스테이지에 각각 새로 불러서(레이아웃 강제
+     *  재계산) 화면이 큰(4K 등) 캡처일수록 드래그가 눈에 띄게 버벅였다. 이제 드래그 시작
+     *  시 위치를 한 번만 재서 캐시해 두고, 실제 화면 갱신은 requestAnimationFrame으로
+     *  프레임당 한 번만 하도록 묶었다 — 마우스 이벤트마다 레이아웃을 다시 재지 않는다. */
     function bindScreenCropStageEvents() {
       const stage = document.getElementById('screen-capture-crop-stage');
       if (!stage || stage.dataset.cropBound === '1') return;
       stage.dataset.cropBound = '1';
+
+      let rafPending = false;
+      let latestPointer = null;
+
+      function applyDragFrame() {
+        rafPending = false;
+        if (!screenCropDrag || !latestPointer) return;
+        const { imgRect, stageRect, startX, startY } = screenCropDrag;
+        const cx = Math.max(0, Math.min(latestPointer.x - imgRect.left, imgRect.width));
+        const cy = Math.max(0, Math.min(latestPointer.y - imgRect.top, imgRect.height));
+        const x = Math.min(startX, cx);
+        const y = Math.min(startY, cy);
+        const w = Math.abs(cx - startX);
+        const h = Math.abs(cy - startY);
+        screenCropState.sel = { x, y, w, h };
+        applyScreenCropRectVisual(imgRect.left - stageRect.left, imgRect.top - stageRect.top);
+      }
 
       stage.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         const img = document.getElementById('screen-capture-crop-img');
         const imgRect = img.getBoundingClientRect();
         if (e.clientX < imgRect.left || e.clientX > imgRect.right || e.clientY < imgRect.top || e.clientY > imgRect.bottom) return;
+        const stageRect = stage.getBoundingClientRect();
         const startX = e.clientX - imgRect.left;
         const startY = e.clientY - imgRect.top;
-        screenCropDrag = { startX, startY };
+        screenCropDrag = { startX, startY, imgRect, stageRect };
         screenCropState.sel = { x: startX, y: startY, w: 0, h: 0 };
-        updateScreenCropRectVisual();
+        applyScreenCropRectVisual(imgRect.left - stageRect.left, imgRect.top - stageRect.top);
         e.preventDefault();
       });
 
       window.addEventListener('mousemove', (e) => {
         if (!screenCropDrag) return;
-        const img = document.getElementById('screen-capture-crop-img');
-        const imgRect = img.getBoundingClientRect();
-        const cx = Math.max(0, Math.min(e.clientX - imgRect.left, imgRect.width));
-        const cy = Math.max(0, Math.min(e.clientY - imgRect.top, imgRect.height));
-        const x = Math.min(screenCropDrag.startX, cx);
-        const y = Math.min(screenCropDrag.startY, cy);
-        const w = Math.abs(cx - screenCropDrag.startX);
-        const h = Math.abs(cy - screenCropDrag.startY);
-        screenCropState.sel = { x, y, w, h };
-        updateScreenCropRectVisual();
+        latestPointer = { x: e.clientX, y: e.clientY };
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(applyDragFrame);
+        }
       });
 
       window.addEventListener('mouseup', () => {
         screenCropDrag = null;
+        latestPointer = null;
       });
     }
 
