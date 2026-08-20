@@ -21576,10 +21576,13 @@
       }
       try {
         if (mode === 'region') {
-          // withMainWindowHiddenForCapture가 finally에서 항상 창을 다시 보이게 하므로,
-          // 성공/실패 어느 쪽이든 여기서 따로 복구할 필요가 없다(예전엔 실패 시 복구 코드가
-          // return 뒤에 있어 실행되지 않는 죽은 코드였다).
-          const dataUrl = await withMainWindowHiddenForCapture(() => captureFrameFromSource(source.id));
+          // ⚠️ 예전엔 여기서 창을 통째로 숨겼다가(withMainWindowHiddenForCapture) 캡처 후
+          // 다시 보이게 했는데, 그 순간 창이 "최소화됐다 돌아오는" 것처럼 느껴진다는 요청으로
+          // 없앴다. 이제 창을 그대로 둔 채로 화면을 캡처한다 — "전체 화면 캡처"(다른 창 선택)
+          // 모드도 원래 창을 숨기지 않았으므로 동작을 통일한 것이기도 하다. 메신저 창이 화면
+          // 일부를 가리고 있었다면 그 캡처 결과에도 그대로 보이지만, 사용자가 다른 부분을
+          // 드래그해서 고르면 그 부분만 잘라 보내므로 실제 사용에는 문제가 없다.
+          const dataUrl = await captureFrameFromSource(source.id);
           // IPMSG처럼 화면 전체를 자연스럽게 드래그해서 고를 수 있도록, 창이 최대화 상태가
           // 아니었으면 영역을 고르는 동안만 최대화한다(고르고 나면 restoreWindowAfterScreenCrop
           // 에서 원래 크기로 되돌림).
