@@ -1399,8 +1399,7 @@
     .msg-row.is-other .msg-text { background: var(--border-soft); color: var(--text-primary); }
     .msg-row.is-me .msg-text { background: var(--sidebar-active); color: #0f172a; border: none; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .msg-text:has(.chat-img-preview), .msg-text:has(.chat-file-box) { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0; }
-    .msg-text[draggable="true"], .chat-bubble[draggable="true"] { cursor: grab; }
-    .msg-row.is-message-dragging .msg-text, .msg-row-bubble.is-message-dragging .chat-bubble { cursor: grabbing; opacity: 0.88; }
+    .msg-text, .chat-bubble { user-select: text; -webkit-user-select: text; }
     .msg-bubble-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 100%; }
     .msg-row.is-other .msg-bubble-stack { align-items: flex-start; }
 
@@ -6551,6 +6550,13 @@
               </select>
             </label>
             <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">미니 모드 목록에서 직원 이름을 클릭했을 때 「쪽지 보내기」 창을 열지, 그 사람과의 「채팅창」을 열지 정합니다.</p>
+            <label class="settings-field">메시지 입력창에서 Enter 키
+              <select id="setting-enter-to-send" class="settings-select" onchange="setEnterToSend(this.value === 'send')">
+                <option value="send">Enter로 전송 (기본값)</option>
+                <option value="newline">Enter로 줄바꿈</option>
+              </select>
+            </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">「Enter로 전송」(기본값)이면 지금처럼 Enter로 보내고 Shift+Enter로 줄바꿈합니다. 「Enter로 줄바꿈」을 고르면 Enter는 줄바꿈만 하고, Ctrl+Enter로 보냅니다.</p>
             <label class="settings-toggle-row span-2" for="setting-open-chat-in-new-window">
               <input type="checkbox" id="setting-open-chat-in-new-window" onchange="setChatWindowFeatureEnabled(this.checked)">
               <span class="settings-toggle-text">
@@ -10053,6 +10059,7 @@
       setSidebarRailFilter('users');
     }
     loadNoticesList().catch(() => {});
+    if (!isEnterToSendEnabled()) setEnterToSend(false);
     let pendingScheduleBoardOpenDate = '';
     let pendingScheduleBoardQuickOpts = null;
 
@@ -10150,6 +10157,24 @@
 
     function isChatWindowFeatureEnabled() {
       return localStorage.getItem('openChatInNewWindow') === 'true';
+    }
+
+    /** 메시지 입력창에서 Enter 키 동작. 기본값(저장된 값이 없으면)은 지금까지와 동일하게
+     *  "Enter로 전송"이다 — 값이 'newline'일 때만 Enter가 줄바꿈으로 바뀐다. */
+    function isEnterToSendEnabled() {
+      return localStorage.getItem('chatEnterToSend') !== 'newline';
+    }
+
+    function setEnterToSend(enabled) {
+      localStorage.setItem('chatEnterToSend', enabled ? 'send' : 'newline');
+      const el = document.getElementById('setting-enter-to-send');
+      if (el) el.value = enabled ? 'send' : 'newline';
+      const textarea = document.getElementById('chat-textarea');
+      if (textarea) {
+        textarea.placeholder = enabled
+          ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)'
+          : '메시지 입력 (Ctrl+Enter 전송 · Enter 줄바꿈 · / 명령어)';
+      }
     }
 
     function setChatWindowFeatureEnabled(on) {
@@ -11551,9 +11576,10 @@
       }
       updateCompactModeButtonUi();
       const ta = document.getElementById('chat-textarea');
+      const enterHint = isEnterToSendEnabled() ? 'Enter 전송 · Shift+Enter 줄바꿈' : 'Ctrl+Enter 전송 · Enter 줄바꿈';
       if (ta) ta.placeholder = isCompactMode
-        ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)'
-        : '메시지를 입력하세요 (Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 사진)';
+        ? `메시지 입력 (${enterHint})`
+        : `메시지를 입력하세요 (${enterHint} · Ctrl+V 사진)`;
       updateMainPanelVisibility();
       if (activeChatUser) loadChatHistory();
       resizeChatTextarea();
@@ -22252,28 +22278,15 @@
       return { html: buildForwardMessageHtml(inner, senderName, getActiveChatLabel()) };
     }
 
+    // ⚠️ 예전엔 여기서 말풍선 전체(.msg-text/.chat-bubble)를 draggable=true로 만들어
+    // "드래그로 바로 전달"이 가능했다. 하지만 브라우저는 draggable 요소 위에서는 마우스
+    // 드래그를 "글자 선택"이 아니라 "요소 끌기"로 먼저 처리해서, 메시지 일부만 드래그해
+    // 선택·복사하는 게 아예 안 됐다("드래그 자체가 잠김"). 전달 기능은 우클릭 메뉴의
+    // "↪️ 전달" 버튼(shareThisMessage)으로 이미 똑같이 가능해서, 말풍선 자체의 드래그
+    // 끌기는 없애고 대신 마우스로 글자 일부만 선택해 복사할 수 있게 했다.
     function bindMessageForwardDrag(row) {
-      const bubble = row.querySelector('.msg-text, .chat-bubble');
-      if (!bubble || bubble.dataset.forwardDragBound === '1') return;
-      const payload = extractForwardPayloadFromRow(row);
-      if (!payload) return;
-      bubble.dataset.forwardDragBound = '1';
-      bubble.draggable = true;
-      bubble.title = '드래그하여 좌측 대화방·상대에게 전달';
-      bubble.addEventListener('dragstart', (ev) => {
-        const p = extractForwardPayloadFromRow(row);
-        if (!p) { ev.preventDefault(); return; }
-        ev.stopPropagation();
-        messageDragPayload = p;
-        ev.dataTransfer.setData(MESSAGE_DRAG_MIME, 'forward');
-        ev.dataTransfer.effectAllowed = 'copy';
-        row.classList.add('is-message-dragging');
-      });
-      bubble.addEventListener('dragend', () => {
-        messageDragPayload = null;
-        row.classList.remove('is-message-dragging');
-        clearUserDropHover();
-      });
+      // 우클릭 "↪️ 전달" 버튼으로 대체되어 더 이상 말풍선을 끌 필요가 없다. 아래 함수들
+      // (extractForwardPayloadFromRow 등)은 그 버튼에서도 그대로 쓰이므로 남겨둔다.
     }
 
     async function forwardMessageWithConfirm(targetLabel, sendFn) {
@@ -26244,8 +26257,13 @@
           }
         }
       }
-      // Enter: 전송 / Shift+Enter: 줄바꿈
-      if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      // Enter: 전송 / Shift+Enter: 줄바꿈 (설정에서 "Enter로 줄바꿈"을 고르면 반대로 Ctrl+Enter가 전송)
+      if (isEnterToSendEnabled()) {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          sendChatMessage();
+        }
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         sendChatMessage();
       }
@@ -26903,6 +26921,8 @@
         if (compactClickEl) compactClickEl.value = getCompactPersonClickMode();
         const chatWinEl = document.getElementById('setting-open-chat-in-new-window');
         if (chatWinEl) chatWinEl.checked = isChatWindowFeatureEnabled();
+        const enterToSendEl = document.getElementById('setting-enter-to-send');
+        if (enterToSendEl) enterToSendEl.value = isEnterToSendEnabled() ? 'send' : 'newline';
         const sidebarRightStartEl = document.getElementById('setting-sidebar-right-start-collapsed');
         if (sidebarRightStartEl) sidebarRightStartEl.checked = isSidebarRightStartCollapsed();
         const autoAwayEl = document.getElementById('setting-auto-away');
