@@ -755,10 +755,12 @@
     #sidebar-block-channels #channels-section-body {
       overflow-y: auto; max-height: min(36vh, 320px);
     }
-    /* 왼쪽 아이콘 레일의 #(채널)·⭐(즐겨찾기) 버튼으로 목록을 해당 블록만 보이게 필터링 */
-    #sidebar-main-sections.rail-filter-channels [data-sidebar-block]:not([data-sidebar-block="channels"]) { display: none !important; }
-    #sidebar-main-sections.rail-filter-favorites [data-sidebar-block]:not([data-sidebar-block="favorites"]) { display: none !important; }
-    #sidebar-main-sections.rail-filter-users [data-sidebar-block]:not([data-sidebar-block="users"]) { display: none !important; }
+    /* 왼쪽 아이콘 레일의 #(채널)·⭐(즐겨찾기) 버튼으로 목록을 해당 블록만 보이게 필터링.
+       「최근 대화」(data-sidebar-block="recent")는 어느 필터를 골라도 항상 보이는
+       빠른 확인용 패널이라 세 규칙 모두에서 예외로 뺐다. */
+    #sidebar-main-sections.rail-filter-channels [data-sidebar-block]:not([data-sidebar-block="channels"]):not([data-sidebar-block="recent"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-favorites [data-sidebar-block]:not([data-sidebar-block="favorites"]):not([data-sidebar-block="recent"]) { display: none !important; }
+    #sidebar-main-sections.rail-filter-users [data-sidebar-block]:not([data-sidebar-block="users"]):not([data-sidebar-block="recent"]) { display: none !important; }
     .rail-filter-channels #sidebar-block-channels #channels-section-body,
     .rail-filter-favorites #sidebar-block-favorites #favorites-section-body {
       max-height: none;
@@ -3949,6 +3951,13 @@
       margin-left: auto; font-size: 11px; color: #94a3b8; white-space: nowrap; flex-shrink: 0;
       font-variant-numeric: tabular-nums; padding-left: 6px; font-weight: 600;
     }
+    .log-card-jump-btn {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: var(--radius-sm);
+      border: 1px solid #e8edf2; background: #fff; color: #64748b; font-size: 11px;
+      display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .log-card-jump-btn:hover { background: var(--accent-soft); color: var(--accent-dark); border-color: transparent; }
     .log-card-body {
       font-size: 12.5px; color: #475569; line-height: 1.5; word-break: break-word;
       overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2;
@@ -5303,6 +5312,22 @@
       <!-- 「다이렉트 메시지」 헤더(빠른 전송 버튼이 빠지며 빈 줄만 남음)는 제거 — DM은
            아래 사용자 목록에서 바로 열리고, 드롭존(dm-section-label)·집계 배지
            (dm-section-unread-badge)는 각 사용자 카드의 개별 배지로 충분히 대체된다. -->
+
+      <!-- 최근 대화: 미니 모드의 "최근 대화" 목록과 완전히 같은 데이터·렌더 함수를 그대로
+           재사용한다(loadCompactRecentConversations/buildCompactConversationRows/
+           appendCompactConversationItem) — 새 로직 없이 화면에 한 칸 더 보여주는 것뿐이라
+           메시지 저장·네트워크 쪽은 전혀 건드리지 않는다. 최근 8개만, 대화가 없으면 숨김. -->
+      <div id="sidebar-block-recent" class="sidebar-main-block" data-sidebar-block="recent" style="display:none;">
+        <div class="section-label sidebar-block-head" id="recent-chats-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
+          <span style="display:flex; align-items:center; gap:6px; min-width:0;">
+            <span data-ui-icon="logs"></span> 최근 대화
+          </span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span class="unread-badge" id="recent-chats-section-unread-badge" style="display:none;">0</span>
+          </span>
+        </div>
+        <div id="recent-chats-section-body"></div>
+      </div>
 
       <div id="sidebar-block-favorites" class="sidebar-main-block" data-sidebar-block="favorites" style="display:none;">
         <div class="section-label sidebar-block-head" id="favorites-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
@@ -13681,6 +13706,43 @@
       favorites.forEach((u) => body.appendChild(buildUserCard(u)));
     }
 
+    const RECENT_CHATS_SECTION_MAX = 8;
+    let recentChatsSectionRenderToken = 0;
+
+    /** 일반 화면(3단) 사이드바 "최근 대화" — 미니 모드에서 쓰는 최근 대화 목록과 완전히
+     *  같은 함수(loadCompactRecentConversations/buildCompactConversationRows/
+     *  appendCompactConversationItem)로 데이터를 가져와 위쪽 8개만 카드로 보여준다.
+     *  renderUserListTree()가 호출되는 모든 시점(새 메시지 도착 포함)에 같이 갱신된다. */
+    async function renderRecentChatsSection() {
+      const block = document.getElementById('sidebar-block-recent');
+      const body = document.getElementById('recent-chats-section-body');
+      const unreadEl = document.getElementById('recent-chats-section-unread-badge');
+      if (!block || !body) return;
+      const myToken = ++recentChatsSectionRenderToken;
+      let recent;
+      try {
+        recent = await loadCompactRecentConversations(true);
+      } catch (e) {
+        return;
+      }
+      // 기다리는 동안 더 최신 호출이 있었으면(연속으로 여러 번 트리거) 낡은 결과는 버린다.
+      if (myToken !== recentChatsSectionRenderToken) return;
+      const rows = buildCompactConversationRows(recent).slice(0, RECENT_CHATS_SECTION_MAX);
+      if (!rows.length) {
+        if (unreadEl) unreadEl.style.display = 'none';
+        block.style.display = 'none';
+        return;
+      }
+      block.style.display = '';
+      const totalUnread = rows.reduce((sum, r) => sum + (r.unread || 0), 0);
+      if (unreadEl) {
+        unreadEl.style.display = totalUnread > 0 ? '' : 'none';
+        unreadEl.textContent = formatUnreadBadge(totalUnread);
+      }
+      body.innerHTML = '';
+      rows.forEach((row) => appendCompactConversationItem(body, row));
+    }
+
     function appendCompactListPanelsInSidebarOrder(container, channelPanel, userPanels, emptyHintEl) {
       const order = loadSidebarBlockOrder();
       order.forEach((key) => {
@@ -15615,6 +15677,7 @@
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
       syncSidebarFloorDeptJumpSelects();
       renderFavoritesSection(favorites);
+      renderRecentChatsSection();
 
       const structureKey = buildUserListStructureKey([], sortedGroupKeys, groups, groupingKey);
 
@@ -15783,6 +15846,58 @@
       }
       if (!isSent && item.sender_name) return String(item.sender_name);
       return peerIp || '1:1';
+    }
+
+    /** 전체 대화 기록의 한 항목이 어느 대화(1:1·부서·층·그룹·전체공지)에 속하는지 알아낸다.
+     *  이미 있는 채널 생성 함수들(makeDeptChannel 등)을 그대로 재사용한다 — 이 함수 자체는
+     *  아무 것도 바꾸지 않고 "어느 채팅창을 열어야 하는지"만 골라낸다. */
+    function resolveChatTargetFromLogItem(item, isSent) {
+      const receiverIp = String(item.receiver_ip || '');
+      if (receiverIp === 'BROADCAST') return BROADCAST_CHANNEL;
+      if (receiverIp.startsWith('DEPT:')) return makeDeptChannel(receiverIp.slice(5));
+      if (receiverIp.startsWith('FLOOR:')) return makeFloorChannel(receiverIp.slice(6));
+      if (receiverIp.startsWith('GROUP:')) {
+        const uid = receiverIp.slice(6);
+        const g = (myGroupChats || []).find((x) => String(x.uid) === String(uid));
+        return g ? makeGroupChannel(g) : null;
+      }
+      const peerIp = isSent ? receiverIp : String(item.sender_ip || '');
+      if (!peerIp) return null;
+      return findUserByIp(peerIp) || { ip: peerIp, username: item.sender_name || peerIp };
+    }
+
+    /** 전체 대화 기록 카드의 "↪ 이동" 버튼 — 그 대화창을 열고, 그 날짜 근처로 이동한 뒤
+     *  해당 메시지를 찾아 스크롤 + 잠깐 강조 표시한다. 기존 답장(reply) 이동 강조 표시와
+     *  같은 방식이다. 대화·메시지를 새로 저장하거나 바꾸는 건 전혀 없고 화면 이동만 한다. */
+    async function jumpToLogMessageFromItem(item, isSent) {
+      const target = resolveChatTargetFromLogItem(item, isSent);
+      if (!target) {
+        await appAlert('이 대화로 이동할 수 없습니다. (삭제된 그룹이거나 알 수 없는 상대입니다)');
+        return;
+      }
+      closeAllLogsModal();
+      if (document.body.classList.contains('compact-mode')) {
+        // 미니 모드는 대화가 별도 창으로 열릴 수 있어 이동·강조까지는 지원하지 않고,
+        // 평소처럼 그 대화를 여는 것까지만 한다.
+        openChatTargetFromClick(target);
+        return;
+      }
+      await selectUserChat(target);
+      const dateStr = String(item.created_time || '').slice(0, 10);
+      if (dateStr) {
+        await loadChatHistory(null, { aroundDate: dateStr, scrollToDate: dateStr });
+      }
+      const msgId = item.id;
+      if (!msgId) return;
+      setTimeout(() => {
+        const row = document.querySelector(`#chat-messages-area [data-msg-id="${msgId}"]`);
+        if (!row) return;
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        row.style.transition = 'background 0.3s';
+        const prevBg = row.style.background;
+        row.style.background = 'rgba(254, 243, 199, 0.85)';
+        setTimeout(() => { row.style.background = prevBg; }, 1200);
+      }, 120);
     }
 
     function formatAllLogTimeParts(createdTime) {
@@ -16011,10 +16126,18 @@
               <span class="log-card-sender" title="${escapeHtml(senderName)}">${senderHtml}</span>
               <span class="log-card-type ${typeMeta.class}" title="${escapeHtml(contextLabel)}">${escapeHtml(contextLabel)}</span>
               <span class="log-card-time" title="${escapeHtml(item.created_time || '')}">${escapeHtml(timeParts.timeLabel)}</span>
+              <button type="button" class="log-card-jump-btn" title="대화창에서 이 메시지로 이동">↪</button>
             </div>
             <div class="log-card-body">${bodyHtml}</div>
           </div>
         `;
+        const jumpBtn = card.querySelector('.log-card-jump-btn');
+        if (jumpBtn) {
+          jumpBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            jumpToLogMessageFromItem(item, isSent);
+          });
+        }
 
         if (kind === 'link' && media.url) {
           card.classList.add('is-clickable');
