@@ -373,6 +373,8 @@
       transition: background var(--transition-fast), color var(--transition-fast);
     }
     .sidebar-header-icon-btn:hover { background: var(--surface-muted); color: var(--text-primary); }
+    #sidebar-alpha-sort-btn { width: auto; padding: 0 6px; }
+    #sidebar-alpha-sort-btn.is-active { background: var(--accent-soft); color: var(--accent-dark); }
     .sidebar-header-icon-btn .icon-glyph { width: 14px; height: 14px; }
     #toolbar-refresh-btn.is-spinning .icon-glyph { animation: toolbar-refresh-spin 0.7s linear infinite; }
     @keyframes toolbar-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -5369,6 +5371,7 @@
           <span style="display:flex; justify-content:space-between; align-items:center;">
             <span style="display:flex; align-items:center; gap:6px; min-width:0;"><span data-ui-icon="users"></span> 사용자</span>
             <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em;">가나다</span>
               <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
               <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
               <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
@@ -8087,7 +8090,28 @@
       return 800;
     }
 
+    /** 켜면 사용자 목록을 이름 가나다순으로만 정렬한다(온라인 우선·재활치료부 직급
+     *  순서 무시). 온라인 여부는 카드의 초록 점으로 여전히 구분할 수 있다. */
+    let sidebarAlphaSortEnabled = localStorage.getItem('sidebarAlphaSort') === '1';
+
+    function toggleSidebarAlphaSort() {
+      sidebarAlphaSortEnabled = !sidebarAlphaSortEnabled;
+      localStorage.setItem('sidebarAlphaSort', sidebarAlphaSortEnabled ? '1' : '0');
+      syncSidebarAlphaSortUi();
+      lastUserListStructureKey = '';
+      renderUserListTree(true);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+    }
+
+    function syncSidebarAlphaSortUi() {
+      const btn = document.getElementById('sidebar-alpha-sort-btn');
+      if (btn) btn.classList.toggle('is-active', sidebarAlphaSortEnabled);
+    }
+
     function compareUsersSidebarOrder(a, b) {
+      if (sidebarAlphaSortEnabled) {
+        return (a.username || '').localeCompare(b.username || '', 'ko');
+      }
       if (!!a.online !== !!b.online) return a.online ? -1 : 1;
       if (isRehabDeptUser(a) && isRehabDeptUser(b)) {
         const dr = rehabRankSortIndex(a.rank) - rehabRankSortIndex(b.rank);
@@ -10114,6 +10138,7 @@
     }
     loadNoticesList().catch(() => {});
     if (!isEnterToSendEnabled()) setEnterToSend(false);
+    syncSidebarAlphaSortUi();
     let pendingScheduleBoardOpenDate = '';
     let pendingScheduleBoardQuickOpts = null;
 
