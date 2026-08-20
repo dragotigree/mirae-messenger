@@ -6247,6 +6247,9 @@
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">부서
         <input type="text" id="master-user-edit-dept" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">소부서
+        <input type="text" id="master-user-edit-sub-dept" placeholder="예: 5병동" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
+      </label>
       <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">층
         <input type="text" id="master-user-edit-floor" placeholder="예: 10층" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
       </label>
@@ -6258,6 +6261,9 @@
           <input type="text" id="master-user-edit-phone" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
         </label>
       </div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">비고
+        <textarea id="master-user-edit-note" rows="2" placeholder="없으면 비움" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px; resize:vertical; font-family:inherit;"></textarea>
+      </label>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
         <button type="button" onclick="closeMasterUserEditModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: 12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="saveMasterUserProfile()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">저장</button>
@@ -18450,6 +18456,44 @@
 
     const masterStatusLabel = { ONLINE: '🟢 온라인', TREATMENT: '🟡 자리비움', OFFLINE: '⚫ 오프라인' };
 
+    /** 「접속 PC」 표 헤더 클릭 정렬 — 기본값은 이전과 동일(온라인 우선 + 이름순)이고,
+     *  이름·부서·IP·버전·상태·마지막 접속 열을 눌러 직접 원하는 기준으로 바꿀 수 있다.
+     *  같은 열을 다시 누르면 오름/내림차순이 뒤집힌다. */
+    let masterClientsSortKey = null;
+    let masterClientsSortDir = 1;
+
+    function setMasterClientsSort(key) {
+      if (masterClientsSortKey === key) {
+        masterClientsSortDir = -masterClientsSortDir;
+      } else {
+        masterClientsSortKey = key;
+        masterClientsSortDir = 1;
+      }
+      renderMasterOnlineClients();
+    }
+
+    function compareMasterClientsBy(key, a, b) {
+      const nameOf = (u) => `${u.rank || ''} ${u.username || ''}`.trim();
+      switch (key) {
+        case 'name':
+          return nameOf(a).localeCompare(nameOf(b), 'ko');
+        case 'dept':
+          return `${a.dept || ''} ${a.floor || ''}`.localeCompare(`${b.dept || ''} ${b.floor || ''}`, 'ko');
+        case 'ip':
+          return String(a.ip || '').localeCompare(String(b.ip || ''), 'ko', { numeric: true });
+        case 'version':
+          return String(a.appVersion || '').localeCompare(String(b.appVersion || ''), 'ko', { numeric: true });
+        case 'status': {
+          const rank = (u) => (u.usageDisabled ? -1 : (u.online ? (normalizeSelectableStatusState(u.statusState) === 'ONLINE' ? 2 : 1) : 0));
+          return rank(a) - rank(b);
+        }
+        case 'last':
+          return (a.lastSeen || 0) - (b.lastSeen || 0);
+        default:
+          return 0;
+      }
+    }
+
     async function renderMasterOnlineClients() {
       const box = document.getElementById('master-online-clients-box');
       const refEl = document.getElementById('master-ref-version');
@@ -18459,6 +18503,9 @@
       if (refEl) refEl.textContent = refVersion;
 
       const rows = [...allUsers].sort((a, b) => {
+        if (masterClientsSortKey) {
+          return masterClientsSortDir * compareMasterClientsBy(masterClientsSortKey, a, b);
+        }
         if (!!a.online !== !!b.online) return a.online ? -1 : 1;
         if (isRehabDeptUser(a) && isRehabDeptUser(b)) {
           const dr = rehabRankSortIndex(a.rank) - rehabRankSortIndex(b.rank);
@@ -18472,18 +18519,21 @@
         return;
       }
 
+      const sortArrow = (key) => masterClientsSortKey === key ? (masterClientsSortDir > 0 ? ' ▲' : ' ▼') : '';
+      const sortableTh = (key, label) => `<th class="is-sortable" data-sort-key="${key}" style="cursor:pointer; user-select:none;" title="눌러서 이 기준으로 정렬">${label}${sortArrow(key)}</th>`;
+
       const tableHead = `<table class="master-clients-table">
         <colgroup>
           <col class="c-name"><col class="c-dept"><col class="c-ip"><col class="c-ver">
           <col class="c-status"><col class="c-last"><col class="c-actions">
         </colgroup>
         <thead><tr>
-          <th>이름</th>
-          <th>부서/층</th>
-          <th>IP</th>
-          <th>버전</th>
-          <th>상태</th>
-          <th>마지막</th>
+          ${sortableTh('name', '이름')}
+          ${sortableTh('dept', '부서/층')}
+          ${sortableTh('ip', 'IP')}
+          ${sortableTh('version', '버전')}
+          ${sortableTh('status', '상태')}
+          ${sortableTh('last', '마지막')}
           <th>관리</th>
         </tr></thead><tbody>`;
 
@@ -18526,6 +18576,9 @@
           e.stopPropagation();
           openMasterClientMenu(btn.getAttribute('data-ip'), btn);
         });
+      });
+      box.querySelectorAll('th.is-sortable').forEach((th) => {
+        th.addEventListener('click', () => setMasterClientsSort(th.getAttribute('data-sort-key')));
       });
     }
 
@@ -19190,9 +19243,11 @@
       document.getElementById('master-user-edit-username').value = u.username || '';
       document.getElementById('master-user-edit-rank').value = u.rank || '';
       document.getElementById('master-user-edit-dept').value = u.dept || '';
+      document.getElementById('master-user-edit-sub-dept').value = u.subDept || '';
       document.getElementById('master-user-edit-floor').value = u.floor || '';
       document.getElementById('master-user-edit-ext').value = u.extNo || '';
       document.getElementById('master-user-edit-phone').value = u.phone || '';
+      document.getElementById('master-user-edit-note').value = u.note || '';
       document.getElementById('master-user-edit-modal').style.display = 'flex';
     }
 
@@ -19216,9 +19271,11 @@
         username,
         rank: document.getElementById('master-user-edit-rank').value.trim(),
         dept: document.getElementById('master-user-edit-dept').value.trim(),
+        subDept: document.getElementById('master-user-edit-sub-dept').value.trim(),
         floor: document.getElementById('master-user-edit-floor').value.trim(),
         extNo: document.getElementById('master-user-edit-ext').value.trim(),
-        phone: document.getElementById('master-user-edit-phone').value.trim()
+        phone: document.getElementById('master-user-edit-phone').value.trim(),
+        note: document.getElementById('master-user-edit-note').value.trim()
       });
       if (!res || !res.success) {
         await appAlert(res?.msg || '저장에 실패했습니다.');

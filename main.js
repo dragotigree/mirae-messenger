@@ -4294,6 +4294,10 @@ db.serialize(() => {
     phone_no TEXT DEFAULT '',
     updated_at TEXT
   )`, logDbErr);
+  // 마스터 관리자가 소부서·비고까지 원격으로 고칠 수 있게 컬럼 추가.
+  ['sub_dept TEXT DEFAULT \'\'', 'note TEXT DEFAULT \'\''].forEach((colDef) => {
+    alterAddColumn('user_profile_overrides', colDef);
+  });
 
   // 이 PC의 메신저 사용 중지(잠금) 상태 — 재시작 후에도 유지
   db.run(`CREATE TABLE IF NOT EXISTS usage_lock (
@@ -6494,9 +6498,11 @@ function profileOverrideFromRow(row) {
     username: row.username || '',
     rank: row.rank || '',
     dept: row.dept || '',
+    subDept: row.sub_dept || '',
     floor: row.floor || '',
     extNo: row.ext_no || '',
-    phone: row.phone_no || ''
+    phone: row.phone_no || '',
+    note: row.note || ''
   };
 }
 
@@ -6517,7 +6523,7 @@ function applyStoredProfileOverride(u) {
   const ov = profileOverrides.get(u.ip);
   if (!ov) return u;
   const out = { ...u };
-  ['username', 'rank', 'dept', 'floor', 'extNo', 'phone'].forEach((f) => {
+  ['username', 'rank', 'dept', 'subDept', 'floor', 'extNo', 'phone', 'note'].forEach((f) => {
     if (Object.prototype.hasOwnProperty.call(ov, f)) {
       out[f] = String(ov[f] ?? '').trim();
     }
@@ -6529,13 +6535,14 @@ function persistProfileOverrideToDb(ov) {
   if (!ov || !ov.ip) return;
   const updatedAt = new Date().toISOString();
   db.run(
-    `INSERT INTO user_profile_overrides (ip, username, rank, dept, floor, ext_no, phone_no, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO user_profile_overrides (ip, username, rank, dept, sub_dept, floor, ext_no, phone_no, note, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(ip) DO UPDATE SET
        username = excluded.username, rank = excluded.rank, dept = excluded.dept,
-       floor = excluded.floor, ext_no = excluded.ext_no, phone_no = excluded.phone_no,
+       sub_dept = excluded.sub_dept, floor = excluded.floor, ext_no = excluded.ext_no,
+       phone_no = excluded.phone_no, note = excluded.note,
        updated_at = excluded.updated_at`,
-    [ov.ip, ov.username || '', ov.rank || '', ov.dept || '', ov.floor || '', ov.extNo || '', ov.phone || '', updatedAt],
+    [ov.ip, ov.username || '', ov.rank || '', ov.dept || '', ov.subDept || '', ov.floor || '', ov.extNo || '', ov.phone || '', ov.note || '', updatedAt],
     logDbErr
   );
 }
@@ -6548,19 +6555,22 @@ function storeProfileOverride(patch) {
     username: patch.username != null ? String(patch.username).trim() : (prev.username || ''),
     rank: patch.rank != null ? String(patch.rank).trim() : (prev.rank || ''),
     dept: patch.dept != null ? String(patch.dept).trim() : (prev.dept || ''),
+    subDept: patch.subDept != null ? String(patch.subDept).trim() : (prev.subDept || ''),
     floor: patch.floor != null ? String(patch.floor).trim() : (prev.floor || ''),
     extNo: patch.extNo != null ? String(patch.extNo).trim() : (prev.extNo || ''),
-    phone: patch.phone != null ? String(patch.phone).trim() : (prev.phone || '')
+    phone: patch.phone != null ? String(patch.phone).trim() : (prev.phone || ''),
+    note: patch.note != null ? String(patch.note).trim() : (prev.note || '')
   };
   profileOverrides.set(patch.ip, merged);
   persistProfileOverrideToDb(merged);
   db.run(
-    `INSERT INTO known_users (ip, username, rank, dept, floor, ext_no, phone_no, status_state, photo, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT status_state FROM known_users WHERE ip = ?), 'OFFLINE'), COALESCE((SELECT photo FROM known_users WHERE ip = ?), ''), COALESCE((SELECT last_seen_at FROM known_users WHERE ip = ?), 0))
+    `INSERT INTO known_users (ip, username, rank, dept, sub_dept, floor, ext_no, phone_no, note, status_state, photo, last_seen_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT status_state FROM known_users WHERE ip = ?), 'OFFLINE'), COALESCE((SELECT photo FROM known_users WHERE ip = ?), ''), COALESCE((SELECT last_seen_at FROM known_users WHERE ip = ?), 0))
      ON CONFLICT(ip) DO UPDATE SET
        username = excluded.username, rank = excluded.rank, dept = excluded.dept,
-       floor = excluded.floor, ext_no = excluded.ext_no, phone_no = excluded.phone_no`,
-    [merged.ip, merged.username, merged.rank, merged.dept, merged.floor, merged.extNo, merged.phone, merged.ip, merged.ip, merged.ip],
+       sub_dept = excluded.sub_dept, floor = excluded.floor, ext_no = excluded.ext_no,
+       phone_no = excluded.phone_no, note = excluded.note`,
+    [merged.ip, merged.username, merged.rank, merged.dept, merged.subDept, merged.floor, merged.extNo, merged.phone, merged.note, merged.ip, merged.ip, merged.ip],
     logDbErr
   );
 }
@@ -6572,13 +6582,15 @@ function applyProfileOverrideToSelf(patch) {
     username: patch.username !== undefined ? patch.username : myProfile.username,
     rank: patch.rank !== undefined ? patch.rank : myProfile.rank,
     dept: patch.dept !== undefined ? patch.dept : myProfile.dept,
+    subDept: patch.subDept !== undefined ? patch.subDept : myProfile.subDept,
     floor: patch.floor !== undefined ? patch.floor : myProfile.floor,
     extNo: patch.extNo !== undefined ? patch.extNo : myProfile.extNo,
-    phone: patch.phone !== undefined ? patch.phone : myProfile.phone
+    phone: patch.phone !== undefined ? patch.phone : myProfile.phone,
+    note: patch.note !== undefined ? patch.note : myProfile.note
   };
   db.run(
-    `INSERT OR REPLACE INTO user_profile (id, username, rank, dept, floor, ext_no, phone_no, status_state, photo) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || ''],
+    `INSERT OR REPLACE INTO user_profile (id, username, rank, dept, sub_dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [myProfile.username, myProfile.rank, myProfile.dept, myProfile.subDept || '', myProfile.floor, myProfile.extNo, myProfile.phone, myProfile.statusState, myProfile.photo || '', myProfile.note || ''],
     logDbErr
   );
 }
@@ -6608,9 +6620,11 @@ function handleProfileOverrideSync(payload) {
     username: p.username,
     rank: p.rank,
     dept: p.dept,
+    subDept: p.subDept != null ? p.subDept : p.sub_dept,
     floor: p.floor,
     extNo: p.extNo != null ? p.extNo : p.ext_no,
-    phone: p.phone != null ? p.phone : p.phone_no
+    phone: p.phone != null ? p.phone : p.phone_no,
+    note: p.note
   });
   refreshUserAfterProfileOverride(p.ip);
 }
@@ -11459,9 +11473,11 @@ ipcMain.handle('master-update-user-profile', async (event, payload) => {
     username: p.username != null ? String(p.username).trim() : '',
     rank: p.rank != null ? String(p.rank).trim() : '',
     dept: p.dept != null ? String(p.dept).trim() : '',
+    subDept: p.subDept != null ? String(p.subDept).trim() : '',
     floor: p.floor != null ? String(p.floor).trim() : '',
     extNo: p.extNo != null ? String(p.extNo).trim() : (p.ext_no != null ? String(p.ext_no).trim() : ''),
-    phone: p.phone != null ? String(p.phone).trim() : (p.phone_no != null ? String(p.phone_no).trim() : '')
+    phone: p.phone != null ? String(p.phone).trim() : (p.phone_no != null ? String(p.phone_no).trim() : ''),
+    note: p.note != null ? String(p.note).trim() : ''
   };
   if (!patch.username) {
     const known = allKnownUsers.get(ip);
