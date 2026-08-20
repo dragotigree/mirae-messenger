@@ -5833,16 +5833,58 @@ ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
   }
 });
 
-/** IPMSG처럼 「영역 캡처」를 누르면 메신저 창이 실제로 내려가고, 그 자리에서 바로 실제
- *  화면(스크린샷)을 드래그해 영역을 고를 수 있게 하는 전용 오버레이 창. 기존엔 메신저
- *  창은 그대로 둔 채 그 안에 스크린샷을 담은 모달을 띄웠는데, 사용자가 "메신저만 내려가고
- *  거기서 바로 원하는 영역을 보낼 수 있게" 요청해서, 메인 창을 진짜로 숨기고 화면 전체를
- *  덮는 별도 창에서 선택하도록 바꿨다. */
+/** IPMSG처럼 「영역 캡처」를 누르면 메신저 창이 실제로 내려가고, 그 자리에서 곧바로 실제
+ *  화면(스크린샷)을 드래그해 영역을 고를 수 있게 하는 전용 오버레이 창.
+ *  ⚠️ 실사고: 처음엔 캡처를 누를 때마다 이 창을 새로 만들었는데(loadFile → did-finish-load
+ *  대기), 그 생성 자체에 걸리는 시간 때문에 "새 창이 뜨는" 전환이 눈에 보였다(사용자가
+ *  IPMSG는 이런 전환 없이 바로 화면 위에서 선택된다고 지적). 그래서 이 오버레이 창을 앱
+ *  시작 시 미리 한 번만 만들어서 숨겨둔 채로 유지하고(prewarmCaptureOverlayWindow),
+ *  캡처할 때는 이미 떠 있는 창에 이미지만 흘려보내고 show()만 호출한다 — 창 생성/로딩
+ *  과정이 전혀 보이지 않는다. 확인·취소 후에도 창을 닫지 않고 숨기기만 해서 다음 캡처도
+ *  똑같이 즉시 뜬다. */
+async function prewarmCaptureOverlayWindow() {
+  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) return captureOverlayWindow;
+  const display = screen.getPrimaryDisplay();
+  const win = new BrowserWindow({
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    backgroundColor: '#0f172a',
+    webPreferences: {
+      preload: getMainPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      backgroundThrottling: false
+    }
+  });
+  win.setMenu(null);
+  win.on('closed', () => {
+    if (captureOverlayWindow === win) captureOverlayWindow = null;
+  });
+  captureOverlayWindow = win;
+  await new Promise((resolve) => {
+    win.webContents.once('did-finish-load', resolve);
+    win.loadFile('index.html', { hash: 'capture-overlay' });
+  });
+  return win;
+}
+
 function closeCaptureOverlayAndRestoreMain() {
   if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) {
-    captureOverlayWindow.close();
+    captureOverlayWindow.hide();
   }
-  captureOverlayWindow = null;
   if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
     mainWindow.focus();
@@ -5851,17 +5893,21 @@ function closeCaptureOverlayAndRestoreMain() {
 }
 
 ipcMain.handle('open-region-capture-overlay', async () => {
-  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) {
-    captureOverlayWindow.focus();
-    return { success: true };
-  }
   if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'NO_MAIN_WINDOW' };
   try {
+    const overlay = await prewarmCaptureOverlayWindow();
+    if (overlay.isVisible()) { overlay.focus(); return { success: true }; }
+
+    const display = screen.getPrimaryDisplay();
+    overlay.setBounds({ x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height });
+
     const wasHidden = !mainWindow.isVisible();
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.hide();
     captureOverlayMainWasHidden = !wasHidden;
-    await new Promise((r) => setTimeout(r, 250));
+    // 메신저 창이 화면 합성에서 완전히 빠지는 데 필요한 최소한의 시간만 기다린다
+    // (너무 짧으면 캡처 결과에 메신저 창이 순간적으로 찍힐 수 있다).
+    await new Promise((r) => setTimeout(r, 120));
 
     const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 64, height: 64 }, fetchWindowIcons: false });
     const primaryId = (sources[0] && sources[0].id) || 'screen:0:0';
@@ -5872,48 +5918,10 @@ ipcMain.handle('open-region-capture-overlay', async () => {
       return captured;
     }
 
-    const display = screen.getPrimaryDisplay();
-    captureOverlayWindow = new BrowserWindow({
-      x: display.bounds.x,
-      y: display.bounds.y,
-      width: display.bounds.width,
-      height: display.bounds.height,
-      frame: false,
-      transparent: false,
-      alwaysOnTop: true,
-      resizable: false,
-      movable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      skipTaskbar: true,
-      show: false,
-      backgroundColor: '#0f172a',
-      webPreferences: {
-        preload: getMainPreloadPath(),
-        contextIsolation: true,
-        nodeIntegration: false,
-        spellcheck: false,
-        backgroundThrottling: false
-      }
-    });
-    captureOverlayWindow.setMenu(null);
-    captureOverlayWindow.loadFile('index.html', { hash: 'capture-overlay' });
-    captureOverlayWindow.webContents.once('did-finish-load', () => {
-      if (!captureOverlayWindow || captureOverlayWindow.isDestroyed()) return;
-      captureOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
-      captureOverlayWindow.show();
-      captureOverlayWindow.focus();
-      captureOverlayWindow.webContents.send('capture-overlay-init', captured.dataUrl);
-    });
-    captureOverlayWindow.on('closed', () => {
-      captureOverlayWindow = null;
-      if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
-      captureOverlayMainWasHidden = false;
-    });
+    overlay.webContents.send('capture-overlay-init', captured.dataUrl);
+    overlay.setAlwaysOnTop(true, 'screen-saver');
+    overlay.show();
+    overlay.focus();
     return { success: true };
   } catch (err) {
     if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
@@ -6035,6 +6043,8 @@ app.whenReady().then(async () => {
   createTray();
   setupJumpList();
   registerGlobalShortcuts();
+  // 영역 캡처 창을 미리 만들어 숨겨둔다 — 처음 캡처할 때도 창 생성 지연이 보이지 않게.
+  setTimeout(() => { prewarmCaptureOverlayWindow().catch(() => {}); }, 3000);
 
   const initialJumpAction = parseJumpListActionFromArgv(process.argv);
   if (initialJumpAction && mainWindow) {
