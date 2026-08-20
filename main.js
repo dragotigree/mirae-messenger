@@ -6198,6 +6198,9 @@ function startUdpDiscovery() {
         if (wasOffline || profileChanged) notifyUserList();
 
         if (wasOffline) {
+          // 새로 켠(또는 방금 온라인이 된) 상대가 나를 최대 15초까지 기다리지 않도록,
+          // 무거운 동기화와 무관하게 내 신호만 그 자리에서 바로 한 번 더 보낸다.
+          sendPresencePingUnicast(rinfo.address);
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
@@ -6381,6 +6384,30 @@ function broadcastPresence(socket) {
     if (i < ips.length) setImmediate(sendBatch);
   };
   sendBatch();
+}
+
+/** 처음 보거나(또는 방금 오프라인→온라인 된) 상대에게만 내 신호(PING)를 그 즉시 한 번 더
+ *  보낸다. broadcastPresence()와 같은 내용을 그 한 사람에게만 유니캐스트로 보내는
+ *  것뿐이라 새 트래픽 종류가 아니다 — 원래 15초마다 오던 정기 신호를 이번 한 번만
+ *  앞당기는 것. 새로 켠 PC가 동료들을 화면에 훨씬 빨리 볼 수 있게 하기 위함. */
+function sendPresencePingUnicast(ip) {
+  if (!globalUdpSocket || !ip) return;
+  if (!profileLoaded) return;
+  if (isMessengerUsageBlocked()) return;
+  if (Date.now() < udpStormUntil) return; // 수신 UDP 폭주 중엔 자제 (broadcastPresence와 동일 기준)
+  const packet = Buffer.from(JSON.stringify({
+    type: 'PING',
+    username: myProfile.username,
+    rank: myProfile.rank,
+    dept: myProfile.dept,
+    floor: myProfile.floor,
+    extNo: myProfile.extNo,
+    phone: myProfile.phone,
+    statusState: myProfile.statusState,
+    appVersion: APP_VERSION,
+    note: myProfile.note || ''
+  }));
+  try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
 }
 
 function broadcastGoodbye() {
