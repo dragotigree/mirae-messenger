@@ -5328,6 +5328,9 @@
               <option value="floor">층별</option>
               <option value="dept">부서별</option>
             </select>
+            <select id="sidebar-group-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroup(this.value)" title="해당 층·부서로 바로 이동" style="font-size:11px; padding:2px 4px; max-width:90px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+              <option value="">전체</option>
+            </select>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
             <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
@@ -13690,6 +13693,31 @@
       localStorage.setItem(USER_DEPT_FLOOR_GROUP_ORDER_KEY, JSON.stringify(map));
     }
 
+    /** 사이드바 상단 "이동" 선택상자를 현재 묶음 기준(층별/부서별)에 맞는 실제 층·부서
+     *  이름들로 채운다. 목록이 다시 그려질 때마다(renderUserListTree) 함께 갱신한다. */
+    function syncSidebarGroupJumpSelect(groupingKey, groupKeys) {
+      const el = document.getElementById('sidebar-group-jump-select');
+      if (!el) return;
+      const prevValue = el.value;
+      el.innerHTML = '<option value="">전체</option>' +
+        groupKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      el.value = groupKeys.includes(prevValue) ? prevValue : '';
+    }
+
+    /** 사이드바 "이동" 선택상자 — 고른 층·부서로 화면을 스크롤하고, 접혀 있었으면 펼친다. */
+    function jumpToUserGroup(groupName) {
+      if (!groupName) return;
+      const groupingKey = appSettings.userGrouping || 'floor';
+      const collapseKey = `${groupingKey}:${groupName}`;
+      if (collapsedGroups.has(collapseKey)) {
+        collapsedGroups.delete(collapseKey);
+        localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups]));
+        renderUserListTree(true);
+      }
+      const block = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"]`);
+      if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     /** 사이드바 "↺" — 손으로 끌어서 바꿔둔 부서·층 묶음 순서를 지우고 원래(가나다/숫자) 순서로 되돌린다.
      *  내 컴퓨터 화면 표시 설정만 지우는 것이라 다른 PC·데이터에는 영향이 없다. */
     function resetUserGroupOrder() {
@@ -15543,6 +15571,7 @@
       const restAll = allUsers || [];
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
+      syncSidebarGroupJumpSelect(groupingKey, sortedGroupKeys);
       renderFavoritesSection(favorites);
 
       const structureKey = buildUserListStructureKey([], sortedGroupKeys, groups, groupingKey);
