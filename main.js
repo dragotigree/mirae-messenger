@@ -173,6 +173,8 @@ async function matchMasterPassword(input, stored) {
 let mainWindow;
 let scheduleBoardWindow = null;
 let noticeBoardWindow = null;
+let captureOverlayWindow = null;
+let captureOverlayMainWasHidden = false;
 /** 💬 별도 채팅창: 상대(채널) 키 → BrowserWindow. 파일 앞쪽 함수들도 참조하므로 상단에 선언한다. */
 const chatWindows = new Map();
 let excalidrawWindow = null;
@@ -5805,26 +5807,133 @@ ipcMain.handle('get-desktop-capture-sources', async () => {
   }));
 });
 
+async function captureDesktopSourceImageDataUrl(sourceId) {
+  const primary = screen.getPrimaryDisplay();
+  const thumbW = Math.min(7680, Math.max(640, Math.round(primary.size.width * primary.scaleFactor)));
+  const thumbH = Math.min(4320, Math.max(480, Math.round(primary.size.height * primary.scaleFactor)));
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: thumbW, height: thumbH },
+    fetchWindowIcons: false
+  });
+  const source = sources.find((s) => s.id === sourceId) || sources.find((s) => String(s.id).startsWith('screen')) || sources[0];
+  if (!source || !source.thumbnail || source.thumbnail.isEmpty()) {
+    return { success: false, error: 'EMPTY_CAPTURE' };
+  }
+  const jpeg = source.thumbnail.toJPEG(88);
+  const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+  return { success: true, dataUrl };
+}
+
 ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
   try {
-    const primary = screen.getPrimaryDisplay();
-    const thumbW = Math.min(7680, Math.max(640, Math.round(primary.size.width * primary.scaleFactor)));
-    const thumbH = Math.min(4320, Math.max(480, Math.round(primary.size.height * primary.scaleFactor)));
-    const sources = await desktopCapturer.getSources({
-      types: ['screen', 'window'],
-      thumbnailSize: { width: thumbW, height: thumbH },
-      fetchWindowIcons: false
-    });
-    const source = sources.find((s) => s.id === sourceId) || sources.find((s) => String(s.id).startsWith('screen')) || sources[0];
-    if (!source || !source.thumbnail || source.thumbnail.isEmpty()) {
-      return { success: false, error: 'EMPTY_CAPTURE' };
-    }
-    const jpeg = source.thumbnail.toJPEG(88);
-    const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
-    return { success: true, dataUrl };
+    return await captureDesktopSourceImageDataUrl(sourceId);
   } catch (err) {
     return { success: false, error: err.message || String(err) };
   }
+});
+
+/** IPMSG처럼 「영역 캡처」를 누르면 메신저 창이 실제로 내려가고, 그 자리에서 바로 실제
+ *  화면(스크린샷)을 드래그해 영역을 고를 수 있게 하는 전용 오버레이 창. 기존엔 메신저
+ *  창은 그대로 둔 채 그 안에 스크린샷을 담은 모달을 띄웠는데, 사용자가 "메신저만 내려가고
+ *  거기서 바로 원하는 영역을 보낼 수 있게" 요청해서, 메인 창을 진짜로 숨기고 화면 전체를
+ *  덮는 별도 창에서 선택하도록 바꿨다. */
+function closeCaptureOverlayAndRestoreMain() {
+  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) {
+    captureOverlayWindow.close();
+  }
+  captureOverlayWindow = null;
+  if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  captureOverlayMainWasHidden = false;
+}
+
+ipcMain.handle('open-region-capture-overlay', async () => {
+  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) {
+    captureOverlayWindow.focus();
+    return { success: true };
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'NO_MAIN_WINDOW' };
+  try {
+    const wasHidden = !mainWindow.isVisible();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.hide();
+    captureOverlayMainWasHidden = !wasHidden;
+    await new Promise((r) => setTimeout(r, 250));
+
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 64, height: 64 }, fetchWindowIcons: false });
+    const primaryId = (sources[0] && sources[0].id) || 'screen:0:0';
+    const captured = await captureDesktopSourceImageDataUrl(primaryId);
+    if (!captured.success) {
+      if (captureOverlayMainWasHidden) { mainWindow.show(); mainWindow.focus(); }
+      captureOverlayMainWasHidden = false;
+      return captured;
+    }
+
+    const display = screen.getPrimaryDisplay();
+    captureOverlayWindow = new BrowserWindow({
+      x: display.bounds.x,
+      y: display.bounds.y,
+      width: display.bounds.width,
+      height: display.bounds.height,
+      frame: false,
+      transparent: false,
+      alwaysOnTop: true,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      show: false,
+      backgroundColor: '#0f172a',
+      webPreferences: {
+        preload: getMainPreloadPath(),
+        contextIsolation: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        backgroundThrottling: false
+      }
+    });
+    captureOverlayWindow.setMenu(null);
+    captureOverlayWindow.loadFile('index.html', { hash: 'capture-overlay' });
+    captureOverlayWindow.webContents.once('did-finish-load', () => {
+      if (!captureOverlayWindow || captureOverlayWindow.isDestroyed()) return;
+      captureOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      captureOverlayWindow.show();
+      captureOverlayWindow.focus();
+      captureOverlayWindow.webContents.send('capture-overlay-init', captured.dataUrl);
+    });
+    captureOverlayWindow.on('closed', () => {
+      captureOverlayWindow = null;
+      if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      captureOverlayMainWasHidden = false;
+    });
+    return { success: true };
+  } catch (err) {
+    if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    captureOverlayMainWasHidden = false;
+    return { success: false, error: err.message || String(err) };
+  }
+});
+
+ipcMain.on('region-capture-confirm', (event, dataUrl) => {
+  closeCaptureOverlayAndRestoreMain();
+  if (mainWindow && !mainWindow.isDestroyed() && dataUrl) {
+    mainWindow.webContents.send('region-capture-result', dataUrl);
+  }
+});
+
+ipcMain.on('region-capture-cancel', () => {
+  closeCaptureOverlayAndRestoreMain();
 });
 
 // ⚠️ 실사고: 화면 캡처(특히 영역 캡처) 직전에 창 UI가 스크린샷에 안 찍히게 잠깐 숨기려고

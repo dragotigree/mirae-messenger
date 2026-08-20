@@ -2266,6 +2266,26 @@
     #screen-capture-crop-img { display: block; max-width: 100%; height: auto; vertical-align: top; }
     #screen-capture-crop-shade { position: absolute; inset: 0; pointer-events: none; box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55); display: none; }
     #screen-capture-crop-rect { position: absolute; border: 2px solid #90CAF9; background: rgba(144, 202, 249, 0.12); display: none; pointer-events: none; box-sizing: border-box; }
+
+    /* IPMSG처럼 메신저 창이 내려가고 실제 화면 위에서 바로 영역을 고르는 전용 캡처
+       오버레이 창 전용 스타일 — 화면 전체를 스크린샷으로 채우고 카드 여백/그림자를 없앤다. */
+    body.capture-overlay-standalone { background: #0f172a; overflow: hidden; }
+    body.capture-overlay-standalone #screen-capture-crop-modal { background: transparent; animation: none; }
+    body.capture-overlay-standalone #screen-capture-crop-modal .modal-card {
+      width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
+      border-radius: 0; padding: 0; margin: 0; box-shadow: none; gap: 0;
+    }
+    body.capture-overlay-standalone #screen-capture-crop-modal .modal-card > div:first-child,
+    body.capture-overlay-standalone #screen-capture-crop-modal .modal-card > div:nth-child(2) {
+      display: none;
+    }
+    body.capture-overlay-standalone #screen-capture-crop-stage {
+      max-height: 100vh; height: 100vh; border-radius: 0; overflow: hidden;
+    }
+    body.capture-overlay-standalone #screen-capture-crop-img { max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; object-fit: contain; }
+    body.capture-overlay-standalone #screen-capture-crop-modal .modal-card > div:last-child {
+      position: fixed; right: 24px; bottom: 24px; z-index: 5;
+    }
     #screen-capture-source-modal .capture-source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; max-height: 55vh; overflow-y: auto; padding: 4px 0; }
     .capture-source-card { border: 2px solid var(--border); border-radius: 12px; padding: 8px; cursor: pointer; background: #fff; transition: border-color 0.12s, box-shadow 0.12s; }
     .capture-source-card:hover { border-color: #90CAF9; box-shadow: var(--shadow-sm); }
@@ -10375,6 +10395,36 @@
       return (location.hash || '').replace(/^#/, '') === 'notice-board';
     }
 
+    /* IPMSG처럼 메신저 창이 실제로 내려가고, 그 자리에서 바로 화면(스크린샷)을 드래그해
+       영역을 고르는 전용 캡처 오버레이 창인지 확인한다. main.js의 open-region-capture-overlay
+       핸들러가 이 해시로 별도 프레임리스 창을 띄운다. */
+    function isCaptureOverlayStandalone() {
+      return (location.hash || '').replace(/^#/, '') === 'capture-overlay';
+    }
+
+    function initCaptureOverlayStandaloneShell() {
+      document.body.classList.add('capture-overlay-standalone');
+      document.title = '영역 캡처 — Mirae Messenger';
+      const splash = document.getElementById('splash-screen');
+      if (splash) splash.classList.add('is-hidden');
+      const titlebar = document.getElementById('custom-titlebar');
+      if (titlebar) titlebar.style.display = 'none';
+      const appRow = document.getElementById('app-body-row');
+      if (appRow) appRow.style.display = 'none';
+      const modal = document.getElementById('screen-capture-crop-modal');
+      if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); cancelScreenCrop(); }
+      });
+      if (window.api && typeof window.api.onCaptureOverlayInit === 'function') {
+        window.api.onCaptureOverlayInit((dataUrl) => {
+          if (dataUrl) openScreenCropModal(dataUrl);
+        });
+      }
+    }
+
     function initNoticeBoardStandaloneShell() {
       document.body.classList.add('notice-board-standalone');
       document.title = '공지사항 게시판 — Mirae Messenger';
@@ -10429,6 +10479,11 @@
       if (window.api && typeof window.api.onExcalidrawPngReady === 'function') {
         window.api.onExcalidrawPngReady((data) => { handleExcalidrawPngReady(data); });
       }
+      if (!isCaptureOverlayStandalone() && window.api && typeof window.api.onRegionCaptureResult === 'function') {
+        window.api.onRegionCaptureResult((dataUrl) => {
+          if (dataUrl) processAndSendImageDataUrl(dataUrl, `capture-${Date.now()}.jpg`);
+        });
+      }
       window.addEventListener('storage', (e) => {
         if (e.key === NOTICE_OPERATOR_STORAGE_KEY) {
           loadNoticeOperatorSession();
@@ -10439,6 +10494,7 @@
       if (isScheduleBoardStandalone()) initScheduleBoardStandaloneShell();
       if (isNoticeBoardStandalone()) initNoticeBoardStandaloneShell();
       if (isChatWindowStandalone()) initChatWindowStandaloneShell();
+      if (isCaptureOverlayStandalone()) initCaptureOverlayStandaloneShell();
       applyCompactDenseListClass();
       paintUiIcons();
       initUserDragAndDrop();
@@ -21507,6 +21563,10 @@
       screenCropState = { dataUrl: null, sel: null };
       screenCropDrag = null;
       document.getElementById('screen-capture-crop-img').src = '';
+      if (isCaptureOverlayStandalone()) {
+        if (window.api && window.api.sendRegionCaptureCancel) window.api.sendRegionCaptureCancel();
+        return;
+      }
       restoreWindowAfterScreenCrop();
     }
 
@@ -21545,7 +21605,15 @@
         canvas.width = sw;
         canvas.height = sh;
         canvas.getContext('2d').drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
-        processAndSendImageDataUrl(canvas.toDataURL('image/jpeg', 0.88), `capture-${Date.now()}.jpg`);
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        if (isCaptureOverlayStandalone()) {
+          document.getElementById('screen-capture-crop-modal').style.display = 'none';
+          screenCropState = { dataUrl: null, sel: null };
+          screenCropDrag = null;
+          if (window.api && window.api.sendRegionCaptureConfirm) window.api.sendRegionCaptureConfirm(croppedDataUrl);
+          return;
+        }
+        processAndSendImageDataUrl(croppedDataUrl, `capture-${Date.now()}.jpg`);
         cancelScreenCrop();
       };
       image.onerror = () => { void appAlert('영역을 잘라내지 못했습니다.'); };
@@ -21562,6 +21630,21 @@
         await openScreenCaptureSourceModal();
         return;
       }
+      if (mode === 'region') {
+        // IPMSG처럼: 메신저 창을 실제로 내리고, 그 자리에서 바로 실제 화면(스크린샷) 위에서
+        // 드래그로 영역을 골라 보낸다. 캡처·창 숨김·영역 선택 전부 main.js의 전용 오버레이
+        // 창(open-region-capture-overlay)에서 처리하고, 결과만 region-capture-result로 돌아온다.
+        try {
+          const res = await window.api.openRegionCaptureOverlay();
+          if (!res || !res.success) {
+            await appAlert('화면을 캡처하지 못했습니다.');
+          }
+        } catch (e) {
+          console.error(e);
+          await appAlert('화면을 캡처하지 못했습니다.');
+        }
+        return;
+      }
       let sources;
       try {
         sources = await getDesktopCaptureSources();
@@ -21575,26 +21658,7 @@
         return;
       }
       try {
-        if (mode === 'region') {
-          // ⚠️ 예전엔 여기서 창을 통째로 숨겼다가(withMainWindowHiddenForCapture) 캡처 후
-          // 다시 보이게 했는데, 그 순간 창이 "최소화됐다 돌아오는" 것처럼 느껴진다는 요청으로
-          // 없앴다. 이제 창을 그대로 둔 채로 화면을 캡처한다 — "전체 화면 캡처"(다른 창 선택)
-          // 모드도 원래 창을 숨기지 않았으므로 동작을 통일한 것이기도 하다. 메신저 창이 화면
-          // 일부를 가리고 있었다면 그 캡처 결과에도 그대로 보이지만, 사용자가 다른 부분을
-          // 드래그해서 고르면 그 부분만 잘라 보내므로 실제 사용에는 문제가 없다.
-          const dataUrl = await captureFrameFromSource(source.id);
-          // IPMSG처럼 화면 전체를 자연스럽게 드래그해서 고를 수 있도록, 창이 최대화 상태가
-          // 아니었으면 영역을 고르는 동안만 최대화한다(고르고 나면 restoreWindowAfterScreenCrop
-          // 에서 원래 크기로 되돌림).
-          screenCropWasMaximizedBefore = isMainWindowMaximized;
-          if (!isMainWindowMaximized && window.api && window.api.windowMaximizeToggle) {
-            try { await window.api.windowMaximizeToggle(); } catch (_) { /* ignore */ }
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          }
-          openScreenCropModal(dataUrl);
-        } else {
-          await captureAndSendFromSource(source.id, `capture-${Date.now()}.jpg`);
-        }
+        await captureAndSendFromSource(source.id, `capture-${Date.now()}.jpg`);
       } catch (e) {
         console.error(e);
         await appAlert('화면 캡처에 실패했습니다.');
