@@ -5318,15 +5318,15 @@
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
+        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; flex-wrap:wrap; row-gap:6px; justify-content:space-between; align-items:center; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:4px; min-width:0;">
             <span style="display:flex; align-items:center; gap:6px;"><span data-ui-icon="users"></span> 사용자</span>
           </span>
-          <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <select id="sidebar-floor-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('floor', this.value); this.value='';" title="층별로 보기 · 해당 층으로 이동" style="font-size:11px; padding:2px 4px; max-width:80px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+          <span style="display:flex; flex-wrap:wrap; row-gap:6px; align-items:center; gap:8px;">
+            <select id="sidebar-floor-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('floor', this.value); this.value='';" title="층별로 보기 · 해당 층으로 이동" style="font-size:13px; padding:3px 6px; max-width:92px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
               <option value="">층별</option>
             </select>
-            <select id="sidebar-dept-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('dept', this.value); this.value='';" title="부서별로 보기 · 해당 부서로 이동" style="font-size:11px; padding:2px 4px; max-width:80px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
+            <select id="sidebar-dept-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('dept', this.value); this.value='';" title="부서별로 보기 · 해당 부서로 이동" style="font-size:13px; padding:3px 6px; max-width:92px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text-secondary); cursor:pointer;">
               <option value="">부서별</option>
             </select>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
