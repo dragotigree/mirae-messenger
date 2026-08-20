@@ -173,7 +173,7 @@ async function matchMasterPassword(input, stored) {
 let mainWindow;
 let scheduleBoardWindow = null;
 let noticeBoardWindow = null;
-let captureOverlayWindow = null;
+let captureOverlayWindows = new Map(); // displayId(String) -> BrowserWindow
 let captureOverlayMainWasHidden = false;
 /** 💬 별도 채팅창: 상대(채널) 키 → BrowserWindow. 파일 앞쪽 함수들도 참조하므로 상단에 선언한다. */
 const chatWindows = new Map();
@@ -5364,11 +5364,7 @@ async function openChatWindow(payload) {
 
   const existing = getChatWindowFor(peerKey);
   if (existing) {
-    try {
-      if (existing.isMinimized()) existing.restore();
-      existing.show();
-      existing.focus();
-    } catch (e) { /* ignore */ }
+    bringWindowToFront(existing);
     return { success: true, reused: true };
   }
 
@@ -5400,7 +5396,15 @@ async function openChatWindow(payload) {
     if (!win || win.isDestroyed()) return;
     try { win.webContents.send('chat-window-open', { peerKey, title }); } catch (e) { /* ignore */ }
   };
-  win.webContents.once('did-finish-load', () => setTimeout(sendOpenPayload, 150));
+  // ⚠️ 실사고: 미니 모드에서 사람을 눌러 새 채팅창을 열어도, Windows의 "포커스 스틸링
+  // 방지" 정책 때문에 방금 포커스를 쥐고 있던 미니 모드 창 뒤에 새 창이 가려진 채로
+  // 남는 문제가 있었다(병동 일정 현황판 창에서 이미 같은 문제를 겪어 bringWindowToFront로
+  // 고쳤던 것과 동일한 원인). 채팅창도 똑같이 적용한다.
+  bringWindowToFront(win);
+  win.webContents.once('did-finish-load', () => {
+    bringWindowToFront(win);
+    setTimeout(sendOpenPayload, 150);
+  });
 
   const sendChatWinMaximizedState = () => {
     if (!win || win.isDestroyed()) return;
@@ -5838,13 +5842,18 @@ ipcMain.handle('capture-desktop-source-image', async (event, sourceId) => {
  *  ⚠️ 실사고: 처음엔 캡처를 누를 때마다 이 창을 새로 만들었는데(loadFile → did-finish-load
  *  대기), 그 생성 자체에 걸리는 시간 때문에 "새 창이 뜨는" 전환이 눈에 보였다(사용자가
  *  IPMSG는 이런 전환 없이 바로 화면 위에서 선택된다고 지적). 그래서 이 오버레이 창을 앱
- *  시작 시 미리 한 번만 만들어서 숨겨둔 채로 유지하고(prewarmCaptureOverlayWindow),
+ *  시작 시 미리 한 번만 만들어서 숨겨둔 채로 유지하고(prewarmCaptureOverlayWindows),
  *  캡처할 때는 이미 떠 있는 창에 이미지만 흘려보내고 show()만 호출한다 — 창 생성/로딩
  *  과정이 전혀 보이지 않는다. 확인·취소 후에도 창을 닫지 않고 숨기기만 해서 다음 캡처도
- *  똑같이 즉시 뜬다. */
-async function prewarmCaptureOverlayWindow() {
-  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) return captureOverlayWindow;
-  const display = screen.getPrimaryDisplay();
+ *  똑같이 즉시 뜬다.
+ *  ⚠️ 실사고: 모니터가 두 대 이상이면 처음엔 기본(주) 모니터 하나에만 오버레이가 떴다
+ *  ("듀얼인 경우 하나만 선택된다"는 요청으로 확인). 이제 연결된 모니터마다 각각 자기
+ *  화면의 스크린샷을 담은 오버레이 창을 띄운다 — 아무 모니터에서나 영역을 골라 보내면
+ *  나머지 모니터의 오버레이도 함께 닫힌다. */
+function ensureCaptureOverlayWindowForDisplay(display) {
+  const key = String(display.id);
+  const existing = captureOverlayWindows.get(key);
+  if (existing && !existing.isDestroyed()) return existing;
   const win = new BrowserWindow({
     x: display.bounds.x,
     y: display.bounds.y,
@@ -5871,20 +5880,28 @@ async function prewarmCaptureOverlayWindow() {
   });
   win.setMenu(null);
   win.on('closed', () => {
-    if (captureOverlayWindow === win) captureOverlayWindow = null;
+    if (captureOverlayWindows.get(key) === win) captureOverlayWindows.delete(key);
   });
-  captureOverlayWindow = win;
-  await new Promise((resolve) => {
+  captureOverlayWindows.set(key, win);
+  const ready = new Promise((resolve) => {
     win.webContents.once('did-finish-load', resolve);
-    win.loadFile('index.html', { hash: 'capture-overlay' });
   });
+  win.loadFile('index.html', { hash: 'capture-overlay' });
+  win._readyPromise = ready;
   return win;
 }
 
+async function prewarmCaptureOverlayWindows() {
+  const displays = screen.getAllDisplays();
+  const wins = displays.map((d) => ensureCaptureOverlayWindowForDisplay(d));
+  await Promise.all(wins.map((w) => w._readyPromise || Promise.resolve()));
+  return wins;
+}
+
 function closeCaptureOverlayAndRestoreMain() {
-  if (captureOverlayWindow && !captureOverlayWindow.isDestroyed()) {
-    captureOverlayWindow.hide();
-  }
+  captureOverlayWindows.forEach((win) => {
+    if (win && !win.isDestroyed()) win.hide();
+  });
   if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
     mainWindow.focus();
@@ -5892,14 +5909,44 @@ function closeCaptureOverlayAndRestoreMain() {
   captureOverlayMainWasHidden = false;
 }
 
+/** 모니터마다 자기 화면의 스크린샷을 짝지어 준다. Windows에서는 desktopCapturer가 주는
+ *  display_id로 정확히 짝짓고, display_id가 비어 있는 환경(일부 Linux 등)에서는 모니터
+ *  수와 화면 소스 수가 같을 때에 한해 순서대로 짝짓는다. */
+async function captureAllScreenSourcesForOverlay() {
+  const displays = screen.getAllDisplays();
+  let maxW = 640, maxH = 480;
+  displays.forEach((d) => {
+    maxW = Math.max(maxW, Math.round(d.size.width * d.scaleFactor));
+    maxH = Math.max(maxH, Math.round(d.size.height * d.scaleFactor));
+  });
+  maxW = Math.min(7680, maxW);
+  maxH = Math.min(4320, maxH);
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: maxW, height: maxH },
+    fetchWindowIcons: false
+  });
+  const screenSources = sources.filter((s) => String(s.id).startsWith('screen'));
+  const byDisplayId = new Map();
+  screenSources.forEach((s) => { if (s.display_id) byDisplayId.set(String(s.display_id), s); });
+
+  return displays.map((d, idx) => {
+    let source = byDisplayId.get(String(d.id));
+    if (!source && screenSources.length === displays.length) source = screenSources[idx];
+    if (!source) source = screenSources[0];
+    return { display: d, source };
+  });
+}
+
 ipcMain.handle('open-region-capture-overlay', async () => {
   if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'NO_MAIN_WINDOW' };
   try {
-    const overlay = await prewarmCaptureOverlayWindow();
-    if (overlay.isVisible()) { overlay.focus(); return { success: true }; }
-
-    const display = screen.getPrimaryDisplay();
-    overlay.setBounds({ x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height });
+    const overlays = await prewarmCaptureOverlayWindows();
+    if (overlays.some((w) => w.isVisible())) {
+      const primaryWin = captureOverlayWindows.get(String(screen.getPrimaryDisplay().id));
+      (primaryWin || overlays[0]).focus();
+      return { success: true };
+    }
 
     const wasHidden = !mainWindow.isVisible();
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -5910,28 +5957,41 @@ ipcMain.handle('open-region-capture-overlay', async () => {
     await new Promise((r) => setTimeout(r, 120));
 
     // ⚠️ 실사고: 여기서 별도로 desktopCapturer.getSources를 먼저 불러 소스 id를 구한 뒤
-    // captureDesktopSourceImageDataUrl 안에서 다시 한 번 getSources를 불렀는데(원본
-    // "전체 화면 캡처"가 하던 한 번 호출과 달리 두 번 연속 호출), 병원 PC 일부 환경에서
-    // 이 두 번째 호출이 실패해 "화면을 캡처하지 못했습니다" 오류가 났다. 원래 잘 동작하던
-    // "전체 화면 캡처"와 동일하게 getSources를 한 번만 부르도록 단순화했다.
-    let captured = await captureDesktopSourceImageDataUrl('screen:0:0');
-    if (!captured.success) {
+    // 또 한 번 getSources를 부르는 식으로(원래 "전체 화면 캡처"가 하던 한 번 호출과 달리
+    // 두 번 연속 호출) 만들었더니, 병원 PC 일부 환경에서 이 중복 호출이 실패를 일으켰다.
+    // 모니터별 캡처도 getSources를 딱 한 번만 부르도록(captureAllScreenSourcesForOverlay)
+    // 유지한다.
+    let pairs = await captureAllScreenSourcesForOverlay();
+    if (!pairs.some((p) => p.source && p.source.thumbnail && !p.source.thumbnail.isEmpty())) {
       // 화면 캡처가 실패할 수 있는 순간적인 상태(창이 막 숨겨진 직후 등)를 감안해 한 번만
       // 짧게 재시도한다.
       await new Promise((r) => setTimeout(r, 200));
-      captured = await captureDesktopSourceImageDataUrl('screen:0:0');
-    }
-    if (!captured.success) {
-      writeToLogFile('error', `[영역캡처] 화면 캡처 실패: ${captured.error || 'UNKNOWN'}`);
-      if (captureOverlayMainWasHidden) { mainWindow.show(); mainWindow.focus(); }
-      captureOverlayMainWasHidden = false;
-      return captured;
+      pairs = await captureAllScreenSourcesForOverlay();
     }
 
-    overlay.webContents.send('capture-overlay-init', captured.dataUrl);
-    overlay.setAlwaysOnTop(true, 'screen-saver');
-    overlay.show();
-    overlay.focus();
+    let anyShown = false;
+    for (const { display, source } of pairs) {
+      if (!source || !source.thumbnail || source.thumbnail.isEmpty()) continue;
+      const overlay = captureOverlayWindows.get(String(display.id));
+      if (!overlay || overlay.isDestroyed()) continue;
+      overlay.setBounds({ x: display.bounds.x, y: display.bounds.y, width: display.bounds.width, height: display.bounds.height });
+      const jpeg = source.thumbnail.toJPEG(88);
+      const dataUrl = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+      overlay.webContents.send('capture-overlay-init', dataUrl);
+      overlay.setAlwaysOnTop(true, 'screen-saver');
+      overlay.show();
+      anyShown = true;
+    }
+
+    if (!anyShown) {
+      writeToLogFile('error', '[영역캡처] 화면 캡처 실패: EMPTY_CAPTURE (모든 모니터)');
+      if (captureOverlayMainWasHidden) { mainWindow.show(); mainWindow.focus(); }
+      captureOverlayMainWasHidden = false;
+      return { success: false, error: 'EMPTY_CAPTURE' };
+    }
+
+    const primaryOverlay = captureOverlayWindows.get(String(screen.getPrimaryDisplay().id));
+    if (primaryOverlay && primaryOverlay.isVisible()) primaryOverlay.focus();
     return { success: true };
   } catch (err) {
     writeToLogFile('error', `[영역캡처] 오버레이 열기 실패: ${err && err.message || err}`);
@@ -6055,7 +6115,7 @@ app.whenReady().then(async () => {
   setupJumpList();
   registerGlobalShortcuts();
   // 영역 캡처 창을 미리 만들어 숨겨둔다 — 처음 캡처할 때도 창 생성 지연이 보이지 않게.
-  setTimeout(() => { prewarmCaptureOverlayWindow().catch(() => {}); }, 3000);
+  setTimeout(() => { prewarmCaptureOverlayWindows().catch(() => {}); }, 3000);
 
   const initialJumpAction = parseJumpListActionFromArgv(process.argv);
   if (initialJumpAction && mainWindow) {
