@@ -903,6 +903,15 @@
     .user-card-unread { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; min-width: 20px; padding-left: 6px; }
     .user-name-text { font-weight: 600; font-size: 12.5px; color: var(--sidebar-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-sub-text { font-size: 10.5px; font-weight: 400; color: var(--sidebar-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 프로필 "비고"를 목록에서도 눈에 띄게 보여주는 작은 배지. 업무명 같은 걸 적어두면
+       (예: "3층 운동/언어치료 스케쥴") 길어도 잘리고, 전체 내용은 마우스를 올리면 보인다. */
+    .user-note-badge {
+      display: inline-block; max-width: 100%; margin-top: 3px; padding: 1px 7px;
+      font-size: 10px; font-weight: 700; line-height: 1.5; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent-dark);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em;
+    }
+    .user-card-item.active:not(.is-multi-selected) .user-note-badge { background: rgba(255,255,255,0.28); color: inherit; }
     #sidebar-left .user-card-item .unread-badge { min-width: 18px; height: 18px; font-size: 10px; font-weight: 700; padding: 0 5px; box-shadow: 0 0 0 2px var(--sidebar-bg); display: inline-flex; align-items: center; justify-content: center; }
     #sidebar-left .channel-item .unread-badge,
     #sidebar-left .section-label .unread-badge,
@@ -15107,6 +15116,15 @@
       return escapeHtml(text);
     }
 
+    /** 사용자 목록 카드에 "비고"를 눈에 띄는 작은 배지로 보여준다. 비고를 안 적었으면
+     *  아무것도 안 그린다(빈 배지가 자리만 차지하지 않게). 길면 줄임표(…)로 잘리고,
+     *  전체 내용은 마우스를 올렸을 때(title 속성, 빠른 말풍선 둘 다) 볼 수 있다. */
+    function userNoteBadgeHtml(u) {
+      const note = (u && u.note && String(u.note).trim()) || '';
+      if (!note) return '';
+      return `<div class="user-note-badge" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
+    }
+
     function stripCuteAvatarClasses(el) {
       if (!el) return;
       for (let i = 0; i < CUTE_AVATAR_PALETTE_COUNT; i++) el.classList.remove(`avatar-cute-${i}`);
@@ -15541,9 +15559,10 @@
       const photoOk = isUsableProfilePhoto(u.photo);
       const displayName = formatDmListDisplayName(u);
       const subHtml = formatUserSubLineSidebarHtml(u);
+      const noteBadgeHtml = userNoteBadgeHtml(u);
       const bodyHtml = subHtml
-        ? `<div class="user-card-body"><div class="user-name-text">${displayName}</div><div class="user-sub-text">${subHtml}</div></div>`
-        : `<div class="user-card-body"><div class="user-name-text">${displayName}</div></div>`;
+        ? `<div class="user-card-body"><div class="user-name-text">${displayName}</div><div class="user-sub-text">${subHtml}</div>${noteBadgeHtml}</div>`
+        : `<div class="user-card-body"><div class="user-name-text">${displayName}</div>${noteBadgeHtml}</div>`;
       card.innerHTML = `
         <div class="avatar-wrapper">
           <div class="avatar-circle ${photoOk ? 'avatar-photo' : cuteAvatarClassFor(u.username, u.photo, u.ip)}">${avatarInnerHtml(u.username, u.photo, u.ip)}</div>
@@ -15601,6 +15620,19 @@
         const subEl = card.querySelector('.user-sub-text');
         const subHtml = formatUserSubLineSidebarHtml(u);
         if (subEl && subHtml) subEl.innerHTML = subHtml;
+        const note = (u.note && String(u.note).trim()) || '';
+        let noteEl = card.querySelector('.user-note-badge');
+        if (note) {
+          if (!noteEl) {
+            noteEl = document.createElement('div');
+            noteEl.className = 'user-note-badge';
+            card.querySelector('.user-card-body')?.appendChild(noteEl);
+          }
+          noteEl.textContent = note;
+          noteEl.title = note;
+        } else if (noteEl) {
+          noteEl.remove();
+        }
         const host = card.querySelector('.user-card-unread');
         if (host) host.innerHTML = unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : '';
       });
