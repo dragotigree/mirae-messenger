@@ -15821,14 +15821,14 @@
         const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
         const countBadge = block.querySelector('.group-count-badge');
         if (countBadge) countBadge.textContent = groupStaffCountBadge(groupUsers);
-        const trail = block.querySelector('.subsection-label > span:last-child');
-        if (!trail) return;
-        let unreadEl = trail.querySelector('.unread-badge');
+        const nameTrail = block.querySelector('.subsection-label > span:first-child');
+        if (!nameTrail) return;
+        let unreadEl = nameTrail.querySelector('.unread-badge');
         if (groupUnread > 0) {
           if (!unreadEl) {
             unreadEl = document.createElement('span');
             unreadEl.className = 'unread-badge';
-            trail.appendChild(unreadEl);
+            nameTrail.appendChild(unreadEl);
           }
           unreadEl.textContent = formatUnreadBadge(groupUnread);
         } else if (unreadEl) {
@@ -15944,13 +15944,13 @@
         const icon = getUserGroupSidebarIcon(groupingKey, groupName);
 
         label.innerHTML = `
-          <span style="display:flex; align-items:center; min-width:0; flex:1; gap:2px;">
+          <span style="display:flex; align-items:center; min-width:0; flex:1; gap:6px;">
             <span class="channel-reorder-grip" title="드래그하여 순서 변경">⠿</span>
             <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span class="group-chevron">▾</span>${icon} ${escapeHtml(groupName)}</span>
+            ${groupUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(groupUnread)}</span>` : ''}
           </span>
           <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
             <span class="group-count-badge">${groupStaffCountBadge(groupUsers)}</span>
-            ${groupUnread > 0 ? `<span class="unread-badge">${formatUnreadBadge(groupUnread)}</span>` : ''}
           </span>
         `;
         label.onclick = (e) => {
