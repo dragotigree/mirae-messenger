@@ -2468,6 +2468,17 @@
     body.compact-dense-list .compact-section-label { padding: 8px 14px 3px; }
     body.compact-dense-list .compact-list-item .unread-badge { min-width: 18px; height: 18px; }
 
+    /* 일반 화면(3단) 사이드바 「최근 대화」 — 바로 아래 「사용자」 목록과 여백 차이가
+       너무 크다는 요청으로, 위 "촘촘하게 보기" 값을 그대로 가져와 이 섹션에만 항상
+       적용한다(설정과 무관하게 고정). 미니 모드 자체의 목록 카드 크기는 그대로 둔다. */
+    #recent-chats-section-body .compact-list-item { min-height: 40px; padding: 5px 14px; gap: 9px; }
+    #recent-chats-section-body .compact-avatar { width: 32px; height: 32px; font-size: 12px; }
+    #recent-chats-section-body .compact-item-body { gap: 1px; }
+    #recent-chats-section-body .compact-item-name { font-size: 13.5px; }
+    #recent-chats-section-body .compact-item-sub,
+    #recent-chats-section-body .compact-item-preview { font-size: 11.5px; }
+    #recent-chats-section-body .compact-list-item .unread-badge { min-width: 18px; height: 18px; }
+
     .compact-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; }
     .compact-more-profile { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: #fff; }
     .compact-more-profile-top { padding: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
