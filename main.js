@@ -5909,10 +5909,20 @@ ipcMain.handle('open-region-capture-overlay', async () => {
     // (너무 짧으면 캡처 결과에 메신저 창이 순간적으로 찍힐 수 있다).
     await new Promise((r) => setTimeout(r, 120));
 
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 64, height: 64 }, fetchWindowIcons: false });
-    const primaryId = (sources[0] && sources[0].id) || 'screen:0:0';
-    const captured = await captureDesktopSourceImageDataUrl(primaryId);
+    // ⚠️ 실사고: 여기서 별도로 desktopCapturer.getSources를 먼저 불러 소스 id를 구한 뒤
+    // captureDesktopSourceImageDataUrl 안에서 다시 한 번 getSources를 불렀는데(원본
+    // "전체 화면 캡처"가 하던 한 번 호출과 달리 두 번 연속 호출), 병원 PC 일부 환경에서
+    // 이 두 번째 호출이 실패해 "화면을 캡처하지 못했습니다" 오류가 났다. 원래 잘 동작하던
+    // "전체 화면 캡처"와 동일하게 getSources를 한 번만 부르도록 단순화했다.
+    let captured = await captureDesktopSourceImageDataUrl('screen:0:0');
     if (!captured.success) {
+      // 화면 캡처가 실패할 수 있는 순간적인 상태(창이 막 숨겨진 직후 등)를 감안해 한 번만
+      // 짧게 재시도한다.
+      await new Promise((r) => setTimeout(r, 200));
+      captured = await captureDesktopSourceImageDataUrl('screen:0:0');
+    }
+    if (!captured.success) {
+      writeToLogFile('error', `[영역캡처] 화면 캡처 실패: ${captured.error || 'UNKNOWN'}`);
       if (captureOverlayMainWasHidden) { mainWindow.show(); mainWindow.focus(); }
       captureOverlayMainWasHidden = false;
       return captured;
@@ -5924,6 +5934,7 @@ ipcMain.handle('open-region-capture-overlay', async () => {
     overlay.focus();
     return { success: true };
   } catch (err) {
+    writeToLogFile('error', `[영역캡처] 오버레이 열기 실패: ${err && err.message || err}`);
     if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
       mainWindow.focus();
