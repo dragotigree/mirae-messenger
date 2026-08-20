@@ -6535,6 +6535,13 @@
                 <span class="settings-toggle-desc">켜면 위 표시 시간과 무관하게, 「닫기」·「읽기」를 누르기 전까지 알림이 화면에 계속 떠 있습니다.</span>
               </span>
             </label>
+            <label class="settings-toggle-row" for="setting-toast-keyboard-open">
+              <input type="checkbox" id="setting-toast-keyboard-open">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">스페이스바·엔터로 알림 바로 열기</span>
+                <span class="settings-toggle-desc">기본은 꺼짐: 알림창이 떠도 지금 하던 작업(예: 메시지 입력)이 방해받지 않도록, 알림창은 화면에만 보일 뿐 키보드는 계속 원래 창(입력하던 곳)으로 들어갑니다. 이 설정을 켜면 알림이 뜨는 순간 키보드가 알림창으로 넘어가서 스페이스바나 엔터로 바로 열 수 있게 되지만, 그 순간 메시지를 입력하던 중이었다면 타이핑이 끊기고 엔터가 「전송」이 아니라 「알림 열기」로 눌릴 수 있습니다. 알림을 자주 놓쳐서 빨리 확인하고 싶은 분만 켜는 걸 권장합니다.</span>
+              </span>
+            </label>
             <div class="settings-divider"></div>
             <div class="settings-section-title">병원 일정 알람</div>
             <label class="settings-toggle-row" for="setting-schedule-alarm-enabled">
@@ -27207,6 +27214,8 @@
         const toastStayEl = document.getElementById('setting-toast-stay');
         if (toastStayEl) toastStayEl.checked = !!msgNotify.toastStayUntilDismissed;
         syncToastStaySettingUi();
+        const toastKeyboardOpenEl = document.getElementById('setting-toast-keyboard-open');
+        if (toastKeyboardOpenEl) toastKeyboardOpenEl.checked = !!msgNotify.toastKeyboardOpenEnabled;
         const spellEl = document.getElementById('setting-spellcheck');
         if (spellEl) spellEl.checked = appSettings.spellcheck === true;
 
@@ -27260,6 +27269,9 @@
   }
   const toastStayUntilDismissed = document.getElementById('setting-toast-stay')
     ? document.getElementById('setting-toast-stay').checked
+    : false;
+  const toastKeyboardOpenEnabled = document.getElementById('setting-toast-keyboard-open')
+    ? document.getElementById('setting-toast-keyboard-open').checked
     : false;
   const notifyModeEl = document.querySelector('input[name="incoming-notify-mode"]:checked');
   const incomingNotifyMode = (notifyModeEl && notifyModeEl.value === 'desktop') ? 'desktop' : 'toast';
@@ -27372,7 +27384,8 @@
     notifyReadReceipts,
     toastDurationSeconds,
     toastStayUntilDismissed,
-    incomingNotifyMode
+    incomingNotifyMode,
+    toastKeyboardOpenEnabled
   });
   await syncSpellcheckEngine();
 

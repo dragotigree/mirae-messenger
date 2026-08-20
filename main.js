@@ -762,6 +762,10 @@ let incomingNotifyMode = 'toast';
 let toastDurationSeconds = 7;
 /** 켜면 토스트가 자동으로 안 사라지고, 「닫기」·「읽기」·X를 눌러야만 없어진다. 기본 꺼짐. */
 let toastStayUntilDismissed = true;
+/** 켜면 토스트가 뜰 때 그 창으로 키보드 포커스를 가져가 스페이스바/엔터로 바로 열 수 있게
+ *  한다. 그 대신 메시지를 입력하던 중이었다면 타이핑이 그 순간 끊긴다 — 그래서 기본은
+ *  꺼짐이고, 설정에서 직접 켜야만 동작한다. */
+let toastKeyboardOpenEnabled = false;
 let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
@@ -1439,12 +1443,18 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
   const q = new URLSearchParams({
     title: truncateToastText(title || '새 메시지', 48),
     body: truncateToastText(body || '', 72),
-    urgent: urgent ? '1' : '0'
+    urgent: urgent ? '1' : '0',
+    keyboardOpen: toastKeyboardOpenEnabled ? '1' : '0'
   });
 
   toastWindow.loadFile(path.join(__dirname, 'toast.html'), { search: `?${q.toString()}` });
   toastWindow.once('ready-to-show', () => {
-    if (toastWindow && !toastWindow.isDestroyed()) toastWindow.showInactive();
+    if (!toastWindow || toastWindow.isDestroyed()) return;
+    // 기본은 포커스를 뺏지 않는 showInactive() — 메시지를 입력하던 중이면 타이핑이 안
+    // 끊긴다. 설정에서 "스페이스바/엔터로 열기"를 켠 경우에만 포커스를 가져가 키 입력을
+    // 받을 수 있게 한다(사용자가 그 트레이드오프를 직접 선택했을 때만).
+    if (toastKeyboardOpenEnabled) toastWindow.show();
+    else toastWindow.showInactive();
   });
   toastWindow.on('closed', () => { toastWindow = null; });
 
@@ -4614,6 +4624,7 @@ db.serialize(() => {
   alterAddColumn('app_settings', `notify_read_receipts INTEGER DEFAULT 1`);
   alterAddColumn('app_settings', `toast_duration_seconds INTEGER DEFAULT 7`);
   alterAddColumn('app_settings', `toast_stay_until_dismissed INTEGER DEFAULT 1`);
+  alterAddColumn('app_settings', `toast_keyboard_open INTEGER DEFAULT 0`);
   alterAddColumn('app_settings', `incoming_notify_mode TEXT DEFAULT 'toast'`);
   alterAddColumn('app_settings', `update_mode TEXT DEFAULT 'manual'`);
   db.get(`SELECT * FROM app_settings WHERE id = 1`, (err, row) => {
@@ -4632,6 +4643,7 @@ db.serialize(() => {
         if (Number.isFinite(n)) toastDurationSeconds = Math.max(2, Math.min(60, n));
       }
       if (row.toast_stay_until_dismissed != null) toastStayUntilDismissed = !!row.toast_stay_until_dismissed;
+      if (row.toast_keyboard_open != null) toastKeyboardOpenEnabled = !!row.toast_keyboard_open;
       if (row.incoming_notify_mode === 'desktop' || row.incoming_notify_mode === 'toast') {
         incomingNotifyMode = row.incoming_notify_mode;
       } else {
@@ -12735,7 +12747,8 @@ ipcMain.handle('get-message-notification-settings', async () => ({
   notifyReadReceipts,
   toastDurationSeconds,
   toastStayUntilDismissed,
-  incomingNotifyMode
+  incomingNotifyMode,
+  toastKeyboardOpenEnabled
 }));
 
 ipcMain.handle('set-message-notification-settings', async (event, settings) => {
@@ -12755,12 +12768,15 @@ ipcMain.handle('set-message-notification-settings', async (event, settings) => {
   if (settings && (settings.incomingNotifyMode === 'toast' || settings.incomingNotifyMode === 'desktop')) {
     incomingNotifyMode = settings.incomingNotifyMode;
   }
+  if (settings && typeof settings.toastKeyboardOpenEnabled === 'boolean') {
+    toastKeyboardOpenEnabled = settings.toastKeyboardOpenEnabled;
+  }
   db.run(
-    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ?, toast_stay_until_dismissed = ?, incoming_notify_mode = ? WHERE id = 1`,
-    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds, toastStayUntilDismissed ? 1 : 0, incomingNotifyMode],
+    `UPDATE app_settings SET notify_incoming_messages = ?, notify_read_receipts = ?, toast_duration_seconds = ?, toast_stay_until_dismissed = ?, incoming_notify_mode = ?, toast_keyboard_open = ? WHERE id = 1`,
+    [notifyIncomingMessages ? 1 : 0, notifyReadReceipts ? 1 : 0, toastDurationSeconds, toastStayUntilDismissed ? 1 : 0, incomingNotifyMode, toastKeyboardOpenEnabled ? 1 : 0],
     logDbErr
   );
-  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds, toastStayUntilDismissed, incomingNotifyMode };
+  return { notifyIncomingMessages, notifyReadReceipts, toastDurationSeconds, toastStayUntilDismissed, incomingNotifyMode, toastKeyboardOpenEnabled };
 });
 
 ipcMain.handle('get-app-version', async () => APP_VERSION);

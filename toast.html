@@ -141,6 +141,21 @@
       e.stopPropagation();
       if (window.toastApi) window.toastApi.close();
     });
+
+    // 설정에서 "스페이스바/엔터로 열기"를 켠 경우에만 이 창이 포커스를 받고(main.js에서
+    // show() 사용) 이 리스너가 의미가 있다. 꺼져 있으면 이 창은 포커스를 받지 않으므로
+    // (showInactive) 아래 keydown은 애초에 발생하지 않는다.
+    if (params.get('keyboardOpen') === '1') {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Spacebar' || e.key === 'Enter') {
+          e.preventDefault();
+          if (window.toastApi) window.toastApi.open();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          if (window.toastApi) window.toastApi.close();
+        }
+      });
+    }
   </script>
 </body>
 </html>
