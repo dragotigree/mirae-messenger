@@ -5895,6 +5895,10 @@
           <div class="settings-panel" data-master-panel="traffic" style="max-width:none;">
             <h3 class="settings-panel-title">부하 감시</h3>
             <p class="settings-panel-desc">이 PC가 <b>받은</b> 네트워크 트래픽 기준입니다. 최근 1분 메시지·용량이 많거나 버퍼 초과가 있으면 「주의/과다」로 표시됩니다. (앱 재시작 전까지만 집계)</p>
+            <div class="settings-card settings-section" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <div style="font-size:13px; color:#475569;">이 PC에 저장된 공지 개수: <strong id="master-notice-count" style="color:#0f172a;">-</strong></div>
+              <button type="button" onclick="refreshMasterNoticeCount()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
+            </div>
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div id="master-traffic-meta" style="font-size:12px; color:#64748b;">집계 중…</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -18198,6 +18202,25 @@
       if (key === 'traffic') {
         try { renderMasterPeerTraffic(); } catch (_) {}
         try { refreshMasterLoadSimStatus(); } catch (_) {}
+        try { refreshMasterNoticeCount(); } catch (_) {}
+      }
+    }
+
+    /** 마스터 관리자 「부하 감시」 화면의 "저장된 공지 개수" — 그냥 세서 보여주기만
+     *  하는 읽기 전용 기능이라 다른 데이터·화면에는 영향이 없다. */
+    async function refreshMasterNoticeCount() {
+      const el = document.getElementById('master-notice-count');
+      if (!el) return;
+      el.textContent = '확인 중…';
+      try {
+        const res = await window.api.getNoticeCount();
+        if (res && res.success) {
+          el.textContent = `${res.count.toLocaleString('ko-KR')}건`;
+        } else {
+          el.textContent = '확인 실패';
+        }
+      } catch (e) {
+        el.textContent = '확인 실패';
       }
     }
 

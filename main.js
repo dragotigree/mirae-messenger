@@ -11833,6 +11833,22 @@ ipcMain.handle('delete-notice', async (event, uid) => {
   });
 });
 
+/** 마스터 관리자 「부하 감시」 화면에서 지금 이 PC에 저장된 공지 개수를 그냥 세서
+ *  보여주기만 한다 — 읽기 전용 COUNT라 다른 데이터에는 영향이 없다. */
+ipcMain.handle('get-notice-count', async () => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 인증이 필요합니다.' };
+  return new Promise((resolve) => {
+    db.get(`SELECT COUNT(*) AS cnt FROM notices`, [], (err, row) => {
+      if (err) {
+        logDbErr(err);
+        resolve({ success: false, msg: userFacingDbError(err) });
+        return;
+      }
+      resolve({ success: true, count: (row && row.cnt) || 0 });
+    });
+  });
+});
+
 ipcMain.handle('get-notice-operators', async () => {
   if (!masterSessionActive) return [];
   return new Promise((resolve) => {
