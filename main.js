@@ -6137,6 +6137,7 @@ app.whenReady().then(async () => {
   createTray();
   setupJumpList();
   registerGlobalShortcuts();
+  try { applyAutoLaunchDefaultOnce(); } catch (e) { /* ignore */ }
   // 영역 캡처 창을 미리 만들어 숨겨둔다 — 처음 캡처할 때도 창 생성 지연이 보이지 않게.
   setTimeout(() => { prewarmCaptureOverlayWindows().catch(() => {}); }, 3000);
 
@@ -14118,6 +14119,24 @@ ipcMain.handle('set-auto-launch', async (event, enable) => {
 });
 
 ipcMain.handle('get-auto-launch', async () => app.getLoginItemSettings().openAtLogin);
+
+/** 「부팅 시 자동 실행」을 기본값으로 켠다 — 단, 딱 한 번만.
+ *  업데이트 후 첫 실행에서 모든 PC에 자동 실행을 켜 주되, 이후 사용자가 설정에서 직접
+ *  끄면 그 선택이 그대로 유지되어야 한다(다음 실행 때 다시 켜지면 안 됨). 그래서 업데이트
+ *  소스 마이그레이션과 똑같이 userData의 마커 파일로 1회 실행을 보장한다. */
+function applyAutoLaunchDefaultOnce() {
+  const marker = path.join(app.getPath('userData'), 'auto-launch-default-applied.txt');
+  if (fs.existsSync(marker)) return;
+  try {
+    if (!app.getLoginItemSettings().openAtLogin) {
+      app.setLoginItemSettings({ openAtLogin: true, path: app.getPath('exe') });
+      writeToLogFile('info', '[자동실행] 기본값으로 「부팅 시 자동 실행」을 켰습니다(최초 1회).');
+    }
+    fs.writeFileSync(marker, '1', 'utf8');
+  } catch (e) {
+    writeToLogFile('warn', `[자동실행] 기본값 적용 실패: ${e && e.message || e}`);
+  }
+}
 
 function getDefaultCompactBounds(width = COMPACT_DEFAULT_WIDTH, height = COMPACT_DEFAULT_HEIGHT) {
   const current = mainWindow ? mainWindow.getBounds() : { x: 0, y: 0, width, height };
