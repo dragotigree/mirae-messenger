@@ -5917,6 +5917,8 @@
                 <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
+            <input type="text" id="master-clients-filter" placeholder="이름, 부서, 층 또는 IP로 찾기 (Ctrl+F)" oninput="onMasterClientsFilterInput(this.value)" onkeydown="onMasterClientsFilterKeyDown(event)" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12.5px; margin-top:8px;">
+            <div id="master-clients-filter-count" style="font-size:11px; color:#64748b; min-height:14px;"></div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">「사용 중지」는 안내 문구와 함께 해당 PC만 잠급니다. 「로그 삭제」는 오프라인이어도 예약되며, 대상 PC가 접속하면 바로 실행됩니다. (대상 PC 마스터 비밀번호가 이 PC와 같아야 합니다.)</p>
           </div>
@@ -18530,6 +18532,32 @@
     let masterClientsSortKey = null;
     let masterClientsSortDir = 1;
 
+    /** 「접속 PC」 표에서 사람을 바로 찾기 위한 검색어. 이름·직급·부서·층·IP를 한 번에
+     *  훑어서 걸러낸다(사이드바 사람 검색과 같은 감각). Ctrl+F로도 이 칸에 바로 들어온다. */
+    let masterClientsFilter = '';
+
+    function onMasterClientsFilterInput(value) {
+      masterClientsFilter = String(value || '').trim().toLowerCase();
+      renderMasterOnlineClients();
+    }
+
+    function onMasterClientsFilterKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        const input = document.getElementById('master-clients-filter');
+        if (input) input.value = '';
+        onMasterClientsFilterInput('');
+      }
+    }
+
+    function masterClientMatchesFilter(u) {
+      if (!masterClientsFilter) return true;
+      const hay = [u.rank, u.username, u.dept, u.subDept, u.floor, u.ip, u.note]
+        .filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(masterClientsFilter);
+    }
+
     function setMasterClientsSort(key) {
       if (masterClientsSortKey === key) {
         masterClientsSortDir = -masterClientsSortDir;
@@ -18570,7 +18598,7 @@
       const refVersion = await window.api.getAppVersion();
       if (refEl) refEl.textContent = refVersion;
 
-      const rows = [...allUsers].sort((a, b) => {
+      const rows = allUsers.filter(masterClientMatchesFilter).sort((a, b) => {
         if (masterClientsSortKey) {
           return masterClientsSortDir * compareMasterClientsBy(masterClientsSortKey, a, b);
         }
@@ -18582,8 +18610,15 @@
         return `${a.rank || ''} ${a.username || ''}`.localeCompare(`${b.rank || ''} ${b.username || ''}`, 'ko');
       });
 
+      const countEl = document.getElementById('master-clients-filter-count');
+      if (countEl) {
+        countEl.textContent = masterClientsFilter ? `검색 결과 ${rows.length}명 / 전체 ${allUsers.length}명` : '';
+      }
+
       if (rows.length === 0) {
-        box.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">아직 등록된 사용자 정보가 없습니다.</div>`;
+        box.innerHTML = masterClientsFilter
+          ? `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">「${escapeHtml(masterClientsFilter)}」와 일치하는 PC가 없습니다.</div>`
+          : `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">아직 등록된 사용자 정보가 없습니다.</div>`;
         return;
       }
 
@@ -20803,6 +20838,19 @@
         const input = document.getElementById('ipmsg-user-filter');
         if (input) { input.focus(); input.select(); }
         return true;
+      }
+      // 관리자 화면의 「접속 PC」 탭에서도 Ctrl+F로 바로 사람을 찾을 수 있게 한다 —
+      // 쪽지 보내기 창과 같은 이유로, 모달이 열려 있을 때 단축키를 막는 규칙보다 우선한다.
+      if (isFlexOverlay('master-admin-modal')) {
+        const clientsPanel = document.querySelector('[data-master-panel="clients"]');
+        const input = document.getElementById('master-clients-filter');
+        if (input && clientsPanel && clientsPanel.classList.contains('active')) {
+          e.preventDefault();
+          e.stopPropagation();
+          input.focus();
+          input.select();
+          return true;
+        }
       }
       if (isBlockingOverlayOpenForSearchShortcut()) return false;
 
