@@ -5388,6 +5388,16 @@ function sendChatEvent(channel, ...args) {
   notifyChatWindows(channel, ...args);
 }
 
+/** 메신저의 창 중 하나라도 포커스를 갖고 있는지. 메인 창뿐 아니라 별도 채팅창에서
+ *  대화를 보고 있는 경우도 "사용자가 보고 있는 중"으로 봐야 읽음 처리가 정상 동작한다. */
+function isAnyMessengerWindowFocused() {
+  try {
+    return BrowserWindow.getAllWindows().some((w) => w && !w.isDestroyed() && w.isFocused());
+  } catch (e) {
+    return !!toastUiState.focused;
+  }
+}
+
 async function openChatWindow(payload) {
   const data = payload || {};
   const peerKey = String(data.peerKey || '').trim();
@@ -10659,8 +10669,13 @@ ipcMain.handle('notify-read', async (event, arg) => {
       String(targetIP).startsWith('FLOOR:') || String(targetIP).startsWith('GROUP:')) {
     return { success: false };
   }
-  // 토스트「읽기」등 의도적 확인이 아니면, 창 포커스 없을 때 읽음 차단
-  if (!intentional && !toastUiState.focused) {
+  // 토스트「읽기」등 의도적 확인이 아니면, 창 포커스 없을 때 읽음 차단.
+  // ⚠️ 실사고: 예전엔 toastUiState.focused(메인 창의 focus/blur로만 갱신)만 봤다. 그래서
+  // 「새 창으로 열기」로 띄운 별도 채팅창에서 대화를 보고 있어도 메인 창이 포커스가 아니면
+  // 이 검사에 걸려 읽음이 상대에게 가지 않았다(방을 처음 열 때의 '의도적 읽음'만 전달되고,
+  // 그 뒤 도착한 메시지를 읽는 건 계속 「보냄」으로 남았다). 메신저의 어느 창이든 포커스를
+  // 갖고 있으면 사용자가 보고 있는 것이므로, 창 전체를 기준으로 판단한다.
+  if (!intentional && !isAnyMessengerWindowFocused()) {
     return { success: false, reason: 'window-not-focused' };
   }
   return new Promise((resolve) => {
