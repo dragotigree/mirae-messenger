@@ -6924,6 +6924,14 @@ function mergeUserProfile(base, overlay, online) {
     const b = merged[f];
     if (f === 'username' && looksLikeIpv4(o) && b && String(b).trim() && !looksLikeIpv4(b)) return;
     if (f === 'photo' && !isUsableProfilePhotoValue(o) && isUsableProfilePhotoValue(b)) return;
+    // ⚠️ 실사고: 예전에 네트워크 수신 중 한글이 깨지는 버그가 있었는데(1.0.817에서 수정),
+    // 그때 깨진 이름이 각 PC에 저장돼 버려서 계속 서로에게 전파됐다. 깨진 문자(U+FFFD)가
+    // 들어 있는 값으로 멀쩡한 기존 값을 덮어쓰지 않게 막는다 — 한 대만 고쳐도 다시
+    // 깨진 값이 돌아오는 일을 방지한다.
+    if (typeof o === 'string' && o.indexOf('�') !== -1) {
+      const bStr = typeof b === 'string' ? b : '';
+      if (bStr && bStr.indexOf('�') === -1) return;
+    }
     merged[f] = o;
   });
   merged.lastSeen = merged.lastSeen || 0;
