@@ -12554,7 +12554,7 @@
 
         const subLabel = document.createElement('div');
         subLabel.className = `compact-section-label compact-subdept-label is-toggle${subCollapsed ? ' is-collapsed' : ''}`;
-        subLabel.innerHTML = `<span><span class="group-chevron">▾</span>소속 ${escapeHtml(subName)}</span>`;
+        subLabel.innerHTML = `<span><span class="group-chevron">▾</span>${escapeHtml(subName)}</span>`;
         const subWrap = document.createElement('div');
         subWrap.className = 'compact-panel-items';
         if (subCollapsed) subWrap.style.display = 'none';
@@ -16167,7 +16167,7 @@
         subLabel.className = `subsection-label sub-dept-label ${subCollapsed ? 'is-collapsed' : ''}`;
         subLabel.innerHTML = `
           <span style="display:flex; align-items:center; min-width:0; flex:1; gap:2px;">
-            <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span class="group-chevron">▾</span> 소속 ${escapeHtml(subName)}</span>
+            <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span class="group-chevron">▾</span> ${escapeHtml(subName)}</span>
           </span>
           <span style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
             <span class="group-count-badge">${groupStaffCountBadge(subUsers)}</span>
