@@ -5365,6 +5365,12 @@ async function openChatWindow(payload) {
   const existing = getChatWindowFor(peerKey);
   if (existing) {
     bringWindowToFront(existing);
+    // ⚠️ 실사고: 이미 열려 있는 채팅창을 다시 누르면 창을 앞으로 가져오기만 하고 열기
+    // payload를 다시 보내지 않아서, 그 창의 "대화방을 직접 열었다 = 의도적 읽음" 처리가
+    // 실행되지 않았다. 그래서 미니 모드에서 「새 창으로 열기」를 켜 둔 경우, 창이 이미
+    // 떠 있는 상대의 새 메시지를 눌러서 봐도 상대에게 「읽음」이 안 갔다. 재사용할 때도
+    // 똑같이 payload를 보내 읽음 처리가 되게 한다.
+    try { existing.webContents.send('chat-window-open', { peerKey, title }); } catch (e) { /* ignore */ }
     return { success: true, reused: true };
   }
 
