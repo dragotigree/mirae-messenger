@@ -10173,6 +10173,8 @@
     }
 
     /* # / ⭐ / 💬 레일 버튼: 사이드바를 채널만 · 즐겨찾기만 · 사용자만 보이도록 필터링 (다시 누르면 전체 보기로 복귀) */
+    const SIDEBAR_RAIL_FILTER_KEY = 'sidebarRailFilter';
+    const SIDEBAR_RAIL_FILTER_VALUES = new Set(['all', 'channels', 'favorites', 'users', 'recent']);
     let sidebarRailFilter = 'all';
     const SIDEBAR_RAIL_FILTER_BTN_IDS = { channels: 'icon-rail-chat-btn', favorites: 'icon-rail-favorites-btn', users: 'icon-rail-users-btn', recent: 'icon-rail-recent-btn' };
     const SIDEBAR_RAIL_FILTER_BLOCK_IDS = { channels: 'sidebar-block-channels', favorites: 'sidebar-block-favorites', users: 'sidebar-block-users', recent: 'sidebar-block-recent' };
@@ -10183,6 +10185,12 @@
       // (예전엔 다시 누르면 'all'로 풀렸는데, "사용자만 보기"를 유지하고 싶은데
       // 실수로 두 번 눌러 채널·대화방까지 다시 보이는 게 혼란스럽다는 요청으로 변경)
       sidebarRailFilter = kind;
+      // ⚠️ 실사고: 미니 모드로 앱을 시작하면 일반 모드 전용 부팅 코드(아래 setSidebarRailFilter
+      // 호출)가 아예 실행되지 않아 필터가 한 번도 안 걸린 채로 남았다. 그 상태에서 나중에
+      // 일반 모드로 전환하면 아무것도 안 걸러진 "전체보기"라 최근대화·즐겨찾기·채널·사용자가
+      // 한꺼번에 펼쳐져 보였다(신고된 증상). 마지막으로 고른 필터를 기억해 뒀다가, 모드
+      // 전환·재시작 때마다 그 필터로 복원한다.
+      try { localStorage.setItem(SIDEBAR_RAIL_FILTER_KEY, kind); } catch (_) { /* ignore */ }
       sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users', 'rail-filter-recent');
       // 최근 대화 전용 보기에서는 아래쪽 목록 설정 줄에서 사용자 목록 전용 항목을 감춘다.
       document.body.classList.toggle('sidebar-recent-only', kind === 'recent');
@@ -10230,7 +10238,12 @@
       document.body.classList.add('compact-mode');
       setCompactRailTab(compactRailTab);
     } else {
-      setSidebarRailFilter('users');
+      let savedRailFilter = 'users';
+      try {
+        const stored = localStorage.getItem(SIDEBAR_RAIL_FILTER_KEY);
+        if (stored && SIDEBAR_RAIL_FILTER_VALUES.has(stored)) savedRailFilter = stored;
+      } catch (_) { /* ignore */ }
+      setSidebarRailFilter(savedRailFilter);
     }
     loadNoticesList().catch(() => {});
     if (!isEnterToSendEnabled()) setEnterToSend(false);
@@ -11876,6 +11889,17 @@
       appSettings.defaultViewMode = compact ? 'compact' : 'normal';
       localStorage.setItem('appSettings', JSON.stringify(appSettings));
       document.body.classList.toggle('compact-mode', isCompactMode);
+      // ⚠️ 미니 모드로 부팅하면 일반 모드 전용 필터 초기화 코드가 아예 안 돌기 때문에,
+      // 나중에 일반 모드로 전환할 때 여기서 마지막으로 고른 필터를 걸어 준다(전체보기로
+      // 다 펼쳐져 보이던 문제 방지).
+      if (!isCompactMode) {
+        let savedRailFilter = 'users';
+        try {
+          const stored = localStorage.getItem(SIDEBAR_RAIL_FILTER_KEY);
+          if (stored && SIDEBAR_RAIL_FILTER_VALUES.has(stored)) savedRailFilter = stored;
+        } catch (_) { /* ignore */ }
+        setSidebarRailFilter(savedRailFilter);
+      }
       let savedBounds = null;
       if (isCompactMode) {
         try { savedBounds = JSON.parse(localStorage.getItem('compactWindowBounds') || 'null'); } catch (e) {}
