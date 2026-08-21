@@ -2481,6 +2481,7 @@
     .compact-section-label.is-toggle:hover { background: var(--surface-muted); }
     .compact-section-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 3px; font-size: 10px; opacity: .75; }
     .compact-section-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
+    .compact-subdept-label { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); padding: 6px 16px 4px 20px; border-top: none; background: transparent; }
     .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
     .compact-list-item:hover { background: var(--surface-muted); }
     .compact-list-item.is-active { background: var(--sidebar-active); }
@@ -12526,6 +12527,46 @@
       container.appendChild(item);
     }
 
+    /** 부서별 보기에서, 일반 모드(renderDeptGroupMembers)와 똑같이 그 부서 사람들 중
+     *  "소부서"를 적어둔 사람만 그 소부서 이름으로 한 번 더 묶어서 보여준다. collapsedGroups
+     *  키를 일반 모드와 그대로 공유해 접은 상태도 함께 유지된다. */
+    function renderCompactDeptGroupMembers(wrap, groupingKey, groupName, groupUsers) {
+      const flatUsers = [];
+      const subGroups = {};
+      groupUsers.forEach((u) => {
+        const sub = (u.subDept && String(u.subDept).trim()) || '';
+        if (!sub) { flatUsers.push(u); return; }
+        if (!subGroups[sub]) subGroups[sub] = [];
+        subGroups[sub].push(u);
+      });
+      flatUsers.forEach((u) => appendCompactUserItem(wrap, u));
+      const subNames = defaultSortGroupKeys(Object.keys(subGroups));
+      subNames.forEach((subName) => {
+        const subUsers = subGroups[subName];
+        const subCollapseKey = `${groupingKey}:${groupName}::sub:${subName}`;
+        const subCollapsed = collapsedGroups.has(subCollapseKey);
+        const subBlock = document.createElement('div');
+        subBlock.className = 'compact-subdept-block';
+
+        const subLabel = document.createElement('div');
+        subLabel.className = `compact-section-label compact-subdept-label is-toggle${subCollapsed ? ' is-collapsed' : ''}`;
+        subLabel.innerHTML = `<span><span class="group-chevron">▾</span>소속 ${escapeHtml(subName)}</span>`;
+        const subWrap = document.createElement('div');
+        subWrap.className = 'compact-panel-items';
+        if (subCollapsed) subWrap.style.display = 'none';
+        subLabel.onclick = () => {
+          toggleGroupCollapse(subCollapseKey);
+          const nowCollapsed = collapsedGroups.has(subCollapseKey);
+          subLabel.classList.toggle('is-collapsed', nowCollapsed);
+          subWrap.style.display = nowCollapsed ? 'none' : '';
+        };
+        subUsers.forEach((u) => appendCompactUserItem(subWrap, u));
+        subBlock.appendChild(subLabel);
+        subBlock.appendChild(subWrap);
+        wrap.appendChild(subBlock);
+      });
+    }
+
     /** collapseKey를 주면 라벨을 눌러 접고 펼 수 있다 — 일반 모드 사이드바와 같은
      *  collapsedGroups 저장소를 그대로 써서, 접은 상태가 미니모드·일반모드 사이에 유지된다. */
     function createCompactPanel(titleHtml, badgeHtml, collapseKey) {
@@ -12968,7 +13009,11 @@
         // 접은 상태가 미니모드·일반모드 사이에 그대로 유지된다.
         const collapseKey = `${groupingKey}:${groupName}`;
         const groupPanel = createCompactPanel(`${icon} ${groupName}`, '', collapseKey);
-        groupUsers.forEach(u => appendCompactUserItem(groupPanel.compactItemsWrap, u));
+        if (groupingKey === 'dept') {
+          renderCompactDeptGroupMembers(groupPanel.compactItemsWrap, groupingKey, groupName, groupUsers);
+        } else {
+          groupUsers.forEach(u => appendCompactUserItem(groupPanel.compactItemsWrap, u));
+        }
         userPanels.push(groupPanel);
       });
 
