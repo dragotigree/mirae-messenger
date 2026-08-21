@@ -6508,6 +6508,19 @@ function startUdpDiscovery() {
           if (overrideForPeer) {
             sendJsonToPeer(rinfo.address, { type: 'PROFILE_OVERRIDE_SYNC', profile: overrideForPeer });
           }
+          // ⚠️ 실사고: 작성 권한자(notice_operators) 계정도 profileOverrides와 똑같은 구멍이
+          // 있었다. OPERATOR_ADD는 "추가하는 그 순간 온라인인 PC"에만 브로드캐스트되고,
+          // 그 뒤로는 상대방이 재접속할 때 "네 데이터를 나에게 보내 달라"고 요청(pull)만
+          // 할 뿐, 이 PC가 이미 알고 있는 운영자 계정을 먼저 나서서 전달(push)하지는
+          // 않았다. 그래서 관리자 PC가 한 번도 꺼지지 않은 채 새 작성자 계정을 추가하면,
+          // 그 순간 오프라인이었거나 이미 접속 중이던(재접속 이벤트가 없는) 다른 PC들은
+          // 영원히 그 계정을 모른 채로 남아 "작성자 로그인이 안 된다"는 신고로 이어졌다.
+          // 이제 어떤 피어든 재접속을 감지할 때마다, 이 PC가 들고 있는 운영자 계정 전체를
+          // 곧바로 그 피어에게 보내 준다 — profileOverride 수정과 같은 원리의 해결책.
+          db.all(`SELECT * FROM notice_operators`, [], (opErr, opRows) => {
+            if (opErr || !opRows || !opRows.length) return;
+            sendJsonToPeer(rinfo.address, { type: 'NOTICE_SYNC_RESPONSE', operators: opRows });
+          });
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
