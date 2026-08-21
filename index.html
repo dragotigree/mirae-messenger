@@ -10419,6 +10419,25 @@
       return (location.hash || '').replace(/^#/, '') === 'capture-overlay';
     }
 
+    /** ⚠️ 실사고: 현황판·공지 게시판은 메인 창과 별개의 창으로 뜨는데, 마스터 로그인
+     *  여부는 창마다 따로 있는 변수라 새 창에서는 항상 false였다. 그래서 마스터로 로그인해
+     *  두고 현황판을 열어도 「수정」·「삭제」 버튼이 안 나오고 「복사」만 보였다. 메인
+     *  프로세스가 들고 있는 마스터 세션 상태를 새 창도 이어받게 한다. */
+    async function adoptMasterSessionForStandaloneWindow() {
+      if (!isScheduleBoardStandalone() && !isNoticeBoardStandalone() && !isChatWindowStandalone()) return;
+      if (isMasterAuthenticated) return;
+      if (!window.api || typeof window.api.getMasterSessionActive !== 'function') return;
+      try {
+        const active = await window.api.getMasterSessionActive();
+        if (!active) return;
+        isMasterAuthenticated = true;
+        try { updateMasterAuthUi(); } catch (_) { /* ignore */ }
+        try { refreshNoticePermission(); } catch (_) { /* ignore */ }
+        if (isScheduleBoardStandalone()) { try { renderScheduleBoard(); } catch (_) { /* ignore */ } }
+        if (isNoticeBoardStandalone()) { try { loadNoticesList(); } catch (_) { /* ignore */ } }
+      } catch (e) { /* ignore */ }
+    }
+
     function initCaptureOverlayStandaloneShell() {
       document.body.classList.add('capture-overlay-standalone');
       document.title = '영역 캡처 — Mirae Messenger';
@@ -10512,6 +10531,7 @@
       if (isNoticeBoardStandalone()) initNoticeBoardStandaloneShell();
       if (isChatWindowStandalone()) initChatWindowStandaloneShell();
       if (isCaptureOverlayStandalone()) initCaptureOverlayStandaloneShell();
+      adoptMasterSessionForStandaloneWindow();
       applyCompactDenseListClass();
       paintUiIcons();
       initUserDragAndDrop();

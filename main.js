@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, 
 const path = require('path');
 const dgram = require('dgram');
 const net = require('net');
+const { StringDecoder } = require('string_decoder');
 const os = require('os');
 const fs = require('fs');
 const https = require('https');
@@ -7417,6 +7418,12 @@ function startTcpServer() {
     }
     tcpActiveConnections += 1;
     let buffer = '';
+    // ⚠️ 실사고: 예전엔 청크마다 chunk.toString('utf8')로 바로 문자열을 만들었는데,
+    // 한글은 UTF-8에서 3바이트라 TCP 청크 경계가 글자 한가운데를 자르면 그 반쪽이
+    // 각각 깨진 문자(�)로 변환돼 이름이 "작업치��?팀장"처럼 영구히 깨졌다(프로필을
+    // 수정한 적도 없는데 이름이 깨져 보인다는 신고의 원인). StringDecoder는 잘린
+    // 멀티바이트 조각을 다음 청크가 올 때까지 들고 있다가 온전해지면 변환해 준다.
+    const decoder = new StringDecoder('utf8');
     let released = false;
     const release = () => {
       if (released) return;
@@ -7453,7 +7460,7 @@ function startTcpServer() {
       }
       // quiet 중(이론상 TCP 미기동)이거나 비정상적으로 큰 미완성 라인은 조기 차단
       const softCap = isNetworkQuietPeriod() ? 64 * 1024 : MAX_TCP_LINE_BUFFER;
-      buffer += chunk.toString('utf8');
+      buffer += decoder.write(chunk);
       if (buffer.length > softCap && buffer.indexOf('\n') === -1) {
         console.error(`[TCP] 버퍼 초과(개행 없음) from=${from} bytes=${buffer.length} head=${JSON.stringify(buffer.slice(0, 80))} — 연결 종료`);
         recordPeerTraffic(from, { bytes: chunk.length, overflow: true, type: 'TCP_BUFFER_OVERFLOW' });
@@ -7472,6 +7479,7 @@ function startTcpServer() {
       drain();
     });
     socket.on('end', () => {
+      buffer += decoder.end();
       drain();
       if (buffer.trim()) { parseAndRoute(buffer, socket); buffer = ''; }
     });
@@ -10353,9 +10361,12 @@ function httpsRequestJson(method, targetUrl, body, redirectsLeft, options) {
         resolve(httpsRequestJson('GET', res.headers.location, null, redirectsLeft - 1, opts));
         return;
       }
-      let raw = '';
-      res.on('data', chunk => { raw += chunk; });
+      // TCP 수신과 같은 이유로, 청크가 한글 한 글자를 반으로 자를 수 있어 조각을 모았다가
+      // 온전해질 때만 문자열로 바꾼다(그냥 이어붙이면 깨진 문자가 된다).
+      const resChunks = [];
+      res.on('data', chunk => { resChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)); });
       res.on('end', () => {
+        const raw = Buffer.concat(resChunks).toString('utf8');
         try {
           const parsed = JSON.parse(raw);
           if (parsed.ok) {
@@ -11684,6 +11695,14 @@ ipcMain.handle('clear-master-session', async () => {
   masterSessionActive = false;
   return { success: true };
 });
+
+/** ⚠️ 실사고: 「병동 일정 현황판」·「공지 게시판」은 메인 창과 별개의 창으로 뜨는데,
+ *  마스터 로그인 여부(isMasterAuthenticated)는 창마다 따로 있는 변수라 새 창에서는 항상
+ *  false였다. 그래서 마스터로 로그인해 두고 현황판을 열어도 「수정」·「삭제」 버튼이 안 뜨고
+ *  「복사」만 보였다(예전엔 현황판이 같은 창 안의 모달이라 문제가 없었다). 마스터 세션은
+ *  메인 프로세스가 이미 하나로 들고 있으므로, 새 창이 그 상태를 물어볼 수 있게 한다.
+ *  (실제 쓰기 작업은 어차피 이 masterSessionActive로 다시 검사하므로 권한이 늘어나지 않는다.) */
+ipcMain.handle('get-master-session-active', async () => !!masterSessionActive);
 
 ipcMain.handle('master-update-user-profile', async (event, payload) => {
   if (!masterSessionActive) {
