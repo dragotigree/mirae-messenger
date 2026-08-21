@@ -12407,10 +12407,14 @@
       container.appendChild(item);
     }
 
+    // ⚠️ 실사고: 예전엔 부서·층이 있으면 내선번호를 아예 안 보여줬다(둘 다 없을 때만
+    // "내선 XXX"로 폴백). 거의 모든 직원이 부서·층을 갖고 있어서 사실상 미니 모드
+    // 사용자 목록에는 연락처가 전혀 안 보였다("연락처가 나오게 해달라"는 요청의 원인).
+    // 일반 모드 사이드바(formatUserSubLineSidebar)와 같은 형식으로 통일해, 온라인일 때
+    // 부서·층 뒤에 내선번호를 같이 보여준다.
     function compactUserPreview(u) {
-      const deptFloor = [u.dept, u.floor].filter(Boolean).join(' · ');
-      if (deptFloor) return deptFloor;
-      if (u.extNo) return `내선 ${u.extNo}`;
+      const text = formatUserSubLineSidebar(u);
+      if (text) return text;
       if (u.online) return '메시지를 보내보세요';
       return '';
     }
