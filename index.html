@@ -5499,6 +5499,12 @@
           <span class="compact-rail-icon" data-ui-icon="chatBubble"></span>
           <span class="unread-badge compact-rail-badge" id="compact-rail-chat-badge" style="display:none;">0</span>
         </button>
+        <button type="button" class="compact-rail-btn" data-rail="favorites" onclick="setCompactRailTab('favorites')" title="즐겨찾기">
+          <span class="compact-rail-icon" data-ui-icon="star"></span>
+        </button>
+        <button type="button" class="compact-rail-btn" data-rail="groups" onclick="setCompactRailTab('groups')" title="그룹채팅방">
+          <span class="compact-rail-icon" data-ui-icon="hash"></span>
+        </button>
         <button type="button" class="compact-rail-btn" onclick="openScheduleBoardModal()" title="병동 일정 현황판">
           <span class="compact-rail-icon" data-ui-icon="clipboardList"></span>
         </button>
@@ -5564,6 +5570,12 @@
             <input type="text" id="compact-search-input-friends" placeholder="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
           </div>
           <div id="compact-friends-list-items"></div>
+        </div>
+        <div class="compact-pane" data-compact-pane="favorites" hidden>
+          <div id="compact-favorites-list-items"></div>
+        </div>
+        <div class="compact-pane" data-compact-pane="groups" hidden>
+          <div id="compact-groups-list-items"></div>
         </div>
         <div id="compact-multi-select-bar" class="compact-multi-select-bar" aria-live="polite">
           <span class="ums-count" id="compact-multi-select-count">0명 선택</span>
@@ -12884,12 +12896,20 @@
     }
 
     async function renderCompactList() {
-      const container = document.getElementById(compactRailTab === 'friends' ? 'compact-friends-list-items' : 'compact-list-items');
+      const containerId = compactRailTab === 'friends' ? 'compact-friends-list-items'
+        : compactRailTab === 'favorites' ? 'compact-favorites-list-items'
+        : compactRailTab === 'groups' ? 'compact-groups-list-items'
+        : 'compact-list-items';
+      const container = document.getElementById(containerId);
       if (!container) return;
       updateCompactOnlineCount();
 
       if (compactRailTab === 'chat') {
         await renderCompactChatConversations(container);
+      } else if (compactRailTab === 'favorites') {
+        await renderCompactFilteredConversations(container, (r) => r.isFavorite, '즐겨찾기한 대상이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.');
+      } else if (compactRailTab === 'groups') {
+        await renderCompactFilteredConversations(container, (r) => r.kind === 'group', '참여 중인 그룹채팅방이 없습니다.');
       } else {
         renderCompactStaffDirectory(container);
       }
@@ -12899,6 +12919,22 @@
       syncCompactDeptFloorFilterUi();
       pruneSidebarUserSelection();
       syncCompactInboxBar();
+    }
+
+    /** 즐겨찾기 · 그룹채팅방 전용 탭 — 최근 대화 목록(buildCompactConversationRows)을
+     *  재사용해 조건에 맞는 것만 골라 보여준다. 검색어·필터 칩 없이 항상 전체를 보여준다. */
+    async function renderCompactFilteredConversations(container, filterFn, emptyText) {
+      const recent = await loadCompactRecentConversations(true);
+      let rows = buildCompactConversationRows(recent).filter(filterFn);
+      container.innerHTML = '';
+      if (!rows.length) {
+        const emptyHintEl = document.createElement('div');
+        emptyHintEl.className = 'compact-empty-hint';
+        emptyHintEl.textContent = emptyText;
+        container.appendChild(emptyHintEl);
+        return;
+      }
+      rows.forEach((row) => appendCompactConversationItem(container, row));
     }
 
     function onCompactSearchInput(v) {
