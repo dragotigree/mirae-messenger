@@ -1604,6 +1604,7 @@ function repairMimeDisguisedFileName(fileName) {
   return name;
 }
 
+/** 사용자가 「받기」를 눌렀을 때 실제로 저장되는 폴더(= 설정의 다운로드 폴더). */
 function getReceivedFilesDir() {
   const dir = downloadFolderPath || app.getPath('downloads');
   try {
@@ -1612,6 +1613,32 @@ function getReceivedFilesDir() {
     console.error('파일 저장 폴더 생성 오류:', e.message);
   }
   return dir;
+}
+
+/** ⚠️ 실사고: 주고받은 첨부파일을 앱이 내부적으로 보관하는 위치가 「다운로드 폴더」 자체라서,
+ *  보낸 파일·받은 파일이 사용자가 받기를 누르지 않아도 전부 다운로드 폴더에 쌓였다. 게다가
+ *  「받기」를 누르면 같은 폴더에 사본이 하나 더 저장돼서 파일이 두 개씩 생겼다. 내부 보관은
+ *  앱 데이터 폴더로 옮기고, 다운로드 폴더에는 사용자가 「받기」를 눌렀을 때만 저장한다. */
+function getAttachmentStoreDir() {
+  const dir = path.join(app.getPath('userData'), 'attachments');
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {
+    console.error('첨부 보관 폴더 생성 오류:', e.message);
+  }
+  return dir;
+}
+
+/** 보관된 첨부파일의 실제 경로. 새 보관 폴더에 없으면, 예전 버전이 다운로드 폴더에 저장해
+ *  둔 파일도 찾아본다(업데이트 전에 주고받은 메시지의 첨부가 계속 열리도록). */
+function resolveAttachmentPath(storedName) {
+  const name = path.basename(String(storedName || ''));
+  if (!name || name === '.' || name === '..') return '';
+  const primary = path.join(getAttachmentStoreDir(), name);
+  if (fs.existsSync(primary)) return primary;
+  const legacy = path.join(downloadFolderPath || app.getPath('downloads'), name);
+  if (fs.existsSync(legacy)) return legacy;
+  return primary;
 }
 
 /** xferUid → { meta, chunks: Map<index, Buffer>, timer, senderIP } */
@@ -1647,7 +1674,7 @@ function makeStoredFileName(fileName, msgUid) {
 }
 
 async function writeReceivedFileAsync(storedName, buffer) {
-  const dir = getReceivedFilesDir();
+  const dir = getAttachmentStoreDir();
   await fs.promises.mkdir(dir, { recursive: true });
   const filePath = path.join(dir, storedName);
   await fs.promises.writeFile(filePath, buffer);
@@ -1980,7 +2007,7 @@ function extractAndSaveAttachments(messageHtml, options) {
   const opts = options || {};
   const compact = !!opts.compact;
   if (typeof messageHtml !== 'string' || messageHtml.indexOf('data:') === -1) return messageHtml;
-  const dir = getReceivedFilesDir();
+  const dir = getAttachmentStoreDir();
   let out = messageHtml;
   const regex = /((?:src|href)=")(data:([^;]+);base64,([^"]+))(")/gi;
   const replacements = [];
@@ -2022,9 +2049,14 @@ function extractAndSaveAttachments(messageHtml, options) {
       const finalName = path.extname(safeName)
         ? safeName
         : `${safeName}.${ext}`;
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      // ⚠️ 실사고: 예전엔 저장 파일명에 현재 시각(toISOString)을 넣었는데, 이 함수는 메시지
+      // 하나당 두 번 불린다(한 번은 첨부 보관용, 한 번은 메시지 압축용 compactMessageRowById).
+      // 그래서 같은 첨부가 몇 ms 차이로 서로 다른 이름의 파일 두 개로 저장돼, 보낸 파일·받은
+      // 파일이 전부 두 개씩 쌓였다(실제 확인: 같은 캡처가 16ms 차이로 2개, 내용 동일).
+      // 이제 파일명을 내용 해시로 정하므로 몇 번을 불려도 같은 파일 하나에 덮어써진다.
+      const contentHash = crypto.createHash('sha1').update(base64Data).digest('hex').slice(0, 16);
       const uidPart = opts.msgUid ? `${sanitizeFileName(String(opts.msgUid).slice(0, 40))}_` : '';
-      const storedName = `${uidPart}${timestamp}_${fileIndex}_${finalName}`;
+      const storedName = `${uidPart}${contentHash}_${fileIndex}_${finalName}`;
       fileIndex += 1;
       const filePath = path.join(dir, storedName);
       // sync 파일쓰기는 메인 스레드를 막아 '응답 없음'을 유발한다 — 백신 실시간 검사가 파일마다
@@ -2074,13 +2106,12 @@ function compactStoredMessageHtml(messageHtml, msgUid) {
 /** 재전송용: mirae-file:// → data URL (파일이 없으면 원문 유지) */
 function expandMiraeFileUrlsToDataUrls(messageHtml) {
   if (typeof messageHtml !== 'string' || messageHtml.indexOf('mirae-file://') === -1) return messageHtml;
-  const dir = getReceivedFilesDir();
   const MAX_SYNC_EXPAND_BYTES = 2 * 1024 * 1024;
   return messageHtml.replace(/((?:src|href)=")mirae-file:\/\/([^"]+)(")/gi, (full, prefix, encName, suffix) => {
     try {
       const name = path.basename(decodeURIComponent(encName.split(/[?#]/)[0]));
-      const filePath = path.join(dir, name);
-      if (!fs.existsSync(filePath)) return full;
+      const filePath = resolveAttachmentPath(name);
+      if (!filePath || !fs.existsSync(filePath)) return full;
       let st;
       try { st = fs.statSync(filePath); } catch (e) { return full; }
       // 대용량 sync readFileSync는 메인 스레드 정지 → 응답 없음
@@ -2700,7 +2731,7 @@ function registerMiraeFileProtocol() {
           callback({ error: -2 });
           return;
         }
-        callback({ path: path.join(getReceivedFilesDir(), name) });
+        callback({ path: resolveAttachmentPath(name) });
       } catch (e) {
         callback({ error: -2 });
       }
@@ -10553,7 +10584,7 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
       if (!storedName || storedName === '.' || storedName === '..') {
         return { success: false, msg: '파일 이름을 확인할 수 없습니다.' };
       }
-      sourcePath = path.join(getReceivedFilesDir(), storedName);
+      sourcePath = resolveAttachmentPath(storedName);
       if (!fs.existsSync(sourcePath)) {
         return { success: false, msg: '저장된 파일을 찾을 수 없습니다. 다시 받아 주세요.' };
       }
@@ -11057,7 +11088,7 @@ function flushPendingFileXfers() {
 
 async function retryPendingFileXfer(row) {
   try {
-    const filePath = path.join(getReceivedFilesDir(), row.stored_name);
+    const filePath = resolveAttachmentPath(row.stored_name);
     let buf;
     try {
       buf = await fs.promises.readFile(filePath);
