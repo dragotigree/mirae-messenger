@@ -19852,6 +19852,26 @@
       setChatDateJumpBanner(null);
       loadChatHistory();
       refreshScheduledIndicator();
+      focusChatInputAfterOpen();
+    }
+
+    /** 최근 대화·사용자 목록·즐겨찾기·그룹 대화방 등에서 대화를 열면 곧바로 타이핑할 수
+     *  있도록 입력창에 커서를 둔다. 대화를 여는 모든 경로가 selectUserChat을 지나므로
+     *  여기 한 곳에서만 처리한다. 검색창에 입력하던 중이면 그 입력을 뺏지 않는다. */
+    function focusChatInputAfterOpen() {
+      const ta = document.getElementById('chat-textarea');
+      if (!ta) return;
+      // 현황판·공지 게시판 등 대화창이 없는 별도 창에서는 하지 않는다.
+      if (isScheduleBoardStandalone() || isNoticeBoardStandalone() || isCaptureOverlayStandalone()) return;
+      const container = document.getElementById('active-chat-container');
+      if (container && container.style.display === 'none') return;
+      // 다른 팝업(설정·관리자·확인창 등)이 떠 있으면 그쪽 입력을 뺏지 않는다.
+      // 사람 검색칸에서 골라 들어온 경우는 오히려 바로 타이핑하고 싶은 상황이라 막지 않는다.
+      if (isBlockingOverlayOpenForSearchShortcut()) return;
+      // 목록 렌더가 끝난 뒤에 커서를 둬야 포커스가 다시 밀리지 않는다.
+      requestAnimationFrame(() => {
+        try { ta.focus({ preventScroll: true }); } catch (_) { try { ta.focus(); } catch (__) { /* ignore */ } }
+      });
     }
 
     function renderContactDetailPanel(user) {
