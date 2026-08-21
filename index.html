@@ -2257,6 +2257,11 @@
 
     /* 💬 빠른 문구 팝오버 */
     #quick-phrase-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 260px; max-height: 240px; overflow-y: auto; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 8px; z-index: 50; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
+    /* 😊 입력창 이모티콘 고르기 — 리액션 목록(REACTION_EMOJIS)을 그대로 재사용한다. */
+    #composer-emoji-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 296px; max-height: 260px; overflow-y: auto; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 10px; z-index: 50; animation: menu-pop 0.18s var(--ease-spring); }
+    #composer-emoji-popover .composer-emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+    #composer-emoji-popover .composer-emoji-btn { font-size: 20px; line-height: 1; padding: 6px 0; background: none; border: none; border-radius: var(--radius-sm); cursor: pointer; }
+    #composer-emoji-popover .composer-emoji-btn:hover { background: var(--sidebar-hover); }
     #screen-capture-popover { display: none; position: absolute; bottom: 64px; left: 20px; width: 220px; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; z-index: 50; /* backdrop-filter removed (Win CPU) */ }
     .screen-capture-menu-item { display: block; width: 100%; text-align: left; padding: 9px 12px; border: none; background: transparent; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; color: var(--text-primary); cursor: pointer; }
     .screen-capture-menu-item:hover { background: var(--surface-muted); }
@@ -2518,6 +2523,14 @@
        바깥 .sidebar-main-sections의 overflow:hidden에 그냥 잘려서 스크롤 자체가 안 됐다.
        사용자 목록(#user-list-tree)처럼 이 섹션만 따로 스크롤되게 높이를 제한한다. */
     #recent-chats-section-body { max-height: 260px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+    /* 「최근 대화만 보기」에서는 아래쪽 목록 설정 줄 중 사용자 목록 전용 항목(층/부서,
+       전체/온, 공용/숨김)은 해당 사항이 없어 감춘다. 「N」(안 읽은 대화만)은 최근 대화에도
+       적용되므로 그대로 남긴다. */
+    body.sidebar-recent-only #sidebar-list-prefs .sidebar-pref-seg:not(.sidebar-pref-seg-solo) {
+      display: none;
+    }
+    body.sidebar-recent-only #sidebar-list-prefs { justify-content: flex-end; }
+
     /* 아이콘 바에서 「최근 대화만 보기」를 골라 이 섹션만 보일 때는, 260px에서 잘리지 않고
        사이드바 높이를 끝까지 채우도록 한다(아래가 텅 비어 보인다는 요청). */
     #sidebar-main-sections.rail-filter-recent #sidebar-block-recent { flex: 1; min-height: 0; }
@@ -5666,6 +5679,7 @@
       <div id="scheduled-list-box"></div>
 
       <div id="quick-phrase-popover"></div>
+      <div id="composer-emoji-popover" role="dialog" aria-label="이모티콘 고르기"></div>
       <div id="chat-shared-drawer" class="chat-shared-drawer" aria-hidden="true">
         <div class="chat-shared-top">
           <div class="chat-shared-head">
@@ -5729,6 +5743,7 @@
               <button class="btn-capture chat-tool-btn" type="button" onclick="toggleScreenCapturePopover(event)" title="화면 캡처" data-ui-icon="camera"></button>
               <button class="chat-tool-btn" type="button" onclick="openExcalidrawForChat()" title="그림 그리기 (Excalidraw)" data-ui-icon="pencil"></button>
               <button class="btn-schedule chat-tool-btn" onclick="openScheduleMessageModal()" title="예약 전송" data-ui-icon="alarmClock"></button>
+              <button class="btn-emoji chat-tool-btn" type="button" onclick="toggleComposerEmojiPopover(event)" title="이모티콘" data-ui-icon="smiley"></button>
               <button class="btn-quickphrase chat-tool-btn" onclick="toggleQuickPhrasePopover()" title="빠른 문구" data-ui-icon="chatBubble"></button>
             </div>
             <button class="btn-send" onclick="sendChatMessage()" title="전송" aria-label="전송" data-ui-icon="sendArrow"></button>
@@ -7776,6 +7791,7 @@
       calendar: _uiSvg('<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>'),
       question: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'),
       /* 💬 채팅 입력창 도구모음: 이모지 대신 통일된 선(stroke) 아이콘 세트 사용 */
+      smiley: _uiSvg('<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>'),
       paperclip: _uiSvg('<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'),
       camera: _uiSvg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'),
       pencil: _uiSvg('<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'),
@@ -8749,9 +8765,18 @@
       lastUserListStructureKey = '';
       renderUserListTree(true);
       renderGroupChannels();
+      // 「N」(안읽음만) 등 목록 설정은 최근 대화에도 적용되므로 함께 다시 그린다.
+      try { renderRecentChatsSection(); } catch (e) { /* ignore */ }
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
         try { renderCompactList(); } catch (e) { /* ignore */ }
       }
+    }
+
+    /** 아이콘 바에서 「최근 대화만 보기」를 고른 상태인지.
+     *  이 함수는 sidebarRailFilter 선언(아래쪽)보다 앞에 있으므로, 부팅 도중 먼저 불릴
+     *  경우를 대비해 TDZ 오류가 나지 않도록 방어한다(이 파일에서 실제로 겪은 유형의 오류). */
+    function isSidebarRecentOnlyView() {
+      try { return sidebarRailFilter === 'recent'; } catch (e) { return false; }
     }
 
     function setDirectoryListPref(pref, value) {
@@ -10144,6 +10169,8 @@
       // 실수로 두 번 눌러 채널·대화방까지 다시 보이는 게 혼란스럽다는 요청으로 변경)
       sidebarRailFilter = kind;
       sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users', 'rail-filter-recent');
+      // 최근 대화 전용 보기에서는 아래쪽 목록 설정 줄에서 사용자 목록 전용 항목을 감춘다.
+      document.body.classList.toggle('sidebar-recent-only', kind === 'recent');
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
       if (sidebarRailFilter === 'favorites') {
         // ⚠️ 실사고: 즐겨찾기가 0명이면 renderFavoritesSection이 블록 자체를
@@ -10532,6 +10559,7 @@
       if (isChatWindowStandalone()) initChatWindowStandaloneShell();
       if (isCaptureOverlayStandalone()) initCaptureOverlayStandaloneShell();
       adoptMasterSessionForStandaloneWindow();
+      bindComposerFocusKeeper();
       applyCompactDenseListClass();
       paintUiIcons();
       initUserDragAndDrop();
@@ -13908,9 +13936,19 @@
       }
       // 기다리는 동안 더 최신 호출이 있었으면(연속으로 여러 번 트리거) 낡은 결과는 버린다.
       if (myToken !== recentChatsSectionRenderToken) return;
-      const rows = buildCompactConversationRows(recent).slice(0, RECENT_CHATS_SECTION_MAX);
+      let rows = buildCompactConversationRows(recent);
+      // 「N」(안 읽은 대화만) 토글은 사용자 목록뿐 아니라 최근 대화에도 똑같이 적용한다.
+      if (sidebarUnreadOnly) rows = rows.filter((r) => (r.unread || 0) > 0);
+      rows = rows.slice(0, RECENT_CHATS_SECTION_MAX);
       if (!rows.length) {
         if (unreadEl) unreadEl.style.display = 'none';
+        // 안읽음만 보기에서 결과가 없을 때는 섹션을 숨기지 말고 이유를 알려준다
+        // (섹션이 통째로 사라지면 목록이 고장 난 것처럼 보인다).
+        if (sidebarUnreadOnly && isSidebarRecentOnlyView()) {
+          block.style.display = '';
+          body.innerHTML = '<div style="padding:18px 12px; text-align:center; color:var(--sidebar-text-dim); font-size:12px; line-height:1.6;">안 읽은 대화가 없습니다.</div>';
+          return;
+        }
         block.style.display = 'none';
         return;
       }
@@ -14443,8 +14481,12 @@
         setTimeout(() => document.getElementById('setting-privacy-lock-enabled')?.focus(), 60);
       }
     }
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (ev) => {
       closeScreenCapturePopover();
+      // 이모티콘 고르기는 그 안을 클릭한 게 아닐 때만 닫는다.
+      if (!(ev && ev.target && ev.target.closest && ev.target.closest('#composer-emoji-popover, .btn-emoji'))) {
+        closeComposerEmojiPopover();
+      }
       const menu = document.getElementById('dm-context-menu');
       if (menu) menu.style.display = 'none';
       const gmenu = document.getElementById('group-context-menu');
@@ -19790,12 +19832,17 @@
     }
 
     async function selectUserChat(user) {
+      // 대화를 바꾸기 전에, 쓰던 글을 그 대화의 임시 보관함에 넣어 둔다(아래에서 새 대화의
+      // 보관분을 다시 채워 넣는다). 이렇게 해야 대화를 옮겨도 글이 사라지지 않으면서,
+      // 엉뚱한 사람 대화창에 남의 글이 딸려가는 일도 없다.
+      saveCurrentChatDraft();
       cancelEditMessage();
       cancelReplyMessage();
       clearChatAttachments();
       const resolved = findUserByIp(user.ip) || user;
       activeChatUser = normalizeUserRecord(resolved);
       user = activeChatUser;
+      restoreChatDraftForActiveChat();
       channelReadNotifyWatermark = '';
       pendingUnreadScrollCount = getUnreadForUser(user);
       unreadCounts[user.ip] = 0;
@@ -19858,6 +19905,26 @@
     /** 최근 대화·사용자 목록·즐겨찾기·그룹 대화방 등에서 대화를 열면 곧바로 타이핑할 수
      *  있도록 입력창에 커서를 둔다. 대화를 여는 모든 경로가 selectUserChat을 지나므로
      *  여기 한 곳에서만 처리한다. 검색창에 입력하던 중이면 그 입력을 뺏지 않는다. */
+    /** 입력창 영역(도구 아이콘 줄 옆 빈 공간 등)을 눌러도 입력이 끊기지 않게 한다.
+     *  ⚠️ 예전엔 빈 공간을 누르면 textarea가 포커스를 잃어 입력창이 회색으로 바뀌고 타이핑이
+     *  안 됐다(사용자 신고). mousedown에서 기본 동작을 막으면 포커스가 빠지지 않으므로,
+     *  버튼·입력칸 등 실제로 눌러야 하는 요소가 아닐 때만 막고 커서를 입력창에 되돌린다. */
+    function bindComposerFocusKeeper() {
+      const box = document.getElementById('chat-input-inner');
+      if (!box || box.dataset.focusKeeperBound === '1') return;
+      box.dataset.focusKeeperBound = '1';
+      box.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        const ta = document.getElementById('chat-textarea');
+        if (!ta) return;
+        // 버튼·링크·다른 입력칸·선택 가능한 팝오버 항목은 정상 동작해야 한다.
+        if (e.target.closest('button, a, input, textarea, select, label, [contenteditable], [role="listbox"], [role="option"], .chat-attach-thumb')) return;
+        // 이미 입력창에 커서가 있으면 굳이 건드리지 않는다(드래그 선택 등 방해 방지).
+        e.preventDefault();
+        if (document.activeElement !== ta) ta.focus({ preventScroll: true });
+      });
+    }
+
     function focusChatInputAfterOpen() {
       const ta = document.getElementById('chat-textarea');
       if (!ta) return;
@@ -20724,6 +20791,7 @@
       }
       if (res.uid) refreshChannelMessageUnreadCounts();
       textarea.value = '';
+      clearChatDraftFor(activeChatUser); // 보낸 뒤에는 임시 보관분도 지운다
       resizeChatTextarea();
       cancelReplyMessage();
       if (attachmentsToSend === pendingChatAttachments) clearChatAttachments();
@@ -20743,11 +20811,103 @@
       document.getElementById('edit-mode-banner').style.display = 'flex';
     }
 
+    /** ⚠️ 실사고: 예전엔 이 함수가 무조건 입력창을 비웠는데, 「답장」을 누를 때도 이 함수를
+     *  거치기 때문에 쓰던 메시지가 통째로 날아갔다(사용자 신고). 실제로 메시지 수정 모드였을
+     *  때만 비운다 — 수정 모드에서는 입력창 내용이 '수정 중인 원문'이라 반드시 비워야 한다. */
     function cancelEditMessage() {
+      const wasEditing = !!editingMessageUid;
       editingMessageUid = null;
-      document.getElementById('chat-textarea').value = '';
+      if (wasEditing) document.getElementById('chat-textarea').value = '';
       document.getElementById('edit-mode-banner').style.display = 'none';
       resizeChatTextarea();
+    }
+
+    /** 😊 입력창 이모티콘 고르기 — 리액션에서 쓰는 이모지 목록을 그대로 재사용한다.
+     *  고른 이모지는 커서 위치에 끼워 넣고, 입력창에 커서를 되돌려 계속 타이핑할 수 있게 한다. */
+    function closeComposerEmojiPopover() {
+      const pop = document.getElementById('composer-emoji-popover');
+      if (pop) pop.style.display = 'none';
+    }
+
+    function renderComposerEmojiPopover(pop) {
+      const list = (typeof REACTION_EMOJIS !== 'undefined' && Array.isArray(REACTION_EMOJIS)) ? REACTION_EMOJIS : [];
+      pop.innerHTML = '<div class="composer-emoji-grid">' +
+        list.map((em) => `<button type="button" class="composer-emoji-btn" data-emoji="${em}" title="${em}">${em}</button>`).join('') +
+        '</div>';
+      if (pop.dataset.bound !== '1') {
+        pop.dataset.bound = '1';
+        pop.addEventListener('mousedown', (e) => {
+          // 버튼을 눌러도 입력창 포커스가 빠지지 않도록
+          if (e.target.closest('.composer-emoji-btn')) e.preventDefault();
+        });
+        pop.addEventListener('click', (e) => {
+          const btn = e.target.closest('.composer-emoji-btn');
+          if (!btn) return;
+          insertEmojiIntoComposer(btn.getAttribute('data-emoji') || '');
+        });
+      }
+    }
+
+    function insertEmojiIntoComposer(emoji) {
+      const ta = document.getElementById('chat-textarea');
+      if (!ta || !emoji) return;
+      const start = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+      const end = ta.selectionEnd != null ? ta.selectionEnd : ta.value.length;
+      ta.value = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+      const caret = start + emoji.length;
+      ta.focus({ preventScroll: true });
+      try { ta.setSelectionRange(caret, caret); } catch (_) { /* ignore */ }
+      resizeChatTextarea();
+      try { onChatTextareaInput(); } catch (_) { /* ignore */ }
+    }
+
+    async function toggleComposerEmojiPopover(ev) {
+      if (ev) ev.stopPropagation();
+      if (!activeChatUser) {
+        await appAlert('이모티콘을 넣을 대화를 먼저 선택하세요.');
+        return;
+      }
+      const pop = document.getElementById('composer-emoji-popover');
+      if (!pop) return;
+      // 다른 팝오버는 닫는다(빠른 문구·화면 캡처와 겹치지 않게)
+      const qp = document.getElementById('quick-phrase-popover');
+      if (qp) qp.style.display = 'none';
+      try { closeScreenCapturePopover(); } catch (_) { /* ignore */ }
+      const willShow = pop.style.display !== 'block';
+      if (willShow) renderComposerEmojiPopover(pop);
+      pop.style.display = willShow ? 'block' : 'none';
+    }
+
+    /** 대화별로 쓰다 만 글을 잠깐 기억해 둔다(앱을 켜 둔 동안만, 저장은 하지 않음).
+     *  대화를 옮겼다가 돌아오면 쓰던 글이 그대로 남아 있다. */
+    const chatDraftsByPeer = new Map();
+
+    function chatDraftKeyFor(user) {
+      return user && user.ip ? String(user.ip) : '';
+    }
+
+    function saveCurrentChatDraft() {
+      const ta = document.getElementById('chat-textarea');
+      const key = chatDraftKeyFor(activeChatUser);
+      if (!ta || !key) return;
+      // 메시지 수정 중이면 입력창 내용은 '수정 중인 원문'이라 초안으로 보관하지 않는다.
+      if (editingMessageUid) return;
+      const text = ta.value;
+      if (text && text.trim()) chatDraftsByPeer.set(key, text);
+      else chatDraftsByPeer.delete(key);
+    }
+
+    function restoreChatDraftForActiveChat() {
+      const ta = document.getElementById('chat-textarea');
+      const key = chatDraftKeyFor(activeChatUser);
+      if (!ta) return;
+      ta.value = (key && chatDraftsByPeer.get(key)) || '';
+      resizeChatTextarea();
+    }
+
+    function clearChatDraftFor(user) {
+      const key = chatDraftKeyFor(user);
+      if (key) chatDraftsByPeer.delete(key);
     }
 
     function findChatMessageRowByUid(msgUid) {

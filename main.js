@@ -5001,7 +5001,14 @@ function createTray() {
 
 /** Windows 작업표시줄 아이콘 우클릭 시 뜨는 점프리스트 — 화면 모드/빠른 실행/작업 3개 그룹 */
 const JUMPLIST_ACTION_FLAG = '--jumplist=';
+/** 점프 목록(작업 표시줄 우클릭 메뉴) 항목 앞의 아이콘.
+ *  ⚠️ 예전엔 모든 항목에 앱 아이콘(icon.ico)을 붙여서 같은 말풍선이 줄줄이 반복돼 보였다.
+ *  Windows 점프 목록은 아이콘을 "없음"으로 둘 수 없고(비워두면 실행파일 아이콘이 대신
+ *  쓰인다), 그래서 완전 투명한 아이콘을 지정해 글자만 보이도록 한다.
+ *  투명 아이콘 파일이 없으면 예전처럼 앱 아이콘으로 되돌아간다(안전). */
 function getJumpListIconPath() {
+  const blankPath = path.join(__dirname, 'jumplist-blank.ico');
+  if (fs.existsSync(blankPath)) return blankPath;
   const icoPath = path.join(__dirname, 'icon.ico');
   return fs.existsSync(icoPath) ? icoPath : process.execPath;
 }
