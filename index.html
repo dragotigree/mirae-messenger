@@ -601,6 +601,9 @@
     .channel-item.is-channel-dragging { opacity: 0.45; }
     .channel-item.is-channel-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
     .user-card-item.is-favorite-drop-target, .compact-list-item.is-favorite-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
+    .compact-list-panel.is-compact-group-dragging { opacity: 0.45; }
+    .compact-list-panel.is-compact-group-drop-target .compact-section-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
+    .compact-section-label.is-compact-group-drag-handle { cursor: grab; }
     .channel-item .channel-reorder-grip { opacity: 0; font-size: 11px; cursor: grab; padding: 0 2px 0 0; flex-shrink: 0; line-height: 1; user-select: none; transition: opacity var(--transition-fast); }
     .channel-item:hover .channel-reorder-grip { opacity: 0.5; }
     .channel-item .channel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -12669,6 +12672,7 @@
       if (collapsed) itemsWrap.style.display = 'none';
       panel.appendChild(itemsWrap);
       panel.compactItemsWrap = itemsWrap;
+      panel.compactLabelEl = label;
       if (collapseKey) {
         panel.dataset.collapseKey = collapseKey;
         label.onclick = () => {
@@ -13077,7 +13081,7 @@
         if (!groups[groupName]) groups[groupName] = [];
         groups[groupName].push(u);
       });
-      const sortedGroupKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, Object.keys(groups));
 
       let emptyHintEl = null;
       if (sortedGroupKeys.length === 0 && favorites.length === 0) {
@@ -13099,6 +13103,7 @@
         // 접은 상태가 미니모드·일반모드 사이에 그대로 유지된다.
         const collapseKey = `${groupingKey}:${groupName}`;
         const groupPanel = createCompactPanel(`${icon} ${groupName}`, '', collapseKey);
+        bindCompactUserGroupReorderDrag(groupPanel, groupPanel.compactLabelEl, groupingKey, groupName);
         if (groupingKey === 'dept') {
           renderCompactDeptGroupMembers(groupPanel.compactItemsWrap, groupingKey, groupName, groupUsers);
         } else {
@@ -14548,6 +14553,50 @@
       order.splice(from, 1);
       order.splice(to, 0, draggedName);
       saveUserGroupOrderList(groupingKey, order);
+    }
+
+    /** 미니 모드 직원 탭 버전 — 부서·층 소그룹(compact-list-panel)을 드래그해서 순서를
+     *  바꾼다. 저장소(reorderUserGroupKeys/getOrderedUserGroupKeys)는 일반 모드와 완전히
+     *  같은 것을 공유하므로, 어느 화면에서 바꾸든 서로 그대로 반영된다. */
+    function bindCompactUserGroupReorderDrag(blockEl, labelEl, groupingKey, groupName) {
+      labelEl.draggable = true;
+      labelEl.classList.add('is-compact-group-drag-handle');
+      labelEl.dataset.groupName = groupName;
+      labelEl.dataset.groupingKey = groupingKey;
+      labelEl.addEventListener('dragstart', (ev) => {
+        if (isUserDragEvent(ev)) return;
+        ev.stopPropagation();
+        userGroupDragName = groupName;
+        ev.dataTransfer.setData(USER_GROUP_DRAG_MIME, groupName);
+        ev.dataTransfer.effectAllowed = 'move';
+        blockEl.classList.add('is-compact-group-dragging');
+      });
+      labelEl.addEventListener('dragend', () => {
+        blockEl.classList.remove('is-compact-group-dragging');
+        userGroupDragName = '';
+        document.querySelectorAll('.compact-list-panel.is-compact-group-drop-target').forEach((n) => n.classList.remove('is-compact-group-drop-target'));
+      });
+      labelEl.addEventListener('dragover', (ev) => {
+        if (!isUserGroupDragEvent(ev)) return;
+        const overName = labelEl.dataset.groupName;
+        if (!overName || overName === userGroupDragName) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.compact-list-panel.is-compact-group-drop-target').forEach((n) => n.classList.remove('is-compact-group-drop-target'));
+        blockEl.classList.add('is-compact-group-drop-target');
+      });
+      labelEl.addEventListener('dragleave', (ev) => {
+        if (!blockEl.contains(ev.relatedTarget)) blockEl.classList.remove('is-compact-group-drop-target');
+      });
+      labelEl.addEventListener('drop', (ev) => {
+        if (!isUserGroupDragEvent(ev)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        blockEl.classList.remove('is-compact-group-drop-target');
+        const dragged = getDraggedUserGroupName(ev) || userGroupDragName;
+        reorderUserGroupKeys(groupingKey, dragged, labelEl.dataset.groupName);
+        renderCompactList();
+      });
     }
 
     function bindUserGroupReorderDrag(blockEl, labelEl, groupingKey, groupName) {

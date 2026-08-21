@@ -1,6 +1,6 @@
 {
   "name": "mirae-messenger",
-  "version": "1.0.845",
+  "version": "1.0.846",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
