@@ -7250,7 +7250,12 @@ function repairKnownUsersProfiles(callback) {
         let merged = groupSnap ? mergeUserProfile(base, groupSnap, onlineUsers.has(row.ip)) : base;
 
         if (!needsDetail) {
-          allKnownUsers.set(row.ip, { ...merged, online: onlineUsers.has(row.ip) });
+          // ⚠️ 실사고: 그룹 대화방에 저장돼 있던 옛 멤버 스냅샷(dept 등)을 여기서 되살릴 때
+          // 관리자가 나중에 고쳐 둔 override를 다시 얹지 않으면, 이 부팅 시점 복구 루틴이
+          // 방금 고친 소부서를 그대로 지워버린다(신고된 증상 — 강제 업데이트로 전체가
+          // 재시작된 직후 소부서가 사라짐). 다른 모든 allKnownUsers.set 지점처럼 override를
+          // 마지막에 다시 적용한다.
+          allKnownUsers.set(row.ip, applyStoredProfileOverride({ ...merged, online: onlineUsers.has(row.ip) }));
           finishOne();
           return;
         }
@@ -7271,7 +7276,7 @@ function repairKnownUsersProfiles(callback) {
             }
             const before = JSON.stringify({ rank: base.rank, dept: base.dept, extNo: base.extNo, phone: base.phone });
             const after = JSON.stringify({ rank: merged.rank, dept: merged.dept, extNo: merged.extNo, phone: merged.phone });
-            allKnownUsers.set(row.ip, { ...merged, online: onlineUsers.has(row.ip) });
+            allKnownUsers.set(row.ip, applyStoredProfileOverride({ ...merged, online: onlineUsers.has(row.ip) }));
             if (before !== after || !(base.rank && base.dept)) {
               persistKnownUserSnapshot(merged);
             }
@@ -7310,7 +7315,7 @@ function repairKnownUsersFromMessages(callback) {
               ? { username: parsed.username, ip: row.ip, lastSeen: base.lastSeen }
               : { username: name, ip: row.ip, lastSeen: base.lastSeen };
             const patched = mergeUserProfile(base, patch, false);
-            allKnownUsers.set(row.ip, { ...patched, online: onlineUsers.has(row.ip) });
+            allKnownUsers.set(row.ip, applyStoredProfileOverride({ ...patched, online: onlineUsers.has(row.ip) }));
             persistKnownUserSnapshot(patched);
           }
           pending -= 1;
