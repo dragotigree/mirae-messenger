@@ -9910,6 +9910,18 @@
     }
     loadMyProfile().catch((e) => console.error('프로필 초기화 실패:', e));
 
+    // 관리자가 이 PC 사용자(나)의 소부서 등을 원격으로 고치면, main 프로세스는 즉시
+    // 반영되지만 화면이 부팅 때 받아 둔 myProfile 사본은 낡은 채로 남는다. 그 상태에서
+    // 설정 창을 열지 않고도 화면 어딘가 myProfile을 참조하는 곳이 낡은 값을 쓰지 않도록
+    // main이 보내주는 최신 값으로 즉시 맞춰 둔다(설정 창 자체는 열 때마다 서버에서 다시
+    // 받아오므로 이 리스너가 없어도 열면 맞지만, 안전하게 항상 최신으로 유지한다).
+    if (window.api && typeof window.api.onMyProfileUpdated === 'function') {
+      window.api.onMyProfileUpdated((p) => {
+        if (!p) return;
+        myProfile = p;
+      });
+    }
+
     window.api.onApplyTrayViewMode((mode) => {
       applyViewMode(mode === 'compact').catch((e) => console.error('트레이 화면 전환 실패:', e));
     });

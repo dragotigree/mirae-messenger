@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 👤 프로필 및 연락처 (휴대폰 번호 포함)
   getMyProfile: () => ipcRenderer.invoke('get-my-profile'),
+  onMyProfileUpdated: (callback) => ipcRenderer.on('my-profile-updated', (e, profile) => callback(profile)),
   getProfilePhoto: (ip) => ipcRenderer.invoke('get-profile-photo', ip),
   saveMyProfile: (profile) => ipcRenderer.invoke('save-my-profile', profile),
 

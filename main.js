@@ -6775,7 +6775,8 @@ function profileOverrideFromRow(row) {
     floor: row.floor || '',
     extNo: row.ext_no || '',
     phone: row.phone_no || '',
-    note: row.note || ''
+    note: row.note || '',
+    updatedAt: row.updated_at || ''
   };
 }
 
@@ -6806,7 +6807,7 @@ function applyStoredProfileOverride(u) {
 
 function persistProfileOverrideToDb(ov) {
   if (!ov || !ov.ip) return;
-  const updatedAt = new Date().toISOString();
+  const updatedAt = ov.updatedAt || new Date().toISOString();
   db.run(
     `INSERT INTO user_profile_overrides (ip, username, rank, dept, sub_dept, floor, ext_no, phone_no, note, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -6820,9 +6821,20 @@ function persistProfileOverrideToDb(ov) {
   );
 }
 
+/** ⚠️ 실사고: 관리자가 소부서 등을 새로 고쳐 놓아도, 그 소식을 아직 못 들은(오프라인이었거나
+ * 편집 전 시점의) 다른 PC와 나중에 P2P로 다시 연결되면, 그 PC가 갖고 있던 "더 옛날" 값이
+ * 그대로 다시 덮어써서 방금 고친 내용이 되돌아갔다(수정 기록에 시각이 전혀 없어 "먼저
+ * 도착하는 값이 항상 이긴다"였기 때문). updated_at을 진짜 최신순 비교 기준으로 써서,
+ * 이미 가진 값보다 옛날인 값은 무시한다(최신 수정 우선). 관리자가 지금 막 입력한 값처럼
+ * updatedAt이 없는 patch는 항상 "지금"으로 찍어 최신으로 반영한다. */
 function storeProfileOverride(patch) {
   if (!patch || !patch.ip) return;
   const prev = profileOverrides.get(patch.ip) || { ip: patch.ip };
+  const incomingUpdatedAt = patch.updatedAt || new Date().toISOString();
+  if (prev.updatedAt && incomingUpdatedAt < prev.updatedAt) {
+    // 이미 가진 값이 더 최신이면, 옛 값으로는 아무것도 바꾸지 않는다.
+    return;
+  }
   const merged = {
     ip: patch.ip,
     username: patch.username != null ? String(patch.username).trim() : (prev.username || ''),
@@ -6832,7 +6844,8 @@ function storeProfileOverride(patch) {
     floor: patch.floor != null ? String(patch.floor).trim() : (prev.floor || ''),
     extNo: patch.extNo != null ? String(patch.extNo).trim() : (prev.extNo || ''),
     phone: patch.phone != null ? String(patch.phone).trim() : (prev.phone || ''),
-    note: patch.note != null ? String(patch.note).trim() : (prev.note || '')
+    note: patch.note != null ? String(patch.note).trim() : (prev.note || ''),
+    updatedAt: incomingUpdatedAt
   };
   profileOverrides.set(patch.ip, merged);
   persistProfileOverrideToDb(merged);
@@ -6874,6 +6887,14 @@ function refreshUserAfterProfileOverride(ip) {
     if (ov) applyProfileOverrideToSelf(ov);
     registerSelf();
     notifyUserList();
+    // ⚠️ 실사고: 관리자가 원격으로 내(=이 PC) 소부서 등을 바꾸면 main 프로세스의
+    // myProfile은 즉시 갱신되지만, 화면(렌더러)이 부팅 때 한 번 받아 둔 myProfile
+    // 사본은 그대로 낡은 채로 남았다. 그 상태에서 이 PC 사용자가 설정 창을 열어
+    // (다른 항목만 바꾸더라도) 저장을 누르면, 설정 창은 열 때 채워 둔 낡은 값을
+    // 그대로 다시 보내(빈 소부서) main의 정상 값을 덮어쓰고 그대로 재전파해서
+    // "고쳐 놓은 소부서가 다시 사라진다"는 문제가 났다. 렌더러도 즉시 최신 값을
+    // 받아 자기 사본을 갱신하도록 알려준다.
+    try { safeWebContentsSend('my-profile-updated', myProfile); } catch (e) { /* ignore */ }
     return;
   }
   const live = allKnownUsers.get(ip);
@@ -6897,7 +6918,8 @@ function handleProfileOverrideSync(payload) {
     floor: p.floor,
     extNo: p.extNo != null ? p.extNo : p.ext_no,
     phone: p.phone != null ? p.phone : p.phone_no,
-    note: p.note
+    note: p.note,
+    updatedAt: p.updatedAt || p.updated_at || ''
   });
   refreshUserAfterProfileOverride(p.ip);
 }
@@ -11781,7 +11803,10 @@ ipcMain.handle('master-update-user-profile', async (event, payload) => {
     floor: p.floor != null ? String(p.floor).trim() : '',
     extNo: p.extNo != null ? String(p.extNo).trim() : (p.ext_no != null ? String(p.ext_no).trim() : ''),
     phone: p.phone != null ? String(p.phone).trim() : (p.phone_no != null ? String(p.phone_no).trim() : ''),
-    note: p.note != null ? String(p.note).trim() : ''
+    note: p.note != null ? String(p.note).trim() : '',
+    // 지금 관리자가 직접 입력한 값이 항상 최신이 되도록 시각을 찍는다(뒤늦게 동기화되는
+    // 다른 PC의 옛 값이 이걸 덮어쓰지 못하게).
+    updatedAt: new Date().toISOString()
   };
   if (!patch.username) {
     const known = allKnownUsers.get(ip);
