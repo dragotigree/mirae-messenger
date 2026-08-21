@@ -2487,6 +2487,15 @@
     .compact-list-item.is-offline { opacity: 0.72; }
     .compact-list-item.is-offline .compact-item-name { color: var(--text-muted); }
     .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
+    .compact-item-leave-btn {
+      position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+      width: 20px; height: 20px; border-radius: 50%; border: none;
+      background: var(--surface-muted); color: var(--text-muted);
+      font-size: 11px; line-height: 1; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; opacity: 0; transition: opacity 0.12s, background 0.12s, color 0.12s;
+    }
+    .compact-list-item:hover .compact-item-leave-btn { opacity: 1; }
+    .compact-item-leave-btn:hover { background: #fee2e2; color: #dc2626; }
     .compact-avatar { position: relative; width: 46px; height: 46px; border-radius: 50%; background: var(--sidebar-active); color: var(--accent-dark); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; box-shadow: none; overflow: hidden; }
     .compact-avatar-broadcast { background: #475569; color: #fff; font-size: 14px; }
     .compact-avatar-transport { background: var(--danger); color: #fff; font-size: 15px; }
@@ -12786,6 +12795,37 @@
       };
     }
 
+    /** 최근 대화에서 "나가기"가 실제로 의미 있는 줄만 골라낸다.
+     *  전체공지(BROADCAST)·그룹채팅·즐겨찾기한 사람은 메시지가 없어도 목록에 항상
+     *  다시 채워 넣으므로(buildCompactConversationRows), 나가도 곧바로 되살아나 버려
+     *  버튼을 보여줘도 의미가 없다 — 실제 대화 기록이 있는 개인/부서/층 채팅만 대상. */
+    function canLeaveRecentChatRow(row) {
+      if (!row || !((row.lastId || 0) > 0)) return false;
+      if (row.kind === 'dm') return !row.isFavorite;
+      return row.kind === 'dept' || row.kind === 'floor';
+    }
+
+    async function leaveRecentChatRow(key, name) {
+      const label = name || '이 대화';
+      const ok = await appConfirm(
+        `[${label}]을(를) 최근 대화에서 내보낼까요?\n\n` +
+          '· 메시지 기록은 지워지지 않고 전체 로그(기록)에서 계속 볼 수 있습니다.\n' +
+          '· 전체 로그에서 이 대화로 이동하는 링크도 그대로 동작합니다.\n' +
+          '· 다만 최근 대화 목록에는 다시 나타나지 않으며, 상대가 새 메시지를 보내면 그때 다시 나타납니다.'
+      );
+      if (!ok) return;
+      const res = await window.api.leaveRecentChat(key);
+      if (!res || !res.success) {
+        await appAlert((res && res.msg) || '최근 대화에서 나가지 못했습니다.');
+        return;
+      }
+      invalidateCompactRecentConversations();
+      try { renderRecentChatsSection(); } catch (e) { /* ignore */ }
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { renderCompactList(); } catch (e) { /* ignore */ }
+      }
+    }
+
     function appendCompactConversationItem(container, row) {
       const item = document.createElement('div');
       const active = row.user && isCompactChatActive(row.user.ip);
@@ -12797,6 +12837,7 @@
         ? formatCompactConversationTime(row.createdAtLocal)
         : (row.kind === 'dm' && row.user ? compactUserTimeLabel(row.user) : '');
       const timeClass = row.kind === 'dm' && row.user && row.user.online ? 'compact-item-time is-live' : 'compact-item-time';
+      const canLeave = canLeaveRecentChatRow(row);
       item.innerHTML = `
         <div class="compact-avatar ${row.avatarClass || ''}">${row.avatarHtml || ''}</div>
         <div class="compact-item-body">
@@ -12809,11 +12850,21 @@
             ${row.unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(row.unread)}</span>` : ''}
           </div>
         </div>
+        ${canLeave ? `<button type="button" class="compact-item-leave-btn" title="최근 대화에서 나가기">✕</button>` : ''}
       `;
       item.onclick = row.onClick;
       if (row.kind === 'dm' && row.user) {
         item.oncontextmenu = (e) => showUserContextMenu(e, row.user);
         bindUserDragSource(item, row.user);
+      }
+      if (canLeave) {
+        const leaveBtn = item.querySelector('.compact-item-leave-btn');
+        if (leaveBtn) {
+          leaveBtn.onclick = (e) => {
+            e.stopPropagation();
+            leaveRecentChatRow(row.key, row.name);
+          };
+        }
       }
       container.appendChild(item);
     }

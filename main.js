@@ -4655,6 +4655,15 @@ db.serialize(() => {
     cleared_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`, logDbErr);
 
+  // 최근 대화 목록에서 "나가기" — chat_view_clears(대화창 안 내용 지우기)와 같은 원리로,
+  // 실제 메시지는 전혀 지우지 않고 "여기까지는 최근 대화에서 숨긴다"는 표시만 남긴다.
+  // 이 시각 이후로 새 메시지가 오면(last_id가 커지면) 자연스럽게 다시 최근 대화에 나타난다.
+  db.run(`CREATE TABLE IF NOT EXISTS recent_chat_leaves (
+    channel_key TEXT PRIMARY KEY,
+    left_up_to_id INTEGER NOT NULL DEFAULT 0,
+    left_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, logDbErr);
+
   db.run(`CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     show_notification_preview INTEGER DEFAULT 1,
@@ -11366,6 +11375,8 @@ ipcMain.handle('get-recent-conversations', async () => {
         GROUP BY peer_key
       ) x
       JOIN messages m ON m.id = x.last_id
+      LEFT JOIN recent_chat_leaves l ON l.channel_key = x.peer_key
+      WHERE x.last_id > COALESCE(l.left_up_to_id, 0)
       ORDER BY x.last_id DESC
       LIMIT 200`;
     db.all(sql, [myIp, myIp, myIp], (err, rows) => {
@@ -11562,6 +11573,33 @@ ipcMain.handle('clear-chat-view', async (event, channelKey) => {
     });
   } catch (e) {
     return { success: false, msg: e.message || '대화창을 비우지 못했습니다.' };
+  }
+});
+
+// 최근 대화에서만 나가기 — 메시지는 그대로 두고(전체 로그·해당 대화창에서는 계속 보임)
+// 최근 대화 목록에서만 숨긴다. 새 메시지가 오면 자동으로 다시 나타난다.
+ipcMain.handle('leave-recent-chat', async (event, channelKey) => {
+  const rawKey = String(channelKey || '').trim();
+  const key = rawKey === MY_IP ? 'SELF' : rawKey;
+  if (!key) return { success: false, msg: '대화방 정보가 없습니다.' };
+  try {
+    const maxId = await getMaxMessageIdForChannel(key);
+    return new Promise((resolve) => {
+      db.run(
+        `INSERT INTO recent_chat_leaves (channel_key, left_up_to_id, left_at) VALUES (?, ?, datetime('now','localtime'))
+         ON CONFLICT(channel_key) DO UPDATE SET left_up_to_id = excluded.left_up_to_id, left_at = excluded.left_at`,
+        [key, maxId],
+        (err) => {
+          if (err) {
+            resolve({ success: false, msg: err.message });
+            return;
+          }
+          resolve({ success: true, leftUpToId: maxId });
+        }
+      );
+    });
+  } catch (e) {
+    return { success: false, msg: e.message || '최근 대화에서 나가지 못했습니다.' };
   }
 });
 

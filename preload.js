@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   getChatSharedArchive: (targetIP) => ipcRenderer.invoke('get-chat-shared-archive', targetIP),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
   clearChatView: (channelKey) => ipcRenderer.invoke('clear-chat-view', channelKey),
+  leaveRecentChat: (channelKey) => ipcRenderer.invoke('leave-recent-chat', channelKey),
   getAllChatHistory: (opts) => ipcRenderer.invoke('get-all-chat-history', opts),
 
   // 👥 그룹 대화방
