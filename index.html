@@ -8098,9 +8098,10 @@
     }
 
     function canModifySchedule(sch) {
-      // 마스터: 전체 / 작성 권한자: 본인이 작성한 일정(외진 포함)만
+      // 마스터: 전체 / 작성 권한자: 본인이 작성한 일정 + 마스터가 작성(또는 수정)했던 일정
       if (isMasterAuthenticated) return true;
       if (!isNoticeOperatorAuthenticated) return false;
+      if (sch && Number(sch.author_is_master) === 1) return true;
       return isMySchedule(sch);
     }
 

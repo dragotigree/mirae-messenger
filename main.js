@@ -4522,6 +4522,10 @@ db.serialize(() => {
   alterAddColumn('hospital_schedules', `meal_cancel_dinner INTEGER DEFAULT 0`);
   alterAddColumn('hospital_schedules', `remark TEXT DEFAULT ''`);
   alterAddColumn('hospital_schedules', `guardian_only INTEGER DEFAULT 0`);
+  // 마스터가 작성(또는 수정)한 일정은 작성 권한자 누구나 고칠 수 있게 하기 위한 표식.
+  // 한 번 1이 되면 이후 다른 작성자가 손대도 다시 0으로 내려가지 않는다(마스터가
+  // 관여했던 일정이라는 사실 자체를 계속 기억해야 하므로).
+  alterAddColumn('hospital_schedules', `author_is_master INTEGER DEFAULT 0`);
 
   /** 삭제된 일정 UID — 피어 NOTICE_SYNC 가 INSERT OR IGNORE 로 되살리는 것 방지 */
   db.run(`CREATE TABLE IF NOT EXISTS deleted_schedules (
@@ -9703,8 +9707,8 @@ function insertScheduleRowIgnoringTombstone(s, notify) {
     const remark = scheduleRemarkFromPayload(s);
     const guardianOnly = scheduleGuardianOnlyFromPayload(s);
     db.run(
-      `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly],
+      `INSERT OR IGNORE INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only, author_is_master) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, Number(s.author_is_master) === 1 ? 1 : 0],
       () => { if (notify) notifySchedulesChanged(); }
     );
   });
@@ -9729,8 +9733,8 @@ function upsertScheduleFromSync(s) {
       if (err) return;
       if (!row) {
         db.run(
-          `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only, modified_at, modified_by_name, modified_by_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp],
+          `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only, modified_at, modified_by_name, modified_by_ip, author_is_master) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [s.uid, s.type, s.title, s.time_str, s.author_name, s.author_ip, s.created_at, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, Number(s.author_is_master) === 1 ? 1 : 0],
           logDbErr
         );
         return;
@@ -9739,8 +9743,10 @@ function upsertScheduleFromSync(s) {
       const remoteMod = String(modAt || '');
       // 원격에 수정 시각이 있고 로컬보다 같거나 더 최신이면 반영 (수정 동기화)
       if (remoteMod && (!localMod || remoteMod >= localMod)) {
+        // author_is_master는 한 번 1이 되면 내려가지 않게, 원격 값이 1일 때만 올려 준다.
+        const masterFlagSql = Number(s.author_is_master) === 1 ? '1' : 'author_is_master';
         db.run(
-          `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+          `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql} WHERE uid = ?`,
           [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
           logDbErr
         );
@@ -9770,8 +9776,9 @@ function handleScheduleEdit(s) {
     const modAt = s.modified_at || '';
     const modName = s.modified_by_name || '';
     const modIp = s.modified_by_ip || '';
+    const masterFlagSql = Number(s.author_is_master) === 1 ? '1' : 'author_is_master';
     db.run(
-      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql} WHERE uid = ?`,
       [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
       () => { notifySchedulesChanged(); }
     );
@@ -12534,12 +12541,12 @@ function scheduleModifyAllowed(uid) {
       resolve(false);
       return;
     }
-    db.get(`SELECT uid, author_ip, author_name FROM hospital_schedules WHERE uid = ?`, [uid], (err, row) => {
+    db.get(`SELECT uid, author_ip, author_name, author_is_master FROM hospital_schedules WHERE uid = ?`, [uid], (err, row) => {
       if (err || !row) {
         resolve(false);
         return;
       }
-      resolve(isAuthorOfRecord(row));
+      resolve(isAuthorOfRecord(row) || Number(row.author_is_master) === 1);
     });
   });
 }
@@ -12603,11 +12610,13 @@ ipcMain.handle('add-schedule', async (event, payload) => {
       meal_cancel_lunch: meal.meal_cancel_lunch,
       meal_cancel_dinner: meal.meal_cancel_dinner,
       remark,
-      guardian_only: guardianOnly
+      guardian_only: guardianOnly,
+      // 지금 이 일정을 마스터 관리자 세션에서 등록하면, 이후 어떤 작성 권한자든 고칠 수 있게 표시해 둔다.
+      author_is_master: masterSessionActive ? 1 : 0
     };
     db.run(
-      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided, record.meal_cancel_breakfast, record.meal_cancel_lunch, record.meal_cancel_dinner, record.remark, record.guardian_only],
+      `INSERT INTO hospital_schedules (uid, type, title, time_str, author_name, author_ip, created_at, remind_before, attending_physician, time_end_str, ward, rm_team, room_no, patient_name, time_start_undecided, time_end_undecided, meal_cancel_breakfast, meal_cancel_lunch, meal_cancel_dinner, remark, guardian_only, author_is_master) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [record.uid, record.type, record.title, record.time_str, record.author_name, record.author_ip, record.created_at, record.remind_before, record.attending_physician, record.time_end_str, record.ward, record.rm_team, record.room_no, record.patient_name, record.time_start_undecided, record.time_end_undecided, record.meal_cancel_breakfast, record.meal_cancel_lunch, record.meal_cancel_dinner, record.remark, record.guardian_only, record.author_is_master],
       (err) => {
         if (!err) {
           broadcastToOnlinePeers({ type: 'SCHEDULE_ADD', schedule: record });
@@ -12660,8 +12669,11 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
       const attending = p.attendingPhysician || '';
       const timeEnd = p.timeEndStr || '';
       const audit = scheduleModificationAudit();
+      // 마스터가 지금 수정하면, 앞으로 이 일정은 어떤 작성 권한자든 고칠 수 있게 표시해 둔다
+      // (원래부터 마스터가 만든 것이었다면 이미 1이므로 그대로 유지됨).
+      const masterFlagSql = masterSessionActive ? '1' : 'author_is_master';
       db.run(
-        `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ? WHERE uid = ?`,
+        `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql} WHERE uid = ?`,
         [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
         function onEditSchedule(err) {
           if (err) {
@@ -12672,18 +12684,22 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
             resolve({ success: false, msg: '일정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.' });
             return;
           }
-          broadcastToOnlinePeers({
-            type: 'SCHEDULE_EDIT',
-            schedule: {
-              uid: p.uid, type: p.type, title: p.title, time_str: p.timeStr,
-              remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
-              ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
-              time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
-              meal_cancel_breakfast: meal.meal_cancel_breakfast, meal_cancel_lunch: meal.meal_cancel_lunch, meal_cancel_dinner: meal.meal_cancel_dinner,
-              remark,
-              guardian_only: guardianOnly,
-              modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip
-            }
+          db.get(`SELECT author_is_master FROM hospital_schedules WHERE uid = ?`, [p.uid], (selErr, selRow) => {
+            const authorIsMaster = selErr ? (masterSessionActive ? 1 : 0) : Number((selRow && selRow.author_is_master) || 0);
+            broadcastToOnlinePeers({
+              type: 'SCHEDULE_EDIT',
+              schedule: {
+                uid: p.uid, type: p.type, title: p.title, time_str: p.timeStr,
+                remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
+                ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
+                time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
+                meal_cancel_breakfast: meal.meal_cancel_breakfast, meal_cancel_lunch: meal.meal_cancel_lunch, meal_cancel_dinner: meal.meal_cancel_dinner,
+                remark,
+                guardian_only: guardianOnly,
+                modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip,
+                author_is_master: authorIsMaster
+              }
+            });
           });
           notifySchedulesChanged();
           resolve({ success: true });
