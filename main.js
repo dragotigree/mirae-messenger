@@ -13888,6 +13888,19 @@ ipcMain.handle('master-force-update', async (event, payload) => {
     fromIp: MY_IP
   };
 
+  // 관리자 화면에서 접속 PC 몇 대를 체크박스로 골라 한 번에 강제 업데이트.
+  // 기존 targetIp(단일/ALL/ALL_OUTDATED)와 별개 경로 — 온라인 상태인 대상만 골라 보낸다.
+  if (Array.isArray(p.targetIps) && p.targetIps.length) {
+    const requested = [...new Set(p.targetIps.map((ip) => String(ip || '').trim()).filter(Boolean))];
+    const ips = requested.filter((ip) => ip !== MY_IP && onlineUsers.has(ip));
+    const skipped = requested.length - ips.length;
+    if (!ips.length) {
+      return { success: false, msg: '선택한 PC 중 온라인 상태인 대상이 없습니다.' };
+    }
+    sendToIps(ips, forcePayload);
+    return { success: true, count: ips.length, ips, skipped };
+  }
+
   // 이 PC
   if (!targetIp || targetIp === MY_IP || targetIp === 'SELF') {
     safeWebContentsSend('force-update-started', { fromIp: MY_IP, targetVersion: APP_VERSION, local: true });

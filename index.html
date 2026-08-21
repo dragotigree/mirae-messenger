@@ -5931,6 +5931,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div style="font-size:12px; color:#64748b;">기준 버전: <strong id="master-ref-version" style="color:#0f172a;">-</strong></div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" id="master-bulk-force-update-btn" onclick="masterForceUpdateSelected()" disabled style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요">⚡ 선택한 PC 강제 업데이트</button>
                 <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
                 <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
@@ -12585,6 +12586,15 @@
         }
       });
 
+      // 즐겨찾기한 직원은 대화 기록이 없어도(한 번도 대화한 적 없어도) 목록에 유지 —
+      // 일반 모드의 「즐겨찾기」 섹션과 동일하게 동작하도록.
+      (favoriteIps || new Set()).forEach((ip) => {
+        if (!ip || byKey.has(ip)) return;
+        putRow(ip, {
+          key: ip, lastId: 0, createdAtLocal: '', preview: '', senderName: ''
+        });
+      });
+
       // unread만 있고 히스토리 조회에 빠진 키 보정
       Object.keys(unreadCounts || {}).forEach((key) => {
         if (!unreadCounts[key]) return;
@@ -18764,6 +18774,11 @@
     let masterClientsSortKey = null;
     let masterClientsSortDir = 1;
 
+    /** 「접속 PC」 표에서 체크박스로 골라 놓은 IP들. 몇 명 골라 한 번에 강제 업데이트를
+     *  보낼 때 쓴다 — 정렬·검색으로 표가 다시 그려져도(renderMasterOnlineClients) 선택은
+     *  유지된다(그 함수 밖에 있는 변수라서). */
+    let masterClientsSelectedIps = new Set();
+
     /** 「접속 PC」 표에서 사람을 바로 찾기 위한 검색어. 이름·직급·부서·층·IP를 한 번에
      *  훑어서 걸러낸다(사이드바 사람 검색과 같은 감각). Ctrl+F로도 이 칸에 바로 들어온다. */
     let masterClientsFilter = '';
@@ -18857,12 +18872,18 @@
       const sortArrow = (key) => masterClientsSortKey === key ? (masterClientsSortDir > 0 ? ' ▲' : ' ▼') : '';
       const sortableTh = (key, label) => `<th class="is-sortable" data-sort-key="${key}" style="cursor:pointer; user-select:none;" title="눌러서 이 기준으로 정렬">${label}${sortArrow(key)}</th>`;
 
+      // 체크박스로 골라둔 대상은 목록이 다시 그려져도(정렬·검색 등) 그대로 유지한다.
+      // 지금 화면에 없는(필터링된) IP는 셀렉트-올 등에서 실수로 포함되지 않게 정리한다.
+      const visibleIps = new Set(rows.map((u) => u.ip));
+      [...masterClientsSelectedIps].forEach((ip) => { if (!visibleIps.has(ip)) masterClientsSelectedIps.delete(ip); });
+
       const tableHead = `<table class="master-clients-table">
         <colgroup>
-          <col class="c-name"><col class="c-dept"><col class="c-ip"><col class="c-ver">
+          <col class="c-check" style="width:30px;"><col class="c-name"><col class="c-dept"><col class="c-ip"><col class="c-ver">
           <col class="c-status"><col class="c-last"><col class="c-actions">
         </colgroup>
         <thead><tr>
+          <th><input type="checkbox" id="master-clients-select-all" title="전체 선택/해제"></th>
           ${sortableTh('name', '이름')}
           ${sortableTh('dept', '부서/층')}
           ${sortableTh('ip', 'IP')}
@@ -18892,7 +18913,12 @@
         const wipePendingBadge = wipePending
           ? ' <span class="master-pill is-wipe">삭제예약</span>'
           : '';
+        // 강제 업데이트는 온라인 + 이 PC 자신이 아닌 대상에만 뜻이 있다 — 나머지는 체크박스를
+        // 아예 못 누르게 해서, 골라 놓고 눌러도 안 되는 상황을 애초에 막는다.
+        const selectable = !!u.online && !isMe;
+        const checked = masterClientsSelectedIps.has(u.ip) ? 'checked' : '';
         return `<tr class="${u.online && !usageDisabled ? '' : 'is-dim'}">
+          <td><input type="checkbox" class="master-client-select-box" data-ip="${escAttr(u.ip)}" ${checked} ${selectable ? '' : 'disabled'} title="${selectable ? '선택' : '오프라인이거나 이 PC라 선택할 수 없습니다'}"></td>
           <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:var(--accent-dark); font-size:10px;">(이 PC)</span>' : ''}${wipePendingBadge}</td>
           <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
@@ -18915,6 +18941,64 @@
       box.querySelectorAll('th.is-sortable').forEach((th) => {
         th.addEventListener('click', () => setMasterClientsSort(th.getAttribute('data-sort-key')));
       });
+      box.querySelectorAll('.master-client-select-box').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          const ip = cb.getAttribute('data-ip');
+          if (!ip) return;
+          if (cb.checked) masterClientsSelectedIps.add(ip);
+          else masterClientsSelectedIps.delete(ip);
+          syncMasterClientsSelectAllUi();
+          updateMasterBulkForceUpdateBtn();
+        });
+      });
+      const selectAllBox = document.getElementById('master-clients-select-all');
+      if (selectAllBox) {
+        selectAllBox.addEventListener('change', () => {
+          const selectableBoxes = [...box.querySelectorAll('.master-client-select-box:not(:disabled)')];
+          selectableBoxes.forEach((cb) => {
+            cb.checked = selectAllBox.checked;
+            const ip = cb.getAttribute('data-ip');
+            if (!ip) return;
+            if (selectAllBox.checked) masterClientsSelectedIps.add(ip);
+            else masterClientsSelectedIps.delete(ip);
+          });
+          updateMasterBulkForceUpdateBtn();
+        });
+      }
+      syncMasterClientsSelectAllUi();
+      updateMasterBulkForceUpdateBtn();
+    }
+
+    /** 선택 가능한 행이 전부 체크됐는지에 맞춰 헤더의 「전체 선택」 체크박스 상태를 맞춘다. */
+    function syncMasterClientsSelectAllUi() {
+      const box = document.getElementById('master-online-clients-box');
+      const selectAllBox = document.getElementById('master-clients-select-all');
+      if (!box || !selectAllBox) return;
+      const selectableBoxes = [...box.querySelectorAll('.master-client-select-box:not(:disabled)')];
+      selectAllBox.checked = selectableBoxes.length > 0 && selectableBoxes.every((cb) => cb.checked);
+      selectAllBox.indeterminate = !selectAllBox.checked && selectableBoxes.some((cb) => cb.checked);
+    }
+
+    function updateMasterBulkForceUpdateBtn() {
+      const btn = document.getElementById('master-bulk-force-update-btn');
+      if (!btn) return;
+      const n = masterClientsSelectedIps.size;
+      btn.textContent = n > 0 ? `⚡ 선택한 ${n}대 강제 업데이트` : '⚡ 선택한 PC 강제 업데이트';
+      btn.disabled = n === 0;
+    }
+
+    /** 체크박스로 고른 PC 몇 대를 한 번에 강제 업데이트한다. */
+    function masterForceUpdateSelected() {
+      const ips = [...masterClientsSelectedIps];
+      if (!ips.length) {
+        appAlert('먼저 접속 PC 표에서 업데이트할 대상을 체크해 주세요.');
+        return;
+      }
+      const names = ips
+        .map((ip) => (allUsers || []).find((u) => u.ip === ip))
+        .filter(Boolean)
+        .map((u) => `${u.rank || ''} ${u.username || ip}`.trim());
+      openMasterForceUpdateModal({ bulkIps: ips, bulkNames: names });
     }
 
     /** 「접속 PC」 행마다 5개까지 늘어서 있던 버튼을 하나의 「⋮ 관리」 드롭다운으로 정리 */
@@ -18957,21 +19041,33 @@
       menu.style.top = y + 'px';
     }
 
+    /** 이 모달이 열려 있는 동안 쓸 「선택한 여러 대」 목록. 확인 시 이게 있으면 그쪽을
+     *  우선 쓴다(단일 IP 문자열 하나만 담는 hidden input에 배열을 억지로 넣지 않기 위함). */
+    let masterForceUpdateBulkIps = null;
+
     function openMasterForceUpdateModal(opts) {
       if (!isMasterAuthenticated) {
         appAlert('마스터 관리자 로그인이 필요합니다.');
         return;
       }
       const o = opts || {};
-      const targetIp = o.targetIp || 'ALL_OUTDATED';
-      document.getElementById('master-force-update-target').value = targetIp;
+      masterForceUpdateBulkIps = Array.isArray(o.bulkIps) && o.bulkIps.length ? o.bulkIps : null;
       const desc = document.getElementById('master-force-update-desc');
-      if (targetIp === 'ALL_OUTDATED') {
-        desc.textContent = '온라인 상태이면서 기준 버전보다 낮은 PC에 강제 업데이트를 보냅니다.';
-      } else if (o.isMe) {
-        desc.textContent = `이 PC(${targetIp})를 지금 강제 업데이트하고 재시작합니다.`;
+      if (masterForceUpdateBulkIps) {
+        document.getElementById('master-force-update-target').value = '';
+        const names = Array.isArray(o.bulkNames) ? o.bulkNames : [];
+        const preview = names.slice(0, 5).join(', ') + (names.length > 5 ? ` 외 ${names.length - 5}명` : '');
+        desc.textContent = `선택한 ${masterForceUpdateBulkIps.length}대에 강제 업데이트를 보냅니다.${preview ? ` (${preview})` : ''}`;
       } else {
-        desc.textContent = `${o.name || '대상'} (${targetIp}) PC에 강제 업데이트를 보냅니다.`;
+        const targetIp = o.targetIp || 'ALL_OUTDATED';
+        document.getElementById('master-force-update-target').value = targetIp;
+        if (targetIp === 'ALL_OUTDATED') {
+          desc.textContent = '온라인 상태이면서 기준 버전보다 낮은 PC에 강제 업데이트를 보냅니다.';
+        } else if (o.isMe) {
+          desc.textContent = `이 PC(${targetIp})를 지금 강제 업데이트하고 재시작합니다.`;
+        } else {
+          desc.textContent = `${o.name || '대상'} (${targetIp}) PC에 강제 업데이트를 보냅니다.`;
+        }
       }
       document.getElementById('master-force-update-pwd').value = '';
       document.getElementById('master-force-update-modal').style.display = 'flex';
@@ -18980,6 +19076,7 @@
 
     function closeMasterForceUpdateModal() {
       document.getElementById('master-force-update-modal').style.display = 'none';
+      masterForceUpdateBulkIps = null;
     }
 
     function masterForceUpdateOutdated() {
@@ -18991,19 +19088,25 @@
         await appAlert('마스터 관리자 로그인이 필요합니다.');
         return;
       }
+      const bulkIps = masterForceUpdateBulkIps;
       const targetIp = document.getElementById('master-force-update-target').value.trim();
       const password = document.getElementById('master-force-update-pwd').value;
       if (!password) {
         await appAlert('마스터 비밀번호를 입력해 주세요.');
         return;
       }
-      if (!await appConfirm('정말 강제 업데이트를 실행할까요?\n대상 PC가 잠시 재시작됩니다.', {
+      const confirmMsg = bulkIps
+        ? `선택한 ${bulkIps.length}대에 정말 강제 업데이트를 실행할까요?\n대상 PC들이 잠시 재시작됩니다.`
+        : '정말 강제 업데이트를 실행할까요?\n대상 PC가 잠시 재시작됩니다.';
+      if (!await appConfirm(confirmMsg, {
         title: '강제 업데이트',
         confirmText: '실행',
         cancelText: '취소'
       })) return;
 
-      const res = await window.api.masterForceUpdate({ targetIp, password });
+      const res = await window.api.masterForceUpdate(
+        bulkIps ? { targetIps: bulkIps, password } : { targetIp, password }
+      );
       closeMasterForceUpdateModal();
       if (!res || !res.success) {
         await appAlert((res && res.msg) || '강제 업데이트 요청에 실패했습니다.');
@@ -19014,7 +19117,12 @@
         return;
       }
       if (res.count != null) {
-        await appAlert(`강제 업데이트 명령을 ${res.count}대에 보냈습니다.\n\n대상 PC가 구버전이면 명령을 모를 수 있습니다. 그 경우 해당 PC에서 설정 → 업데이트 → 「지금 확인」을 눌러 주세요.`);
+        const skippedNote = res.skipped ? ` (오프라인 등으로 ${res.skipped}대는 건너뜀)` : '';
+        await appAlert(`강제 업데이트 명령을 ${res.count}대에 보냈습니다.${skippedNote}\n\n대상 PC가 구버전이면 명령을 모를 수 있습니다. 그 경우 해당 PC에서 설정 → 업데이트 → 「지금 확인」을 눌러 주세요.`);
+        if (bulkIps) {
+          masterClientsSelectedIps.clear();
+          renderMasterOnlineClients();
+        }
       } else {
         await appAlert(`강제 업데이트 명령을 보냈습니다. (${res.targetIp || targetIp})\n\n결과가 오면 아래에 표시됩니다. 대상이 너무 오래된 버전이면 수동 핫픽스가 필요합니다.`);
       }
