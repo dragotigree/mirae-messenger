@@ -5790,7 +5790,10 @@
     <div class="modal-card user-info-modal-card" onclick="event.stopPropagation()">
       <div class="user-info-modal-top">
         <div class="detail-heading">상세 정보</div>
-        <button type="button" class="user-info-modal-close" onclick="closeUserInfoModal()" title="닫기">✕</button>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button type="button" id="user-info-master-edit-btn" onclick="editUserInfoAsMaster()" title="관리자 권한으로 이 직원 정보 수정" style="display:none; padding:5px 12px; background:#1e40af; color:#fff; border:none; border-radius:999px; font-size:11.5px; font-weight:700; cursor:pointer;">✏️ 정보 수정</button>
+          <button type="button" class="user-info-modal-close" onclick="closeUserInfoModal()" title="닫기">✕</button>
+        </div>
       </div>
       <div class="detail-profile-card" id="detail-contact-section">
         <div class="detail-avatar" id="detail-avatar">직원</div>
@@ -10930,7 +10933,10 @@
             .map((card) => findUserByIp(card.getAttribute('data-user-ip')))
             .filter(Boolean);
           const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
-          const trail = block.querySelector('.subsection-label > span:last-child');
+          // ⚠️ 부서 이름 뒤(첫 번째 span)에 배지를 둔다. 예전엔 오른쪽 끝(마지막 span)에
+          // 넣었는데, 표시 위치를 이름 뒤로 옮긴 뒤에도 이 빠른 갱신 경로만 옛 위치를
+          // 그대로 써서 배지가 양쪽에 중복으로 생길 수 있었다.
+          const trail = block.querySelector('.subsection-label > span:first-child');
           if (!trail) return;
           let unreadEl = trail.querySelector('.unread-badge');
           if (groupUnread > 0) {
@@ -10943,10 +10949,17 @@
           } else if (unreadEl) {
             unreadEl.remove();
           }
+          // 옛 위치(오른쪽 끝)에 남아 있을 수 있는 중복 배지를 정리한다.
+          const oldTrail = block.querySelector('.subsection-label > span:last-child');
+          if (oldTrail && oldTrail !== trail) {
+            const stale = oldTrail.querySelector('.unread-badge');
+            if (stale) stale.remove();
+          }
         });
       } else {
         renderUserListTree();
       }
+      refreshRecentChatsUnreadBadges();
       renderGroupChannels();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
@@ -10960,6 +10973,42 @@
         renderGroupChannels();
       }
       syncUnreadInboxBars();
+    }
+
+    /** 새 메시지가 오거나 읽었을 때, 사이드바 「최근 대화」 각 줄의 안 읽은 개수를 그 자리에서
+     *  갱신한다. 목록 전체를 다시 그리면(DB 조회 포함) 무거우므로 숫자만 바꾼다. */
+    function refreshRecentChatsUnreadBadges() {
+      const body = document.getElementById('recent-chats-section-body');
+      if (!body) return;
+      let total = 0;
+      body.querySelectorAll('.compact-list-item[data-conv-key]').forEach((item) => {
+        const key = item.getAttribute('data-conv-key') || '';
+        let unread = 0;
+        try {
+          const ip = item.getAttribute('data-user-ip') || '';
+          const u = ip ? findUserByIp(ip) : null;
+          unread = u ? getUnreadForUser(u) : getUnreadCount(key);
+        } catch (e) { unread = 0; }
+        total += unread || 0;
+        const bottom = item.querySelector('.compact-item-bottom');
+        if (!bottom) return;
+        let badge = bottom.querySelector('.unread-badge');
+        if (unread > 0) {
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'unread-badge';
+            bottom.appendChild(badge);
+          }
+          badge.textContent = formatUnreadBadge(unread);
+        } else if (badge) {
+          badge.remove();
+        }
+      });
+      const headEl = document.getElementById('recent-chats-section-unread-badge');
+      if (headEl) {
+        headEl.style.display = total > 0 ? '' : 'none';
+        headEl.textContent = formatUnreadBadge(total);
+      }
     }
 
     function anyModalOverlayOpen() {
@@ -12591,6 +12640,8 @@
       const active = row.user && isCompactChatActive(row.user.ip);
       item.className = `compact-list-item compact-list-item-chat${row.kind === 'dm' ? ' compact-list-item-user' : ''}${active ? ' is-active' : ''}${row.kind === 'dm' && !row.isOnline ? ' is-offline' : ''}${row.kind === 'dm' && row.user && isSidebarIpSelected(row.user.ip) ? ' is-multi-selected' : ''}`;
       if (row.kind === 'dm' && row.user && row.user.ip) item.dataset.userIp = row.user.ip;
+      // 새 메시지가 왔을 때 이 줄의 안읽음 숫자만 콕 집어 갱신하려고 대화 키를 남겨 둔다.
+      if (row.key) item.dataset.convKey = String(row.key);
       const timeLabel = row.createdAtLocal
         ? formatCompactConversationTime(row.createdAtLocal)
         : (row.kind === 'dm' && row.user ? compactUserTimeLabel(row.user) : '');
@@ -14415,9 +14466,31 @@
       menu.style.display = 'block';
     }
 
-    function openUserInfoModal() {
+    /** 「정보보기」 창이 지금 누구를 보여주고 있는지 — 마스터 수정 버튼이 이 대상을 쓴다. */
+    let userInfoModalTargetIp = '';
+
+    function openUserInfoModal(targetUser) {
       const modal = document.getElementById('user-info-modal');
-      if (modal) modal.style.display = 'flex';
+      if (!modal) return;
+      // 마스터로 로그인했을 때만, 그리고 실제 직원(공지·부서·층·그룹 채널이 아닌 경우)에만
+      // 수정 버튼을 보여준다. 실제 수정은 기존 마스터 수정 창을 그대로 재사용한다.
+      const u = targetUser || null;
+      const isRealUser = !!(u && u.ip && !u.isBroadcast && !u.isDept && !u.isFloor && !u.isGroup);
+      userInfoModalTargetIp = isRealUser ? String(u.ip) : '';
+      const btn = document.getElementById('user-info-master-edit-btn');
+      if (btn) btn.style.display = (isRealUser && isMasterAuthenticated) ? '' : 'none';
+      modal.style.display = 'flex';
+    }
+
+    function editUserInfoAsMaster() {
+      if (!isMasterAuthenticated) {
+        appAlert('마스터 관리자로 로그인한 경우에만 수정할 수 있습니다.');
+        return;
+      }
+      const ip = userInfoModalTargetIp;
+      if (!ip) return;
+      closeUserInfoModal();
+      openMasterUserEditModal(ip);
     }
 
     function closeUserInfoModal() {
@@ -14437,7 +14510,7 @@
       else if (user.isFloor) renderFloorDetailPanel(user.floorName);
       else if (user.isGroup) renderGroupDetailPanel(user);
       else renderContactDetailPanel(user);
-      openUserInfoModal();
+      openUserInfoModal(user);
     }
 
     function ctxEditMyProfile() {
