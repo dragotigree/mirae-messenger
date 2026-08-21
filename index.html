@@ -2471,11 +2471,16 @@
 
     #compact-list-items,
     #compact-friends-list-items { flex: 1; min-height: 0; overflow-y: auto; padding: 0; scrollbar-width: thin; background: #fff; }
+    .compact-list-prefs { border-top: 1px solid var(--border-soft); background: #fff; padding: 6px 10px 8px; margin: 0; }
     .compact-list-panel { background: transparent; margin-bottom: 0; }
     .compact-section-label { font-size: 12px; font-weight: 600; color: var(--text-muted); padding: 14px 16px 6px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-top: 1px solid var(--border-soft); }
     .compact-list-panel:first-child .compact-section-label { border-top: none; }
     .compact-section-label span:first-child { color: var(--text-muted); font-weight: 600; font-size: 12px; }
     .compact-section-label .unread-badge { min-width: 16px; height: 16px; font-size: 9px; background: var(--compact-accent); box-shadow: none; }
+    .compact-section-label.is-toggle { cursor: pointer; user-select: none; }
+    .compact-section-label.is-toggle:hover { background: var(--surface-muted); }
+    .compact-section-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 3px; font-size: 10px; opacity: .75; }
+    .compact-section-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
     .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
     .compact-list-item:hover { background: var(--surface-muted); }
     .compact-list-item.is-active { background: var(--sidebar-active); }
@@ -5570,6 +5575,20 @@
             <input type="text" id="compact-search-input-friends" placeholder="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
           </div>
           <div id="compact-friends-list-items"></div>
+          <div class="sidebar-list-prefs compact-list-prefs" role="toolbar" aria-label="목록 표시 방식">
+            <div class="sidebar-pref-seg" role="group" aria-label="분류">
+              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
+            </div>
+            <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
+              <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
+            </div>
+            <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
+              <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터 표시">공용</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터 숨김">숨김</button>
+            </div>
+          </div>
         </div>
         <div class="compact-pane" data-compact-pane="favorites" hidden>
           <div id="compact-favorites-list-items"></div>
@@ -8762,22 +8781,26 @@
       if (sharedEl) sharedEl.value = showSharedPcsInDirectory() ? 'show' : 'hide';
     }
 
+    /** 미니모드 「직원」 탭에도 같은 표시 설정 바(층/부서·전체/온·공용/숨김)를 하나 더 두므로,
+     *  같은 클래스를 가진 모든 바를 한꺼번에 동기화한다(둘 다 같은 appSettings를 보여줌). */
     function syncSidebarListPrefsUi() {
-      const root = document.getElementById('sidebar-list-prefs');
-      if (!root) return;
+      const roots = document.querySelectorAll('.sidebar-list-prefs');
+      if (!roots.length) return;
       const grouping = appSettings.userGrouping === 'dept' ? 'dept' : 'floor';
       const presence = showOfflineUsersInDirectory() ? 'all' : 'online';
       const shared = showSharedPcsInDirectory() ? 'show' : 'hide';
-      root.querySelectorAll('[data-list-pref]').forEach((btn) => {
-        const pref = btn.getAttribute('data-list-pref');
-        const val = btn.getAttribute('data-value');
-        let on = false;
-        if (pref === 'grouping') on = val === grouping;
-        else if (pref === 'presence') on = val === presence;
-        else if (pref === 'shared') on = val === shared;
-        else if (pref === 'unread') on = sidebarUnreadOnly && val === 'on';
-        btn.classList.toggle('is-active', on);
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      roots.forEach((root) => {
+        root.querySelectorAll('[data-list-pref]').forEach((btn) => {
+          const pref = btn.getAttribute('data-list-pref');
+          const val = btn.getAttribute('data-value');
+          let on = false;
+          if (pref === 'grouping') on = val === grouping;
+          else if (pref === 'presence') on = val === presence;
+          else if (pref === 'shared') on = val === shared;
+          else if (pref === 'unread') on = sidebarUnreadOnly && val === 'on';
+          btn.classList.toggle('is-active', on);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
       });
       syncSidebarInboxBar();
     }
@@ -8839,14 +8862,15 @@
     }
 
     function initSidebarListPrefs() {
-      const root = document.getElementById('sidebar-list-prefs');
-      if (!root || root.dataset.bound === '1') return;
-      root.dataset.bound = '1';
-      root.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-list-pref]');
-        if (!btn || !root.contains(btn)) return;
-        e.preventDefault();
-        setDirectoryListPref(btn.getAttribute('data-list-pref'), btn.getAttribute('data-value'));
+      document.querySelectorAll('.sidebar-list-prefs').forEach((root) => {
+        if (!root || root.dataset.bound === '1') return;
+        root.dataset.bound = '1';
+        root.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-list-pref]');
+          if (!btn || !root.contains(btn)) return;
+          e.preventDefault();
+          setDirectoryListPref(btn.getAttribute('data-list-pref'), btn.getAttribute('data-value'));
+        });
       });
       syncSidebarListPrefsUi();
     }
@@ -12500,13 +12524,30 @@
       container.appendChild(item);
     }
 
-    function createCompactPanel(titleHtml, badgeHtml) {
+    /** collapseKey를 주면 라벨을 눌러 접고 펼 수 있다 — 일반 모드 사이드바와 같은
+     *  collapsedGroups 저장소를 그대로 써서, 접은 상태가 미니모드·일반모드 사이에 유지된다. */
+    function createCompactPanel(titleHtml, badgeHtml, collapseKey) {
       const panel = document.createElement('div');
       panel.className = 'compact-list-panel';
+      const collapsed = !!(collapseKey && collapsedGroups.has(collapseKey));
       const label = document.createElement('div');
-      label.className = 'compact-section-label';
-      label.innerHTML = `<span>${titleHtml}</span>${badgeHtml || ''}`;
+      label.className = `compact-section-label${collapseKey ? ' is-toggle' : ''}${collapsed ? ' is-collapsed' : ''}`;
+      const chevronHtml = collapseKey ? '<span class="group-chevron">▾</span>' : '';
+      label.innerHTML = `<span>${chevronHtml}${titleHtml}</span>${badgeHtml || ''}`;
       panel.appendChild(label);
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'compact-panel-items';
+      if (collapsed) itemsWrap.style.display = 'none';
+      panel.appendChild(itemsWrap);
+      panel.compactItemsWrap = itemsWrap;
+      if (collapseKey) {
+        label.onclick = () => {
+          toggleGroupCollapse(collapseKey);
+          const nowCollapsed = collapsedGroups.has(collapseKey);
+          label.classList.toggle('is-collapsed', nowCollapsed);
+          itemsWrap.style.display = nowCollapsed ? 'none' : '';
+        };
+      }
       return panel;
     }
 
@@ -12858,7 +12899,7 @@
 
       if (favorites.length > 0) {
         const favPanel = createCompactPanel('즐겨찾는 직원', '');
-        favorites.forEach(u => appendCompactUserItem(favPanel, u));
+        favorites.forEach(u => appendCompactUserItem(favPanel.compactItemsWrap, u));
         userPanels.push(favPanel);
       }
 
@@ -12887,8 +12928,11 @@
       sortedGroupKeys.forEach(groupName => {
         const groupUsers = groups[groupName];
         const icon = getUserGroupSidebarIcon(groupingKey, groupName);
-        const groupPanel = createCompactPanel(`${icon} ${groupName}`, '');
-        groupUsers.forEach(u => appendCompactUserItem(groupPanel, u));
+        // 일반 모드 사이드바와 같은 collapsedGroups 키(groupingKey:groupName)를 그대로 써서
+        // 접은 상태가 미니모드·일반모드 사이에 그대로 유지된다.
+        const collapseKey = `${groupingKey}:${groupName}`;
+        const groupPanel = createCompactPanel(`${icon} ${groupName}`, '', collapseKey);
+        groupUsers.forEach(u => appendCompactUserItem(groupPanel.compactItemsWrap, u));
         userPanels.push(groupPanel);
       });
 
