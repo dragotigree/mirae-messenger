@@ -11672,7 +11672,13 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
     incoming.username = '';
   }
   const photoChanged = typeof incoming.photo === 'string' && incoming.photo !== myProfile.photo;
-  myProfile = { ...myProfile, ...incoming };
+  // ⚠️ 실사고: 관리자가 이 PC 사용자의 소부서 등을 원격으로 지정해 놓아도, 이 사람이 설정
+  // 창에서 (다른 항목만 고치더라도) 저장을 누르면 그 값 그대로 DB에 다시 쓰였다 — 지금까지는
+  // profileOverrides를 전혀 다시 확인하지 않았다. PING 수신·부팅 복구 등 다른 모든 지점은
+  // applyStoredProfileOverride로 보호돼 있는데 정작 "본인이 직접 저장"하는 이 경로만 빠져
+  // 있었다("어제는 됐는데 오늘 다시 소부서가 사라짐"의 원인). 관리자가 지정해 둔 값이 있으면
+  // 본인 저장보다 항상 우선한다.
+  myProfile = applyStoredProfileOverride({ ...myProfile, ...incoming, ip: MY_IP });
   console.log('[프로필] 저장:', myProfile.username || '(이름 미설정)', myProfile.rank, myProfile.dept, myProfile.floor, myProfile.extNo);
   logToRendererConsole('info', `[프로필] 저장: ${myProfile.username || '(이름 미설정)'} ${myProfile.rank} ${myProfile.dept} ${myProfile.floor} ${myProfile.extNo}`);
   db.run(`INSERT OR REPLACE INTO user_profile (id, username, rank, dept, sub_dept, floor, ext_no, phone_no, status_state, photo, note) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
