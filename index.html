@@ -14886,6 +14886,16 @@
     function ctxOpenGroupInvite() {
       document.getElementById('dm-context-menu').style.display = 'none';
       if (!ctxMenuTargetUser) return;
+      // ⚠️ 실사고: 여러 명을 다중선택한 상태에서 그중 한 명을 우클릭해 「그룹대화방 초대」를
+      // 누르면, 선택된 전원으로 그룹을 만들려는 의도이지 마우스가 있던 한 명만으로 만들려는
+      // 게 아니다. 예전엔 항상 우클릭한 그 한 명만 넘겨서, 여러 명을 골라도 그룹이 1명으로
+      // 만들어졌다(신고된 그 증상). 「쪽지 보내기」의 같은 패턴을 그대로 따른다 — 우클릭한
+      // 사람이 선택 목록에 포함돼 있을 때만 전체 선택을 쓰고, 다른 사람을 우클릭했다면
+      // (지금 하려는 게 그 사람 개인 대상이므로) 그대로 1명만 쓴다.
+      if (sidebarSelectedUserIps.size > 1 && isSidebarIpSelected(ctxMenuTargetUser.ip)) {
+        openGroupChatModal(getSidebarSelectedUsers(), { mode: 'new' });
+        return;
+      }
       openGroupChatModal(ctxMenuTargetUser);
     }
 
