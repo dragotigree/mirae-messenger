@@ -2487,15 +2487,6 @@
     .compact-list-item.is-offline { opacity: 0.72; }
     .compact-list-item.is-offline .compact-item-name { color: var(--text-muted); }
     .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
-    .compact-item-leave-btn {
-      position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
-      width: 20px; height: 20px; border-radius: 50%; border: none;
-      background: var(--surface-muted); color: var(--text-muted);
-      font-size: 11px; line-height: 1; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; opacity: 0; transition: opacity 0.12s, background 0.12s, color 0.12s;
-    }
-    .compact-list-item:hover .compact-item-leave-btn { opacity: 1; }
-    .compact-item-leave-btn:hover { background: #fee2e2; color: #dc2626; }
     .compact-avatar { position: relative; width: 46px; height: 46px; border-radius: 50%; background: var(--sidebar-active); color: var(--accent-dark); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; box-shadow: none; overflow: hidden; }
     .compact-avatar-broadcast { background: #475569; color: #fff; font-size: 14px; }
     .compact-avatar-transport { background: var(--danger); color: #fff; font-size: 15px; }
@@ -7237,6 +7228,7 @@
       <div class="ctx-menu-item" onclick="ctxOpenGroupInvite()">👥 그룹대화방 초대</div>
       <div class="ctx-menu-item" onclick="ctxDmSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
       <div class="ctx-menu-item" id="ctx-dm-reset-emoji" style="display:none;" onclick="ctxDmClearTitleEmoji()">↩️ 이모티콘 제거</div>
+      <div class="ctx-menu-item" id="ctx-leave-recent-chat" style="display:none; color:#dc2626;" onclick="ctxLeaveRecentChat()">🚪 최근 대화에서 나가기</div>
     </div>
     <div id="ctx-self-items" style="display:none;">
       <div class="ctx-menu-item" onclick="ctxViewUserInfo()">ℹ️ 정보보기</div>
@@ -7250,6 +7242,7 @@
     <div class="ctx-menu-item" onclick="ctxDeptFloorOpenChat()">💬 채널 열기</div>
     <div class="ctx-menu-item" onclick="ctxDeptFloorSetTitleEmoji()">😀 제목 이모티콘 (나만)</div>
     <div class="ctx-menu-item" id="ctx-dept-floor-reset-emoji" style="display:none;" onclick="ctxDeptFloorClearTitleEmoji()">↩️ 이모티콘 제거</div>
+    <div class="ctx-menu-item" id="ctx-dept-floor-leave-recent-chat" style="display:none; color:#dc2626;" onclick="ctxDeptFloorLeaveRecentChat()">🚪 최근 대화에서 나가기</div>
   </div>
 
   <!-- 🖱 마스터 「접속 PC」 행 관리 메뉴 -->
@@ -12837,7 +12830,6 @@
         ? formatCompactConversationTime(row.createdAtLocal)
         : (row.kind === 'dm' && row.user ? compactUserTimeLabel(row.user) : '');
       const timeClass = row.kind === 'dm' && row.user && row.user.online ? 'compact-item-time is-live' : 'compact-item-time';
-      const canLeave = canLeaveRecentChatRow(row);
       item.innerHTML = `
         <div class="compact-avatar ${row.avatarClass || ''}">${row.avatarHtml || ''}</div>
         <div class="compact-item-body">
@@ -12850,21 +12842,14 @@
             ${row.unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(row.unread)}</span>` : ''}
           </div>
         </div>
-        ${canLeave ? `<button type="button" class="compact-item-leave-btn" title="최근 대화에서 나가기">✕</button>` : ''}
       `;
       item.onclick = row.onClick;
       if (row.kind === 'dm' && row.user) {
-        item.oncontextmenu = (e) => showUserContextMenu(e, row.user);
+        // 우클릭하면 기존 메뉴(즐겨찾기·정보보기 등)에 "최근 대화에서 나가기"가 함께 뜬다.
+        item.oncontextmenu = (e) => showUserContextMenu(e, row.user, row);
         bindUserDragSource(item, row.user);
-      }
-      if (canLeave) {
-        const leaveBtn = item.querySelector('.compact-item-leave-btn');
-        if (leaveBtn) {
-          leaveBtn.onclick = (e) => {
-            e.stopPropagation();
-            leaveRecentChatRow(row.key, row.name);
-          };
-        }
+      } else if (row.kind === 'dept' || row.kind === 'floor') {
+        item.oncontextmenu = (e) => showDeptFloorContextMenu(e, row.kind, row.name, row);
       }
       container.appendChild(item);
     }
@@ -13988,18 +13973,31 @@
       refreshAllTitleDisplays();
     }
 
-    function showDeptFloorContextMenu(e, groupingKey, groupName) {
+    // 최근 대화 목록에서 우클릭했을 때만 채워지는 대상 줄 (showUserContextMenu의 ctxMenuTargetRow와 같은 역할).
+    let ctxMenuDeptFloorRow = null;
+    function showDeptFloorContextMenu(e, groupingKey, groupName, row) {
       e.preventDefault();
       e.stopPropagation();
       ctxMenuDeptFloor = { groupingKey, groupName };
+      ctxMenuDeptFloorRow = row || null;
       const key = groupingKey === 'dept' ? `DEPT:${groupName}` : `FLOOR:${groupName}`;
       const resetEl = document.getElementById('ctx-dept-floor-reset-emoji');
       if (resetEl) resetEl.style.display = getChannelTitleEmoji(key) ? 'block' : 'none';
+      const leaveEl = document.getElementById('ctx-dept-floor-leave-recent-chat');
+      if (leaveEl) leaveEl.style.display = canLeaveRecentChatRow(ctxMenuDeptFloorRow) ? 'block' : 'none';
       const menu = document.getElementById('dept-floor-context-menu');
       const menuWidth = 220;
       menu.style.left = Math.min(e.clientX, window.innerWidth - menuWidth) + 'px';
-      menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
+      menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px';
       menu.style.display = 'block';
+    }
+
+    function ctxDeptFloorLeaveRecentChat() {
+      document.getElementById('dept-floor-context-menu').style.display = 'none';
+      const row = ctxMenuDeptFloorRow;
+      ctxMenuDeptFloorRow = null;
+      if (!row) return;
+      leaveRecentChatRow(row.key, row.name);
     }
 
     function ctxDeptFloorOpenChat() {
@@ -14673,9 +14671,13 @@
       renderChannelsSection();
     }
 
-    function showUserContextMenu(e, user) {
+    // 최근 대화 목록(compact-list-item)에서 우클릭했을 때만 채워지는, "나가기"가 실제로
+    // 의미 있는지 판단할 대상 줄. 사용자 목록 트리 등 다른 곳에서 열면 null이라 안 보인다.
+    let ctxMenuTargetRow = null;
+    function showUserContextMenu(e, user, row) {
       e.preventDefault();
       ctxMenuTargetUser = user;
+      ctxMenuTargetRow = row || null;
       const menu = document.getElementById('dm-context-menu');
       const isSelf = !!(user && (user.isMe || (myProfile && user.ip && user.ip === myProfile.ip)));
       const peerItems = document.getElementById('ctx-peer-items');
@@ -14686,13 +14688,23 @@
         document.getElementById('ctx-favorite-item').textContent = favoriteIps.has(user.ip) ? '⭐ 즐겨찾기 해제' : '⭐ 즐겨찾기 추가';
         const resetEmojiEl = document.getElementById('ctx-dm-reset-emoji');
         if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(`DM:${user.ip}`) ? 'block' : 'none';
+        const leaveEl = document.getElementById('ctx-leave-recent-chat');
+        if (leaveEl) leaveEl.style.display = canLeaveRecentChatRow(ctxMenuTargetRow) ? 'block' : 'none';
       }
-      const menuWidth = 200, menuHeight = isSelf ? 120 : 180;
+      const menuWidth = 200, menuHeight = isSelf ? 120 : 210;
       const x = Math.min(e.clientX, window.innerWidth - menuWidth);
       const y = Math.min(e.clientY, window.innerHeight - menuHeight);
       menu.style.left = x + 'px';
       menu.style.top = y + 'px';
       menu.style.display = 'block';
+    }
+
+    function ctxLeaveRecentChat() {
+      document.getElementById('dm-context-menu').style.display = 'none';
+      const row = ctxMenuTargetRow;
+      ctxMenuTargetRow = null;
+      if (!row) return;
+      leaveRecentChatRow(row.key, row.name);
     }
 
     /** 「정보보기」 창이 지금 누구를 보여주고 있는지 — 마스터 수정 버튼이 이 대상을 쓴다. */
