@@ -600,6 +600,7 @@
     .icon-rail-btn.is-drop-hover { background: var(--sidebar-active) !important; color: var(--accent-dark) !important; box-shadow: inset 0 0 0 2px var(--accent); }
     .channel-item.is-channel-dragging { opacity: 0.45; }
     .channel-item.is-channel-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
+    .user-card-item.is-favorite-drop-target, .compact-list-item.is-favorite-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
     .channel-item .channel-reorder-grip { opacity: 0; font-size: 11px; cursor: grab; padding: 0 2px 0 0; flex-shrink: 0; line-height: 1; user-select: none; transition: opacity var(--transition-fast); }
     .channel-item:hover .channel-reorder-grip { opacity: 0.5; }
     .channel-item .channel-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -9042,6 +9043,64 @@
       syncTaskbarBadge();
     }
     let favoriteIps = new Set(JSON.parse(localStorage.getItem('favoriteIps') || '[]'));
+    // 즐겨찾기 사람들을 손으로 끌어서 바꾼 순서 — 아직 순서를 안 정한 새 즐겨찾기는
+    // 이 목록 맨 뒤(기존 정렬 기준)에 자연스럽게 붙는다. 일반 모드·미니 모드가 이
+    // 저장소를 그대로 공유해 어느 화면에서 바꾸든 서로 똑같이 반영된다.
+    let favoritesOrderList = JSON.parse(localStorage.getItem('favoritesOrder') || '[]');
+    function saveFavoritesOrderList(order) {
+      favoritesOrderList = order;
+      localStorage.setItem('favoritesOrder', JSON.stringify(order));
+    }
+    function sortFavoritesByOrder(users) {
+      const orderIndex = new Map(favoritesOrderList.map((ip, i) => [ip, i]));
+      return [...users].sort((a, b) => {
+        const ia = orderIndex.has(a.ip) ? orderIndex.get(a.ip) : Infinity;
+        const ib = orderIndex.has(b.ip) ? orderIndex.get(b.ip) : Infinity;
+        if (ia !== ib) return ia - ib;
+        return compareUsersSidebarOrder(a, b);
+      });
+    }
+    /** 즐겨찾기 목록 안에서 손으로 끌어 순서를 바꾼다 — 일반 모드·미니 모드 어느 쪽 목록에서
+     *  드롭해도 똑같이 저장되고 두 화면 모두 다시 그려 즉시 반영한다. */
+    function reorderFavoriteIps(draggedIp, targetIp) {
+      if (!draggedIp || !targetIp || draggedIp === targetIp) return;
+      if (!favoriteIps.has(draggedIp) || !favoriteIps.has(targetIp)) return;
+      const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
+      const currentFavUsers = (allUsers || []).filter(isFavoriteUser);
+      const ordered = sortFavoritesByOrder(currentFavUsers).map((u) => u.ip);
+      const from = ordered.indexOf(draggedIp);
+      const to = ordered.indexOf(targetIp);
+      if (from < 0 || to < 0) return;
+      ordered.splice(from, 1);
+      ordered.splice(to, 0, draggedIp);
+      saveFavoritesOrderList(ordered);
+      renderUserListTree(true);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+    }
+    /** 즐겨찾기 목록 안의 카드를 서로에게 드롭했을 때만 순서를 바꾼다(다른 용도의 드래그와
+     *  섞이지 않도록 이 목록 안에서만 dragover/drop을 건다). */
+    function bindFavoriteReorderTarget(el, ip) {
+      if (!el || !ip) return;
+      el.addEventListener('dragover', (ev) => {
+        if (!isUserDragEvent(ev)) return;
+        const draggedIp = getDraggedUserIp(ev);
+        if (!draggedIp || draggedIp === ip || !favoriteIps.has(draggedIp)) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        el.classList.add('is-favorite-drop-target');
+      });
+      el.addEventListener('dragleave', (ev) => {
+        if (!el.contains(ev.relatedTarget)) el.classList.remove('is-favorite-drop-target');
+      });
+      el.addEventListener('drop', (ev) => {
+        const draggedIp = getDraggedUserIp(ev);
+        if (!draggedIp || draggedIp === ip || !favoriteIps.has(draggedIp)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        el.classList.remove('is-favorite-drop-target');
+        reorderFavoriteIps(draggedIp, ip);
+      });
+    }
     let myGroupChats = [];
     let ctxMenuTargetUser = null;
     let calendarViewDate = new Date();
@@ -12551,6 +12610,7 @@
       item.oncontextmenu = (e) => showUserContextMenu(e, u);
       bindUserDragSource(item, u);
       container.appendChild(item);
+      return item;
     }
 
     /** 부서별 보기에서, 일반 모드(renderDeptGroupMembers)와 똑같이 그 부서 사람들 중
@@ -12996,14 +13056,17 @@
       if (compactListFilter === 'unread') filtered = filtered.slice();
 
       const sorted = [...filtered].sort(compareUsersSidebarOrder);
-      const favorites = compactListFilter !== 'favorite' ? sorted.filter(isFavoriteUser) : [];
+      const favorites = compactListFilter !== 'favorite' ? sortFavoritesByOrder(sorted.filter(isFavoriteUser)) : [];
       // 즐겨찾기해도 아래 일반 목록에서 사라지지 않도록 — 위 즐겨찾기 패널은 빠른 접근용
       // "복사본"일 뿐, 원래 목록에서 빼는 용도가 아니다.
       const rest = sorted;
 
       if (favorites.length > 0) {
         const favPanel = createCompactPanel('즐겨찾는 직원', '');
-        favorites.forEach(u => appendCompactUserItem(favPanel.compactItemsWrap, u));
+        favorites.forEach(u => {
+          const item = appendCompactUserItem(favPanel.compactItemsWrap, u);
+          bindFavoriteReorderTarget(item, u.ip);
+        });
         userPanels.push(favPanel);
       }
 
@@ -13060,7 +13123,7 @@
       if (compactRailTab === 'chat') {
         await renderCompactChatConversations(container);
       } else if (compactRailTab === 'favorites') {
-        await renderCompactFilteredConversations(container, (r) => r.isFavorite, '즐겨찾기한 대상이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.');
+        await renderCompactFilteredConversations(container, (r) => r.isFavorite, '즐겨찾기한 대상이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.', true);
       } else if (compactRailTab === 'groups') {
         await renderCompactFilteredConversations(container, (r) => r.kind === 'group', '참여 중인 그룹채팅방이 없습니다.');
       } else {
@@ -13076,9 +13139,18 @@
 
     /** 즐겨찾기 · 그룹채팅방 전용 탭 — 최근 대화 목록(buildCompactConversationRows)을
      *  재사용해 조건에 맞는 것만 골라 보여준다. 검색어·필터 칩 없이 항상 전체를 보여준다. */
-    async function renderCompactFilteredConversations(container, filterFn, emptyText) {
+    async function renderCompactFilteredConversations(container, filterFn, emptyText, sortByFavorites) {
       const recent = await loadCompactRecentConversations(true);
       let rows = buildCompactConversationRows(recent).filter(filterFn);
+      if (sortByFavorites) {
+        const orderIndex = new Map(favoritesOrderList.map((ip, i) => [ip, i]));
+        rows.sort((a, b) => {
+          const ia = orderIndex.has(a.key) ? orderIndex.get(a.key) : Infinity;
+          const ib = orderIndex.has(b.key) ? orderIndex.get(b.key) : Infinity;
+          if (ia !== ib) return ia - ib;
+          return (a.lastId || 0) !== (b.lastId || 0) ? (b.lastId || 0) - (a.lastId || 0) : 0;
+        });
+      }
       container.innerHTML = '';
       if (!rows.length) {
         const emptyHintEl = document.createElement('div');
@@ -13087,7 +13159,13 @@
         container.appendChild(emptyHintEl);
         return;
       }
-      rows.forEach((row) => appendCompactConversationItem(container, row));
+      rows.forEach((row) => {
+        appendCompactConversationItem(container, row);
+        if (sortByFavorites) {
+          const item = container.lastElementChild;
+          bindFavoriteReorderTarget(item, row.key);
+        }
+      });
     }
 
     function onCompactSearchInput(v) {
@@ -14265,7 +14343,11 @@
         unreadEl.textContent = formatUnreadBadge(favUnread);
       }
       body.innerHTML = '';
-      favorites.forEach((u) => body.appendChild(buildUserCard(u)));
+      favorites.forEach((u) => {
+        const card = buildUserCard(u);
+        bindFavoriteReorderTarget(card, u.ip);
+        body.appendChild(card);
+      });
     }
 
     /** 일반 화면(3단) 사이드바 "최근 대화" — 미니 모드에서 쓰는 최근 대화 목록과 완전히
@@ -16352,8 +16434,7 @@
       );
 
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
-      const favorites = filtered.filter(isFavoriteUser);
-      favorites.sort(compareUsersSidebarOrder);
+      const favorites = sortFavoritesByOrder(filtered.filter(isFavoriteUser));
       // 즐겨찾기해도 아래 일반 목록(층/부서별)에서 사라지지 않도록 — 즐겨찾기 섹션은
       // 빠른 접근용 "복사본"일 뿐, 원래 목록에서 빼는 용도가 아니다.
       const rest = filtered;
