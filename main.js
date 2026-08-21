@@ -6453,7 +6453,15 @@ function startUdpDiscovery() {
           online: true,
           isMe: false
         };
-        const userObj = mergeUserProfile(previouslyKnown, overlay, true);
+        let userObj = mergeUserProfile(previouslyKnown, overlay, true);
+        // ⚠️ 실사고: 관리자가 소부서 등을 원격으로 고쳐도(master-update-user-profile),
+        // 그 값은 이 PC의 profileOverrides에만 반영된다. 정작 그 사람 본인 PC가 오프라인
+        // 이었거나 구버전이라 PROFILE_OVERRIDE_SYNC를 못 받았으면, 그 사람 PC는 계속
+        // "고치기 전" 값을 PING으로 방송한다. 여기서 override를 다시 덮어씌우지 않으면,
+        // 몇 초마다 오는 그 PING이 관리자가 고친 값을 그대로 되돌려버린다(신고된 증상 —
+        // 소부서를 고쳐도 다시 원래대로 돌아감). PING을 받을 때마다 저장된 override를
+        // 한 번 더 얹어서, 그 사람 PC가 실제로 업데이트를 받아 반영할 때까지 보호한다.
+        userObj = applyStoredProfileOverride(userObj);
         // lastSeen = 마지막 '종료/오프라인' 시각. 접속 중에는 갱신하지 않는다.
         userObj.lastPingAt = now;
         if (previouslyKnown && Number(previouslyKnown.lastSeen) > 0) {

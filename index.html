@@ -10568,6 +10568,21 @@
           refreshNoticePermission();
           updateBoardAuthStatusText();
         }
+        // ⚠️ 실사고: 「새 창으로 열기」로 띄운 별도 채팅창에서 메시지를 읽으면 그 창의
+        // unreadCounts만 localStorage에 저장될 뿐, 메인 창의 메모리 안 unreadCounts는
+        // 그대로라서 사이드바·최근 대화 배지 숫자가 안 지워졌다(신고된 증상: 별도
+        // 채팅창에서 읽어도 메인 창 최근 대화에 안읽음 숫자가 그대로 남음). 다른 창이
+        // unreadCounts를 저장하면 이 storage 이벤트가 뜨므로, 그 값을 다시 읽어와 배지를
+        // 갱신한다.
+        if (e.key === 'unreadCounts') {
+          try {
+            const fresh = JSON.parse(e.newValue || '{}');
+            if (fresh && typeof fresh === 'object') {
+              unreadCounts = fresh;
+              refreshUnreadBadges();
+            }
+          } catch (_) { /* ignore */ }
+        }
       });
       if (isScheduleBoardStandalone()) initScheduleBoardStandaloneShell();
       if (isNoticeBoardStandalone()) initNoticeBoardStandaloneShell();
