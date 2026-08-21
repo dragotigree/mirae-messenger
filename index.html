@@ -6740,6 +6740,13 @@
             <label class="settings-inline-check span-2">
               <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
             </label>
+            <label class="settings-inline-check span-2">
+              <input type="checkbox" id="setting-taskbar-badge" onchange="onTaskbarBadgeSettingChange()"> 작업 표시줄에 안읽음 배지 표시
+            </label>
+            <div class="span-2" style="font-size:11px; color:#94a3b8; margin-top:-6px; line-height:1.6;">
+              켜도 숫자가 안 보이면, Windows 자체 설정에서도 배지 표시가 꺼져 있을 수 있습니다.<br>
+              <b>Windows 설정 → 개인 설정 → 작업 표시줄 → 「작업 표시줄 동작」에서 「작업 표시줄 앱에 배지 표시」</b>를 함께 켜 주세요.
+            </div>
           </div>
         </div>
       </div>
@@ -8957,6 +8964,29 @@
 
     function saveUnreadCounts() {
       localStorage.setItem('unreadCounts', JSON.stringify(unreadCounts));
+      syncTaskbarBadge();
+    }
+
+    /** 작업 표시줄 안읽음 배지 — 기본값은 꺼짐(설정에서 직접 켜야만 표시). Windows 자체
+     *  설정("작업 표시줄 앱에 배지 표시")도 켜져 있어야 실제로 보인다(설정 화면에 안내 문구
+     *  넣어 둠). 값이 자주 바뀔 수 있어 짧게 묶어서 보낸다. */
+    function isTaskbarBadgeEnabled() {
+      return localStorage.getItem('taskbarBadgeEnabled') === 'true';
+    }
+
+    let taskbarBadgeSyncTimer = null;
+    function syncTaskbarBadge() {
+      clearTimeout(taskbarBadgeSyncTimer);
+      taskbarBadgeSyncTimer = setTimeout(() => {
+        if (!window.api || typeof window.api.updateUnreadBadge !== 'function') return;
+        window.api.updateUnreadBadge({ enabled: isTaskbarBadgeEnabled(), count: getTotalUnread() }).catch(() => {});
+      }, 150);
+    }
+
+    function onTaskbarBadgeSettingChange() {
+      const el = document.getElementById('setting-taskbar-badge');
+      localStorage.setItem('taskbarBadgeEnabled', el && el.checked ? 'true' : 'false');
+      syncTaskbarBadge();
     }
     let favoriteIps = new Set(JSON.parse(localStorage.getItem('favoriteIps') || '[]'));
     let myGroupChats = [];
@@ -10248,6 +10278,7 @@
     loadNoticesList().catch(() => {});
     if (!isEnterToSendEnabled()) setEnterToSend(false);
     syncSidebarAlphaSortUi();
+    syncTaskbarBadge();
     let pendingScheduleBoardOpenDate = '';
     let pendingScheduleBoardQuickOpts = null;
 
@@ -11013,6 +11044,7 @@
         renderGroupChannels();
       }
       syncUnreadInboxBars();
+      syncTaskbarBadge();
     }
 
     /** 새 메시지가 오거나 읽었을 때, 사이드바 「최근 대화」 각 줄의 안 읽은 개수를 그 자리에서
@@ -27952,6 +27984,8 @@
         const showSharedPcsEl = document.getElementById('setting-show-shared-pcs');
         if (showSharedPcsEl) showSharedPcsEl.value = showSharedPcsInDirectory() ? 'show' : 'hide';
         document.getElementById('setting-auto-launch').checked = appSettings.autoLaunch;
+        const taskbarBadgeEl = document.getElementById('setting-taskbar-badge');
+        if (taskbarBadgeEl) taskbarBadgeEl.checked = isTaskbarBadgeEnabled();
         const privacyEnabledEl = document.getElementById('setting-privacy-lock-enabled');
         if (privacyEnabledEl) privacyEnabledEl.checked = !!appSettings.privacyLockEnabled && !!appSettings.privacyLockPinHash;
         const privacyOnHideEl = document.getElementById('setting-privacy-lock-on-hide');

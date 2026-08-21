@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   resetNoticeOperatorPassword: (data) => ipcRenderer.invoke('reset-notice-operator-password', data),
   clearMasterSession: () => ipcRenderer.invoke('clear-master-session'),
   getMasterSessionActive: () => ipcRenderer.invoke('get-master-session-active'),
+  updateUnreadBadge: (payload) => ipcRenderer.invoke('update-unread-badge', payload),
   masterUpdateUserProfile: (payload) => ipcRenderer.invoke('master-update-user-profile', payload),
   masterForceUpdate: (payload) => ipcRenderer.invoke('master-force-update', payload),
   getUsageLockState: () => ipcRenderer.invoke('get-usage-lock-state'),

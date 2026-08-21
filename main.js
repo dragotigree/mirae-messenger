@@ -221,6 +221,7 @@ let toastUiState = { focused: false, activeChannelKey: '' };
 let tray = null;
 let trayLaunchViewMode = 'normal'; // 트레이·단축키로 창을 열 때 사용할 화면 (normal | compact)
 let isQuitting = false;
+const taskbarBadgeIconCache = new Map(); // count(1~9,'9+') -> nativeImage, 매번 파일을 다시 읽지 않도록
 let currentViewMode = 'normal';
 let savedNormalWindowBounds = null;
 
@@ -6492,6 +6493,17 @@ function startUdpDiscovery() {
           // 새로 켠(또는 방금 온라인이 된) 상대가 나를 최대 15초까지 기다리지 않도록,
           // 무거운 동기화와 무관하게 내 신호만 그 자리에서 바로 한 번 더 보낸다.
           sendPresencePingUnicast(rinfo.address);
+          // ⚠️ 실사고: 관리자가 원격으로 소부서 등을 고칠 때, 그 순간 당사자 PC가 꺼져
+          // 있었으면 PROFILE_OVERRIDE_SYNC를 못 받는다. 재접속할 때 이 PC가 하는 일은
+          // "당사자의 데이터를 나에게 보내 달라"는 요청(requestNoticeSync)뿐이라, 당사자는
+          // 끝까지 자기 subDept가 고쳐진 걸 모른 채 계속 옛 값을 방송했다("소부서로 지정된
+          // 컴퓨터와 관리자 PC만 업데이트했는데도 다시 원래대로 돌아간다"는 신고의 원인).
+          // 이 PC가 그 사람 IP에 대해 들고 있는 override가 있으면, 재접속하는 그 순간
+          // 곧바로 되돌려 보내 준다 — 당사자 PC가 스스로 알게 되는 유일한 경로다.
+          const overrideForPeer = profileOverrides.get(rinfo.address);
+          if (overrideForPeer) {
+            sendJsonToPeer(rinfo.address, { type: 'PROFILE_OVERRIDE_SYNC', profile: overrideForPeer });
+          }
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
@@ -14238,6 +14250,46 @@ ipcMain.handle('set-auto-launch', async (event, enable) => {
 });
 
 ipcMain.handle('get-auto-launch', async () => app.getLoginItemSettings().openAtLogin);
+
+/** 작업 표시줄 안읽음 배지. 렌더러가 안읽음 총합이 바뀔 때마다 호출한다.
+ *  ⚠️ Windows는 dock 배지가 없어 app.setBadgeCount가 안 먹힌다 — 대신 작업 표시줄 아이콘
+ *  위에 작은 오버레이 아이콘을 얹는 setOverlayIcon을 쓴다. 매번 캔버스로 숫자를 그리면
+ *  네이티브 의존성이 늘어나므로, 1~9·9+ 열 개짜리 배지 이미지를 미리 만들어 두고
+ *  그중 하나를 골라 붙인다(assets/badges). 그 외 플랫폼(macOS·Linux)은 Electron
+ *  기본 제공 app.setBadgeCount를 그대로 쓴다. */
+function getTaskbarBadgeIcon(n) {
+  const key = n > 9 ? '9plus' : String(n);
+  if (taskbarBadgeIconCache.has(key)) return taskbarBadgeIconCache.get(key);
+  try {
+    const file = path.join(__dirname, 'assets', 'badges', `badge-${key}.png`);
+    const img = nativeImage.createFromPath(file);
+    taskbarBadgeIconCache.set(key, img.isEmpty() ? null : img);
+    return taskbarBadgeIconCache.get(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+ipcMain.handle('update-unread-badge', async (event, payload) => {
+  try {
+    const enabled = !!(payload && payload.enabled);
+    const count = Math.max(0, Number(payload && payload.count) || 0);
+    if (process.platform === 'win32') {
+      if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+      if (enabled && count > 0) {
+        const icon = getTaskbarBadgeIcon(count);
+        if (icon) mainWindow.setOverlayIcon(icon, `안읽은 메시지 ${count}개`);
+      } else {
+        mainWindow.setOverlayIcon(null, '');
+      }
+    } else if (app.setBadgeCount) {
+      app.setBadgeCount(enabled ? count : 0);
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, msg: e.message || String(e) };
+  }
+});
 
 /** 「부팅 시 자동 실행」을 기본값으로 켠다 — 단, 딱 한 번만.
  *  업데이트 후 첫 실행에서 모든 PC에 자동 실행을 켜 주되, 이후 사용자가 설정에서 직접
