@@ -13420,7 +13420,17 @@ async function applyUpdateFiles(opts = {}) {
     'assets/fonts/SUIT-Medium.woff2',
     'assets/fonts/SUIT-Regular.woff2'
   ];
-  const optionalAssets = soft ? [...FONT_ASSETS] : ['assets/splash.png', ...FONT_ASSETS];
+  // ⚠️ 실사고: 작업 표시줄 배지 숫자 아이콘(assets/badges/*.png)을 새로 추가했는데, 이
+  // 파일 목록에 안 넣으면 이미 설치된 PC들은 「업데이트」를 눌러도 이 새 파일들을 전혀
+  // 받지 못한다(이 목록에 있는 파일만 내려받으므로). 그 상태에서 배지 기능을 켜면
+  // 아이콘 파일이 없어 조용히 아무것도 안 뜬다("배지 숫자가 안 뜬다"는 신고의 원인).
+  const BADGE_ASSETS = [
+    'assets/badges/badge-1.png', 'assets/badges/badge-2.png', 'assets/badges/badge-3.png',
+    'assets/badges/badge-4.png', 'assets/badges/badge-5.png', 'assets/badges/badge-6.png',
+    'assets/badges/badge-7.png', 'assets/badges/badge-8.png', 'assets/badges/badge-9.png',
+    'assets/badges/badge-9plus.png'
+  ];
+  const optionalAssets = soft ? [...FONT_ASSETS, ...BADGE_ASSETS] : ['assets/splash.png', ...FONT_ASSETS, ...BADGE_ASSETS];
   // (Excalidraw 폰트·언어팩 자원은 제거됨 — 자체 그림판은 별도 자원이 필요 없다)
   const backupDir = soft ? '' : path.join(app.getPath('userData'), `pre_update_backup_${Date.now()}`);
   if (backupDir) await fs.promises.mkdir(backupDir, { recursive: true });
