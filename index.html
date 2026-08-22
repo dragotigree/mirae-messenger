@@ -7313,6 +7313,7 @@
     <div class="ctx-menu-item" id="ctx-channel-reset-emoji" style="display:none;" onclick="ctxChannelClearTitleEmoji()">↩️ 이모티콘 제거</div>
     <div id="channel-ctx-group-extra" style="display:none; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px;">
       <div class="ctx-menu-item" onclick="ctxRenameGroup()">🌐 대화방 이름 변경 (전체)</div>
+      <div class="ctx-menu-item" id="ctx-channel-delete-group" style="display:none; color:#ef4444;" onclick="ctxDeleteGroup()">🗑️ 대화방 삭제 (방장)</div>
       <div class="ctx-menu-item" style="color:#ef4444;" onclick="ctxLeaveGroup()">🚪 나가기</div>
     </div>
   </div>
@@ -13566,7 +13567,15 @@
       try {
         if (!activeChatUser || !activeChatUser.isGroup || !activeChatUser.groupUid) return;
         const g = (myGroupChats || []).find((x) => x.uid === activeChatUser.groupUid);
-        if (!g) return;
+        if (!g) {
+          // 지금 보고 있던 그룹방이 없어졌다(방장이 삭제했거나, 내가 강퇴당함) — 예전엔
+          // 여기서 아무것도 안 하고 조용히 빠져나가 화면이 그대로 낡은 상태로 멈춰
+          // 있었다(제목·참여자 수가 그대로인데 실제로는 사라진 방). 직접 나가기(위
+          // leaveGroupConfirmed)와 똑같이 창을 닫아 화면을 정리한다.
+          activeChatUser = null;
+          updateMainPanelVisibility();
+          return;
+        }
         activeChatUser = makeGroupChannel(g);
         const titleEl = document.getElementById('chat-header-title');
         const statusEl = document.getElementById('chat-header-status-text');
@@ -14913,12 +14922,16 @@
       const resetEl = document.getElementById('ctx-channel-reset-name');
       const resetEmojiEl = document.getElementById('ctx-channel-reset-emoji');
       const groupExtra = document.getElementById('channel-ctx-group-extra');
+      const deleteGroupEl = document.getElementById('ctx-channel-delete-group');
       const names = loadChannelDisplayNamesMap();
       if (resetEl) resetEl.style.display = names[entry.key] ? 'block' : 'none';
       if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(entry.key) ? 'block' : 'none';
       if (groupExtra) groupExtra.style.display = entry.group ? 'block' : 'none';
+      // 방장만(또는 방장 개념이 없는 옛날 그룹은 누구나 — 백엔드와 동일 기준) 보이게 한다.
+      const isOwnerOrOwnerless = !!entry.group && (!entry.group.owner_ip || entry.group.owner_ip === (myProfile && myProfile.ip));
+      if (deleteGroupEl) deleteGroupEl.style.display = isOwnerOrOwnerless ? 'block' : 'none';
       const menuWidth = 220;
-      const menuHeight = entry.group ? 220 : 150;
+      const menuHeight = entry.group ? 250 : 150;
       menu.style.left = Math.min(e.clientX, window.innerWidth - menuWidth) + 'px';
       menu.style.top = Math.min(e.clientY, window.innerHeight - menuHeight) + 'px';
       menu.style.display = 'block';
@@ -15470,6 +15483,28 @@
         activeChatUser = null;
         updateMainPanelVisibility();
       }
+      await refreshGroupChats();
+    }
+    async function ctxDeleteGroup() {
+      document.getElementById('channel-context-menu').style.display = 'none';
+      if (!ctxMenuTargetGroup) return;
+      deleteGroupChatConfirmed(ctxMenuTargetGroup.uid, ctxMenuTargetGroup.name);
+    }
+    async function deleteGroupChatConfirmed(uid, name) {
+      if (!await appConfirm(
+        `'${name || '이'}' 대화방을 완전히 삭제하시겠습니까?\n\n` +
+          '· 모든 참여자의 화면에서 이 대화방이 사라집니다.\n' +
+          '· 대화 기록은 지워지지 않고 전체 로그(기록)에서 계속 볼 수 있습니다.\n' +
+          '· 삭제한 뒤에는 되돌릴 수 없습니다(다시 초대해야 새로 만들 수 있습니다).',
+        { title: '대화방 삭제', confirmText: '삭제', cancelText: '취소', variant: 'danger' }
+      )) return;
+      const res = await window.api.deleteGroupChat(uid);
+      if (!res || !res.success) { await appAlert((res && res.msg) || '삭제에 실패했습니다.'); return; }
+      if (activeChatUser && activeChatUser.isGroup && activeChatUser.groupUid === uid) {
+        activeChatUser = null;
+        updateMainPanelVisibility();
+      }
+      if (isFlexOverlay('group-members-modal')) closeGroupMembersModal();
       await refreshGroupChats();
     }
 

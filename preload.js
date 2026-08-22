@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   leaveGroupChat: (uid) => ipcRenderer.invoke('leave-group-chat', { uid }),
   transferGroupOwner: (uid, newOwnerIp) => ipcRenderer.invoke('transfer-group-owner', { uid, newOwnerIp }),
   removeGroupMember: (uid, targetIp) => ipcRenderer.invoke('remove-group-member', { uid, targetIp }),
+  deleteGroupChat: (uid) => ipcRenderer.invoke('delete-group-chat', { uid }),
   sendGroupMessage: (uid, groupName, message) => ipcRenderer.invoke('send-group-message', { uid, groupName, message }),
   editMessage: (msgUid, targetIP, groupUid, newMessage) => ipcRenderer.invoke('edit-message', { msgUid, targetIP, groupUid, newMessage }),
   toggleMessageReaction: (msgKey, emoji, targetIP, groupUid) => ipcRenderer.invoke('toggle-message-reaction', { msgKey, emoji, targetIP, groupUid }),

@@ -9959,9 +9959,17 @@ function handleGroupSync(g) {
     });
     return;
   }
+  // ⚠️ 실사고: INSERT OR REPLACE는 목록에 없는 컬럼을 전부 기본값으로 되돌린다. 이 문장이
+  // owner_ip를 빼먹고 있어서, 내가 직접 만들지 않고 GROUP_SYNC로 "전달받은" 모든
+  // 그룹은 동기화될 때마다(이름 변경·멤버 추가/삭제·방장 위임 등 무엇이든) 내 로컬
+  // owner_ip가 매번 빈 값으로 지워졌다. 그 결과 "방장만" 검사(remove-group-member·
+  // transfer-group-owner·새로 만든 delete-group-chat)가 방장이 아닌 그 그룹의 아무
+  // 멤버에게나 전부 통과돼 버렸다 — 실제로 이 세션 검증 중에 재현했다(방장이 아닌
+  // 계정으로 남의 그룹을 삭제 요청했는데 그대로 성공함). g.owner_ip를 그대로 함께
+  // 저장해야 방장 판정이 다른 PC에서도 정확히 유지된다.
   db.run(
-    `INSERT OR REPLACE INTO group_chats (uid, name, members, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
-    [g.uid, g.name, enrichGroupMembersJson(g.members), g.created_by, g.created_at],
+    `INSERT OR REPLACE INTO group_chats (uid, name, members, created_by, created_at, owner_ip) VALUES (?, ?, ?, ?, ?, ?)`,
+    [g.uid, g.name, enrichGroupMembersJson(g.members), g.created_by, g.created_at, g.owner_ip || ''],
     (err) => {
       logDbErr(err);
       if (!err && mainWindow) safeWebContentsSend('group-chats-update');
@@ -13191,6 +13199,39 @@ ipcMain.handle('remove-group-member', async (event, { uid, targetIp }) => {
         logGroupSystemNotice(uid, row.name, noticeText);
         pushGroupSystemNoticeLive(uid, noticeText);
         sendToIps(remaining.map((m) => m.ip).filter((ip) => ip !== MY_IP), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
+        resolve({ success: true });
+      });
+    });
+  });
+});
+
+// ⚠️ 방장이 대화방 자체를 없애는 기능. 기존 handleGroupSync는 이미 "멤버 목록에 내가
+// 없으면 로컬 group_chats를 지운다"는 규칙을 갖고 있다(누군가 나갈 때 이미 검증된
+// 경로) — 그래서 새 메시지 타입을 만들 필요 없이, 멤버를 빈 배열로 만든 GROUP_SYNC를
+// 전체 멤버에게 보내는 것만으로 모두의 화면에서 안전하게 지워진다. 메시지 기록은
+// (다른 "나가기"류 기능과 동일하게) 지우지 않는다 — 전체 로그에서 계속 볼 수 있다.
+ipcMain.handle('delete-group-chat', async (event, { uid }) => {
+  return new Promise((resolve) => {
+    db.get(`SELECT * FROM group_chats WHERE uid = ?`, [uid], (err, row) => {
+      if (err || !row) { resolve({ success: false, msg: '대화방을 찾을 수 없습니다.' }); return; }
+      const ownerIp = row.owner_ip || '';
+      // 방장 개념이 생기기 전 옛날 그룹(owner_ip 없음)은 remove-group-member와 동일하게
+      // 누구나(멤버라면) 정리할 수 있게 둔다 — 아무도 방장이 아니라 영영 못 지우는
+      // 그룹이 생기지 않도록.
+      if (ownerIp && ownerIp !== MY_IP) {
+        resolve({ success: false, msg: '방장만 대화방을 삭제할 수 있습니다.' });
+        return;
+      }
+      let members = [];
+      try { members = JSON.parse(row.members); } catch (e) {}
+      db.run(`DELETE FROM group_chats WHERE uid = ?`, [uid], (err2) => {
+        if (err2) { logDbErr(err2); resolve({ success: false }); return; }
+        const updated = { ...row, members: JSON.stringify([]) };
+        sendToIps(members.map((m) => m.ip), { type: 'GROUP_SYNC', group: updated });
+        const noticeText = `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 이 대화방을 삭제했습니다.`;
+        logGroupSystemNotice(uid, row.name, noticeText);
+        pushGroupSystemNoticeLive(uid, noticeText);
+        sendToIps(members.map((m) => m.ip).filter((ip) => ip !== MY_IP), { type: 'GROUP_RENAME_NOTICE', uid, newName: row.name, noticeText });
         resolve({ success: true });
       });
     });
