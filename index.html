@@ -13129,6 +13129,16 @@
         // makeGroupChannel()은 user.ip 자리에 "GROUP:uid" 키를 넣어 두므로, 사람과 같은
         // 드래그 소스 바인딩을 그대로 재사용할 수 있다(그룹채팅방 순서 바꾸기용).
         bindUserDragSource(item, row.user);
+        // ⚠️ 실사고: 이 줄(미니 모드 채팅·그룹대화방 탭, 일반 모드 "최근 대화" 섹션이 모두
+        // 이 함수를 공유한다)에는 그룹 우클릭 메뉴가 아예 안 붙어 있었다 — 일반 모드의
+        // 별도 "채널" 목록에서만 나가기·이름변경·삭제가 가능했다. 그래서 미니 모드에서는
+        // 그룹에 들어온 사람이 나갈 방법 자체가 없었다("들어온 사람들이 나갈 수 있게도
+        // 해줘"). 이미 검증된 같은 메뉴(showChannelContextMenu)를 그대로 재사용한다.
+        item.oncontextmenu = (e) => {
+          const g = (myGroupChats || []).find((x) => x.uid === row.user.groupUid);
+          if (!g) return;
+          showChannelContextMenu(e, { key: row.key, defaultName: g.name, group: g });
+        };
       }
       container.appendChild(item);
     }
