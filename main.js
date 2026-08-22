@@ -6883,9 +6883,13 @@ function persistProfileOverrideToDb(ov) {
  * 도착하는 값이 항상 이긴다"였기 때문). updated_at을 진짜 최신순 비교 기준으로 써서,
  * 이미 가진 값보다 옛날인 값은 무시한다(최신 수정 우선). 관리자가 지금 막 입력한 값처럼
  * updatedAt이 없는 patch는 항상 "지금"으로 찍어 최신으로 반영한다. */
-function storeProfileOverride(patch) {
+function storeProfileOverride(patch, __source) {
   if (!patch || !patch.ip) return;
   const prev = profileOverrides.get(patch.ip) || { ip: patch.ip };
+  // 🩺 진단용(영구) — "854 이후에도 다시 입력한 소부서가 또 사라진다"는 신고가 계속돼,
+  // 이 함수가 호출될 때마다 무조건(수용/거부 모두) 어디서 왔는지·어떤 값인지·전후 비교를
+  // 남긴다. 다음 재현 때 이 로그로 정확한 호출 지점을 특정한다.
+  writeToLogFile('info', `[진단-override] ip=${patch.ip} source=${__source || '?'} incoming(subDept="${patch.subDept}", note="${patch.note}", updatedAt=${patch.updatedAt || '(없음)'}) prev(subDept="${prev.subDept || ''}", updatedAt=${prev.updatedAt || '(없음)'})`);
   // ⚠️ 실사고(장기 미해결 소부서·비고 초기화의 진짜 원인): PROFILE_OVERRIDE_SYNC나
   // NOTICE_SYNC_RESPONSE로 다른 PC의 오래됐거나 비어 있는 override 행이 들어올 때,
   // 그 행에 updatedAt이 없으면(옛 버전 PC가 만든 값, 동기화 유실 등) 이걸 "지금 막
@@ -6895,14 +6899,19 @@ function storeProfileOverride(patch) {
   // 이미 뭔가 갖고 있으면 절대 이기지 못하게 하고, 진짜 신규(이 PC가 이 IP를 처음
   // 보는 경우)일 때만 "지금"으로 찍어 받아들인다.
   if (!patch.updatedAt) {
-    if (prev.updatedAt) return;
+    if (prev.updatedAt) {
+      writeToLogFile('info', `[진단-override] ip=${patch.ip} source=${__source || '?'} => 거부(타임스탬프 없음, 기존 값 유지)`);
+      return;
+    }
     patch.updatedAt = new Date().toISOString();
   }
   const incomingUpdatedAt = patch.updatedAt;
   if (prev.updatedAt && incomingUpdatedAt < prev.updatedAt) {
     // 이미 가진 값이 더 최신이면, 옛 값으로는 아무것도 바꾸지 않는다.
+    writeToLogFile('info', `[진단-override] ip=${patch.ip} source=${__source || '?'} => 거부(더 오래된 시각, 기존 값 유지)`);
     return;
   }
+  writeToLogFile('info', `[진단-override] ip=${patch.ip} source=${__source || '?'} => 수용(subDept="${patch.subDept != null ? patch.subDept : prev.subDept || ''}"으로 반영)`);
   const merged = {
     ip: patch.ip,
     username: patch.username != null ? String(patch.username).trim() : (prev.username || ''),
@@ -6988,7 +6997,7 @@ function handleProfileOverrideSync(payload) {
     phone: p.phone != null ? p.phone : p.phone_no,
     note: p.note,
     updatedAt: p.updatedAt || p.updated_at || ''
-  });
+  }, 'PROFILE_OVERRIDE_SYNC수신');
   refreshUserAfterProfileOverride(p.ip);
 }
 
@@ -9282,7 +9291,7 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     remoteProfileOverrides.forEach((row) => {
       const ov = profileOverrideFromRow(row);
       if (!ov) return;
-      storeProfileOverride(ov);
+      storeProfileOverride(ov, 'NOTICE_SYNC_RESPONSE수신');
       refreshUserAfterProfileOverride(ov.ip);
     });
   }
@@ -11958,7 +11967,7 @@ ipcMain.handle('master-update-user-profile', async (event, payload) => {
     const known = allKnownUsers.get(ip);
     if (known && known.username) patch.username = known.username;
   }
-  storeProfileOverride(patch);
+  storeProfileOverride(patch, '관리자직접입력');
   refreshUserAfterProfileOverride(ip);
   broadcastToOnlinePeers({ type: 'PROFILE_OVERRIDE_SYNC', profile: patch });
   return { success: true };
