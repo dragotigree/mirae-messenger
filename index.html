@@ -9105,11 +9105,30 @@
         return compareUsersSidebarOrder(a, b);
       });
     }
+    /** favoriteIps에는 없어도(별칭 IP로 즐겨찾기가 저장된 경우) 즐겨찾기 목록에는 ⭐로
+     *  같이 표시되는 사람이 있다(다른 곳의 fav 판정 로직과 동일하게 별칭까지 확인). 드래그
+     *  순서 바꾸기도 이 판정과 어긋나면 목록엔 별로 보이는데 드래그만 조용히 안 먹는
+     *  문제가 생긴다. */
+    function isFavoriteIp(ip) {
+      if (!ip) return false;
+      if (favoriteIps.has(ip)) return true;
+      const u = findUserByIp(ip);
+      return !!(u && (u.aliasIps || []).some((a) => favoriteIps.has(a)));
+    }
+    /** 드래그로 들어온/대상 IP가 별칭 IP일 수 있어, sortFavoritesByOrder가 쓰는 "본 IP"
+     *  기준으로 맞춰준다(안 맞추면 ordered.indexOf가 못 찾아 조용히 아무 일도 안 일어난다). */
+    function canonicalFavoriteIp(ip) {
+      const u = findUserByIp(ip);
+      return (u && u.ip) || ip;
+    }
     /** 즐겨찾기 목록 안에서 손으로 끌어 순서를 바꾼다 — 일반 모드·미니 모드 어느 쪽 목록에서
      *  드롭해도 똑같이 저장되고 두 화면 모두 다시 그려 즉시 반영한다. */
-    function reorderFavoriteIps(draggedIp, targetIp) {
-      if (!draggedIp || !targetIp || draggedIp === targetIp) return;
-      if (!favoriteIps.has(draggedIp) || !favoriteIps.has(targetIp)) return;
+    function reorderFavoriteIps(draggedIpRaw, targetIpRaw) {
+      if (!draggedIpRaw || !targetIpRaw || draggedIpRaw === targetIpRaw) return;
+      if (!isFavoriteIp(draggedIpRaw) || !isFavoriteIp(targetIpRaw)) return;
+      const draggedIp = canonicalFavoriteIp(draggedIpRaw);
+      const targetIp = canonicalFavoriteIp(targetIpRaw);
+      if (draggedIp === targetIp) return;
       const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
       const currentFavUsers = (allUsers || []).filter(isFavoriteUser);
       const ordered = sortFavoritesByOrder(currentFavUsers).map((u) => u.ip);
@@ -9129,7 +9148,7 @@
       el.addEventListener('dragover', (ev) => {
         if (!isUserDragEvent(ev)) return;
         const draggedIp = getDraggedUserIp(ev);
-        if (!draggedIp || draggedIp === ip || !favoriteIps.has(draggedIp)) return;
+        if (!draggedIp || draggedIp === ip || !isFavoriteIp(draggedIp)) return;
         ev.preventDefault();
         ev.dataTransfer.dropEffect = 'move';
         el.classList.add('is-favorite-drop-target');
@@ -9139,7 +9158,7 @@
       });
       el.addEventListener('drop', (ev) => {
         const draggedIp = getDraggedUserIp(ev);
-        if (!draggedIp || draggedIp === ip || !favoriteIps.has(draggedIp)) return;
+        if (!draggedIp || draggedIp === ip || !isFavoriteIp(draggedIp)) return;
         ev.preventDefault();
         ev.stopPropagation();
         el.classList.remove('is-favorite-drop-target');
@@ -12662,6 +12681,11 @@
       const previewRow = preview
         ? `<div class="compact-item-bottom"><span class="compact-item-preview">${escapeHtml(preview)}</span>${unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : ''}</div>`
         : (unread > 0 ? `<div class="compact-item-bottom"><span class="compact-item-preview"></span><span class="unread-badge">${formatUnreadBadge(unread)}</span></div>` : '');
+      // ⚠️ 실사고: 일반 모드 카드(buildUserCard)는 비고를 작은 배지로 보여주는데, 미니 모드
+      // 직원 목록 카드는 그 배지를 아예 안 그렸다 — 그래서 관리자가 비고에 적어 둔 내용이
+      // 미니 모드에서만 안 보였다("미니모드에서는 비고의 내용이 안나오네"). 같은 배지를
+      // 그대로 추가한다.
+      const noteBadgeHtml = userNoteBadgeHtml(u);
       item.className = `compact-list-item compact-list-item-user ${u.online ? '' : 'is-offline'}${isCompactChatActive(u.ip) ? ' is-active' : ''}${isSidebarIpSelected(u.ip) ? ' is-multi-selected' : ''}${preview ? '' : ' is-single-line'}`;
       item.dataset.userIp = u.ip;
       item.innerHTML = `
@@ -12672,6 +12696,7 @@
             <span class="${timeClass}">${timeLabel}</span>
           </div>
           ${previewRow}
+          ${noteBadgeHtml}
         </div>
       `;
       item.onclick = (e) => handleSidebarUserClick(u, e);
