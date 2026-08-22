@@ -366,9 +366,12 @@
     .notice-widget-header { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
     .notice-widget-header .icon-glyph, .sidebar-block-head .icon-glyph { width: 14px; height: 14px; flex-shrink: 0; }
     .sidebar-quick-actions .icon-glyph { width: 15px; height: 15px; flex-shrink: 0; }
+    /* ⚠️ 20×20이라 누르기 빡빡하다는 지적 — 특히 미니 모드 필터 줄의 ⇕·새로고침은
+       자주 쓰는데 목표가 작았다. 24×24로 키운다(권장 최소 크기). 미니 모드 한 줄
+       배치에는 가로 여유가 29px 있어 세 아이콘을 키워도 줄이 넘치지 않는다. */
     .sidebar-header-icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 20px; height: 20px; border-radius: var(--radius-sm); cursor: pointer;
+      width: 24px; height: 24px; border-radius: var(--radius-sm); cursor: pointer;
       color: var(--sidebar-text-dim); flex-shrink: 0;
       transition: background var(--transition-fast), color var(--transition-fast);
     }
@@ -2407,7 +2410,7 @@
        (overflow-x:auto라 잘린 것뿐 스크롤은 됐지만 보기에 고장난 것처럼 보였다.)
        한 줄 배치는 그대로 두고 여백·글자 여백만 촘촘히 줄여서 480px에 확실히
        들어가게 한다 — Windows 한글 폰트가 더 넓게 그려질 수 있어 여유를 넉넉히 둔다. */
-    .compact-filter-row { display: flex; gap: 5px; padding: 8px 10px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
+    .compact-filter-row { display: flex; gap: 4px; padding: 8px 8px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
     .compact-filter-row::-webkit-scrollbar { display: none; }
     .compact-filter-chip { flex-shrink: 0; padding: 7px 10px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
@@ -5494,19 +5497,19 @@
 
     <div class="sidebar-list-prefs sidebar-list-prefs-footer" id="sidebar-list-prefs" role="toolbar" aria-label="목록 표시 방식">
       <div class="sidebar-pref-seg" role="group" aria-label="분류">
-        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
-        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층으로 묶어서 보기">층</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서로 묶어서 보기">부서</button>
       </div>
       <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
         <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
-        <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온라인</button>
       </div>
       <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
         <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터 표시">공용</button>
         <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="hide" title="공용 컴퓨터 숨김">숨김</button>
       </div>
       <div class="sidebar-pref-seg sidebar-pref-seg-solo" role="group" aria-label="안읽음만">
-        <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">N</button>
+        <button type="button" class="sidebar-pref-chip" data-list-pref="unread" data-value="on" title="안 읽은 대화만 모아보기">안읽음</button>
       </div>
     </div>
   </div>
@@ -5585,11 +5588,11 @@
           <div class="compact-filter-row">
             <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('favorites')">즐겨찾기</button>
             <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('groups')">그룹대화방</button>
-            <select class="compact-filter-select" id="compact-dept-filter" title="부서로 거르기" onchange="setCompactDeptFilter(this.value)">
-              <option value="">부서</option>
+            <select class="compact-filter-select" id="compact-dept-filter" title="고른 부서만 보기" onchange="setCompactDeptFilter(this.value)">
+              <option value="">전체 부서</option>
             </select>
-            <select class="compact-filter-select" id="compact-floor-filter" title="층으로 거르기" onchange="setCompactFloorFilter(this.value)">
-              <option value="">층</option>
+            <select class="compact-filter-select" id="compact-floor-filter" title="고른 층만 보기" onchange="setCompactFloorFilter(this.value)">
+              <option value="">전체 층</option>
             </select>
             <span class="compact-filter-row-spacer"></span>
             <span class="sidebar-header-icon-btn" id="compact-alpha-sort-btn" onclick="toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="width:auto; padding:0 6px; font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em; flex-shrink:0;">가나다</span>
@@ -5603,12 +5606,12 @@
           <div id="compact-friends-list-items"></div>
           <div class="sidebar-list-prefs compact-list-prefs" role="toolbar" aria-label="목록 표시 방식">
             <div class="sidebar-pref-seg" role="group" aria-label="분류">
-              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층별 보기">층</button>
-              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서별 보기">부서</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="floor" title="층으로 묶어서 보기">층</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="grouping" data-value="dept" title="부서로 묶어서 보기">부서</button>
             </div>
             <div class="sidebar-pref-seg" role="group" aria-label="접속 상태">
               <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="all" title="온라인 + 오프라인">전체</button>
-              <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온</button>
+              <button type="button" class="sidebar-pref-chip" data-list-pref="presence" data-value="online" title="온라인만">온라인</button>
             </div>
             <div class="sidebar-pref-seg" role="group" aria-label="공용 컴퓨터">
               <button type="button" class="sidebar-pref-chip" data-list-pref="shared" data-value="show" title="공용 컴퓨터 표시">공용</button>
@@ -9880,15 +9883,29 @@
         return w > 0 ? w : 300;
       }
 
+      /** ⚠️ 실사고: 아래 두 계산이 창 폭에서 "반대쪽 사이드바 + 채팅 최소폭"만 빼고,
+       *  맨 왼쪽 아이콘 레일(#app-icon-rail, 60px)은 빼지 않았다. 그래서 가로 예산을
+       *  레일 폭만큼 초과 배정해, 왼쪽 목록을 넓혀 둔 채로 창이 최소 폭(1040px)에
+       *  가까워지면 오른쪽 현황판이 화면 밖으로 최대 60px 밀려나 잘렸다 —
+       *  document 스크롤도 안 생겨서 잘린 부분에 아예 닿을 수가 없었다.
+       *  (원본 코드로 재현 확인: 왼쪽 300px일 때 40px, 360px일 때 60px 잘림.)
+       *  레일은 항상 화면을 차지하므로 예산에서 먼저 빼야 한다. */
+      function iconRailWidth() {
+        const el = document.getElementById('app-icon-rail');
+        if (!el) return 0;
+        // 미니 모드 등 레일이 숨겨진 상태에서는 0으로 잡혀 예산이 줄지 않는다.
+        return Math.round(el.getBoundingClientRect().width) || 0;
+      }
+
       function maxLeftSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
-        const cap = w - currentRightSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
+        const cap = w - iconRailWidth() - currentRightSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
         return Math.max(0, Math.min(SIDEBAR_MAX, cap));
       }
 
       function maxRightSidebarWidthForWindow() {
         const w = window.innerWidth || 1200;
-        const cap = w - currentLeftSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
+        const cap = w - iconRailWidth() - currentLeftSidebarWidth() - MAIN_CHAT_MIN_WIDTH;
         return Math.max(0, Math.min(SIDEBAR_RIGHT_MAX, cap));
       }
 
@@ -12659,8 +12676,14 @@
         if (el.value !== current) el.value = current;
         el.classList.toggle('is-active', !!current);
       };
-      fill(deptEl, collect((u) => u.dept, compactDeptFilter), compactDeptFilter, '부서');
-      fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '층');
+      // ⚠️ 이 두 선택 상자는 "거르기"(그 부서/층만 보기)인데, 바로 아래 목록 설정 줄에는
+      // 똑같이 「부서」·「층」이라고 쓰인 "묶는 기준" 버튼이 따로 있다. 같은 낱말이 한 화면에
+      // 두 번 나와 무엇이 무엇인지 헷갈린다는 지적을 받아, 이쪽 기본 라벨을 「전체 부서」·
+      // 「전체 층」으로 바꿔 (1) 지금은 전부 보이는 상태라는 것과 (2) 고르면 좁혀진다는 것을
+      // 라벨만 보고도 알 수 있게 했다. 선택지 중 가장 긴 항목(재활치료부·기타 층)보다 짧아
+      // 선택 상자 폭은 늘어나지 않는다(미니 모드 480px 한 줄 배치 유지).
+      fill(deptEl, collect((u) => u.dept, compactDeptFilter), compactDeptFilter, '전체 부서');
+      fill(floorEl, collect((u) => u.floor, compactFloorFilter), compactFloorFilter, '전체 층');
     }
 
     /* 미니 모드 헤더의 「접속 N명 · 전체 N명」 줄은 제거했다(자리만 차지하고
