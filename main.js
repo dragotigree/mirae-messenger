@@ -4885,6 +4885,18 @@ db.serialize(() => {
       // DB에서부터 이미 비어 있는 건지(저장 자체가 안 된 것) 아니면 재적용 단계에서
       // 지워지는 건지 다음 재현 때 로그로 구분한다.
       writeToLogFile('info', `[진단] 부팅 시 profileOverrides ${profileOverrides.size}건: ${JSON.stringify([...profileOverrides.values()].map((ov) => ({ ip: ov.ip, subDept: ov.subDept, note: ov.note, updatedAt: ov.updatedAt })))}`);
+      // ⚠️ 실사고(장기 미해결 "업데이트 재시작할 때마다 소부서·비고가 풀린다"의 진짜 원인):
+      // 예전에 어떤 이유로든(다른 PC의 오래된 override 사본이 재접속 때 나에게 다시
+      // 흘러들어온 경우 등) 내 IP(MY_IP)에 대한 override 행이 한 번이라도 생기면, 부팅
+      // 때마다 이 forEach가 그 행을 무조건 다시 내 프로필에 덮어씌웠다 — 방금 설정 창에서
+      // 직접 고친 값이 있어도 상관없이. 이제 내 프로필의 override 자체를 신뢰하지 않기로
+      // 했으므로(handleProfileOverrideSync·NOTICE_SYNC_RESPONSE에서 내 IP는 더 이상
+      // 받지 않음), 이미 남아 있을 수 있는 옛 행도 부팅 시 지워 스스로 치유한다.
+      if (profileOverrides.has(MY_IP)) {
+        profileOverrides.delete(MY_IP);
+        db.run(`DELETE FROM user_profile_overrides WHERE ip = ?`, [MY_IP], logDbErr);
+        writeToLogFile('info', '[진단-override] 내 IP에 남아있던 override 행을 부팅 시 정리했습니다(더 이상 자기 자신에게 적용하지 않음).');
+      }
       loadPersistedKnownUsers(() => {
         profileOverrides.forEach((ov) => refreshUserAfterProfileOverride(ov.ip));
         notifyUserList();
@@ -7026,6 +7038,12 @@ function refreshUserAfterProfileOverride(ip) {
 function handleProfileOverrideSync(payload) {
   const p = payload && payload.profile;
   if (!p || !p.ip) return;
+  // ⚠️ 실사고: 이 메시지는 인증 없이 broadcastToOnlinePeers로 모두에게 뿌려지고, 재접속
+  // (wasOffline) 때도 그 IP에 대한 override를 들고 있는 아무 PC나 곧바로 나에게 다시
+  // 보낸다. 그 사본이 아무리 오래됐어도 내 profileOverrides에 내 IP 항목이 없으면
+  // 그대로 받아들여져, 방금 내가 직접 고친 소부서·비고를 재시작/재접속 직후 덮어썼다.
+  // 내 프로필은 남이 아니라 나(설정 창)와 내 로컬 DB만 신뢰한다.
+  if (p.ip === MY_IP) return;
   storeProfileOverride({
     ip: p.ip,
     username: p.username,
@@ -9338,6 +9356,16 @@ function handleNoticeSyncResponse(notices, operators, schedules, remoteUpdateSou
     remoteProfileOverrides.forEach((row) => {
       const ov = profileOverrideFromRow(row);
       if (!ov) return;
+      // ⚠️ 실사고: 다른 PC가 들고 있는 "내 IP에 대한 override 사본"은 그 PC가 아주 예전에
+      // 저장해 둔 뒤 한 번도 안 지워졌을 수 있는 신뢰할 수 없는 값이다. 그런데도 내
+      // profileOverrides에 내 IP 항목이 아직 없으면(대개 그렇다) 타임스탬프 비교 없이
+      // 그대로 받아들여져(storeProfileOverride의 "신규는 무조건 수용" 규칙), 방금 내가
+      // 직접 설정 창에서 고친 소부서·비고를 재부팅/재접속 직후 다시 덮어썼다("내가 직접
+      // 고칠 때는 멀쩡한데 업데이트 재시작만 하면 매번 풀린다"의 진짜 원인 — 재시작 =
+      // 재접속이고, 재접속 직후 이런 남의 사본이 몰려 들어오기 때문). 내 프로필은 오직
+      // 내 로컬 DB(user_profile)와 내가 직접 한 입력만 신뢰한다 — 남이 갖고 있는 내 IP의
+      // override 사본은 절대 받지 않는다.
+      if (ov.ip === MY_IP) return;
       storeProfileOverride(ov, 'NOTICE_SYNC_RESPONSE수신');
       refreshUserAfterProfileOverride(ov.ip);
     });
