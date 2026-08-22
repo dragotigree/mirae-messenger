@@ -184,6 +184,13 @@ let excalidrawSession = null;
 let noticeOperatorSessionActive = false;
 /** 마스터 관리자 UI 로그인 (렌더러 verify-master-auth 성공 시) */
 let masterSessionActive = false;
+/** 마스터 관리자는 한 곳에서만 로그인돼 있어야 한다 — 가장 최근 로그인(시각이 가장 큰 쪽)만
+ * 유효하고, 그 소식을 들은 다른 PC는 자기 세션을 스스로 내려놓는다. 중앙 서버가 없으니
+ * "누가 최신인지"를 P2P로 방송해 각자 판단하게 한다(profileOverrides의 updatedAt 비교와
+ * 같은 방식 — 시각 비교만으로 승자를 가린다). */
+let masterSessionToken = '';
+let masterSessionHolderIp = '';
+let masterSessionAt = 0;
 /** 이 PC 메신저 사용 중지(잠금) — true면 접속·프레즌스 중단, 마스터 인증으로만 해제 */
 let localUsageDisabled = false;
 let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
@@ -6527,6 +6534,18 @@ function startUdpDiscovery() {
           if (overrideForPeer) {
             sendJsonToPeer(rinfo.address, { type: 'PROFILE_OVERRIDE_SYNC', profile: overrideForPeer });
           }
+          // 마스터 세션 "한 곳에서만 로그인" — 재접속하는 이 상대가 오프라인이던 사이
+          // 다른 PC에서 마스터로 로그인했을 수 있다. 내가 최신 로그인 소식을 들고 있으면
+          // 재접속한 상대에게 곧바로 알려줘서, 그 상대가 계속 마스터로 남아있었다면
+          // 스스로 로그아웃하게 한다.
+          if (masterSessionAt && masterSessionToken) {
+            sendJsonToPeer(rinfo.address, {
+              type: 'MASTER_SESSION_STATE',
+              token: masterSessionToken,
+              holderIp: masterSessionHolderIp,
+              at: masterSessionAt
+            });
+          }
           // ⚠️ 실사고: 작성 권한자(notice_operators) 계정도 profileOverrides와 똑같은 구멍이
           // 있었다. OPERATOR_ADD는 "추가하는 그 순간 온라인인 PC"에만 브로드캐스트되고,
           // 그 뒤로는 상대방이 재접속할 때 "네 데이터를 나에게 보내 달라"고 요청(pull)만
@@ -7863,6 +7882,7 @@ function routeIncomingPayloadInner(payload, senderIP) {
       });
       break;
     case 'LOG_EXCERPT_RESPONSE': handleLogExcerptResponse(payload, senderIP); break;
+    case 'MASTER_SESSION_STATE': handleMasterSessionState(payload); break;
     default: break;
     }
   } catch (e) {
@@ -11766,9 +11786,45 @@ ipcMain.handle('save-my-profile', async (event, newProfile) => {
 // 🔑 마스터 아이디 + 비밀번호 검증 IPC 핸들러
 ipcMain.handle('verify-master-auth', async (event, { id, password }) => {
   const ok = await verifyLocalMasterAuth(id, password);
-  if (ok) masterSessionActive = true;
+  if (ok) {
+    masterSessionActive = true;
+    claimMasterSession();
+  }
   return ok ? { success: true } : { success: false, msg: '마스터 아이디 또는 비밀번호가 올바르지 않습니다.' };
 });
+
+/** 지금 이 PC가 마스터로 로그인했다고 모든 온라인 PC에 알린다 — 그 소식을 들은 다른 PC가
+ * 자기도 마스터로 로그인돼 있었다면 스스로 로그아웃한다("한 곳에서만 로그인" 요구사항). */
+function claimMasterSession() {
+  masterSessionToken = `${Date.now()}_${MY_IP}_${Math.random().toString(36).slice(2, 8)}`;
+  masterSessionHolderIp = MY_IP;
+  masterSessionAt = Date.now();
+  broadcastToOnlinePeers({
+    type: 'MASTER_SESSION_STATE',
+    token: masterSessionToken,
+    holderIp: MY_IP,
+    at: masterSessionAt
+  });
+}
+
+/** 다른 PC로부터 "누가 최신 마스터 세션인지" 소식을 받았을 때 처리 — profileOverrides와
+ * 동일하게 시각이 더 오래된 소식은 무시하고, 더 최신이면 받아들인다. 받아들인 결과 내가
+ * 최신 로그인 당사자가 아닌데 지금 이 PC가 마스터로 로그인돼 있다면 스스로 로그아웃한다. */
+function handleMasterSessionState(payload) {
+  const p = payload || {};
+  const at = Number(p.at) || 0;
+  const holderIp = String(p.holderIp || '').trim();
+  const token = String(p.token || '').trim();
+  if (!at || !holderIp || !token) return;
+  if (at <= masterSessionAt) return; // 이미 더 최신(또는 같은) 소식을 갖고 있으면 무시
+  masterSessionToken = token;
+  masterSessionHolderIp = holderIp;
+  masterSessionAt = at;
+  if (masterSessionActive && holderIp !== MY_IP) {
+    masterSessionActive = false;
+    safeWebContentsSend('master-session-kicked', { byIp: holderIp });
+  }
+}
 
 // 기존 호환성을 위해 유지 (아이디 무관, 비밀번호만 확인 — 현재 렌더러에서 호출하는 곳은 없음)
 ipcMain.handle('verify-master-password', async (event, inputPassword) => {
