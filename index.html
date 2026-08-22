@@ -10383,7 +10383,7 @@
     syncDbCorruptionStatus();
     refreshSchedulesFromServer();
     refreshDutyRosterFromServer();
-    window.api.onGroupChatsUpdate(() => { refreshGroupChats().catch((e) => console.error('그룹 갱신 실패:', e)); });
+    window.api.onGroupChatsUpdate(() => { refreshAllGroupChatViews().catch((e) => console.error('그룹 갱신 실패:', e)); });
     refreshGroupChats().catch((e) => console.error('그룹 초기 로드 실패:', e));
     renderChannelsSection();
     startScheduleAlarmChecker();
@@ -15059,6 +15059,20 @@
       renderChannelsSection();
     }
 
+    /** 그룹 나가기·삭제·이름변경 뒤 화면을 정리한다. refreshGroupChats()는 일반 모드의
+     *  별도 "채널" 목록(renderChannelsSection)만 다시 그려서, 미니 모드의 채팅·그룹대화방
+     *  탭이나 일반 모드 "최근 대화" 섹션(둘 다 다른 함수로 그림)은 그대로 낡은 채로 남아
+     *  있었다 — 그래서 나가기를 눌러도 화면이 그대로였고, 다른 탭에 갔다 와야(그 탭을 열
+     *  때 다시 그려지면서) 비로소 반영된 게 보였다. 이 화면들도 함께 다시 그린다. */
+    async function refreshAllGroupChatViews() {
+      await refreshGroupChats();
+      invalidateCompactRecentConversations();
+      try { renderRecentChatsSection(); } catch (e) { /* ignore */ }
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) {
+        try { await renderCompactList(); } catch (e) { /* ignore */ }
+      }
+    }
+
     // 최근 대화 목록(compact-list-item)에서 우클릭했을 때만 채워지는, "나가기"가 실제로
     // 의미 있는지 판단할 대상 줄. 사용자 목록 트리 등 다른 곳에서 열면 null이라 안 보인다.
     let ctxMenuTargetRow = null;
@@ -15482,7 +15496,7 @@
       const res = await window.api.renameGroupChat(ctxMenuTargetGroup.uid, newName);
       if (!res || !res.success) { await appAlert(res && res.msg ? res.msg : '이름 변경에 실패했습니다.'); return; }
       closeGroupRenameModal();
-      await refreshGroupChats();
+      await refreshAllGroupChatViews();
       syncActiveChannelHeaderTitle();
     }
 
@@ -15499,7 +15513,7 @@
         activeChatUser = null;
         updateMainPanelVisibility();
       }
-      await refreshGroupChats();
+      await refreshAllGroupChatViews();
     }
     async function ctxDeleteGroup() {
       document.getElementById('channel-context-menu').style.display = 'none';
@@ -15521,7 +15535,7 @@
         updateMainPanelVisibility();
       }
       if (isFlexOverlay('group-members-modal')) closeGroupMembersModal();
-      await refreshGroupChats();
+      await refreshAllGroupChatViews();
     }
 
     function ctxToggleFavorite() {
