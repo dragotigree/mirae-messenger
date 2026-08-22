@@ -176,6 +176,14 @@ let scheduleBoardWindow = null;
 let noticeBoardWindow = null;
 let captureOverlayWindows = new Map(); // displayId(String) -> BrowserWindow
 let captureOverlayMainWasHidden = false;
+/** ⚠️ 실사고: 영역 캡처 결과를 항상 mainWindow로만 돌려보내고 있었다. 그런데 「새 창으로
+ *  열기」로 띄운 별도 채팅창에서 캡처를 누르면, 캡처를 시작한 곳은 그 채팅창인데 결과는
+ *  메인 창으로 갔다. 메인 창은 대화방을 열어둔 상태가 아니라서(목록 화면) 받자마자
+ *  "대화 상대를 먼저 선택하세요"만 뜨고 사진은 어디에도 안 붙었다("한번씩 영역캡쳐하면
+ *  대화상대를 먼저 선정하세요라고 뜬다"는 신고 — 별도 채팅창에서 캡처할 때만 재현된다).
+ *  캡처를 요청한 창을 기억해 두었다가 결과를 그 창으로 돌려준다. */
+let captureRequesterWc = null;
+let captureRequesterWasHidden = false;
 /** 💬 별도 채팅창: 상대(채널) 키 → BrowserWindow. 파일 앞쪽 함수들도 참조하므로 상단에 선언한다. */
 const chatWindows = new Map();
 let excalidrawWindow = null;
@@ -6050,6 +6058,18 @@ function closeCaptureOverlayAndRestoreMain() {
     mainWindow.focus();
   }
   captureOverlayMainWasHidden = false;
+  // 캡처 때문에 같이 내려둔 별도 채팅창을 되돌린다(캡처를 시작한 그 창으로 돌아가야
+  // 사진이 그 대화방에 붙는 걸 바로 볼 수 있다).
+  if (captureRequesterWasHidden) {
+    try {
+      const reqWin = captureRequesterWc ? BrowserWindow.fromWebContents(captureRequesterWc) : null;
+      if (reqWin && !reqWin.isDestroyed()) {
+        reqWin.show();
+        reqWin.focus();
+      }
+    } catch (e) { /* ignore */ }
+  }
+  captureRequesterWasHidden = false;
 }
 
 /** 모니터마다 자기 화면의 스크린샷을 짝지어 준다.
@@ -6099,9 +6119,11 @@ async function captureAllScreenSourcesForOverlay() {
   return pairs;
 }
 
-ipcMain.handle('open-region-capture-overlay', async () => {
+ipcMain.handle('open-region-capture-overlay', async (event) => {
   if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'NO_MAIN_WINDOW' };
   try {
+    // 캡처를 요청한 창(메인 창일 수도, 별도 채팅창일 수도 있다)을 기억해 결과를 그리로 보낸다.
+    captureRequesterWc = (event && event.sender && !event.sender.isDestroyed()) ? event.sender : null;
     const overlays = await prewarmCaptureOverlayWindows();
     if (overlays.some((w) => w.isVisible())) {
       const primaryWin = captureOverlayWindows.get(String(screen.getPrimaryDisplay().id));
@@ -6113,6 +6135,15 @@ ipcMain.handle('open-region-capture-overlay', async () => {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.hide();
     captureOverlayMainWasHidden = !wasHidden;
+    // 별도 채팅창에서 캡처를 눌렀다면 그 창도 같이 내려야 스크린샷에 안 찍힌다.
+    captureRequesterWasHidden = false;
+    try {
+      const reqWin = captureRequesterWc ? BrowserWindow.fromWebContents(captureRequesterWc) : null;
+      if (reqWin && !reqWin.isDestroyed() && reqWin !== mainWindow && reqWin.isVisible()) {
+        reqWin.hide();
+        captureRequesterWasHidden = true;
+      }
+    } catch (e) { /* ignore */ }
     // 메신저 창이 화면 합성에서 완전히 빠지는 데 필요한 최소한의 시간만 기다린다
     // (너무 짧으면 캡처 결과에 메신저 창이 순간적으로 찍힐 수 있다).
     await new Promise((r) => setTimeout(r, 120));
@@ -6151,8 +6182,10 @@ ipcMain.handle('open-region-capture-overlay', async () => {
 
     if (!anyShown) {
       writeToLogFile('error', '[영역캡처] 화면 캡처 실패: EMPTY_CAPTURE (모든 모니터)');
-      if (captureOverlayMainWasHidden) { mainWindow.show(); mainWindow.focus(); }
-      captureOverlayMainWasHidden = false;
+      // 공용 복원 함수를 쓴다 — 메인 창뿐 아니라 캡처 때문에 같이 내려둔 별도 채팅창까지
+      // 되돌려야 한다(예전엔 메인 창만 되돌려서, 실패하면 그 채팅창이 숨겨진 채로 남았다).
+      closeCaptureOverlayAndRestoreMain();
+      captureRequesterWc = null;
       return { success: false, error: 'EMPTY_CAPTURE' };
     }
 
@@ -6161,24 +6194,27 @@ ipcMain.handle('open-region-capture-overlay', async () => {
     return { success: true };
   } catch (err) {
     writeToLogFile('error', `[영역캡처] 오버레이 열기 실패: ${err && err.message || err}`);
-    if (captureOverlayMainWasHidden && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-    captureOverlayMainWasHidden = false;
+    closeCaptureOverlayAndRestoreMain();
+    captureRequesterWc = null;
     return { success: false, error: err.message || String(err) };
   }
 });
 
 ipcMain.on('region-capture-confirm', (event, dataUrl) => {
+  // ⚠️ 결과는 "캡처를 시작한 창"으로 보낸다. 예전처럼 무조건 mainWindow로 보내면, 별도
+  // 채팅창에서 캡처했을 때 대화방이 안 열려 있는 메인 창이 받아 "대화 상대를 먼저
+  // 선택하세요"만 뜨고 사진은 사라진다.
+  const requester = (captureRequesterWc && !captureRequesterWc.isDestroyed()) ? captureRequesterWc : null;
+  const target = requester
+    || ((mainWindow && !mainWindow.isDestroyed()) ? mainWindow.webContents : null);
   closeCaptureOverlayAndRestoreMain();
-  if (mainWindow && !mainWindow.isDestroyed() && dataUrl) {
-    mainWindow.webContents.send('region-capture-result', dataUrl);
-  }
+  if (target && dataUrl) target.send('region-capture-result', dataUrl);
+  captureRequesterWc = null;
 });
 
 ipcMain.on('region-capture-cancel', () => {
   closeCaptureOverlayAndRestoreMain();
+  captureRequesterWc = null;
 });
 
 // ⚠️ 실사고: 화면 캡처(특히 영역 캡처) 직전에 창 UI가 스크린샷에 안 찍히게 잠깐 숨기려고
