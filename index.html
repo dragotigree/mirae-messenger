@@ -10152,6 +10152,14 @@
     // (「최근 대화」 목록이 제대로 안 채워지던 원인). 같은 이유로 여기로 옮긴다.
     const RECENT_CHATS_SECTION_MAX = 200;
     let recentChatsSectionRenderToken = 0;
+    // ⚠️ 실사고: 미니 모드로 껐던 PC는 부팅 직후 최상위 동기 코드(setCompactRailTab)가
+    // renderCompactList -> loadCompactRecentConversations로 이어지며 이 두 값을 먼저
+    // 참조했는데, 원래 이 값들은 훨씬 아래(loadCompactRecentConversations 함수 바로 위)에
+    // 선언돼 있어 TDZ ReferenceError("Cannot access 'compactRecentConversationsInFlight'
+    // before initialization")가 났다("최근 대화" 목록이 미니 모드에서 하얗게 비어 보이던
+    // 원인). 같은 이유로 여기로 옮긴다.
+    let compactRecentConversationsCache = [];
+    let compactRecentConversationsInFlight = null;
     function toggleSidebarRightCollapsed(forceState) {
       const collapsed = typeof forceState === 'boolean' ? forceState : !document.body.classList.contains('sidebar-right-collapsed');
       document.body.classList.toggle('sidebar-right-collapsed', collapsed);
@@ -12742,9 +12750,6 @@
       if (!preview) return '대화를 시작해 보세요';
       return isMe ? `나: ${preview}` : preview;
     }
-
-    let compactRecentConversationsCache = [];
-    let compactRecentConversationsInFlight = null;
 
     async function loadCompactRecentConversations(force) {
       if (!force && compactRecentConversationsCache.length) return compactRecentConversationsCache;
