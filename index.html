@@ -9142,13 +9142,20 @@
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
     }
     /** 즐겨찾기 목록 안의 카드를 서로에게 드롭했을 때만 순서를 바꾼다(다른 용도의 드래그와
-     *  섞이지 않도록 이 목록 안에서만 dragover/drop을 건다). */
+     *  섞이지 않도록 이 목록 안에서만 dragover/drop을 건다).
+     *  ⚠️ 실사고(드래그 순서 바꾸기가 실제로는 전혀 안 먹던 원인): dragover 핸들러에서
+     *  e.dataTransfer.getData()를 호출해 끌리는 IP를 미리 알아내려 했다. 브라우저 DnD
+     *  스펙상 getData()는 보안상 drop(과 dragstart) 중에만 값을 주고, dragover 중에는
+     *  항상 빈 문자열만 돌려준다 — 그래서 draggedIp가 매번 빈 값이 되어 `if (!draggedIp) return`
+     *  에서 매번 조용히 빠져나가 preventDefault()가 한 번도 호출되지 않았고, 그 결과
+     *  브라우저가 드롭 자체를 거부해 실제 마우스 드래그로는 절대 순서가 안 바뀌었다(직접
+     *  함수를 호출해서 검증했을 땐 이 이벤트 경로를 거치지 않아 멀쩡해 보였다). dragover
+     *  중에는 타입(isUserDragEvent)만으로 허용 여부를 정하고, 실제 IP 확인·비교는 값을
+     *  읽을 수 있는 drop 시점으로 미룬다(다른 곳의 bindUserDropZone과 동일한 패턴). */
     function bindFavoriteReorderTarget(el, ip) {
       if (!el || !ip) return;
       el.addEventListener('dragover', (ev) => {
         if (!isUserDragEvent(ev)) return;
-        const draggedIp = getDraggedUserIp(ev);
-        if (!draggedIp || draggedIp === ip || !isFavoriteIp(draggedIp)) return;
         ev.preventDefault();
         ev.dataTransfer.dropEffect = 'move';
         el.classList.add('is-favorite-drop-target');
@@ -9157,15 +9164,63 @@
         if (!el.contains(ev.relatedTarget)) el.classList.remove('is-favorite-drop-target');
       });
       el.addEventListener('drop', (ev) => {
-        const draggedIp = getDraggedUserIp(ev);
-        if (!draggedIp || draggedIp === ip || !isFavoriteIp(draggedIp)) return;
         ev.preventDefault();
         ev.stopPropagation();
         el.classList.remove('is-favorite-drop-target');
+        const draggedIp = getDraggedUserIp(ev);
+        if (!draggedIp || draggedIp === ip || !isFavoriteIp(draggedIp)) return;
         reorderFavoriteIps(draggedIp, ip);
       });
     }
     let myGroupChats = [];
+    // 그룹채팅방을 손으로 끌어서 바꾼 순서 — 즐겨찾기와 같은 저장 방식(일반 모드·미니 모드
+    // 공유)이지만 키가 IP가 아니라 "GROUP:uid"라 별도 저장소를 쓴다.
+    let groupChatsOrderList = JSON.parse(localStorage.getItem('groupChatsOrder') || '[]');
+    function saveGroupChatsOrderList(order) {
+      groupChatsOrderList = order;
+      localStorage.setItem('groupChatsOrder', JSON.stringify(order));
+    }
+    function reorderGroupChatKeys(draggedKey, targetKey) {
+      if (!draggedKey || !targetKey || draggedKey === targetKey) return;
+      if (!draggedKey.startsWith('GROUP:') || !targetKey.startsWith('GROUP:')) return;
+      const allKeys = (myGroupChats || []).map((g) => `GROUP:${g.uid}`);
+      if (!allKeys.includes(draggedKey) || !allKeys.includes(targetKey)) return;
+      const orderIndex = new Map(groupChatsOrderList.map((k, i) => [k, i]));
+      const ordered = [...allKeys].sort((a, b) => {
+        const ia = orderIndex.has(a) ? orderIndex.get(a) : Infinity;
+        const ib = orderIndex.has(b) ? orderIndex.get(b) : Infinity;
+        return ia - ib;
+      });
+      const from = ordered.indexOf(draggedKey);
+      const to = ordered.indexOf(targetKey);
+      if (from < 0 || to < 0) return;
+      ordered.splice(from, 1);
+      ordered.splice(to, 0, draggedKey);
+      saveGroupChatsOrderList(ordered);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+    }
+    /** bindFavoriteReorderTarget과 동일한 패턴(dragover에서는 타입만 확인, 실제 키 비교는
+     *  drop에서) — 그룹채팅방 목록 안에서만 dragover/drop을 건다. */
+    function bindGroupReorderTarget(el, key) {
+      if (!el || !key) return;
+      el.addEventListener('dragover', (ev) => {
+        if (!isUserDragEvent(ev)) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        el.classList.add('is-favorite-drop-target');
+      });
+      el.addEventListener('dragleave', (ev) => {
+        if (!el.contains(ev.relatedTarget)) el.classList.remove('is-favorite-drop-target');
+      });
+      el.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        el.classList.remove('is-favorite-drop-target');
+        const draggedKey = getDraggedUserIp(ev);
+        if (!draggedKey || draggedKey === key) return;
+        reorderGroupChatKeys(draggedKey, key);
+      });
+    }
     let ctxMenuTargetUser = null;
     let calendarViewDate = new Date();
     let selectedCalendarDateStr = formatDateStr(new Date());
@@ -13069,6 +13124,10 @@
         bindUserDragSource(item, row.user);
       } else if (row.kind === 'dept' || row.kind === 'floor') {
         item.oncontextmenu = (e) => showDeptFloorContextMenu(e, row.kind, row.name, row);
+      } else if (row.kind === 'group' && row.user) {
+        // makeGroupChannel()은 user.ip 자리에 "GROUP:uid" 키를 넣어 두므로, 사람과 같은
+        // 드래그 소스 바인딩을 그대로 재사용할 수 있다(그룹채팅방 순서 바꾸기용).
+        bindUserDragSource(item, row.user);
       }
       container.appendChild(item);
     }
@@ -13215,9 +13274,9 @@
       if (compactRailTab === 'chat') {
         await renderCompactChatConversations(container);
       } else if (compactRailTab === 'favorites') {
-        await renderCompactFilteredConversations(container, (r) => r.isFavorite, '즐겨찾기한 대상이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.', true);
+        await renderCompactFilteredConversations(container, (r) => r.isFavorite, '즐겨찾기한 대상이 없습니다.\n목록에서 우클릭으로 추가할 수 있습니다.', 'favorites');
       } else if (compactRailTab === 'groups') {
-        await renderCompactFilteredConversations(container, (r) => r.kind === 'group', '참여 중인 그룹채팅방이 없습니다.');
+        await renderCompactFilteredConversations(container, (r) => r.kind === 'group', '참여 중인 그룹채팅방이 없습니다.', 'groups');
       } else {
         renderCompactStaffDirectory(container);
       }
@@ -13230,8 +13289,10 @@
     }
 
     /** 즐겨찾기 · 그룹채팅방 전용 탭 — 최근 대화 목록(buildCompactConversationRows)을
-     *  재사용해 조건에 맞는 것만 골라 보여준다. 검색어·필터 칩 없이 항상 전체를 보여준다. */
-    async function renderCompactFilteredConversations(container, filterFn, emptyText, sortByFavorites) {
+     *  재사용해 조건에 맞는 것만 골라 보여준다. 검색어·필터 칩 없이 항상 전체를 보여준다.
+     *  reorderMode: 'favorites' | 'groups' | falsy — 어느 저장소·바인딩으로 손으로 끌어
+     *  순서를 바꿀지 고른다. */
+    async function renderCompactFilteredConversations(container, filterFn, emptyText, reorderMode) {
       const recent = await loadCompactRecentConversations(true);
       let rows = buildCompactConversationRows(recent).filter(filterFn);
       if (userFilterKeyword) {
@@ -13241,8 +13302,9 @@
           String(r.searchText || '').toLowerCase().includes(q)
         );
       }
-      if (sortByFavorites) {
-        const orderIndex = new Map(favoritesOrderList.map((ip, i) => [ip, i]));
+      const orderList = reorderMode === 'favorites' ? favoritesOrderList : reorderMode === 'groups' ? groupChatsOrderList : null;
+      if (orderList) {
+        const orderIndex = new Map(orderList.map((k, i) => [k, i]));
         rows.sort((a, b) => {
           const ia = orderIndex.has(a.key) ? orderIndex.get(a.key) : Infinity;
           const ib = orderIndex.has(b.key) ? orderIndex.get(b.key) : Infinity;
@@ -13260,10 +13322,9 @@
       }
       rows.forEach((row) => {
         appendCompactConversationItem(container, row);
-        if (sortByFavorites) {
-          const item = container.lastElementChild;
-          bindFavoriteReorderTarget(item, row.key);
-        }
+        const item = container.lastElementChild;
+        if (reorderMode === 'favorites') bindFavoriteReorderTarget(item, row.key);
+        else if (reorderMode === 'groups') bindGroupReorderTarget(item, row.key);
       });
     }
 
