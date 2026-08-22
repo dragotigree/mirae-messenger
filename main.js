@@ -6224,14 +6224,15 @@ function registerGlobalShortcuts() {
   // ⚠️ 실사고: 검색으로 메인 창을 불러오는 단축키(렌더러 안의 Ctrl+Shift+F)는 메인 창
   // 렌더러 안에서만 keydown으로 잡혀 있어서, "채팅을 새 창으로 열기"로 띄운 별도 채팅
   // 창(openChatWindow)이나 현황판·공지사항 창에 포커스가 가 있을 때는 아무 반응이
-  // 없었다("채팅하다가 눌러도 검색이 안 된다"는 신고의 원인). 이걸 전역 단축키로
-  // 등록하려면 Ctrl+Shift+F 그대로 쓰고 싶었지만, 그 조합은 다른 프로그램(문서
-  // 편집기·EMR 등)에서도 흔히 "찾기"로 쓰여서 전역으로 뺏으면 이 메신저가 켜져 있는
-  // 동안 다른 프로그램에서 그 기능이 먹통이 될 위험이 있다. Ctrl+Alt+S·Ctrl+Alt+E와
-  // 같은 계열의 덜 흔한 조합(Ctrl+Alt+F)을 새로 써서, 어느 창에 포커스가 있든 항상
-  // 먹히면서도 다른 프로그램과 부딪힐 위험은 낮춘다. 메인 창 안에서 쓰던 Ctrl+Shift+F는
+  // 없었다("채팅하다가 눌러도 검색이 안 된다"는 신고의 원인). 처음엔 Ctrl+Alt+F로
+  // 전역 등록했는데, Windows 이벤트 로그에는 등록 자체는 성공했다고 남는데도 실제로
+  // 눌러도 아무 반응이 없다는 신고를 받았다 — 이 파일에 이미 남아 있던 것처럼(아래
+  // Ctrl+Alt+D 관련 메모) Alt가 낀 전역 단축키가 한글 IME 환경에서 등록은 되지만
+  // 실제 입력은 전달되지 않는 것으로 보인다. Alt를 완전히 빼고 Shift 조합
+  // (Ctrl+Shift+K)으로 바꿨다 — 흔한 "찾기" 기본값(Ctrl+F/Ctrl+Shift+F)과도 겹치지
+  // 않고, Alt 관련 IME 문제와도 무관하다. 메인 창 안에서 쓰던 기존 Ctrl+Shift+F는
   // 그대로 남겨 둔다(메인 창에 포커스가 있을 때는 계속 그 키로도 된다).
-  tryRegister('CommandOrControl+Alt+F', () => {
+  tryRegister('CommandOrControl+Shift+K', () => {
     openMainWindowKeepingMode();
     safeWebContentsSend('trigger-focus-people-search');
   });
