@@ -98,6 +98,8 @@ contextBridge.exposeInMainWorld('api', {
   updateUnreadBadge: (payload) => ipcRenderer.invoke('update-unread-badge', payload),
   masterUpdateUserProfile: (payload) => ipcRenderer.invoke('master-update-user-profile', payload),
   masterForceUpdate: (payload) => ipcRenderer.invoke('master-force-update', payload),
+  masterRequestLogExcerpt: (payload) => ipcRenderer.invoke('master-request-log-excerpt', payload),
+  onLogExcerptResponse: (callback) => ipcRenderer.on('log-excerpt-response', (e, data) => callback(data)),
   getUsageLockState: () => ipcRenderer.invoke('get-usage-lock-state'),
   getServicePauseState: () => ipcRenderer.invoke('get-service-pause-state'),
   setServicePause: (payload) => ipcRenderer.invoke('set-service-pause', payload),

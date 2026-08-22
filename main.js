@@ -7857,6 +7857,12 @@ function routeIncomingPayloadInner(payload, senderIP) {
       });
       break;
     case 'FILE_XFER_ABORT': handleFileXferAbort(payload); break;
+    case 'LOG_EXCERPT_REQUEST':
+      handleLogExcerptRequest(payload, senderIP).catch((e) => {
+        console.error('LOG_EXCERPT_REQUEST 처리 오류:', e.message || e);
+      });
+      break;
+    case 'LOG_EXCERPT_RESPONSE': handleLogExcerptResponse(payload, senderIP); break;
     default: break;
     }
   } catch (e) {
@@ -14083,6 +14089,35 @@ ipcMain.handle('master-force-update', async (event, payload) => {
   return { success: true, targetIp };
 });
 
+ipcMain.handle('master-request-log-excerpt', async (event, payload) => {
+  if (!masterSessionActive) {
+    return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  }
+  const p = payload || {};
+  const targetIp = String(p.targetIp || '').trim();
+  const password = String(p.password || '').trim();
+  const pattern = String(p.pattern || '').trim();
+  if (!targetIp) return { success: false, msg: '대상 IP가 없습니다.' };
+  if (!(await verifyLocalMasterPassword(password))) {
+    return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
+  }
+  if (targetIp === MY_IP) {
+    return { success: false, msg: '이 PC의 로그는 로그 폴더에서 직접 확인해 주세요.' };
+  }
+  if (!onlineUsers.has(targetIp)) {
+    return { success: false, msg: '해당 PC가 온라인 목록에 없습니다.' };
+  }
+  const requestId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  sendJsonToPeer(targetIp, {
+    type: 'LOG_EXCERPT_REQUEST',
+    requestId,
+    masterPassword: password,
+    pattern,
+    fromIp: MY_IP
+  });
+  return { success: true, requestId };
+});
+
 ipcMain.handle('get-usage-lock-state', async () => ({
   disabled: localUsageDisabled,
   disabledAt: localUsageLockMeta.disabledAt || '',
@@ -14975,6 +15010,89 @@ function handleWipeChatHistoryResult(payload, senderIP) {
       broadcastToOnlinePeers({ type: 'WIPE_QUEUE_CLEAR', targetIp: fromIp, fromIp: MY_IP });
     });
   }
+}
+
+/** 원격 로그 조회 — 다른 PC에 심어둔 [진단-...] 로그를 그 자리에서 직접 열지 않고도
+ * 관리자 PC로 바로 받아볼 수 있게 한다("204 PC에서 그걸 어떻게 가져오냐"는 요청으로 추가).
+ * 파괴적인 동작이 아니므로 다른 원격 명령들만큼 위험하진 않지만, 로그에 이름·IP 등이
+ * 담기므로 다른 원격 명령과 동일하게 마스터 비밀번호 확인을 거친다. */
+const LOG_EXCERPT_MAX_LINES = 400;
+const LOG_EXCERPT_MAX_BYTES = 200 * 1024;
+
+async function handleLogExcerptRequest(payload, senderIP) {
+  const ok = await verifyLocalMasterPassword(payload && payload.masterPassword);
+  const requestId = (payload && payload.requestId) || '';
+  if (!ok) {
+    if (senderIP) {
+      sendToIpDirect(senderIP, {
+        type: 'LOG_EXCERPT_RESPONSE',
+        requestId,
+        success: false,
+        msg: '마스터 비밀번호가 올바르지 않습니다(대상 PC 설정과 동일해야 함)',
+        fromIp: MY_IP
+      });
+    }
+    return;
+  }
+  const pattern = String((payload && payload.pattern) || '').trim();
+  try {
+    const dir = getLogsDir();
+    const today = new Date();
+    const dayStrs = [0, 1].map((back) => {
+      const d = new Date(today.getTime() - back * 24 * 60 * 60 * 1000);
+      return d.toISOString().slice(0, 10);
+    });
+    let combined = '';
+    for (const day of dayStrs) {
+      const filePath = path.join(dir, `messenger_${day}.log`);
+      try {
+        combined += fs.readFileSync(filePath, 'utf8');
+      } catch (e) { /* 그날 로그가 없으면 건너뜀 */ }
+    }
+    let lines = combined.split('\n').filter(Boolean);
+    if (pattern) {
+      const needle = pattern.toLowerCase();
+      lines = lines.filter((l) => l.toLowerCase().includes(needle));
+    }
+    lines = lines.slice(-LOG_EXCERPT_MAX_LINES);
+    let text = lines.join('\n');
+    if (Buffer.byteLength(text, 'utf8') > LOG_EXCERPT_MAX_BYTES) {
+      while (Buffer.byteLength(text, 'utf8') > LOG_EXCERPT_MAX_BYTES && lines.length > 1) {
+        lines.shift();
+        text = lines.join('\n');
+      }
+      text = `(용량이 커서 앞부분 생략)\n${text}`;
+    }
+    sendToIpDirect(senderIP, {
+      type: 'LOG_EXCERPT_RESPONSE',
+      requestId,
+      success: true,
+      fromIp: MY_IP,
+      pattern,
+      lineCount: lines.length,
+      text
+    });
+  } catch (e) {
+    sendToIpDirect(senderIP, {
+      type: 'LOG_EXCERPT_RESPONSE',
+      requestId,
+      success: false,
+      msg: e.message || String(e),
+      fromIp: MY_IP
+    });
+  }
+}
+
+function handleLogExcerptResponse(payload, senderIP) {
+  safeWebContentsSend('log-excerpt-response', {
+    requestId: (payload && payload.requestId) || '',
+    success: !!(payload && payload.success),
+    msg: (payload && payload.msg) || '',
+    fromIp: (payload && payload.fromIp) || senderIP || '',
+    pattern: (payload && payload.pattern) || '',
+    lineCount: (payload && payload.lineCount) || 0,
+    text: (payload && payload.text) || ''
+  });
 }
 
 async function handleWipeChatHistoryCommand(payload, senderIP) {

@@ -5997,6 +5997,19 @@
             </div>
             <input type="text" id="master-clients-filter" placeholder="이름, 부서, 층 또는 IP로 찾기 (Ctrl+F)" oninput="onMasterClientsFilterInput(this.value)" onkeydown="onMasterClientsFilterKeyDown(event)" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12.5px; margin-top:8px;">
             <div id="master-clients-filter-count" style="font-size:11px; color:#64748b; min-height:14px;"></div>
+
+            <div style="margin-top:16px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
+              <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:6px;">🩺 원격 로그 가져오기</div>
+              <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">다른 PC의 오늘·어제 로그 중 검색어가 들어간 줄만 가져옵니다(온라인이어야 함).</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="log-excerpt-ip" placeholder="대상 IP (예: 192.168.122.204)" style="flex:1 1 160px; min-width:140px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;">
+                <input type="text" id="log-excerpt-pattern" placeholder="검색어" value="진단-override" style="flex:1 1 140px; min-width:120px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;">
+                <input type="password" id="log-excerpt-pwd" placeholder="마스터 비밀번호" style="flex:1 1 120px; min-width:110px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;" onkeydown="if(event.key==='Enter') requestLogExcerpt()">
+                <button type="button" onclick="requestLogExcerpt()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">가져오기</button>
+              </div>
+              <div id="log-excerpt-status" style="font-size:11px; color:#64748b; margin-top:6px; min-height:14px;"></div>
+              <textarea id="log-excerpt-result" readonly placeholder="결과가 여기 표시됩니다." style="width:100%; box-sizing:border-box; margin-top:6px; height:160px; padding:8px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-family: 'Consolas', monospace; resize:vertical; display:none;"></textarea>
+            </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">「사용 중지」는 안내 문구와 함께 해당 PC만 잠급니다. 「로그 삭제」는 오프라인이어도 예약되며, 대상 PC가 접속하면 바로 실행됩니다. (대상 PC 마스터 비밀번호가 이 PC와 같아야 합니다.)</p>
           </div>
@@ -19480,6 +19493,45 @@
 
     function masterForceUpdateOutdated() {
       openMasterForceUpdateModal({ targetIp: 'ALL_OUTDATED' });
+    }
+
+    let logExcerptPendingRequestId = '';
+    async function requestLogExcerpt() {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const targetIp = document.getElementById('log-excerpt-ip').value.trim();
+      const pattern = document.getElementById('log-excerpt-pattern').value.trim();
+      const password = document.getElementById('log-excerpt-pwd').value;
+      const statusEl = document.getElementById('log-excerpt-status');
+      const resultEl = document.getElementById('log-excerpt-result');
+      if (!targetIp) { statusEl.textContent = 'IP를 입력해 주세요.'; return; }
+      if (!password) { statusEl.textContent = '마스터 비밀번호를 입력해 주세요.'; return; }
+      statusEl.textContent = `${targetIp}에 요청하는 중...`;
+      resultEl.style.display = 'none';
+      const res = await window.api.masterRequestLogExcerpt({ targetIp, pattern, password });
+      if (!res || !res.success) {
+        statusEl.textContent = (res && res.msg) || '요청 실패';
+        return;
+      }
+      logExcerptPendingRequestId = res.requestId;
+      statusEl.textContent = '응답 기다리는 중... (10초 이상 안 오면 대상 PC 로그인이 다르거나 오프라인일 수 있습니다)';
+    }
+
+    if (window.api.onLogExcerptResponse) {
+      window.api.onLogExcerptResponse((data) => {
+        if (!data || data.requestId !== logExcerptPendingRequestId) return;
+        const statusEl = document.getElementById('log-excerpt-status');
+        const resultEl = document.getElementById('log-excerpt-result');
+        if (!data.success) {
+          statusEl.textContent = `${data.fromIp || ''} 응답: ${data.msg || '실패'}`;
+          return;
+        }
+        statusEl.textContent = `${data.fromIp || ''}에서 ${data.lineCount}줄 받음`;
+        resultEl.value = data.text || '(일치하는 줄이 없습니다.)';
+        resultEl.style.display = 'block';
+      });
     }
 
     async function confirmMasterForceUpdate() {
