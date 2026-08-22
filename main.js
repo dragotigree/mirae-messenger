@@ -6907,7 +6907,7 @@ function storeProfileOverride(patch) {
   persistProfileOverrideToDb(merged);
   db.run(
     `INSERT INTO known_users (ip, username, rank, dept, sub_dept, floor, ext_no, phone_no, note, status_state, photo, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT status_state FROM known_users WHERE ip = ?), 'OFFLINE'), COALESCE((SELECT photo FROM known_users WHERE ip = ?), ''), COALESCE((SELECT last_seen_at FROM known_users WHERE ip = ?), 0))
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT status_state FROM known_users WHERE ip = ?), 'OFFLINE'), COALESCE((SELECT photo FROM known_users WHERE ip = ?), ''), COALESCE((SELECT last_seen_at FROM known_users WHERE ip = ?), 0))
      ON CONFLICT(ip) DO UPDATE SET
        username = excluded.username, rank = excluded.rank, dept = excluded.dept,
        sub_dept = excluded.sub_dept, floor = excluded.floor, ext_no = excluded.ext_no,
