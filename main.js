@@ -4999,11 +4999,12 @@ function buildTrayContextMenu() {
       }
     },
     {
-      label: '환경 설정',
-      click: () => {
-        openMainWindowKeepingMode();
-        safeWebContentsSend('trigger-open-settings');
-      }
+      label: '현황판 열기',
+      click: () => { openScheduleBoardWindow({}).catch(() => {}); }
+    },
+    {
+      label: '공지사항 열기',
+      click: () => { openNoticeBoardWindow().catch(() => {}); }
     },
     { type: 'separator' },
     {
@@ -5033,10 +5034,16 @@ function buildTrayContextMenu() {
     },
     { type: 'separator' },
     {
+      label: '환경 설정',
+      click: () => {
+        openMainWindowKeepingMode();
+        safeWebContentsSend('trigger-open-settings');
+      }
+    },
+    {
       label: '지금 업데이트 확인',
       click: () => { manualUpdateFromTray().catch((e) => dialog.showErrorBox('업데이트 실패', e && e.message ? e.message : String(e))); }
     },
-    { type: 'separator' },
     {
       label: '문제 진단 화면 열기',
       click: () => {
