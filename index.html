@@ -2401,9 +2401,15 @@
     .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .compact-pane[hidden] { display: none !important; }
 
-    .compact-filter-row { display: flex; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
+    /* ⚠️ 실사고: 미니 모드는 창 최소·기본 폭이 480px로 고정인데, 직원 탭 필터 줄에
+       칩 2개 + 부서/층 선택 2개 + 아이콘 3개를 한 줄에 넣으면서 총 폭이 남는 폭을
+       24px 넘겨, 맨 오른쪽 새로고침 아이콘이 잘린 채 줄이 옆으로 삐져나갔다.
+       (overflow-x:auto라 잘린 것뿐 스크롤은 됐지만 보기에 고장난 것처럼 보였다.)
+       한 줄 배치는 그대로 두고 여백·글자 여백만 촘촘히 줄여서 480px에 확실히
+       들어가게 한다 — Windows 한글 폰트가 더 넓게 그려질 수 있어 여유를 넉넉히 둔다. */
+    .compact-filter-row { display: flex; gap: 5px; padding: 8px 10px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
     .compact-filter-row::-webkit-scrollbar { display: none; }
-    .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
+    .compact-filter-chip { flex-shrink: 0; padding: 7px 10px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
     .compact-filter-chip.is-active { background: var(--accent); color: #fff; }
     .compact-pane-title { font-size: 15px; font-weight: 700; color: var(--text-primary); padding: 14px 16px 6px; }
@@ -2414,8 +2420,10 @@
       background: var(--border-soft);
     }
     .compact-filter-select {
-      flex-shrink: 0; max-width: 108px;
-      padding: 7px 22px 7px 12px; border-radius: 99px; border: none;
+      /* 폭이 모자라면 아이콘을 밀어내 잘리게 하는 대신 이 선택 상자가 먼저 줄어들도록
+         한다(마지막 안전장치 — 위 여백 축소만으로도 480px에는 이미 들어간다). */
+      flex-shrink: 1; min-width: 46px; max-width: 96px;
+      padding: 7px 18px 7px 9px; border-radius: 99px; border: none;
       background-color: var(--surface-muted);
       background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%2364748b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
@@ -2434,7 +2442,7 @@
     }
     .compact-filter-select option { color: var(--text-primary); background: #fff; font-weight: 600; }
     /* 직원 탭 필터 줄에 가나다순 정렬/펴기·접기/새로고침 아이콘까지 한 줄에 우측 정렬로 함께 배치 */
-    .compact-filter-row-spacer { flex: 1 1 auto; min-width: 8px; }
+    .compact-filter-row-spacer { flex: 1 1 auto; min-width: 0; }
 
     .compact-inbox-bar {
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
