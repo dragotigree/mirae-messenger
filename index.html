@@ -28312,6 +28312,14 @@
           if (ta && activeChatUser) ta.focus();
           return;
         }
+        // 「새 창으로 열기」로 띄운 별도 채팅창에서 Esc는 그 창을 닫는다. 이 창은 대화
+        // 하나만 담고 있어서, 예전처럼 "빈 화면으로 되돌리기"를 하면 아무것도 없는 창만
+        // 덩그러니 남았다 — 닫는 게 사용자가 기대하는 동작이다.
+        if (document.body.classList.contains('chat-window-standalone')) {
+          e.preventDefault();
+          try { window.api.windowClose(); } catch (_) { /* ignore */ }
+          return;
+        }
         // 화면 잠금이 켜져 있으면 tryPrivacyLockOnEscape가 먼저 대화를 정리하고
         // 잠금 화면으로 넘어가야 하므로, 그 경우엔 여기서 빈 화면으로만 되돌리지 않는다.
         if (!document.body.classList.contains('compact-mode') && activeChatUser && !isPrivacyLockEnabled()) {
