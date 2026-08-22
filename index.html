@@ -2433,6 +2433,8 @@
       background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
     .compact-filter-select option { color: var(--text-primary); background: #fff; font-weight: 600; }
+    /* 직원 탭 필터 줄에 가나다순 정렬/펴기·접기/새로고침 아이콘까지 한 줄에 우측 정렬로 함께 배치 */
+    .compact-filter-row-spacer { flex: 1 1 auto; min-width: 8px; }
 
     .compact-inbox-bar {
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
@@ -5572,22 +5574,19 @@
           <div id="compact-list-items"></div>
         </div>
         <div class="compact-pane" data-compact-pane="friends" hidden>
-          <div class="compact-friends-toolbar">
-            <span class="sidebar-header-icon-btn" id="compact-alpha-sort-btn" onclick="toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="width:auto; padding:0 6px; font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em;">가나다</span>
-            <span class="sidebar-header-icon-btn" onclick="toggleAllCompactUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
-            <span class="sidebar-header-icon-btn" id="compact-toolbar-refresh-btn" onclick="manualRefreshUsers('compact-toolbar-refresh-btn')" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
-          </div>
           <div class="compact-filter-row">
-            <button type="button" class="compact-filter-chip is-active" data-compact-filter-friends="all" onclick="setCompactListFilter('all')">전체</button>
-            <button type="button" class="compact-filter-chip" data-compact-filter-friends="online" onclick="setCompactListFilter('online')">온라인</button>
-            <button type="button" class="compact-filter-chip" data-compact-filter-friends="favorite" onclick="setCompactListFilter('favorite')">즐겨찾기</button>
-            <span class="compact-filter-divider" aria-hidden="true"></span>
+            <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('favorites')">즐겨찾기</button>
+            <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('groups')">그룹대화방</button>
             <select class="compact-filter-select" id="compact-dept-filter" title="부서로 거르기" onchange="setCompactDeptFilter(this.value)">
               <option value="">부서</option>
             </select>
             <select class="compact-filter-select" id="compact-floor-filter" title="층으로 거르기" onchange="setCompactFloorFilter(this.value)">
               <option value="">층</option>
             </select>
+            <span class="compact-filter-row-spacer"></span>
+            <span class="sidebar-header-icon-btn" id="compact-alpha-sort-btn" onclick="toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="width:auto; padding:0 6px; font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em; flex-shrink:0;">가나다</span>
+            <span class="sidebar-header-icon-btn" onclick="toggleAllCompactUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1; flex-shrink:0;">⇕</span>
+            <span class="sidebar-header-icon-btn" id="compact-toolbar-refresh-btn" onclick="manualRefreshUsers('compact-toolbar-refresh-btn')" title="사용자 목록 새로고침" data-ui-icon="refresh" style="flex-shrink:0;"></span>
           </div>
           <div class="compact-search">
             <span class="compact-search-icon" data-ui-icon="search"></span>
