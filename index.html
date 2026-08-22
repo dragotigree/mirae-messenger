@@ -2339,8 +2339,16 @@
 
     /* ========== 🗨 미니 모드 (모바일 메신저 스타일) ========== */
     body.compact-mode #sidebar-left,
-    body.compact-mode #app-icon-rail,
-    body.compact-mode #sidebar-right { display: none; }
+    body.compact-mode #app-icon-rail { display: none; }
+    /* 미니 모드에서도 오른쪽 「병원 달력」 패널을 쓸 수 있다(기본은 접힘).
+       접힘 여부는 일반 모드와 같은 body.sidebar-right-collapsed로 제어하되,
+       기억해 두는 값은 모드별로 따로다(applyCompactRightPanelState 참고).
+       폭은 창을 넓힌 만큼만 쓰도록 고정 — 늘였다 줄이는 창 폭과 어긋나면
+       목록이 찌그러지기 때문에 유동 폭(--sidebar-right-width)을 쓰지 않는다. */
+    body.compact-mode #sidebar-right {
+      width: 300px; min-width: 300px; flex-shrink: 0;
+      padding: 8px 6px;
+    }
     body.compact-mode #main-chat-panel { border-right: none; width: 100%; background: #fff; min-width: 480px; }
     body.compact-mode #chat-header {
       height: 52px; min-height: 52px; padding: 0 12px; gap: 8px;
@@ -2640,7 +2648,7 @@
     }
     .titlebar-sidebar-right-toggle-btn .icon-glyph { width: 12px; height: 12px; }
     body.sidebar-right-collapsed .titlebar-sidebar-right-toggle-btn .icon-glyph { transform: rotate(180deg); }
-    body.compact-mode .titlebar-sidebar-right-toggle-btn,
+    /* 미니 모드에서도 이 화살표로 달력 패널을 펼치고 접는다(예전엔 숨겼었다). */
     body.schedule-board-standalone .titlebar-sidebar-right-toggle-btn { display: none; }
     .titlebar-help-btn {
       -webkit-app-region: no-drag;
@@ -10255,6 +10263,9 @@
       }
       isCompactMode = desired === 'compact';
       if (isCompactMode) document.body.classList.add('compact-mode');
+      // 미니 모드로 바로 부팅한 경우에도 그 모드에 맞는 달력 패널 상태를 입힌다
+      // (applyViewMode를 거치지 않는 경로라 여기서 따로 해 줘야 한다).
+      try { applyCompactRightPanelState(isCompactMode ? 'compact' : 'normal'); } catch (e) { /* ignore */ }
       updateCompactModeButtonUi();
     }).catch(() => {});
 
@@ -10288,17 +10299,71 @@
     // 원인). 같은 이유로 여기로 옮긴다.
     let compactRecentConversationsCache = [];
     let compactRecentConversationsInFlight = null;
+    /** 미니 모드에서 달력 패널을 펼쳐 뒀는지 — 일반 모드와 따로 기억한다.
+     *  (미니 모드는 "기본은 안 보이고 눌러야 나오는" 게 요청받은 동작이라 기본값 꺼짐) */
+    const COMPACT_RIGHT_OPEN_KEY = 'compactRightPanelOpen';
+    function isCompactRightOpenSaved() {
+      try { return localStorage.getItem(COMPACT_RIGHT_OPEN_KEY) === '1'; } catch (e) { return false; }
+    }
+
     function toggleSidebarRightCollapsed(forceState) {
       const collapsed = typeof forceState === 'boolean' ? forceState : !document.body.classList.contains('sidebar-right-collapsed');
       document.body.classList.toggle('sidebar-right-collapsed', collapsed);
       const btn = document.getElementById('sidebar-right-toggle-btn');
       if (btn) btn.title = collapsed ? '병원 달력 패널 펼치기' : '병원 달력 패널 접기';
+      if (isCompactMode) {
+        // 미니 모드: 창 폭이 480px 고정이라 달력을 그냥 띄우면 목록이 찌그러진다.
+        // 달력 폭만큼 창을 넓혔다 줄이고, 기억은 미니 모드 전용 키에 남긴다.
+        try { localStorage.setItem(COMPACT_RIGHT_OPEN_KEY, collapsed ? '0' : '1'); } catch (e) {}
+        try {
+          if (window.api.setCompactRightPanel) {
+            window.api.setCompactRightPanel(!collapsed)
+              .then((res) => {
+                if (res && res.bounds) localStorage.setItem('compactWindowBounds', JSON.stringify(res.bounds));
+              })
+              .catch(() => {});
+          }
+        } catch (e) { /* 구버전 preload면 창 폭만 안 변할 뿐 나머지는 그대로 동작 */ }
+        return;
+      }
       try { localStorage.setItem(SIDEBAR_RIGHT_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    }
+
+    /** 미니/일반 모드가 바뀔 때 그 모드에 맞는 달력 패널 상태를 다시 입힌다.
+     *  창 폭은 건드리지 않는다(모드 전환 자체가 이미 창 크기를 정하기 때문) —
+     *  단, 미니 모드로 들어가며 펼침 상태였다면 그만큼 넓은 창이 필요해 한 번 맞춰 준다. */
+    function applyCompactRightPanelState(entering) {
+      const btn = document.getElementById('sidebar-right-toggle-btn');
+      if (entering === 'compact') {
+        const open = isCompactRightOpenSaved();
+        document.body.classList.toggle('sidebar-right-collapsed', !open);
+        if (btn) btn.title = open ? '병원 달력 패널 접기' : '병원 달력 패널 펼치기';
+        if (open) {
+          try {
+            if (window.api.setCompactRightPanel) window.api.setCompactRightPanel(true).catch(() => {});
+          } catch (e) { /* ignore */ }
+        }
+        return;
+      }
+      // 일반 모드로 돌아갈 때는 일반 모드에서 쓰던 값으로 되돌린다.
+      let collapsed = false;
+      try {
+        collapsed = localStorage.getItem('sidebarRightStartCollapsed') === 'true'
+          || localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1';
+      } catch (e) { /* ignore */ }
+      document.body.classList.toggle('sidebar-right-collapsed', collapsed);
+      if (btn) btn.title = collapsed ? '병원 달력 패널 펼치기' : '병원 달력 패널 접기';
     }
     // 「펼치기 전까지는 접어두기」가 켜져 있으면, 지난번에 펼쳐 둔 채로 껐어도
     // 매번 새로 시작할 땐 항상 접힌 채로 시작한다 — 눌러야만 열리게 하려는 게
     // 원래 의도라, "마지막 상태 기억"보다 이 설정이 우선한다.
-    if (localStorage.getItem('sidebarRightStartCollapsed') === 'true' || localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1') {
+    // ⚠️ 이 줄은 일반 모드 값만 다룬다. 미니 모드로 부팅한 경우(이 시점에 이미
+    // isCompactMode가 true다)에 여기서 toggleSidebarRightCollapsed를 부르면 미니 모드
+    // 전용 저장값을 '접힘'으로 덮어써, 지난번에 펼쳐 둔 달력이 매번 닫힌 채로 시작해
+    // 버린다. 미니 모드 상태는 applyCompactRightPanelState가 따로 입힌다.
+    if (!isCompactMode
+        && (localStorage.getItem('sidebarRightStartCollapsed') === 'true'
+            || localStorage.getItem(SIDEBAR_RIGHT_COLLAPSED_KEY) === '1')) {
       toggleSidebarRightCollapsed(true);
     }
 
@@ -12231,6 +12296,8 @@
       if (isCompactMode && viewResult && viewResult.bounds) {
         localStorage.setItem('compactWindowBounds', JSON.stringify(viewResult.bounds));
       }
+      // 달력 패널은 모드별로 따로 기억한다 — 미니 모드는 기본 접힘.
+      try { applyCompactRightPanelState(isCompactMode ? 'compact' : 'normal'); } catch (e) { /* ignore */ }
       updateCompactModeButtonUi();
       const ta = document.getElementById('chat-textarea');
       const enterHint = isEnterToSendEnabled() ? 'Enter 전송 · Shift+Enter 줄바꿈' : 'Ctrl+Enter 전송 · Enter 줄바꿈';

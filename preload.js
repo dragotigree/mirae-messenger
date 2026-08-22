@@ -161,6 +161,7 @@ contextBridge.exposeInMainWorld('api', {
   getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
   snapCompactWindow: (edge) => ipcRenderer.invoke('snap-compact-window', edge),
   setCompactSizePreset: (preset) => ipcRenderer.invoke('set-compact-size-preset', preset),
+  setCompactRightPanel: (open) => ipcRenderer.invoke('set-compact-right-panel', open),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
   backupChatHistory: () => ipcRenderer.invoke('backup-chat-history'),
   clearAllChatHistory: () => ipcRenderer.invoke('clear-all-chat-history'),

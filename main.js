@@ -523,6 +523,10 @@ const COMPACT_DEFAULT_WIDTH = 480;
 const COMPACT_DEFAULT_HEIGHT = 680;
 const COMPACT_MIN_WIDTH = 480;
 const COMPACT_MIN_HEIGHT = 520;
+/** 미니 모드에서 오른쪽 「병원 달력」 패널을 펼쳤을 때 늘어나는 폭.
+ *  미니 모드 본체(480px)는 그대로 두고 이 폭만큼 창을 넓혔다 줄인다 — 목록이
+ *  좁아져 못 쓰게 되는 걸 막기 위함. 일반 모드 달력과 같은 폭이라 렌더가 그대로 맞는다. */
+const COMPACT_RIGHT_PANEL_WIDTH = 300;
 const NORMAL_MIN_WIDTH = 1040;
 const NORMAL_MIN_HEIGHT = 600;
 
@@ -14847,6 +14851,36 @@ ipcMain.handle('set-compact-size-preset', async (event, preset) => {
   mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
   mainWindow.setBounds(bounds);
   return { success: true, bounds, preset: String(preset || 'normal') };
+});
+
+/** 미니 모드 오른쪽 달력 패널을 펼치거나 접을 때 창 폭을 함께 조절한다.
+ *  미니 모드 창은 최소·기본 폭이 480px라, 그 안에서 300px짜리 달력을 그냥 띄우면
+ *  목록이 180px로 찌그러져 못 쓴다. 그래서 본체 폭은 건드리지 않고 달력 폭만큼
+ *  창을 넓혔다가(펼칠 때) 다시 줄인다(접을 때). 최소 폭도 같이 올려 두어야
+ *  사용자가 창을 줄여 달력이나 목록이 뭉개지는 걸 막을 수 있다. */
+ipcMain.handle('set-compact-right-panel', async (event, open) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (currentViewMode !== 'compact') return { success: false, error: 'not-compact' };
+  const wantOpen = !!open;
+  const minW = wantOpen ? COMPACT_MIN_WIDTH + COMPACT_RIGHT_PANEL_WIDTH : COMPACT_MIN_WIDTH;
+  prepareWindowForBoundsChange();
+  // ⚠️ 최소 폭을 먼저 줄여 두지 않으면(접을 때) setBounds가 옛 최소 폭에 걸려 안 줄어든다.
+  if (!wantOpen) mainWindow.setMinimumSize(COMPACT_MIN_WIDTH, COMPACT_MIN_HEIGHT);
+  const cur = mainWindow.getBounds();
+  // ⚠️ 실사고: 예전엔 펼칠 때 무조건 +300을 더했는데, 미니 모드로 되돌아올 때 복원되는
+  // 저장 폭에 이미 달력 몫이 들어 있어서 300px이 두 번 더해졌다(창이 1080px로 벌어짐).
+  // 펼칠 때는 "더한다"가 아니라 "달력이 들어갈 만큼은 확보한다"로 계산해서, 이미 충분히
+  // 넓으면 그대로 두고 몇 번을 불러도 결과가 같게(멱등) 만든다.
+  const targetWidth = wantOpen
+    ? Math.max(minW, cur.width)
+    : Math.max(COMPACT_MIN_WIDTH, cur.width - COMPACT_RIGHT_PANEL_WIDTH);
+  const bounds = clampBoundsToWorkArea(
+    { x: cur.x, y: cur.y, width: targetWidth, height: cur.height },
+    { minWidth: minW, minHeight: COMPACT_MIN_HEIGHT, defaultWidth: targetWidth, defaultHeight: cur.height }
+  );
+  mainWindow.setBounds(bounds);
+  if (wantOpen) mainWindow.setMinimumSize(minW, COMPACT_MIN_HEIGHT);
+  return { success: true, bounds, open: wantOpen };
 });
 
 ipcMain.handle('set-window-view-mode', async (event, mode, savedBounds) => {
