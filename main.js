@@ -7114,6 +7114,13 @@ function persistKnownUserSnapshot(u) {
 }
 
 function loadPersistedKnownUsers(callback, onQuick) {
+  // 🩺 진단용(속도) — "부팅이 느리다"는 신고의 원인 후보로 이 known_users 복구 체인
+  // (loadPersistedKnownUsers -> supplementKnownUsersFromMessagePeers ->
+  // repairKnownUsersFromMessages -> repairKnownUsersProfiles)을 지목했다. 이 체인은 매
+  // 부팅마다 messages 테이블 전체를 훑고, 정보가 부족한 사용자마다 쿼리를 하나씩 더
+  // 날리는 N+1 패턴이라 대화 이력이 쌓일수록 느려질 수 있다. 실제로 어느 단계가 얼마나
+  // 걸리는지 정확한 시간을 남겨 다음 느림 신고 때 로그로 확인한다.
+  const __t0 = Date.now();
   db.all(
     `SELECT * FROM known_users WHERE ip != ?`,
     [MY_IP],
@@ -7135,14 +7142,20 @@ function loadPersistedKnownUsers(callback, onQuick) {
           allKnownUsers.set(row.ip, applyStoredProfileOverride({ ...fromDb, online: onlineUsers.has(row.ip) }));
         }
       });
+      writeToLogFile('info', `[진단-속도] known_users 로드(${(rows || []).length}건) ${Date.now() - __t0}ms`);
       // known_users 캐시만으로도 목록을 바로 보여준다 — 메시지 보강(N+1 쿼리)은 백그라운드에서 이어서 처리
       if (onQuick) onQuick();
-      supplementKnownUsersFromMessagePeers(callback);
+      const __t1 = Date.now();
+      supplementKnownUsersFromMessagePeers(() => {
+        writeToLogFile('info', `[진단-속도] known_users 복구 체인 전체(메시지 보강+repair) ${Date.now() - __t1}ms`);
+        if (callback) callback();
+      });
     }
   );
 }
 
 function supplementKnownUsersFromMessagePeers(callback) {
+  const __ts = Date.now();
   db.all(
     `SELECT m.ip, m.last_ts, (
        SELECT sender_name FROM messages
@@ -7166,6 +7179,7 @@ function supplementKnownUsersFromMessagePeers(callback) {
      ) m`,
     [MY_IP, MY_IP],
     (err, rows) => {
+      writeToLogFile('info', `[진단-속도] 메시지 상대 보강 쿼리(${(rows || []).length}건) ${Date.now() - __ts}ms`);
       if (err) {
         logDbErr(err);
         if (callback) callback();
@@ -7222,7 +7236,17 @@ function supplementKnownUsersFromMessagePeers(callback) {
         allKnownUsers.set(row.ip, applyStoredProfileOverride(stub));
         persistKnownUserSnapshot(stub);
       });
-      repairKnownUsersFromMessages(() => repairKnownUsersProfiles(callback));
+      const __tForeachDone = Date.now();
+      writeToLogFile('info', `[진단-속도] 메시지 상대 보강 forEach 처리 ${__tForeachDone - __ts}ms (쿼리 포함)`);
+      const __tRepair = Date.now();
+      repairKnownUsersFromMessages(() => {
+        const __tRepairFromMsgs = Date.now();
+        writeToLogFile('info', `[진단-속도] repairKnownUsersFromMessages ${__tRepairFromMsgs - __tRepair}ms`);
+        repairKnownUsersProfiles(() => {
+          writeToLogFile('info', `[진단-속도] repairKnownUsersProfiles ${Date.now() - __tRepairFromMsgs}ms`);
+          if (callback) callback();
+        });
+      });
     }
   );
 }
