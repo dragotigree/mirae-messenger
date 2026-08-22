@@ -677,9 +677,11 @@
     .user-search-box input:focus { border-color: rgba(33, 150, 243, 0.45); background: #ffffff; box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.12); }
     .user-search-box input::placeholder { color: var(--text-muted); }
 
-    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트 */
+    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트.
+       ⚠️ 실사고: nowrap이라 미니 모드처럼 좁은 창에서는 "공용/숨김" 세그먼트가 스크롤도
+       안 되는 채로 화면 밖에 묻혀 아예 누를 수 없었다. 줄바꿈으로 항상 다 보이게 한다. */
     .sidebar-list-prefs {
-      display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
+      display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px;
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-list-prefs-footer {
@@ -701,7 +703,7 @@
       flex: 0 0 auto;
     }
     .sidebar-pref-seg {
-      display: inline-flex; align-items: stretch; flex: 1 1 0; min-width: 0;
+      display: inline-flex; align-items: stretch; flex: 1 1 108px; min-width: 108px;
       border-radius: 8px; overflow: hidden;
       border: 1px solid var(--border);
       background: var(--surface-muted);
@@ -2399,11 +2401,14 @@
     .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .compact-pane[hidden] { display: none !important; }
 
-    .compact-filter-row { display: flex; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
-    .compact-filter-row::-webkit-scrollbar { display: none; }
+    /* ⚠️ 실사고: 예전엔 overflow-x:auto + 스크롤바 숨김이라, 창이 좁으면 "부서/층"
+       선택상자가 화면 밖으로 밀려도 옆으로 더 있다는 표시가 전혀 없어 아예 못 눌렀다.
+       옆으로 스크롤해서 "찾아야" 하는 대신 줄바꿈으로 항상 다 보이게 바꿨다. */
+    .compact-filter-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; }
     .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
     .compact-filter-chip.is-active { background: var(--accent); color: #fff; }
+    .compact-pane-title { font-size: 15px; font-weight: 700; color: var(--text-primary); padding: 14px 16px 6px; }
     /* 미니 모드 직원 탭 — 부서·층 필터를 칩과 같은 알약 모양으로 통일해 한 줄에 둔다 */
     .compact-filter-row { align-items: center; }
     .compact-filter-divider {
@@ -5516,9 +5521,11 @@
         </button>
         <button type="button" class="compact-rail-btn" data-rail="favorites" onclick="setCompactRailTab('favorites')" title="즐겨찾기">
           <span class="compact-rail-icon" data-ui-icon="star"></span>
+          <span class="unread-badge compact-rail-badge" id="compact-rail-favorites-badge" style="display:none;">0</span>
         </button>
         <button type="button" class="compact-rail-btn" data-rail="groups" onclick="setCompactRailTab('groups')" title="그룹채팅방">
           <span class="compact-rail-icon" data-ui-icon="hash"></span>
+          <span class="unread-badge compact-rail-badge" id="compact-rail-groups-badge" style="display:none;">0</span>
         </button>
         <button type="button" class="compact-rail-btn" onclick="openScheduleBoardModal()" title="병동 일정 현황판">
           <span class="compact-rail-icon" data-ui-icon="clipboardList"></span>
@@ -5606,9 +5613,19 @@
           </div>
         </div>
         <div class="compact-pane" data-compact-pane="favorites" hidden>
+          <div class="compact-pane-title">⭐ 즐겨찾기</div>
+          <div class="compact-search">
+            <span class="compact-search-icon" data-ui-icon="search"></span>
+            <input type="text" id="compact-search-input-favorites" placeholder="즐겨찾기 검색" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
+          </div>
           <div id="compact-favorites-list-items"></div>
         </div>
         <div class="compact-pane" data-compact-pane="groups" hidden>
+          <div class="compact-pane-title"># 그룹채팅방</div>
+          <div class="compact-search">
+            <span class="compact-search-icon" data-ui-icon="search"></span>
+            <input type="text" id="compact-search-input-groups" placeholder="그룹채팅방 검색" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
+          </div>
           <div id="compact-groups-list-items"></div>
         </div>
         <div id="compact-multi-select-bar" class="compact-multi-select-bar" aria-live="polite">
@@ -10959,6 +10976,18 @@
       return (users || []).reduce((sum, u) => sum + getUnreadForUser(u), 0);
     }
 
+    /** 미니 모드 왼쪽 아이콘 레일의 채팅·즐겨찾기·그룹채팅방 배지를 한 번에 갱신한다.
+     *  즐겨찾기·그룹채팅방은 그 안에 안읽은 메시지가 있어도 지금까지 레일 아이콘만 봐서는
+     *  전혀 알 수 없었다(그 탭을 직접 눌러야만 보였음). */
+    function refreshCompactRailBadges() {
+      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      const isFavoriteUser = (u) => favoriteIps.has(u.ip) || (u.aliasIps || []).some((ip) => favoriteIps.has(ip));
+      const favUsers = (allUsers || []).filter(isFavoriteUser);
+      setBadgeEl(document.getElementById('compact-rail-favorites-badge'), sumUnreadForUsers(favUsers));
+      const groupsUnread = (myGroupChats || []).reduce((sum, g) => sum + (unreadCounts[`GROUP:${g.uid}`] || 0), 0);
+      setBadgeEl(document.getElementById('compact-rail-groups-badge'), groupsUnread);
+    }
+
     function getGroupHeaderUnread(groupingKey, groupName, groupUsers) {
       let total = sumUnreadForUsers(groupUsers);
       if (groupingKey === 'dept') total += getUnreadCount(`DEPT:${groupName}`);
@@ -11165,7 +11194,7 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
-      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      refreshCompactRailBadges();
       if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
       else if (sidebarUnreadOnly) {
         lastUserListStructureKey = '';
@@ -12103,7 +12132,7 @@
       if (compact && !hasChat) {
         setCompactRailTab(compactRailTab);
       } else if (compact && hasChat) {
-        setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+        refreshCompactRailBadges();
       }
       pushToastUiState();
     }
@@ -12443,7 +12472,10 @@
     }
 
     function focusCompactSearchInput() {
-      const id = compactRailTab === 'friends' ? 'compact-search-input-friends' : 'compact-search-input';
+      const id = compactRailTab === 'friends' ? 'compact-search-input-friends'
+        : compactRailTab === 'favorites' ? 'compact-search-input-favorites'
+        : compactRailTab === 'groups' ? 'compact-search-input-groups'
+        : 'compact-search-input';
       document.getElementById(id)?.focus();
     }
 
@@ -13135,7 +13167,7 @@
         renderCompactStaffDirectory(container);
       }
 
-      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      refreshCompactRailBadges();
       syncCompactFilterChipUi();
       syncCompactDeptFloorFilterUi();
       pruneSidebarUserSelection();
@@ -13147,6 +13179,13 @@
     async function renderCompactFilteredConversations(container, filterFn, emptyText, sortByFavorites) {
       const recent = await loadCompactRecentConversations(true);
       let rows = buildCompactConversationRows(recent).filter(filterFn);
+      if (userFilterKeyword) {
+        const q = userFilterKeyword;
+        rows = rows.filter((r) =>
+          String(r.name || '').toLowerCase().includes(q) ||
+          String(r.searchText || '').toLowerCase().includes(q)
+        );
+      }
       if (sortByFavorites) {
         const orderIndex = new Map(favoritesOrderList.map((ip, i) => [ip, i]));
         rows.sort((a, b) => {
@@ -13191,9 +13230,13 @@
       const mainInput = document.getElementById('user-search-input');
       const compactInput = document.getElementById('compact-search-input');
       const compactFriendsInput = document.getElementById('compact-search-input-friends');
+      const compactFavoritesInput = document.getElementById('compact-search-input-favorites');
+      const compactGroupsInput = document.getElementById('compact-search-input-groups');
       if (mainInput && mainInput.value !== v) mainInput.value = v || '';
       if (compactInput && compactInput.value !== v) compactInput.value = v || '';
       if (compactFriendsInput && compactFriendsInput.value !== v) compactFriendsInput.value = v || '';
+      if (compactFavoritesInput && compactFavoritesInput.value !== v) compactFavoritesInput.value = v || '';
+      if (compactGroupsInput && compactGroupsInput.value !== v) compactGroupsInput.value = v || '';
       const clearBtn = document.getElementById('compact-search-clear');
       if (clearBtn) clearBtn.style.display = userFilterKeyword ? 'flex' : 'none';
       sidebarSearchNavIndex = -1;
@@ -16471,7 +16514,7 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
-      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      refreshCompactRailBadges();
       syncSidebarUserSelectionUi();
       return true;
     }
@@ -16587,7 +16630,7 @@
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
       refreshIconRailBadges();
       setBadgeEl(document.getElementById('dm-section-unread-badge'), getDmSectionUnread());
-      setBadgeEl(document.getElementById('compact-rail-chat-badge'), getTotalUnread());
+      refreshCompactRailBadges();
       pruneSidebarUserSelection();
       syncSidebarInboxBar();
     }
