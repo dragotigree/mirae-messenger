@@ -2346,9 +2346,17 @@
        폭은 창을 넓힌 만큼만 쓰도록 고정 — 늘였다 줄이는 창 폭과 어긋나면
        목록이 찌그러지기 때문에 유동 폭(--sidebar-right-width)을 쓰지 않는다. */
     body.compact-mode #sidebar-right {
-      width: 300px; min-width: 300px; flex-shrink: 0;
+      width: 240px; min-width: 240px; flex-shrink: 0;
       padding: 8px 6px;
     }
+    /* ⚠️ 실사고: 달력을 펼치면 창을 그만큼 넓히는데(set-compact-right-panel), 그 창 넓히기가
+       어떤 이유로든 실패하면(구버전 preload라 API가 없는 등) 목록·대화 영역의 min-width
+       480px에 막혀 달력이 창 밖으로 밀려나 아예 안 보였다 — 화살표를 눌러도 아무 반응이
+       없는 것처럼 보이고, 창을 손으로 넓혀야만 나타났다(신고 내용과 일치).
+       달력이 펼쳐져 있는 동안에는 이 최소 폭을 풀어, 창이 안 늘어나도 목록이 줄어들면서
+       달력이 항상 화면 안에 보이게 한다(창이 정상적으로 넓어지면 목록은 원래 폭 그대로). */
+    body.compact-mode:not(.sidebar-right-collapsed) #main-chat-panel,
+    body.compact-mode:not(.sidebar-right-collapsed) #compact-list-view { min-width: 0; }
     body.compact-mode #main-chat-panel { border-right: none; width: 100%; background: #fff; min-width: 480px; }
     body.compact-mode #chat-header {
       height: 52px; min-height: 52px; padding: 0 12px; gap: 8px;

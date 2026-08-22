@@ -526,7 +526,7 @@ const COMPACT_MIN_HEIGHT = 520;
 /** 미니 모드에서 오른쪽 「병원 달력」 패널을 펼쳤을 때 늘어나는 폭.
  *  미니 모드 본체(480px)는 그대로 두고 이 폭만큼 창을 넓혔다 줄인다 — 목록이
  *  좁아져 못 쓰게 되는 걸 막기 위함. 일반 모드 달력과 같은 폭이라 렌더가 그대로 맞는다. */
-const COMPACT_RIGHT_PANEL_WIDTH = 300;
+const COMPACT_RIGHT_PANEL_WIDTH = 240;
 const NORMAL_MIN_WIDTH = 1040;
 const NORMAL_MIN_HEIGHT = 600;
 
