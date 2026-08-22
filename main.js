@@ -6221,6 +6221,20 @@ function registerGlobalShortcuts() {
     openMainWindowKeepingMode();
     safeWebContentsSend('trigger-focus-people-search');
   });
+  // ⚠️ 실사고: 검색으로 메인 창을 불러오는 단축키(렌더러 안의 Ctrl+Shift+F)는 메인 창
+  // 렌더러 안에서만 keydown으로 잡혀 있어서, "채팅을 새 창으로 열기"로 띄운 별도 채팅
+  // 창(openChatWindow)이나 현황판·공지사항 창에 포커스가 가 있을 때는 아무 반응이
+  // 없었다("채팅하다가 눌러도 검색이 안 된다"는 신고의 원인). 이걸 전역 단축키로
+  // 등록하려면 Ctrl+Shift+F 그대로 쓰고 싶었지만, 그 조합은 다른 프로그램(문서
+  // 편집기·EMR 등)에서도 흔히 "찾기"로 쓰여서 전역으로 뺏으면 이 메신저가 켜져 있는
+  // 동안 다른 프로그램에서 그 기능이 먹통이 될 위험이 있다. Ctrl+Alt+S·Ctrl+Alt+E와
+  // 같은 계열의 덜 흔한 조합(Ctrl+Alt+F)을 새로 써서, 어느 창에 포커스가 있든 항상
+  // 먹히면서도 다른 프로그램과 부딪힐 위험은 낮춘다. 메인 창 안에서 쓰던 Ctrl+Shift+F는
+  // 그대로 남겨 둔다(메인 창에 포커스가 있을 때는 계속 그 키로도 된다).
+  tryRegister('CommandOrControl+Alt+F', () => {
+    openMainWindowKeepingMode();
+    safeWebContentsSend('trigger-focus-people-search');
+  });
   // 트레이 메뉴에는 "전체 대화 기록 열기 (Ctrl+Alt+E)"라고 안내가 있었지만, 정작 이
   // 단축키를 실제로 등록하는 코드가 없었다 — 메뉴를 클릭할 때만 동작하고, 단축키를
   // 누르면 아무 일도 일어나지 않는 상태였다.
