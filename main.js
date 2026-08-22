@@ -1239,6 +1239,18 @@ function isMessengerUsageBlocked() {
   return localUsageDisabled || isServicePauseLocked();
 }
 
+/** ⚠️ 실사고: 예전엔 "사용 중지(잠금)"를 걸면 접속 신호(PING)까지 완전히 끊겨서, 그
+ * PC가 관리자의 "접속 PC" 목록에서 영원히 오프라인으로만 보였다. 그러면 강제 업데이트
+ * (수동이든, 방금 만든 자동 구버전 업데이트든)가 전부 "온라인 목록"만 대상으로 하기
+ * 때문에, 한 번 잠근 PC는 이후 절대 원격으로 손댈 수 없는 상태가 됐다(관리자가 그
+ * PC 위치를 몰라 자리에서 직접 갱신도 못 하는 경우 특히 문제). 메시지 사용 금지는
+ * 그대로 유지하되, 접속 신호만은 계속 보내서 목록에 "잠김"으로 표시되고 강제 업데이트
+ * 대상이 될 수 있게 한다. 서비스 전체 일시중지는 별개 기능(모두에게 적용)이라 그대로
+ * 프레즌스도 차단한다. */
+function isPresenceBlocked() {
+  return isServicePauseLocked();
+}
+
 function getServicePauseState() {
   return {
     enabled: !!servicePause.enabled,
@@ -1301,7 +1313,7 @@ function notifyServicePauseState() {
 }
 
 function applyServicePausePresenceSideEffects() {
-  if (isMessengerUsageBlocked()) {
+  if (isPresenceBlocked()) {
     try { broadcastGoodbye(); } catch (_) {}
     onlineUsers.delete(MY_IP);
     registerSelf();
@@ -4419,7 +4431,7 @@ db.serialize(() => {
             reason: row.reason || ''
           };
         }
-        if (isMessengerUsageBlocked()) {
+        if (isPresenceBlocked()) {
           try { broadcastGoodbye(); } catch (_) {}
           onlineUsers.delete(MY_IP);
         }
@@ -6719,7 +6731,7 @@ function collectPresenceHeartbeatIps() {
 function broadcastPresence(socket) {
   if (!socket) return;
   if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
-  if (isMessengerUsageBlocked()) return; // 사용 중지·서비스 일시중지 시 접속 신호를 보내지 않음
+  if (isPresenceBlocked()) return; // 서비스 전체 일시중지 시에만 접속 신호를 보내지 않음(개별 잠금은 목록 표시를 위해 계속 보냄)
   const packet = Buffer.from(JSON.stringify({
     type: 'PING',
     username: myProfile.username,
@@ -6762,7 +6774,7 @@ function broadcastPresence(socket) {
 function sendPresencePingUnicast(ip) {
   if (!globalUdpSocket || !ip) return;
   if (!profileLoaded) return;
-  if (isMessengerUsageBlocked()) return;
+  if (isPresenceBlocked()) return;
   if (Date.now() < udpStormUntil) return; // 수신 UDP 폭주 중엔 자제 (broadcastPresence와 동일 기준)
   const packet = Buffer.from(JSON.stringify({
     type: 'PING',
@@ -13990,11 +14002,12 @@ function notifyUsageLockState() {
 function applyLocalUsageDisabled(disabled, meta) {
   const was = localUsageDisabled;
   persistLocalUsageLock(!!disabled, meta || {});
-  if (disabled) {
-    try { broadcastGoodbye(); } catch (_) {}
-    onlineUsers.delete(MY_IP);
-    registerSelf();
-  } else if (was) {
+  // ⚠️ 실사고: 예전엔 여기서 잠글 때 broadcastGoodbye()로 접속 신호까지 끊어버렸다.
+  // 그러면 이 PC는 "접속 PC" 목록에서 영원히 오프라인으로만 보여 이후 원격 강제
+  // 업데이트 대상이 될 수 없었다(관리자가 위치를 몰라 자리에서 직접 갱신도 못 하면
+  // 완전히 손 못 대는 PC가 된다). 이제 메시지 사용 금지는 유지하되, 접속 신호는
+  // 계속 보내 목록에 "잠김"으로 표시되고 강제 업데이트는 여전히 걸 수 있게 한다.
+  if (!disabled && was) {
     registerSelf();
     if (globalUdpSocket) broadcastPresence(globalUdpSocket);
   }

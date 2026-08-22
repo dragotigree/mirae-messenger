@@ -19448,7 +19448,7 @@
         : { icon: '🔒', label: '사용 중지', cls: 'is-danger', run: () => openMasterUsageLockModal({ targetIp: ip, name: nameText, isMe, disabled: true }) });
       items.push({ icon: '🗑️', label: wipePending ? '삭제 재예약' : '로그 삭제', cls: 'is-danger', run: () => openMasterWipeLogsModal({ targetIp: ip, name: nameText, isMe }) });
       if (wipePending) items.push({ icon: '↩️', label: '삭제 예약 취소', run: () => cancelPendingRemoteWipeForIp(ip) });
-      if (u.online && !usageDisabled) items.push({ icon: '⚡', label: '강제 업데이트', cls: 'is-danger', run: () => openMasterForceUpdateModal({ targetIp: ip, name: nameText, isMe }) });
+      if (u.online) items.push({ icon: '⚡', label: '강제 업데이트', cls: 'is-danger', run: () => openMasterForceUpdateModal({ targetIp: ip, name: nameText, isMe }) });
 
       menu.innerHTML = `<div class="ctx-menu-item" style="font-weight:800; color:#94a3b8; font-size:11px; cursor:default;" onclick="event.stopPropagation()">${escapeHtml(nameText)} (${escapeHtml(ip)})</div>` +
         items.map((it, i) => `<div class="ctx-menu-item${it.cls ? ' ' + it.cls : ''}" data-idx="${i}">${it.icon} ${escapeHtml(it.label)}</div>`).join('');
