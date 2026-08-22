@@ -4999,6 +4999,10 @@ function buildTrayContextMenu() {
       }
     },
     {
+      label: '다운로드 폴더 열기',
+      click: () => { shell.openPath(getReceivedFilesDir()); }
+    },
+    {
       label: '현황판 열기',
       click: () => { openScheduleBoardWindow({}).catch(() => {}); }
     },
@@ -5105,15 +5109,27 @@ function setupJumpList() {
       },
       {
         type: 'custom',
-        name: '빠른 실행',
+        name: '대화',
         items: [
           buildJumpListTask('쪽지 보내기', '채팅방 없이 쪽지를 보냅니다', 'send-note'),
+          buildJumpListTask('그룹 만들기', '새 그룹 채팅을 만듭니다', 'open-group-chat'),
+          buildJumpListTask('전체 대화 기록', '전체 대화 기록을 엽니다', 'open-all-logs')
+        ]
+      },
+      {
+        type: 'custom',
+        name: '게시판',
+        items: [
           buildJumpListTask('원내 공지', '원내 공지사항을 엽니다', 'open-board'),
           buildJumpListTask('전체 공지 채널', '전체 공지 채널을 엽니다', 'open-broadcast'),
+          buildJumpListTask('병동 일정 현황판', '병동 일정 현황판을 엽니다', 'open-schedule-board')
+        ]
+      },
+      {
+        type: 'custom',
+        name: '기타',
+        items: [
           buildJumpListTask('이동기사 요청', '이동기사 요청을 엽니다', 'open-transport'),
-          buildJumpListTask('병동 일정 현황판', '병동 일정 현황판을 엽니다', 'open-schedule-board'),
-          buildJumpListTask('그룹 만들기', '새 그룹 채팅을 만듭니다', 'open-group-chat'),
-          buildJumpListTask('전체 대화 기록', '전체 대화 기록을 엽니다', 'open-all-logs'),
           buildJumpListTask('환경 설정', '환경 설정을 엽니다', 'open-settings')
         ]
       },
