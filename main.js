@@ -7506,14 +7506,25 @@ function notifyUserList(force) {
   if (force) notifyUserListForce = true;
   if (notifyUserListTimer) return;
   notifyUserListTimer = setTimeout(() => {
+    // 🩺 진단용(속도) — presenceSweepTick 자체는 안 무거운 것으로 확인됐다. 다음 후보로
+    // 오프라인 처리 직후 매번 실행되는 이 함수(목록 재구성+렌더러 전송)를 지목해 실제
+    // 걸리는 시간을 잰다.
+    const __t0 = Date.now();
     notifyUserListTimer = null;
     const forced = notifyUserListForce;
     notifyUserListForce = false;
     const list = buildDirectoryUserList();
+    const __tBuilt = Date.now();
     notifyChatWindows('user-list-update', list);
+    const __tChatWin = Date.now();
     if (!mainWindow || mainWindow.isDestroyed()) return;
     safeWebContentsSend('user-list-update', list);
+    const __tSend = Date.now();
     notifyNetworkStatus();
+    const __dt = Date.now() - __t0;
+    if (__dt > 300) {
+      writeToLogFile('warn', `[진단] notifyUserList 총 ${__dt}ms (인원 ${list.length}) — buildDirectoryUserList ${__tBuilt - __t0}ms, notifyChatWindows ${__tChatWin - __tBuilt}ms, safeWebContentsSend ${__tSend - __tChatWin}ms, notifyNetworkStatus ${Date.now() - __tSend}ms`);
+    }
     if (forced) { /* keep API compatible */ }
   }, USER_LIST_NOTIFY_DEBOUNCE_MS);
 }
