@@ -4855,9 +4855,19 @@ db.serialize(() => {
       if (globalUdpSocket) broadcastPresence(globalUdpSocket);
     }
     loadProfileOverrides(() => {
+      // 🩺 진단용 — "부팅할 때마다 소부서·비고가 자꾸 풀린다"는 반복 신고의 원인을 아직
+      // 못 찾았다. 부팅 시점에 이 PC가 실제로 들고 있는 override 목록을 로그에 남겨,
+      // DB에서부터 이미 비어 있는 건지(저장 자체가 안 된 것) 아니면 재적용 단계에서
+      // 지워지는 건지 다음 재현 때 로그로 구분한다.
+      writeToLogFile('info', `[진단] 부팅 시 profileOverrides ${profileOverrides.size}건: ${JSON.stringify([...profileOverrides.values()].map((ov) => ({ ip: ov.ip, subDept: ov.subDept, note: ov.note, updatedAt: ov.updatedAt })))}`);
       loadPersistedKnownUsers(() => {
         profileOverrides.forEach((ov) => refreshUserAfterProfileOverride(ov.ip));
         notifyUserList();
+        const check = [...profileOverrides.keys()].map((ip) => {
+          const u = allKnownUsers.get(ip);
+          return { ip, subDept: u && u.subDept, note: u && u.note };
+        });
+        writeToLogFile('info', `[진단] 부팅 완료 후 allKnownUsers 반영 상태: ${JSON.stringify(check)}`);
       }, () => notifyUserListNow());
     });
     setTimeout(() => flushAllPendingOutboundMessages(), 1500);

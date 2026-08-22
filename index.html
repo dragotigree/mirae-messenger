@@ -678,10 +678,12 @@
     .user-search-box input::placeholder { color: var(--text-muted); }
 
     /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트.
-       ⚠️ 실사고: nowrap이라 미니 모드처럼 좁은 창에서는 "공용/숨김" 세그먼트가 스크롤도
-       안 되는 채로 화면 밖에 묻혀 아예 누를 수 없었다. 줄바꿈으로 항상 다 보이게 한다. */
+       ⚠️ 실사고: 한 번 flex-wrap:wrap으로 바꿔봤는데, 실제 사이드바 너비에서는 살짝만
+       모자라도 "N" 세그먼트 하나만 덜렁 다음 줄로 떨어져 오히려 더 어색해 보였다(화면이
+       깨진 것처럼 보인다는 신고). 실제 사용 폭에서는 원래 nowrap으로도 문제가 없었으므로
+       되돌린다 — 미니 모드의 진짜 최소 창 크기(480px)에서는 한 줄에 다 들어감을 이미 확인했다. */
     .sidebar-list-prefs {
-      display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px;
+      display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-list-prefs-footer {
@@ -703,7 +705,7 @@
       flex: 0 0 auto;
     }
     .sidebar-pref-seg {
-      display: inline-flex; align-items: stretch; flex: 1 1 108px; min-width: 108px;
+      display: inline-flex; align-items: stretch; flex: 1 1 0; min-width: 0;
       border-radius: 8px; overflow: hidden;
       border: 1px solid var(--border);
       background: var(--surface-muted);
@@ -789,8 +791,7 @@
       gap: 8px; padding: 3px 8px; margin: 0 2px 1px 2px; align-items: center; min-height: 0;
       border-radius: var(--radius-md);
     }
-    #sidebar-left .user-card-item.is-offline { opacity: 0.52; }
-    #sidebar-left .user-card-item.is-offline:hover { opacity: 0.82; }
+    #sidebar-left .user-card-item.is-offline { opacity: 1; }
     #sidebar-left .user-card-body { line-height: 1.25; padding-top: 0; }
     #sidebar-left .user-name-text {
       font-size: var(--sidebar-item-font-size);
@@ -909,8 +910,7 @@
     .compact-multi-select-bar .ums-btn-clear { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
     .compact-multi-select-bar .ums-btn-msg { background: #fff; color: var(--accent-dark); border: 1px solid #90CAF9; }
     .compact-multi-select-bar .ums-btn-group { background: var(--accent-dark); color: #fff; }
-    .user-card-item.is-offline { opacity: 0.5; }
-    .user-card-item.is-offline:hover { opacity: 0.82; }
+    .user-card-item.is-offline { opacity: 1; }
     .user-card-body { flex: 1; min-width: 0; line-height: 1.25; }
     .user-card-unread { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; min-width: 20px; padding-left: 6px; }
     .user-name-text { font-weight: 600; font-size: 12.5px; color: var(--sidebar-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2401,10 +2401,8 @@
     .compact-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .compact-pane[hidden] { display: none !important; }
 
-    /* ⚠️ 실사고: 예전엔 overflow-x:auto + 스크롤바 숨김이라, 창이 좁으면 "부서/층"
-       선택상자가 화면 밖으로 밀려도 옆으로 더 있다는 표시가 전혀 없어 아예 못 눌렀다.
-       옆으로 스크롤해서 "찾아야" 하는 대신 줄바꿈으로 항상 다 보이게 바꿨다. */
-    .compact-filter-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; }
+    .compact-filter-row { display: flex; gap: 6px; padding: 8px 14px; flex-shrink: 0; background: #fff; overflow-x: auto; scrollbar-width: none; }
+    .compact-filter-row::-webkit-scrollbar { display: none; }
     .compact-filter-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 99px; border: none; background: var(--surface-muted); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: background 0.12s, color 0.12s; }
     .compact-filter-chip:hover { color: var(--text-primary); background: var(--border-soft); }
     .compact-filter-chip.is-active { background: var(--accent); color: #fff; }
@@ -2499,8 +2497,7 @@
     .compact-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin: 0; cursor: pointer; transition: background 0.1s; min-height: 56px; border-bottom: none; position: relative; background: #fff; border-radius: 0; box-shadow: none; }
     .compact-list-item:hover { background: var(--surface-muted); }
     .compact-list-item.is-active { background: var(--sidebar-active); }
-    .compact-list-item.is-offline { opacity: 0.72; }
-    .compact-list-item.is-offline .compact-item-name { color: var(--text-muted); }
+    .compact-list-item.is-offline { opacity: 1; }
     .compact-list-item .unread-badge { min-width: 20px; height: 20px; font-size: 10px; font-weight: 700; box-shadow: none; background: var(--compact-accent); flex-shrink: 0; }
     .compact-avatar { position: relative; width: 46px; height: 46px; border-radius: 50%; background: var(--sidebar-active); color: var(--accent-dark); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; box-shadow: none; overflow: hidden; }
     .compact-avatar-broadcast { background: #475569; color: #fff; font-size: 14px; }
