@@ -191,6 +191,12 @@ let masterSessionActive = false;
 let masterSessionToken = '';
 let masterSessionHolderIp = '';
 let masterSessionAt = 0;
+/** 관리자가 자리에 없거나 구버전 PC가 어디 있는지 몰라 수동으로 강제 업데이트를 못 시키는
+ * 문제 — 이 기능을 켜두면, 구버전 PC가 접속하는 그 순간 자동으로 강제 업데이트를 보낸다.
+ * 비밀번호는 디스크에 저장하지 않고 메모리에만 두며, 로그아웃하거나 기능을 끄면 지운다. */
+let autoOutdatedUpdateEnabled = false;
+let autoOutdatedUpdatePassword = '';
+const autoOutdatedUpdateAttempted = new Map(); // ip -> 마지막 시도 시각(ms)
 /** 이 PC 메신저 사용 중지(잠금) — true면 접속·프레즌스 중단, 마스터 인증으로만 해제 */
 let localUsageDisabled = false;
 let localUsageLockMeta = { disabledAt: '', disabledByIp: '', reason: '' };
@@ -6546,6 +6552,9 @@ function startUdpDiscovery() {
               at: masterSessionAt
             });
           }
+          // 관리자가 자리를 비웠거나 이 PC가 어디 있는지 몰라도, "자동 구버전 업데이트"가
+          // 켜져 있으면 접속하는 순간 바로 강제 업데이트를 보낸다.
+          maybeAutoForceUpdateOutdatedPeer(rinfo.address, data.appVersion);
           // ⚠️ 실사고: 작성 권한자(notice_operators) 계정도 profileOverrides와 똑같은 구멍이
           // 있었다. OPERATOR_ADD는 "추가하는 그 순간 온라인인 PC"에만 브로드캐스트되고,
           // 그 뒤로는 상대방이 재접속할 때 "네 데이터를 나에게 보내 달라"고 요청(pull)만
@@ -11822,9 +11831,53 @@ function handleMasterSessionState(payload) {
   masterSessionAt = at;
   if (masterSessionActive && holderIp !== MY_IP) {
     masterSessionActive = false;
+    autoOutdatedUpdateEnabled = false;
+    autoOutdatedUpdatePassword = '';
     safeWebContentsSend('master-session-kicked', { byIp: holderIp });
   }
 }
+
+/** 관리자가 물리적으로 어디 있는지 모르는 구버전 PC까지 챙길 수 있도록, 그 PC가 접속하는
+ * 순간 자동으로 강제 업데이트를 보낸다("자동 구버전 업데이트" 기능이 켜져 있을 때만). */
+function maybeAutoForceUpdateOutdatedPeer(ip, appVersion) {
+  if (!autoOutdatedUpdateEnabled || !autoOutdatedUpdatePassword) return;
+  if (!ip || ip === MY_IP || !appVersion) return;
+  if (compareVersions(APP_VERSION, appVersion) <= 0) return; // 구버전이 아님
+  const now = Date.now();
+  const last = autoOutdatedUpdateAttempted.get(ip) || 0;
+  if (now - last < 5 * 60 * 1000) return; // 5분 내 같은 IP 재시도 방지(재부팅 반복 등으로 과도한 재시도 방지)
+  autoOutdatedUpdateAttempted.set(ip, now);
+  writeToLogFile('info', `[자동업데이트] 구버전 PC 접속 감지 → 강제 업데이트 전송: ${ip} (버전 ${appVersion} → ${APP_VERSION})`);
+  sendJsonToPeer(ip, {
+    type: 'FORCE_UPDATE',
+    masterPassword: autoOutdatedUpdatePassword,
+    targetVersion: APP_VERSION,
+    fromIp: MY_IP
+  });
+}
+
+ipcMain.handle('set-auto-outdated-update', async (event, payload) => {
+  if (!masterSessionActive) return { success: false, msg: '마스터 관리자 로그인이 필요합니다.' };
+  const p = payload || {};
+  if (p.enabled) {
+    const password = String(p.password || '').trim();
+    if (!(await verifyLocalMasterPassword(password))) {
+      return { success: false, msg: '마스터 비밀번호가 올바르지 않습니다.' };
+    }
+    autoOutdatedUpdateEnabled = true;
+    autoOutdatedUpdatePassword = password;
+    autoOutdatedUpdateAttempted.clear();
+    writeToLogFile('info', '[자동업데이트] 구버전 PC 자동 업데이트 켜짐');
+  } else {
+    autoOutdatedUpdateEnabled = false;
+    autoOutdatedUpdatePassword = '';
+    autoOutdatedUpdateAttempted.clear();
+    writeToLogFile('info', '[자동업데이트] 구버전 PC 자동 업데이트 꺼짐');
+  }
+  return { success: true, enabled: autoOutdatedUpdateEnabled };
+});
+
+ipcMain.handle('get-auto-outdated-update', async () => ({ enabled: autoOutdatedUpdateEnabled }));
 
 // 기존 호환성을 위해 유지 (아이디 무관, 비밀번호만 확인 — 현재 렌더러에서 호출하는 곳은 없음)
 ipcMain.handle('verify-master-password', async (event, inputPassword) => {
@@ -11993,6 +12046,9 @@ ipcMain.handle('reset-notice-operator-password', async (event, payload) => {
 
 ipcMain.handle('clear-master-session', async () => {
   masterSessionActive = false;
+  // 로그아웃하면 메모리에 들고 있던 자동 업데이트용 비밀번호도 함께 지운다.
+  autoOutdatedUpdateEnabled = false;
+  autoOutdatedUpdatePassword = '';
   return { success: true };
 });
 

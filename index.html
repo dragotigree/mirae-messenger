@@ -5999,6 +5999,22 @@
             <div id="master-clients-filter-count" style="font-size:11px; color:#64748b; min-height:14px;"></div>
 
             <div style="margin-top:16px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; color:#0f172a; cursor:pointer;">
+                  <input type="checkbox" id="auto-outdated-update-toggle" onchange="onAutoOutdatedUpdateToggle(this.checked)">
+                  ⚡ 구버전 PC 자동 업데이트
+                </label>
+                <span id="auto-outdated-update-status" style="font-size:11px; color:#64748b;">꺼짐</span>
+              </div>
+              <div style="font-size:11.5px; color:#64748b; margin-top:4px;">켜두면 이 PC가 켜져 있는 동안, 구버전 PC가 접속하는 순간 자동으로 강제 업데이트를 보냅니다. 어디 있는지 몰라 직접 클릭하기 어려운 PC를 챙길 때 유용합니다.</div>
+              <div id="auto-outdated-update-pwd-row" style="display:none; gap:6px; margin-top:8px; align-items:center;">
+                <input type="password" id="auto-outdated-update-pwd" placeholder="마스터 비밀번호" style="flex:1 1 auto; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;" onkeydown="if(event.key==='Enter') confirmAutoOutdatedUpdate()">
+                <button type="button" onclick="confirmAutoOutdatedUpdate()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">켜기</button>
+                <button type="button" onclick="cancelAutoOutdatedUpdateToggle()" style="padding:7px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; color:#475569;">취소</button>
+              </div>
+            </div>
+
+            <div style="margin-top:10px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
               <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:6px;">🩺 원격 로그 가져오기</div>
               <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">다른 PC의 오늘·어제 로그 중 검색어가 들어간 줄만 가져옵니다(온라인이어야 함).</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
@@ -18898,6 +18914,7 @@
       loadMasterOperatorList();
       try { await refreshPendingRemoteWipesUi(); } catch (_) {}
       renderMasterOnlineClients();
+      try { await syncAutoOutdatedUpdateToggleUi(); } catch (_) {}
       try {
         if (window.api.getServicePauseState) {
           const st = await window.api.getServicePauseState();
@@ -19493,6 +19510,64 @@
 
     function masterForceUpdateOutdated() {
       openMasterForceUpdateModal({ targetIp: 'ALL_OUTDATED' });
+    }
+
+    function onAutoOutdatedUpdateToggle(checked) {
+      const pwdRow = document.getElementById('auto-outdated-update-pwd-row');
+      if (checked) {
+        pwdRow.style.display = 'flex';
+        setTimeout(() => document.getElementById('auto-outdated-update-pwd')?.focus(), 30);
+      } else {
+        pwdRow.style.display = 'none';
+        disableAutoOutdatedUpdate();
+      }
+    }
+
+    function cancelAutoOutdatedUpdateToggle() {
+      document.getElementById('auto-outdated-update-toggle').checked = false;
+      document.getElementById('auto-outdated-update-pwd-row').style.display = 'none';
+      document.getElementById('auto-outdated-update-pwd').value = '';
+    }
+
+    async function confirmAutoOutdatedUpdate() {
+      const password = document.getElementById('auto-outdated-update-pwd').value;
+      const statusEl = document.getElementById('auto-outdated-update-status');
+      if (!password) { statusEl.textContent = '마스터 비밀번호를 입력해 주세요.'; return; }
+      let res;
+      try {
+        res = await window.api.setAutoOutdatedUpdate({ enabled: true, password });
+      } catch (e) {
+        statusEl.textContent = '이 PC가 최신 버전이 아닙니다. 업데이트 후 재시작해 주세요.';
+        cancelAutoOutdatedUpdateToggle();
+        return;
+      }
+      document.getElementById('auto-outdated-update-pwd').value = '';
+      if (!res || !res.success) {
+        statusEl.textContent = (res && res.msg) || '켜기 실패';
+        cancelAutoOutdatedUpdateToggle();
+        return;
+      }
+      document.getElementById('auto-outdated-update-pwd-row').style.display = 'none';
+      document.getElementById('auto-outdated-update-toggle').checked = true;
+      statusEl.textContent = '켜짐 — 구버전 PC 접속 시 자동으로 업데이트를 보냅니다.';
+    }
+
+    async function disableAutoOutdatedUpdate() {
+      const statusEl = document.getElementById('auto-outdated-update-status');
+      try {
+        await window.api.setAutoOutdatedUpdate({ enabled: false });
+      } catch (e) { /* 이미 꺼져 있거나 구버전이면 무시 */ }
+      statusEl.textContent = '꺼짐';
+    }
+
+    async function syncAutoOutdatedUpdateToggleUi() {
+      if (!isMasterAuthenticated || !window.api.getAutoOutdatedUpdate) return;
+      try {
+        const res = await window.api.getAutoOutdatedUpdate();
+        const on = !!(res && res.enabled);
+        document.getElementById('auto-outdated-update-toggle').checked = on;
+        document.getElementById('auto-outdated-update-status').textContent = on ? '켜짐 — 구버전 PC 접속 시 자동으로 업데이트를 보냅니다.' : '꺼짐';
+      } catch (e) { /* 무시 */ }
     }
 
     let logExcerptPendingRequestId = '';

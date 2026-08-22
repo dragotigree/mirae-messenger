@@ -101,6 +101,8 @@ contextBridge.exposeInMainWorld('api', {
   masterRequestLogExcerpt: (payload) => ipcRenderer.invoke('master-request-log-excerpt', payload),
   onLogExcerptResponse: (callback) => ipcRenderer.on('log-excerpt-response', (e, data) => callback(data)),
   onMasterSessionKicked: (callback) => ipcRenderer.on('master-session-kicked', (e, data) => callback(data)),
+  setAutoOutdatedUpdate: (payload) => ipcRenderer.invoke('set-auto-outdated-update', payload),
+  getAutoOutdatedUpdate: () => ipcRenderer.invoke('get-auto-outdated-update'),
   getUsageLockState: () => ipcRenderer.invoke('get-usage-lock-state'),
   getServicePauseState: () => ipcRenderer.invoke('get-service-pause-state'),
   setServicePause: (payload) => ipcRenderer.invoke('set-service-pause', payload),
