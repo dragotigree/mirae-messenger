@@ -9950,8 +9950,13 @@ function handleScheduleEdit(s) {
 
 function handleGroupSync(g) {
   if (!g || !g.uid) return;
-  let members = [];
-  try { members = JSON.parse(g.members); } catch (e) {}
+  // ⚠️ members가 깨졌거나(네트워크 손상 등) 배열이 아니면 빈 배열로 취급해 왔는데, 그러면
+  // "내가 멤버 목록에 없다" == "삭제해야 한다"는 규칙 때문에 멀쩡히 갖고 있던 그룹이
+  // 손상된 패킷 하나로 지워질 수 있었다. 형식이 잘못됐으면 아무것도 하지 않고 조용히
+  // 무시한다(삭제도, 반영도 안 함) — 진짜 삭제·나가기는 항상 유효한 빈 배열([])로 온다.
+  let members;
+  try { members = JSON.parse(g.members); } catch (e) { return; }
+  if (!Array.isArray(members)) return;
   const stillMember = members.some(m => m.ip === MY_IP);
   if (!stillMember) {
     db.run(`DELETE FROM group_chats WHERE uid = ?`, [g.uid], (err) => {

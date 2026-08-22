@@ -14928,7 +14928,13 @@
       if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(entry.key) ? 'block' : 'none';
       if (groupExtra) groupExtra.style.display = entry.group ? 'block' : 'none';
       // 방장만(또는 방장 개념이 없는 옛날 그룹은 누구나 — 백엔드와 동일 기준) 보이게 한다.
-      const isOwnerOrOwnerless = !!entry.group && (!entry.group.owner_ip || entry.group.owner_ip === (myProfile && myProfile.ip));
+      // ⚠️ 유·무선 등 여러 IP로 잡히는 PC는 owner_ip가 내 별칭 IP로 저장돼 있을 수 있다
+      // (buildGroupMemberRowsHtml의 iAmOwner 판정과 동일한 이유) — 별칭까지 확인해야
+      // 진짜 방장인데도 메뉴가 안 보이는 일이 없다.
+      const myIp = myProfile && myProfile.ip;
+      const myLiveForCtx = myIp ? (allUsers || []).find((u) => u.ip === myIp) : null;
+      const myIpSetForCtx = new Set([myIp, ...((myLiveForCtx && myLiveForCtx.aliasIps) || [])].filter(Boolean));
+      const isOwnerOrOwnerless = !!entry.group && (!entry.group.owner_ip || myIpSetForCtx.has(entry.group.owner_ip));
       if (deleteGroupEl) deleteGroupEl.style.display = isOwnerOrOwnerless ? 'block' : 'none';
       const menuWidth = 220;
       const menuHeight = entry.group ? 250 : 150;
