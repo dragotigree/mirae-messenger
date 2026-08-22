@@ -6886,7 +6886,19 @@ function persistProfileOverrideToDb(ov) {
 function storeProfileOverride(patch) {
   if (!patch || !patch.ip) return;
   const prev = profileOverrides.get(patch.ip) || { ip: patch.ip };
-  const incomingUpdatedAt = patch.updatedAt || new Date().toISOString();
+  // ⚠️ 실사고(장기 미해결 소부서·비고 초기화의 진짜 원인): PROFILE_OVERRIDE_SYNC나
+  // NOTICE_SYNC_RESPONSE로 다른 PC의 오래됐거나 비어 있는 override 행이 들어올 때,
+  // 그 행에 updatedAt이 없으면(옛 버전 PC가 만든 값, 동기화 유실 등) 이걸 "지금 막
+  // 들어온 값"으로 착각해 new Date()를 찍어버렸다. 그러면 실제로는 훨씬 최신인 이
+  // PC의 기존 값을, 타임스탬프도 없는 남의 빈 값이 무조건 이겨서 덮어썼다("업데이트
+  // 직후·재부팅할 때마다 랜덤하게 소부서가 풀린다"의 원인). updatedAt이 없는 입력은
+  // 이미 뭔가 갖고 있으면 절대 이기지 못하게 하고, 진짜 신규(이 PC가 이 IP를 처음
+  // 보는 경우)일 때만 "지금"으로 찍어 받아들인다.
+  if (!patch.updatedAt) {
+    if (prev.updatedAt) return;
+    patch.updatedAt = new Date().toISOString();
+  }
+  const incomingUpdatedAt = patch.updatedAt;
   if (prev.updatedAt && incomingUpdatedAt < prev.updatedAt) {
     // 이미 가진 값이 더 최신이면, 옛 값으로는 아무것도 바꾸지 않는다.
     return;
