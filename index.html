@@ -14141,10 +14141,7 @@
       const leaveEl = document.getElementById('ctx-dept-floor-leave-recent-chat');
       if (leaveEl) leaveEl.style.display = canLeaveRecentChatRow(ctxMenuDeptFloorRow) ? 'block' : 'none';
       const menu = document.getElementById('dept-floor-context-menu');
-      const menuWidth = 220;
-      menu.style.left = Math.min(e.clientX, window.innerWidth - menuWidth) + 'px';
-      menu.style.top = Math.min(e.clientY, window.innerHeight - 150) + 'px';
-      menu.style.display = 'block';
+      positionContextMenuNearPoint(menu, e.clientX, e.clientY);
     }
 
     function ctxDeptFloorLeaveRecentChat() {
@@ -14894,12 +14891,24 @@
         const leaveEl = document.getElementById('ctx-leave-recent-chat');
         if (leaveEl) leaveEl.style.display = canLeaveRecentChatRow(ctxMenuTargetRow) ? 'block' : 'none';
       }
-      const menuWidth = 200, menuHeight = isSelf ? 120 : 210;
-      const x = Math.min(e.clientX, window.innerWidth - menuWidth);
-      const y = Math.min(e.clientY, window.innerHeight - menuHeight);
+      positionContextMenuNearPoint(menu, e.clientX, e.clientY);
+    }
+
+    /** 메뉴 항목 수가 나중에 늘거나 줄어도(오늘처럼 "나가기" 항목이 새로 붙는 경우 등)
+     *  화면 아래로 잘려 안 보이는 일이 없도록, 실제 렌더링된 크기를 재서 위치를 잡는다.
+     *  항목 개수마다 높이를 손으로 어림잡던 예전 방식은 항목이 추가될 때마다 잘리는
+     *  문제가 반복됐다("나가기" 항목 추가 후 메뉴 아래쪽이 화면 밖으로 잘림). */
+    function positionContextMenuNearPoint(menu, clientX, clientY) {
+      menu.style.left = '-9999px';
+      menu.style.top = '-9999px';
+      menu.style.display = 'block';
+      const rect = menu.getBoundingClientRect();
+      const menuWidth = rect.width || 200;
+      const menuHeight = rect.height || 150;
+      const x = Math.max(4, Math.min(clientX, window.innerWidth - menuWidth - 4));
+      const y = Math.max(4, Math.min(clientY, window.innerHeight - menuHeight - 4));
       menu.style.left = x + 'px';
       menu.style.top = y + 'px';
-      menu.style.display = 'block';
     }
 
     function ctxLeaveRecentChat() {
