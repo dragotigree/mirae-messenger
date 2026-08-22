@@ -19510,7 +19510,13 @@
       if (!password) { statusEl.textContent = '마스터 비밀번호를 입력해 주세요.'; return; }
       statusEl.textContent = `${targetIp}에 요청하는 중...`;
       resultEl.style.display = 'none';
-      const res = await window.api.masterRequestLogExcerpt({ targetIp, pattern, password });
+      let res;
+      try {
+        res = await window.api.masterRequestLogExcerpt({ targetIp, pattern, password });
+      } catch (e) {
+        statusEl.textContent = '이 PC가 최신 버전이 아닙니다. 업데이트 후 프로그램을 완전히 재시작해 주세요.';
+        return;
+      }
       if (!res || !res.success) {
         statusEl.textContent = (res && res.msg) || '요청 실패';
         return;
