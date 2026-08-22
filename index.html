@@ -599,10 +599,10 @@
     .channel-item.is-drop-hover, #chat-header.is-drop-hover, #dm-section-label.is-drop-hover { background: rgba(33, 150, 243, 0.22) !important; box-shadow: inset 0 0 0 2px rgba(144, 202, 249, 0.75); }
     .icon-rail-btn.is-drop-hover { background: var(--sidebar-active) !important; color: var(--accent-dark) !important; box-shadow: inset 0 0 0 2px var(--accent); }
     .channel-item.is-channel-dragging { opacity: 0.45; }
-    .channel-item.is-channel-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
-    .user-card-item.is-favorite-drop-target, .compact-list-item.is-favorite-drop-target { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
+    .channel-item.is-channel-drop-target { box-shadow: inset 0 2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
+    .user-card-item.is-favorite-drop-target, .compact-list-item.is-favorite-drop-target { box-shadow: inset 0 2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15) !important; }
     .compact-list-panel.is-compact-group-dragging { opacity: 0.45; }
-    .compact-list-panel.is-compact-group-drop-target .compact-section-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
+    .compact-list-panel.is-compact-group-drop-target .compact-section-label { box-shadow: inset 0 2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
     .compact-section-label.is-compact-group-drag-handle { cursor: grab; }
     .channel-item .channel-reorder-grip { opacity: 0; font-size: 11px; cursor: grab; padding: 0 2px 0 0; flex-shrink: 0; line-height: 1; user-select: none; transition: opacity var(--transition-fast); }
     .channel-item:hover .channel-reorder-grip { opacity: 0.5; }
@@ -658,7 +658,7 @@
     }
     .subsection-label:hover .channel-reorder-grip { width: 11px; padding: 0 4px 0 0; }
     .user-group-block.is-user-group-dragging { opacity: 0.45; }
-    .user-group-block.is-user-group-drop-target .subsection-label { box-shadow: inset 0 -2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
+    .user-group-block.is-user-group-drop-target .subsection-label { box-shadow: inset 0 2px 0 #90CAF9; background: rgba(33, 150, 243, 0.15); }
     .subsection-label:hover .channel-reorder-grip { opacity: 0.5; }
     /* 부서별 보기에서 "소부서"가 있는 사람만 그 밑에 한 단 더 묶어 보여준다. 소부서를 안
        쓰는 부서는 지금처럼 그대로 보인다(이 스타일은 .user-subdept-block이 있을 때만 적용). */
@@ -757,7 +757,7 @@
     }
     .sidebar-main-block.is-sidebar-block-dragging { opacity: 0.45; }
     .sidebar-main-block.is-sidebar-block-drop-target {
-      box-shadow: inset 0 -2px 0 #90CAF9;
+      box-shadow: inset 0 2px 0 #90CAF9;
       background: rgba(33, 150, 243, 0.12);
     }
     .sidebar-block-head .sidebar-block-drag-handle { cursor: grab; flex-shrink: 0; }
