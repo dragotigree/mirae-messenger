@@ -1950,6 +1950,11 @@
       background: linear-gradient(180deg, #f8fafc 0%, #fff 100%); border-top: 1px solid #e8edf2;
     }
     .ipmsg-compose-label { font-size: 10.5px; font-weight: 700; color: #64748b; margin-bottom: 4px; letter-spacing: -0.02em; flex-shrink: 0; }
+    /* 사진을 끌어다 놓는 동안 "여기에 놓으면 된다"는 걸 보여준다 */
+    .ipmsg-compose-pane.is-drop-hover {
+      outline: 2px dashed var(--accent); outline-offset: -4px;
+      background: var(--accent-soft);
+    }
     .ipmsg-compose-pane textarea {
       flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box; padding: 10px 12px;
       border: 1px solid var(--border); border-radius: 12px;
@@ -1958,6 +1963,9 @@
     }
     .ipmsg-compose-pane textarea:focus { outline: none; border-color: #90CAF9; box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.12); }
     .ipmsg-compose-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap; flex-shrink: 0; }
+    /* 첨부 버튼들은 왼쪽에 모아 두고 「보내기」만 오른쪽 끝에 둔다(예전엔 space-between이
+       버튼 하나하나를 넓게 흩어놔서 무슨 묶음인지 알아보기 어려웠다). */
+    .ipmsg-compose-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .ipmsg-send-btn {
       padding: 11px 26px; border: none; border-radius: var(--radius-lg); font-size: 13px; font-weight: 800; color: #fff; cursor: pointer;
       background: var(--accent); box-shadow: 0 4px 14px rgba(33, 150, 243, 0.25);
@@ -7503,11 +7511,17 @@
             </div>
           </div>
         </div>
-        <div class="ipmsg-compose-pane">
+        <div class="ipmsg-compose-pane" id="ipmsg-compose-pane">
           <div class="ipmsg-compose-label">메시지</div>
-          <textarea id="ipmsg-message-input" placeholder="보낼 내용을 입력하세요..." spellcheck="false"></textarea>
+          <textarea id="ipmsg-message-input" placeholder="보낼 내용을 입력하세요... (사진을 끌어다 놓거나 Ctrl+V로 붙여넣을 수 있습니다)" spellcheck="false" onpaste="handleIpmsgPaste(event)"></textarea>
           <div class="ipmsg-compose-footer">
-            <button type="button" class="ipmsg-mini-btn" onclick="openExcalidrawForIpmsg()" title="그림 그려서 쪽지에 첨부">✏️ 그림</button>
+            <div class="ipmsg-compose-tools">
+              <label class="ipmsg-mini-btn" title="사진 골라서 쪽지에 첨부" style="cursor:pointer;">🖼 사진
+                <input type="file" id="ipmsg-image-input" accept="image/*" multiple style="display:none;" onchange="handleIpmsgImageSelect(event)">
+              </label>
+              <button type="button" class="ipmsg-mini-btn" onclick="runIpmsgRegionCapture()" title="화면을 캡처해서 쪽지에 첨부">📷 캡처</button>
+              <button type="button" class="ipmsg-mini-btn" onclick="openExcalidrawForIpmsg()" title="그림 그려서 쪽지에 첨부">✏️ 그림</button>
+            </div>
             <button type="button" class="ipmsg-send-btn" id="ipmsg-send-btn" onclick="submitIpmsgSend()">보내기</button>
           </div>
         </div>
@@ -10955,7 +10969,13 @@
       }
       if (!isCaptureOverlayStandalone() && window.api && typeof window.api.onRegionCaptureResult === 'function') {
         window.api.onRegionCaptureResult((dataUrl) => {
-          if (dataUrl) processAndSendImageDataUrl(dataUrl, `capture-${Date.now()}.jpg`);
+          if (!dataUrl) return;
+          // 쪽지 보내기 창이 열려 있으면 그 쪽 첨부로 넣는다(대화방이 아니라 쪽지에 붙어야 한다).
+          if (isIpmsgModalOpen()) {
+            addIpmsgImageFromDataUrl(dataUrl, `capture-${Date.now()}.jpg`, 'image/jpeg');
+            return;
+          }
+          processAndSendImageDataUrl(dataUrl, `capture-${Date.now()}.jpg`);
         });
       }
       window.addEventListener('storage', (e) => {
@@ -12169,6 +12189,7 @@
       if (ipmsgCard) ipmsgCard.classList.remove('is-recipient-expanded');
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
+      initIpmsgDragAndDrop();
       document.getElementById('ipmsg-send-modal').style.display = 'flex';
       updateIpmsgSelectionUi();
       window.api.focusMainWindow();
@@ -12215,13 +12236,14 @@
 
     async function submitIpmsgSend() {
       const text = (document.getElementById('ipmsg-message-input')?.value || '').trim();
-      const imageHtml = ipmsgPendingImageHtml || '';
-      if (!text && !imageHtml) { await appAlert('보낼 메시지를 입력해 주세요.'); return; }
+      const imageHtmls = (ipmsgPendingImages || []).map((it) =>
+        `<img src="${it.dataUrl}" class="chat-img-preview" alt="${escapeHtmlText(it.fileName || '사진')}" />`);
+      if (!text && !imageHtmls.length) { await appAlert('보낼 메시지를 입력해 주세요.'); return; }
       const ips = [...ipmsgSelectedIps];
       if (!ips.length) { await appAlert('받는 사람을 한 명 이상 선택해 주세요.'); return; }
       const parts = [];
       if (text) parts.push(textToMessageHtml(text));
-      if (imageHtml) parts.push(imageHtml);
+      imageHtmls.forEach((h) => parts.push(h));
       // 쪽지는 1:1 DM으로 각자 따로 전송되므로, 받는 사람끼리는 서로 누가 같이 받았는지 알 길이
       // 없었다 — 받는 사람 목록을 메시지 끝에 함께 실어 보내 모두가 같은 정보를 보게 한다.
       const recipientNames = ips.map((ip) => {
@@ -17787,39 +17809,167 @@
         return;
       }
       if (purpose === 'ipmsg') {
-        try {
-          const compressed = await compressImageDataUrlForChat(dataUrl, fileName, 'image/png');
-          const safeName = escapeHtmlText(compressed.fileName || fileName);
-          const imgHtml = `<img src="${compressed.dataUrl}" class="chat-img-preview" alt="${safeName}" />`;
-          const msgEl = document.getElementById('ipmsg-message-input');
-          if (msgEl) {
-            const cur = (msgEl.value || '').trim();
-            // 쪽지 본문은 텍스트 입력이지만 전송 시 HTML로 변환되므로,
-            // 이미지 첨부는 바로 보내기 플로우를 쓰는 대신 입력란 아래 미리보기 큐에 넣는다.
-            ipmsgPendingImageHtml = imgHtml;
-            let preview = document.getElementById('ipmsg-draw-preview');
-            if (!preview) {
-              preview = document.createElement('div');
-              preview.id = 'ipmsg-draw-preview';
-              preview.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:8px;';
-              msgEl.parentElement.appendChild(preview);
-            }
-            preview.innerHTML = `<img src="${compressed.dataUrl}" alt="그림" style="max-width:120px;max-height:80px;border-radius: var(--radius-md);border:1px solid var(--border);" /><button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">그림 제거</button>${cur ? '' : '<span style="font-size:11px;color:#64748b;">그림만 보내려면 보내기를 누르세요</span>'}`;
-          }
-        } catch (err) {
-          console.error('쪽지 그림 처리 실패', err);
-          await appAlert('그림을 쪽지에 첨부하지 못했습니다.');
-        }
+        // 쪽지 본문은 텍스트 입력이지만 전송 시 HTML로 변환되므로, 이미지 첨부는 바로
+        // 보내지 않고 입력란 아래 미리보기 큐에 넣는다(캡처·드래그앤드롭과 같은 경로).
+        await addIpmsgImageFromDataUrl(dataUrl, fileName, 'image/png');
         return;
       }
       await processAndSendImageDataUrl(dataUrl, fileName);
     }
 
-    let ipmsgPendingImageHtml = '';
+    /** 쪽지에 붙여 보낼 사진들. 예전엔 문자열 하나뿐이라 그림 한 장만, 그것도 새로 넣으면
+     *  앞의 것이 조용히 지워졌다. 캡처·드래그앤드롭·붙여넣기로 여러 장을 넣을 수 있게
+     *  배열로 바꾼다(보낼 때 submitIpmsgSend에서 장 수만큼 img 태그를 만들어 붙인다). */
+    let ipmsgPendingImages = [];
+
     function clearIpmsgPendingImage() {
-      ipmsgPendingImageHtml = '';
-      const preview = document.getElementById('ipmsg-draw-preview');
-      if (preview) preview.remove();
+      ipmsgPendingImages = [];
+      renderIpmsgAttachPreview();
+    }
+
+    function removeIpmsgPendingImage(idx) {
+      ipmsgPendingImages.splice(idx, 1);
+      renderIpmsgAttachPreview();
+    }
+
+    /** 쪽지 입력란 아래 사진 미리보기 줄을 다시 그린다(각 장마다 개별 삭제 버튼). */
+    function renderIpmsgAttachPreview() {
+      const msgEl = document.getElementById('ipmsg-message-input');
+      if (!msgEl) return;
+      let preview = document.getElementById('ipmsg-draw-preview');
+      if (!ipmsgPendingImages.length) {
+        if (preview) preview.remove();
+        return;
+      }
+      if (!preview) {
+        preview = document.createElement('div');
+        preview.id = 'ipmsg-draw-preview';
+        preview.style.cssText = 'margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+        msgEl.parentElement.appendChild(preview);
+      }
+      preview.innerHTML = ipmsgPendingImages.map((it, i) => `
+        <span style="position:relative; display:inline-flex;">
+          <img src="${it.dataUrl}" alt="첨부 사진" style="max-width:110px;max-height:76px;border-radius:var(--radius-md);border:1px solid var(--border);display:block;">
+          <button type="button" title="이 사진 빼기" onclick="removeIpmsgPendingImage(${i})"
+            style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:12px;line-height:1;cursor:pointer;">×</button>
+        </span>`).join('')
+        + `<button type="button" class="ipmsg-mini-btn" onclick="clearIpmsgPendingImage()">사진 모두 빼기</button>`;
+    }
+
+    /** 사진 한 장을 쪽지 첨부 큐에 넣는다(캡처·그림·드래그앤드롭·붙여넣기 공용). */
+    async function addIpmsgImageFromDataUrl(dataUrl, fileName, mime) {
+      if (!dataUrl) return false;
+      try {
+        const compressed = await compressImageDataUrlForChat(dataUrl, fileName || `image-${Date.now()}.png`, mime || 'image/png');
+        if (!compressed || !compressed.dataUrl) return false;
+        ipmsgPendingImages.push({ dataUrl: compressed.dataUrl, fileName: compressed.fileName || fileName || '' });
+        renderIpmsgAttachPreview();
+        return true;
+      } catch (err) {
+        console.error('쪽지 사진 첨부 실패', err);
+        await appAlert('사진을 쪽지에 첨부하지 못했습니다.');
+        return false;
+      }
+    }
+
+    function isIpmsgModalOpen() {
+      const m = document.getElementById('ipmsg-send-modal');
+      return !!(m && m.style.display === 'flex');
+    }
+
+    /** 파일 목록(사진만)을 쪽지 첨부로 넣는다 — 파일 선택·드래그앤드롭·붙여넣기 공용. */
+    async function addIpmsgImageFiles(files) {
+      const list = [...(files || [])].filter((f) => f && f.type && f.type.startsWith('image/'));
+      if (!list.length) return 0;
+      let added = 0;
+      for (const f of list) {
+        try {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = reject;
+            fr.readAsDataURL(f);
+          });
+          if (await addIpmsgImageFromDataUrl(dataUrl, f.name || `image-${Date.now()}.png`, f.type)) added += 1;
+        } catch (e) { console.error('쪽지 사진 읽기 실패', e); }
+      }
+      return added;
+    }
+
+    async function handleIpmsgImageSelect(ev) {
+      const input = ev && ev.target;
+      const files = input && input.files;
+      await addIpmsgImageFiles(files);
+      if (input) input.value = '';
+    }
+
+    /** 쪽지 입력란에 이미지 붙여넣기(Ctrl+V). */
+    async function handleIpmsgPaste(ev) {
+      const items = ev && ev.clipboardData && ev.clipboardData.items;
+      if (!items) return;
+      const files = [];
+      for (const it of items) {
+        if (it.kind === 'file' && it.type && it.type.startsWith('image/')) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (!files.length) return;   // 글자 붙여넣기는 그대로 둔다
+      ev.preventDefault();
+      await addIpmsgImageFiles(files);
+    }
+
+    /** 쪽지 창에서 화면 캡처 — 결과는 onRegionCaptureResult가 쪽지 첨부로 넣는다. */
+    async function runIpmsgRegionCapture() {
+      if (!window.api || typeof window.api.openRegionCaptureOverlay !== 'function') {
+        await appAlert('화면 캡처 기능을 사용할 수 없습니다.');
+        return;
+      }
+      try {
+        const res = await window.api.openRegionCaptureOverlay();
+        if (!res || !res.success) await appAlert('화면을 캡처하지 못했습니다.');
+      } catch (e) {
+        console.error(e);
+        await appAlert('화면을 캡처하지 못했습니다.');
+      }
+    }
+
+    /** 쪽지 창 어디에든 사진을 끌어다 놓으면 첨부되도록 한다. */
+    function initIpmsgDragAndDrop() {
+      const modal = document.getElementById('ipmsg-send-modal');
+      if (!modal || modal.dataset.dropBound === '1') return;
+      modal.dataset.dropBound = '1';
+      const hasFiles = (e) => {
+        const t = e.dataTransfer && e.dataTransfer.types;
+        return !!(t && [...t].includes('Files'));
+      };
+      const pane = () => document.getElementById('ipmsg-compose-pane');
+      modal.addEventListener('dragover', (e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        const p = pane();
+        if (p) p.classList.add('is-drop-hover');
+      });
+      modal.addEventListener('dragleave', (e) => {
+        if (modal.contains(e.relatedTarget)) return;
+        const p = pane();
+        if (p) p.classList.remove('is-drop-hover');
+      });
+      modal.addEventListener('drop', async (e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const p = pane();
+        if (p) p.classList.remove('is-drop-hover');
+        const files = (e.dataTransfer && e.dataTransfer.files) || [];
+        const imgs = [...files].filter((f) => f && f.type && f.type.startsWith('image/'));
+        const added = await addIpmsgImageFiles(files);
+        // 사진이 아닌 파일을 끌어다 놓은 경우엔 조용히 무시하지 말고 이유를 알려준다.
+        if (!added && files.length && !imgs.length) {
+          await appAlert('쪽지에는 사진만 첨부할 수 있습니다.\n(다른 파일은 1:1 대화나 그룹 대화에서 보내 주세요.)');
+        }
+      });
     }
 
     /* 🕘 공지 작성 시각은 DB에 UTC(ISO 8601, 예: 2026-08-12T06:22:00.000Z)로 저장된다.
