@@ -10247,6 +10247,40 @@ function broadcastToOnlinePeers(payloadObj) {
   setImmediate(pump);
 }
 
+/** 전체공지(BROADCAST) 채팅 메시지 전용 신뢰성 있는 발송 — 온라인인데 연결 실패한 상대는
+ * PENDING(BCAST:) 대기열에 넣어 재시도한다. broadcastToOnlinePeers()는 GROUP_SYNC 같은
+ * "실패해도 다음 동기화 때 다시 맞춰지는" 신호 전용이라 이 용도로 쓰면 안 된다. */
+function sendReliableBroadcastMessage(wire, message, msgUid) {
+  const wireData = JSON.stringify(wire) + '\n';
+  onlineUsers.forEach((_u, ip) => {
+    if (!ip || ip === MY_IP) return;
+    const client = new net.Socket();
+    let delivered = false;
+    client.setTimeout(1200);
+    client.connect(TCP_PORT, ip, () => {
+      delivered = true;
+      client.write(wireData);
+      client.end();
+    });
+    const queueIfFailed = () => {
+      if (delivered) return;
+      enqueuePendingPeerMessage(`BCAST:${ip}`, message, msgUid);
+    };
+    client.on('error', queueIfFailed);
+    client.on('timeout', () => {
+      client.destroy();
+      queueIfFailed();
+    });
+  });
+  // 그 순간 오프라인이었던 상대도 큐에 넣어 재접속 시 받게 한다.
+  allKnownUsers.forEach((u, ip) => {
+    if (ip === MY_IP) return;
+    if (isSyntheticReceiverKey(ip) || !looksLikeIpv4(ip)) return;
+    if (onlineUsers.has(ip)) return;
+    enqueuePendingPeerMessage(`BCAST:${ip}`, message, msgUid);
+  });
+}
+
 function sendToIps(ipList, payloadObj) {
   const wireData = JSON.stringify(payloadObj) + '\n';
   (ipList || []).forEach(ip => {
@@ -10649,17 +10683,7 @@ ipcMain.handle('send-broadcast-message', async (event, messageOrOpts) => {
   const createdAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msgUid = generateMsgUid();
   const wire = { type: 'BROADCAST', sender: myProfile.username, message, msgUid, urgent };
-  broadcastToOnlinePeers(wire);
-  allKnownUsers.forEach((u, ip) => {
-    if (ip === MY_IP) return;
-    if (isSyntheticReceiverKey(ip) || !looksLikeIpv4(ip)) return;
-    if (onlineUsers.has(ip)) return;
-    db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'PENDING', ?)`,
-      [senderLabelForMe(), MY_IP, `BCAST:${ip}`, message, msgUid],
-      logDbErr
-    );
-  });
+  sendReliableBroadcastMessage(wire, message, msgUid);
   return new Promise((resolve) => {
     db.run(
       `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
@@ -15968,7 +15992,12 @@ function dispatchScheduledMessage(row, done) {
     if (row.is_broadcast) {
       const msgUid = generateMsgUid();
       const wire = { type: 'BROADCAST', sender: myProfile.username, message: row.message, msgUid };
-      broadcastToOnlinePeers(wire);
+      // ⚠️ 실사고: 예약 발송(전체공지)이 broadcastToOnlinePeers()만 썼는데, 이건 그 순간
+      // 오프라인이던 상대는 아예 시도조차 안 하고 온라인이어도 연결 실패를 조용히
+      // 삼킨다 — 즉시 발송(send-broadcast-message)엔 있는 PENDING 대기열 안전망이
+      // 예약 발송엔 전혀 없었다. 예약 메시지 특성상 보내는 사람이 자리에 없을 때
+      // 발송되는 경우가 많아 실패를 알아챌 방법도 없다. 동일한 안전망을 적용한다.
+      sendReliableBroadcastMessage(wire, row.message, msgUid);
       db.run(
         `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
         [senderLabelForMe(), MY_IP, row.message, msgUid],
