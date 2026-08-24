@@ -4657,6 +4657,24 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`, logDbErr);
 
+  // ⚠️ 실사고: 그룹채팅 메시지는 1:1 메시지(messages 테이블의 PENDING/재전송 체계)와 달리
+  // 발송 당시 오프라인이거나 TCP 전송이 실패한 멤버를 그냥 조용히 건너뛰었다 — 재시도도,
+  // 재접속 시 따라잡기도 전혀 없었다. sendToIps()는 onlineUsers에 없는 상대는 아예
+  // 시도조차 안 하고, 연결 실패는 에러를 그냥 삼켰다. 그런데도 발신자 쪽엔 항상
+  // status:'SENT'로 저장돼 보낸 사람은 실패를 알 방법이 없었다. 1:1 메시지와 동일한
+  // 원리(오프라인/실패 시 대기열에 쌓아뒀다가 상대가 온라인이 되는 순간 재전송)를
+  // 그룹채팅에도 적용하기 위한 대기열 테이블.
+  db.run(`CREATE TABLE IF NOT EXISTS pending_group_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_uid TEXT NOT NULL,
+    group_uid TEXT NOT NULL,
+    group_name TEXT,
+    member_ip TEXT NOT NULL,
+    sender_name TEXT,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, logDbErr);
+
   db.run(`CREATE TABLE IF NOT EXISTS group_chats (
     uid TEXT PRIMARY KEY,
     name TEXT,
@@ -4921,6 +4939,7 @@ db.serialize(() => {
     });
     setTimeout(() => flushAllPendingOutboundMessages(), 1500);
     setTimeout(() => flushPendingFileXfers(), 1500);
+    setTimeout(() => flushPendingGroupMessages(), 1500);
   }
 
   db.get(`SELECT * FROM user_profile WHERE id = 1`, (err, row) => {
@@ -6507,6 +6526,8 @@ function startUdpDiscovery() {
       setInterval(() => flushAllPendingOutboundMessages(), 5000);
       setTimeout(() => flushPendingFileXfers(), 2500);
       setInterval(() => flushPendingFileXfers(), 5000);
+      setTimeout(() => flushPendingGroupMessages(), 2500);
+      setInterval(() => flushPendingGroupMessages(), 5000);
     }
   });
 
@@ -6673,6 +6694,7 @@ function startUdpDiscovery() {
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
+            resendPendingGroupMessages(rinfo.address);
             // Wi-Fi 불안정 등으로 자주 깜빡이는 PC는 여기서 더 진행하지 않고 쿨다운만
             // 갱신 — 재접속마다 공지·그룹 전체 재동기화를 반복하면 이 PC가 계속 멈춘다.
             const nowTs = Date.now();
@@ -10241,6 +10263,77 @@ function sendToIps(ipList, payloadObj) {
   });
 }
 
+// 그룹채팅 전송: sendToIps와 달리 오프라인 멤버·전송 실패 멤버를 pending_group_messages에
+// 쌓아뒀다가 그 멤버가 온라인이 되는 순간(resendPendingGroupMessages) 자동으로 다시 보낸다.
+function sendGroupMessageToMembers(ipList, payloadObj, groupUid, groupName, message, msgUid) {
+  const wireData = JSON.stringify(payloadObj) + '\n';
+  (ipList || []).forEach((ip) => {
+    if (!ip || ip === MY_IP) return;
+    const queuePending = () => {
+      db.run(
+        `INSERT INTO pending_group_messages (msg_uid, group_uid, group_name, member_ip, sender_name, message) VALUES (?, ?, ?, ?, ?, ?)`,
+        [msgUid, groupUid, groupName, ip, myProfile.username, message],
+        logDbErr
+      );
+    };
+    if (!onlineUsers.has(ip)) {
+      queuePending();
+      return;
+    }
+    const client = new net.Socket();
+    let done = false;
+    client.setTimeout(1200);
+    client.connect(TCP_PORT, ip, () => {
+      done = true;
+      try {
+        client.write(wireData);
+        client.end();
+      } catch (_) {
+        queuePending();
+      }
+    });
+    client.on('error', () => { if (!done) { done = true; queuePending(); } });
+    client.on('timeout', () => { if (!done) { done = true; queuePending(); } client.destroy(); });
+  });
+}
+
+/** 오프라인이라 못 받은 그룹채팅 메시지 — 그 멤버가 온라인이 되면 자동 재전송. */
+function resendPendingGroupMessages(targetIP) {
+  if (!targetIP || !onlineUsers.has(targetIP)) return;
+  db.all(
+    `SELECT * FROM pending_group_messages WHERE member_ip = ? AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}') ORDER BY id ASC`,
+    [targetIP],
+    (err, rows) => {
+      if (err) { logDbErr(err); return; }
+      (rows || []).forEach((row) => {
+        const client = new net.Socket();
+        let done = false;
+        client.setTimeout(1200);
+        const wireData = JSON.stringify({
+          type: 'GROUP_MESSAGE',
+          uid: row.group_uid,
+          groupName: row.group_name,
+          sender: row.sender_name,
+          message: row.message,
+          msgUid: row.msg_uid
+        }) + '\n';
+        client.connect(TCP_PORT, targetIP, () => {
+          done = true;
+          try {
+            client.write(wireData);
+            client.end();
+            db.run(`DELETE FROM pending_group_messages WHERE id = ?`, [row.id], logDbErr);
+          } catch (_) { /* 다음 재접속 때 다시 시도 */ }
+        });
+        client.on('error', () => { if (done) return; client.destroy(); });
+        client.on('timeout', () => { if (done) return; client.destroy(); });
+      });
+    }
+  );
+  // 7일 이상 못 보낸 건 더 기다려도 의미가 없으니 정리 — 다른 대기열과 동일한 기준.
+  db.run(`DELETE FROM pending_group_messages WHERE created_at < datetime('now', '${SENT_ACK_RESEND_WINDOW}')`, [], logDbErr);
+}
+
 // sendToIps는 onlineUsers에 등록된 상대에게만 보내는데, 방금 TCP 연결을 받은 상대는 그 자체로
 // "지금 연결 가능하다"는 확실한 증거이므로 onlineUsers 등록 여부와 무관하게 바로 응답을 보낸다.
 // (그렇지 않으면, UDP 프레즌스가 아직 서로를 인식하기 전 타이밍에 메시지를 주고받을 경우
@@ -11402,6 +11495,22 @@ function flushAllPendingOutboundMessages() {
 
 /** 재전송 중복 실행 방지 — 파일 전송은 수 초가 걸릴 수 있어 5초 주기와 겹칠 수 있다. */
 const fileXferRetryInflight = new Set();
+
+/** 그룹채팅 대기열 — pending_group_messages에 쌓인 멤버 중 지금 온라인인 사람에게만 재시도.
+ * 텍스트 메시지(flushAllPendingOutboundMessages)와 동일한 주기로 호출된다. */
+function flushPendingGroupMessages() {
+  if (!profileLoaded) return;
+  db.all(
+    `SELECT DISTINCT member_ip FROM pending_group_messages WHERE created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
+    [],
+    (err, rows) => {
+      if (err) { logDbErr(err); return; }
+      (rows || []).forEach((row) => {
+        if (onlineUsers.has(row.member_ip)) resendPendingGroupMessages(row.member_ip);
+      });
+    }
+  );
+}
 
 /** 오프라인 상대에게 보내려다 대기 중인 큰 파일 — 상대가 온라인이 되면 자동 재전송.
  * 텍스트 메시지(flushAllPendingOutboundMessages)와 동일한 주기로 호출된다. */
@@ -13202,6 +13311,7 @@ ipcMain.handle('leave-group-chat', async (event, { uid }) => {
       db.run(`DELETE FROM group_chats WHERE uid = ?`, [uid], (err2) => {
         logDbErr(err2);
         if (!err2) {
+          db.run(`DELETE FROM pending_group_messages WHERE group_uid = ? AND member_ip = ?`, [uid, MY_IP], logDbErr);
           // 남은 멤버들에게는 내가 빠진 최신 멤버 목록을 보내 화면에 반영시킨다.
           const updated = { ...row, members: membersJson, owner_ip: nextOwnerIp };
           sendToIps(remainingMembers.map(m => m.ip), { type: 'GROUP_SYNC', group: updated });
@@ -13274,6 +13384,7 @@ ipcMain.handle('remove-group-member', async (event, { uid, targetIp }) => {
       const membersJson = JSON.stringify(remaining);
       db.run(`UPDATE group_chats SET members = ? WHERE uid = ?`, [membersJson, uid], (err2) => {
         if (err2) { logDbErr(err2); resolve({ success: false }); return; }
+        db.run(`DELETE FROM pending_group_messages WHERE group_uid = ? AND member_ip = ?`, [uid, targetIp], logDbErr);
         const updated = { ...row, members: membersJson };
         sendToIps(remaining.map((m) => m.ip), { type: 'GROUP_SYNC', group: updated });
         // 내보내진 사람에게도 최신(자신이 빠진) 멤버 목록을 보내 로컬에서 방을 정리하게 한다.
@@ -13309,6 +13420,7 @@ ipcMain.handle('delete-group-chat', async (event, { uid }) => {
       try { members = JSON.parse(row.members); } catch (e) {}
       db.run(`DELETE FROM group_chats WHERE uid = ?`, [uid], (err2) => {
         if (err2) { logDbErr(err2); resolve({ success: false }); return; }
+        db.run(`DELETE FROM pending_group_messages WHERE group_uid = ?`, [uid], logDbErr);
         const updated = { ...row, members: JSON.stringify([]) };
         sendToIps(members.map((m) => m.ip), { type: 'GROUP_SYNC', group: updated });
         const noticeText = `${SYSTEM_NOTICE_PREFIX}${myProfile.username}님이 이 대화방을 삭제했습니다.`;
@@ -13331,7 +13443,8 @@ ipcMain.handle('send-group-message', async (event, { uid, groupName, message }) 
       if (!err && row) {
         let members = [];
         try { members = JSON.parse(row.members); } catch (e) {}
-        sendToIps(members.map(m => m.ip), { type: 'GROUP_MESSAGE', uid, groupName: row.name, sender: myProfile.username, message, msgUid });
+        const groupPayload = { type: 'GROUP_MESSAGE', uid, groupName: row.name, sender: myProfile.username, message, msgUid };
+        sendGroupMessageToMembers(members.map(m => m.ip), groupPayload, uid, row.name, message, msgUid);
       }
       db.run(
         `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
