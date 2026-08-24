@@ -5412,7 +5412,7 @@
   <div id="app-body-row">
   <div id="app-icon-rail">
     <div id="icon-rail-nav">
-      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" title="원내 공지사항 (Ctrl+`)" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
+      <button type="button" class="icon-rail-btn" id="icon-rail-notice-btn" onclick="openBoardModal()" oncontextmenu="openNoticeBoardStandaloneFromRail(event)" title="원내 공지사항 (Ctrl+` · 우클릭: 새 창으로 열기)" data-ui-icon="notice"><span class="icon-rail-badge" id="icon-rail-notice-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-recent-btn" title="최근 대화만 보기" onclick="setSidebarRailFilter('recent')" data-ui-icon="chatBubble"><span class="icon-rail-badge" id="icon-rail-recent-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-users-btn" title="사용자만 보기" onclick="setSidebarRailFilter('users')" data-ui-icon="users"><span class="icon-rail-badge" id="icon-rail-users-badge" style="display:none;"></span></button>
       <button type="button" class="icon-rail-btn" id="icon-rail-favorites-btn" title="즐겨찾기만 보기 (Ctrl+4)" onclick="setSidebarRailFilter('favorites')" data-ui-icon="star"><span class="icon-rail-badge" id="icon-rail-favorites-badge" style="display:none;"></span></button>
@@ -17354,6 +17354,13 @@
         container.appendChild(card);
       });
       allLogsLastDateKey = lastDateKey;
+    }
+
+    function openNoticeBoardStandaloneFromRail(e) {
+      if (e) e.preventDefault();
+      if (window.api && typeof window.api.openNoticeBoardWindow === 'function') {
+        window.api.openNoticeBoardWindow();
+      }
     }
 
     function openBoardModal() {
