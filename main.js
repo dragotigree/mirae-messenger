@@ -635,6 +635,25 @@ let udpDropLoggedAt = 0;
 let networkQuietUntil = 0;
 let tcpActiveConnections = 0;
 const TCP_MAX_CONNECTIONS = 8;
+/**
+ * ⚠️ 실사고(재현 완료): 예전엔 연결 수가 TCP_MAX_CONNECTIONS를 넘으면 그 자리에서 곧바로
+ * socket.destroy()로 끊었다. 그런데 이 시점엔 TCP 3-way 핸드셰이크가 이미 끝나 있어서,
+ * 보내는 쪽에서는 connect 콜백이 정상적으로 불리고 write까지 성공한다 — 즉 발신 측은
+ * "잘 보냈다"고 판단하는데 수신 측은 한 글자도 안 읽고 버리는, 발신자가 실패를 알 수단이
+ * 전혀 없는 유실이 된다. 1:1 대화는 MSG_ACK 재전송이 있어 되살아나지만 그룹·전체공지·
+ * 부서·층 메시지는 확인 응답이 없어 영구 유실됐다.
+ *
+ * 게다가 파일 전송 한 건이 최대 FILE_XFER_SEND_TIMEOUT_MS(6분)까지 연결을 잡고 있어서,
+ * 파일을 주고받는 PC 몇 대만 겹쳐도 상한이 몇 분씩 꽉 찬 채로 유지될 수 있다.
+ *
+ * 그래서 상한을 넘겼다고 즉시 버리지 않고, 짧은 마감시한을 건 "여유 슬롯"으로 받아준다.
+ * 채팅 메시지는 수 밀리초면 끝나므로 이 여유 슬롯으로 충분히 전달되고, 파일 전송처럼
+ * 오래 무는 연결은 마감시한에 걸려 정리되므로 상한의 원래 목적(폭주 방어)도 유지된다.
+ * 이 여유분까지 넘어서는 경우에만 진짜 폭주로 보고 즉시 끊는다.
+ */
+const TCP_OVERFLOW_CONNECTIONS = 16;
+const TCP_OVERFLOW_DEADLINE_MS = 3000;
+let tcpOverflowLoggedAt = 0;
 /** 예전엔 45초였는데, 상대 PC가 켜진 뒤 최대 45초+ 동안 메시지를 못 받는 지연의 원인이었다.
  * TCP 서버 자체에 이미 연결 수 상한(TCP_MAX_CONNECTIONS)·청크 크기 상한(MAX_TCP_LINE_BUFFER)·
  * 미완성 라인 버퍼 상한(softCap)이 있어 부팅 직후 열어도 버퍼 폭주로부터 보호되므로,
@@ -7765,11 +7784,25 @@ function startTcpServer() {
     tcpServerInstance = null;
   }
   const server = net.createServer((socket) => {
-    if (tcpActiveConnections >= TCP_MAX_CONNECTIONS) {
+    // 여유 슬롯까지 모두 찬 경우에만 즉시 끊는다(위 TCP_OVERFLOW_CONNECTIONS 주석 참고).
+    if (tcpActiveConnections >= TCP_MAX_CONNECTIONS + TCP_OVERFLOW_CONNECTIONS) {
       try { socket.destroy(); } catch (e) { /* ignore */ }
       return;
     }
+    const isOverflowSlot = tcpActiveConnections >= TCP_MAX_CONNECTIONS;
     tcpActiveConnections += 1;
+    let overflowTimer = null;
+    if (isOverflowSlot) {
+      // 짧은 메시지는 통과시키되, 오래 무는 연결은 마감시한에 정리한다.
+      overflowTimer = setTimeout(() => {
+        try { socket.destroy(); } catch (e) { /* ignore */ }
+      }, TCP_OVERFLOW_DEADLINE_MS);
+      const nowTs = Date.now();
+      if (nowTs - tcpOverflowLoggedAt > 10000) {
+        tcpOverflowLoggedAt = nowTs;
+        console.warn(`[TCP] 연결 상한(${TCP_MAX_CONNECTIONS}) 초과 — 여유 슬롯으로 수신 중 (active=${tcpActiveConnections})`);
+      }
+    }
     let buffer = '';
     // ⚠️ 실사고: 예전엔 청크마다 chunk.toString('utf8')로 바로 문자열을 만들었는데,
     // 한글은 UTF-8에서 3바이트라 TCP 청크 경계가 글자 한가운데를 자르면 그 반쪽이
@@ -7781,6 +7814,7 @@ function startTcpServer() {
     const release = () => {
       if (released) return;
       released = true;
+      if (overflowTimer) { clearTimeout(overflowTimer); overflowTimer = null; }
       tcpActiveConnections = Math.max(0, tcpActiveConnections - 1);
     };
     socket.once('close', release);
