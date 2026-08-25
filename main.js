@@ -6671,17 +6671,20 @@ function startUdpDiscovery() {
           // 새로 켠(또는 방금 온라인이 된) 상대가 나를 최대 15초까지 기다리지 않도록,
           // 무거운 동기화와 무관하게 내 신호만 그 자리에서 바로 한 번 더 보낸다.
           sendPresencePingUnicast(rinfo.address);
-          // ⚠️ 실사고: 관리자가 원격으로 소부서 등을 고칠 때, 그 순간 당사자 PC가 꺼져
-          // 있었으면 PROFILE_OVERRIDE_SYNC를 못 받는다. 재접속할 때 이 PC가 하는 일은
-          // "당사자의 데이터를 나에게 보내 달라"는 요청(requestNoticeSync)뿐이라, 당사자는
-          // 끝까지 자기 subDept가 고쳐진 걸 모른 채 계속 옛 값을 방송했다("소부서로 지정된
-          // 컴퓨터와 관리자 PC만 업데이트했는데도 다시 원래대로 돌아간다"는 신고의 원인).
-          // 이 PC가 그 사람 IP에 대해 들고 있는 override가 있으면, 재접속하는 그 순간
-          // 곧바로 되돌려 보내 준다 — 당사자 PC가 스스로 알게 되는 유일한 경로다.
-          const overrideForPeer = profileOverrides.get(rinfo.address);
-          if (overrideForPeer) {
-            sendJsonToPeer(rinfo.address, { type: 'PROFILE_OVERRIDE_SYNC', profile: overrideForPeer });
-          }
+          // ⚠️ 실사고(제거됨): 예전에는 여기서 "이 PC가 그 사람 IP에 대해 들고 있는 override"를
+          // 재접속하는 당사자에게 곧바로 되돌려 보냈다. 관리자가 원격으로 고친 소부서를 당사자
+          // PC에도 알려주려는 의도였지만, 결과적으로 "남이 들고 있는 내 프로필 사본"이 내 PC로
+          // 흘러들어오는 통로가 됐다. 그 사본은 아주 예전 값일 수 있어서, 당사자가 설정 창에서
+          // 직접 고쳐 놓은 소부서·비고를 프로그램 켤 때마다 옛날 값으로 되돌려 놨다.
+          //
+          // 신버전은 받는 쪽에서 이미 "내 IP에 대한 남의 사본은 절대 받지 않는다"로 막았지만,
+          // 아직 업데이트 안 된 구버전 PC는 그 방어가 없어 계속 프로필이 바뀌었다("옛날 버전이
+          // 프로그램을 열면 프로필이 바뀐다"는 신고). 보내는 쪽에서 아예 안 보내면 구버전도
+          // 안전해지므로 이 푸시를 없앤다.
+          //
+          // 관리자가 고친 값은 그대로 유효하다 — 다른 PC들은 override를 계속 들고 있고,
+          // 당사자가 옛 값을 PING으로 방송해도 받는 쪽에서 저장된 override를 다시 얹기 때문에
+          // 화면에는 관리자가 고친 값이 정상적으로 보인다.
           // 마스터 세션 "한 곳에서만 로그인" — 재접속하는 이 상대가 오프라인이던 사이
           // 다른 PC에서 마스터로 로그인했을 수 있다. 내가 최신 로그인 소식을 들고 있으면
           // 재접속한 상대에게 곧바로 알려줘서, 그 상대가 계속 마스터로 남아있었다면
@@ -9379,11 +9382,17 @@ function handleNoticeSyncRequest(senderIP) {
                           const deletedScheduleUids = (deletedRows || []).map((r) => r.uid).filter(Boolean);
                           const deletedNoticeUids = (deletedNoticeRows || []).map((r) => r.uid).filter(Boolean);
                           const deletedOperatorUsernames = (deletedOperatorRows || []).map((r) => r.username).filter(Boolean);
+                          // ⚠️ 요청한 PC에게 "그 PC 자신의 프로필 사본"은 절대 보내지 않는다.
+                          // 이걸 보내면 상대는 자기 프로필을 남이 들고 있던 옛 값으로 덮어쓴다.
+                          // 신버전은 받는 쪽에서 막고 있지만 구버전 PC는 그 방어가 없어서,
+                          // 프로그램을 켤 때마다 소부서·비고가 옛날 값으로 되돌아갔다.
+                          const overridesForPeer = (profileOverridesRows || [])
+                            .filter((r) => String((r && r.ip) || '') !== String(senderIP));
                           const chunks = buildNoticeSyncPayloadChunks(
                             slimNotices,
                             operators || [],
                             schedules || [],
-                            profileOverridesRows || [],
+                            overridesForPeer,
                             deletedScheduleUids,
                             deletedNoticeUids,
                             deletedOperatorUsernames
@@ -10270,7 +10279,8 @@ function requestUiTextSyncFromOnlinePeers(limit) {
   });
 }
 
-function broadcastToOnlinePeers(payloadObj) {
+function broadcastToOnlinePeers(payloadObj, excludeIp) {
+  const skipIp = String(excludeIp || '');
   let wireData;
   try {
     wireData = JSON.stringify(payloadObj) + '\n';
@@ -10280,7 +10290,7 @@ function broadcastToOnlinePeers(payloadObj) {
   }
   const ips = [];
   onlineUsers.forEach((_u, ip) => {
-    if (ip && ip !== MY_IP) ips.push(ip);
+    if (ip && ip !== MY_IP && ip !== skipIp) ips.push(ip);
   });
   if (!ips.length) return;
   // 한꺼번에 connect 하면 작성 PC가 멈춘 것처럼 보이므로 소량씩 나눠 전송
@@ -12412,7 +12422,11 @@ ipcMain.handle('master-update-user-profile', async (event, payload) => {
   }
   storeProfileOverride(patch, '관리자직접입력');
   refreshUserAfterProfileOverride(ip);
-  broadcastToOnlinePeers({ type: 'PROFILE_OVERRIDE_SYNC', profile: patch });
+  // ⚠️ 당사자 PC에는 보내지 않는다. 신버전은 어차피 "내 IP에 대한 남의 값"을 거부하므로
+  // 보내봐야 무시되고, 구버전 PC는 그대로 받아들여 자기 프로필이 바뀌어 버린다.
+  // 다른 PC들이 override를 들고 있으면 당사자가 옛 값을 방송해도 화면에는 고친 값이
+  // 정상적으로 보이므로, 당사자 PC에 직접 알려줄 필요가 없다.
+  broadcastToOnlinePeers({ type: 'PROFILE_OVERRIDE_SYNC', profile: patch }, ip);
   return { success: true };
 });
 
