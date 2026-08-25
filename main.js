@@ -4504,7 +4504,7 @@ db.serialize(() => {
   )`, logDbErr);
   // 예전 버전에서 이미 notices 테이블이 만들어져 있던 PC는 위 CREATE TABLE이 그냥 무시되므로,
   // 없을 수 있는 컬럼들을 하나씩 추가해서 최신 구조로 맞춰준다. (이미 있으면 에러가 나지만 무시됨)
-  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT', 'category TEXT'].forEach(colDef => {
+  ['uid TEXT', 'title TEXT', 'content TEXT', 'author_name TEXT', 'author_ip TEXT', 'created_at TEXT', 'images TEXT', 'category TEXT', 'modified_at TEXT'].forEach(colDef => {
     alterAddColumn('notices', `${colDef}`);
   });
   // 카테고리 컬럼 보장 후 빈 값 보정 (기존 PC에서 INSERT 실패 방지)
@@ -8915,7 +8915,13 @@ function ensureNoticesTableSchema(done) {
     { name: 'author_ip', ddl: 'author_ip TEXT' },
     { name: 'created_at', ddl: 'created_at TEXT' },
     { name: 'images', ddl: "images TEXT DEFAULT ''" },
-    { name: 'category', ddl: "category TEXT DEFAULT '전체'" }
+    { name: 'category', ddl: "category TEXT DEFAULT '전체'" },
+    // ⚠️ 실사고: 일정(hospital_schedules)에는 modified_at이 있어 "오래된 사본이 최신 수정을
+    // 덮어쓰지 못하게" 막고 있었는데, 공지에는 이 컬럼 자체가 없어 upsertNoticeFromSync가
+    // 아무 비교 없이 무조건 덮어썼다. 그래서 공지를 수정하는 동안 꺼져 있던 PC가 나중에
+    // 켜져서 자기가 들고 있던 옛 사본을 동기화로 보내면, 애써 고친 내용이 예전 내용으로
+    // 되돌아갔다("공지를 수정했는데 다시 원래대로 돌아간다"). 일정과 같은 방식으로 막는다.
+    { name: 'modified_at', ddl: "modified_at TEXT DEFAULT ''" }
   ];
 
   db.run(
@@ -9117,22 +9123,27 @@ function handleNoticeUpdate(n) {
     const hasImagesField = n && Object.prototype.hasOwnProperty.call(n, 'images');
     const hasCategoryField = n && Object.prototype.hasOwnProperty.call(n, 'category');
     const category = hasCategoryField ? normalizeNoticeCategory(n.category) : null;
+    // 실시간으로 받은 수정도 시각을 함께 저장해야, 이 PC에서도 나중에 들어오는 남의 옛 사본이
+    // 이 수정을 되돌리지 못한다(저장 안 하면 이 PC만 무방비로 남는다).
+    const modAt = String((n && n.modified_at) || '');
+    const modSetSql = modAt ? ', modified_at = ?' : '';
+    const modParam = modAt ? [modAt] : [];
     if (hasImagesField && hasCategoryField) {
       const images = normalizeNoticeImagesField(n.images);
-      db.run(`UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`, [n.title, n.content, images, category, n.uid], () => {
+      db.run(`UPDATE notices SET title = ?, content = ?, images = ?, category = ?${modSetSql} WHERE uid = ?`, [n.title, n.content, images, category, ...modParam, n.uid], () => {
         notifyNoticesChanged();
       });
     } else if (hasImagesField) {
       const images = normalizeNoticeImagesField(n.images);
-      db.run(`UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`, [n.title, n.content, images, n.uid], () => {
+      db.run(`UPDATE notices SET title = ?, content = ?, images = ?${modSetSql} WHERE uid = ?`, [n.title, n.content, images, ...modParam, n.uid], () => {
         notifyNoticesChanged();
       });
     } else if (hasCategoryField) {
-      db.run(`UPDATE notices SET title = ?, content = ?, category = ? WHERE uid = ?`, [n.title, n.content, category, n.uid], () => {
+      db.run(`UPDATE notices SET title = ?, content = ?, category = ?${modSetSql} WHERE uid = ?`, [n.title, n.content, category, ...modParam, n.uid], () => {
         notifyNoticesChanged();
       });
     } else {
-      db.run(`UPDATE notices SET title = ?, content = ? WHERE uid = ?`, [n.title, n.content, n.uid], () => {
+      db.run(`UPDATE notices SET title = ?, content = ?${modSetSql} WHERE uid = ?`, [n.title, n.content, ...modParam, n.uid], () => {
         notifyNoticesChanged();
       });
     }
@@ -9940,13 +9951,18 @@ function upsertNoticeFromSync(n) {
     const category = hasCategory ? normalizeNoticeCategory(n.category) : null;
     const images = normalizeNoticeImagesField(n.images);
     ensureNoticesTableSchema(() => {
+      // 동기화로 받은 수정 시각도 함께 저장한다 — 저장하지 않으면 이 PC는 다음에 들어오는
+      // 또 다른 옛 사본에 다시 무방비가 된다.
+      const syncModAt = String((n && n.modified_at) || '');
+      const modSet = syncModAt ? ', modified_at = ?' : '';
+      const modArg = syncModAt ? [syncModAt] : [];
       const applyUpdate = (onDone) => {
         const sql = hasCategory
-          ? `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ? WHERE uid = ?`
-          : `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ? WHERE uid = ?`;
+          ? `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?, category = ?${modSet} WHERE uid = ?`
+          : `UPDATE notices SET title = ?, content = ?, author_name = ?, author_ip = ?, created_at = ?, images = ?${modSet} WHERE uid = ?`;
         const params = hasCategory
-          ? [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, n.uid]
-          : [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, n.uid];
+          ? [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, category, ...modArg, n.uid]
+          : [n.title, n.content, n.author_name, n.author_ip, n.created_at, images, ...modArg, n.uid];
         db.run(
           sql,
           params,
@@ -9972,8 +9988,19 @@ function upsertNoticeFromSync(n) {
       };
 
       // 이미 있으면 UPDATE만 — changes===0(동일 내용)이어도 INSERT/새 uid 생성 금지
-      db.get(`SELECT uid FROM notices WHERE uid = ?`, [n.uid], (selErr, existing) => {
+      db.get(`SELECT uid, modified_at FROM notices WHERE uid = ?`, [n.uid], (selErr, existing) => {
         if (existing) {
+          // ⚠️ 실사고(재현 완료): 예전엔 여기서 아무 비교 없이 무조건 덮어썼다. 그래서 공지를
+          // 수정하는 동안 꺼져 있던 PC가 나중에 켜져서 자기가 들고 있던 옛 사본을 동기화로
+          // 보내오면, 방금 고친 내용이 예전 내용으로 되돌아갔다. 일정(upsertScheduleFromSync)은
+          // 이미 modified_at을 비교해 막고 있었는데 공지만 무방비였다.
+          //
+          // 규칙: 이 PC에서 수정한 적이 없으면(localMod 없음) 예전처럼 그대로 받는다 —
+          // modified_at을 아직 안 보내는 구버전 PC와의 호환을 위해서다. 이 PC에 수정 이력이
+          // 있으면, 상대가 그보다 더 최신일 때만 받는다(시각 없는 옛 사본은 거절).
+          const localMod = String((existing && existing.modified_at) || '');
+          const remoteMod = String((n && n.modified_at) || '');
+          if (localMod && !(remoteMod && remoteMod >= localMod)) return;
           applyUpdate(() => {});
           return;
         }
@@ -12693,11 +12720,17 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
   return new Promise((resolve) => {
     const imagesJson = normalizeNoticeImagesField(images);
     const categoryNorm = normalizeNoticeCategory(category);
+    // 수정 시각을 남겨야 다른 PC의 옛 사본이 이 수정을 되돌리지 못한다(일정과 동일한 방식).
+    const modifiedAt = new Date().toISOString();
     ensureNoticesCategoryColumn(() => {
       db.run(
-        `UPDATE notices SET title = ?, content = ?, images = ?, category = ? WHERE uid = ?`,
-        [title, content, imagesJson, categoryNorm, uid],
-        (err) => {
+        `UPDATE notices SET title = ?, content = ?, images = ?, category = ?, modified_at = ? WHERE uid = ?`,
+        [title, content, imagesJson, categoryNorm, modifiedAt, uid],
+        // ⚠️ 실사고: 예전엔 오류만 없으면 무조건 success:true였다. 그런데 그 사이 다른 PC에서
+        // 그 공지를 삭제했다면 WHERE에 걸리는 행이 없어 아무것도 안 바뀌는데도 "수정되었습니다"
+        // 라고 알려, 쓴 사람은 반영된 줄 알고 창을 닫았다. 일정(edit-schedule)은 이미
+        // this.changes === 0을 확인하고 있다 — 같은 방식으로 맞춘다.
+        function onUpdateNotice(err) {
           if (err && isSqliteCorruptError(err)) {
             scheduleDbCorruptRecovery('update-notice');
             resolve({ success: false, msg: DB_CORRUPT_USER_MSG, corrupt: true });
@@ -12707,25 +12740,33 @@ ipcMain.handle('update-notice', async (event, { uid, title, content, images, cat
             db.run(
               `UPDATE notices SET title = ?, content = ?, images = ? WHERE uid = ?`,
               [title, content, imagesJson, uid],
-              (err2) => {
+              function onUpdateNoticeFallback(err2) {
                 if (err2 && isSqliteCorruptError(err2)) {
                   scheduleDbCorruptRecovery('update-notice');
                   resolve({ success: false, msg: DB_CORRUPT_USER_MSG, corrupt: true });
                   return;
                 }
+                if (!err2 && this && this.changes === 0) {
+                  resolve({ success: false, msg: '이미 삭제된 공지입니다. (다른 PC에서 삭제되었을 수 있습니다.)' });
+                  return;
+                }
                 if (!err2) notifyNoticesChanged();
                 resolve({ success: !err2, msg: err2 ? userFacingDbError(err2) : undefined });
                 if (!err2) {
-                  setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
+                  setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm, modified_at: modifiedAt }));
                 }
               }
             );
             return;
           }
+          if (!err && this && this.changes === 0) {
+            resolve({ success: false, msg: '이미 삭제된 공지입니다. (다른 PC에서 삭제되었을 수 있습니다.)' });
+            return;
+          }
           if (!err) notifyNoticesChanged();
           resolve({ success: !err, msg: err ? userFacingDbError(err) : undefined });
           if (!err) {
-            setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm }));
+            setImmediate(() => broadcastNoticeWire('NOTICE_UPDATE', { uid, title, content, images: imagesJson, category: categoryNorm, modified_at: modifiedAt }));
           }
         }
       );
