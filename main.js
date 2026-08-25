@@ -235,8 +235,12 @@ let noticeOperatorDisplayNameSession = '';
 let noticeOperatorUsernameSession = '';
 /** ip → { username, rank, dept, floor, extNo, phone } — 마스터가 지정한 표시 정보 */
 const profileOverrides = new Map();
-let toastWindow = null;
-let toastDismissTimer = null;
+// ⚠️ 실사고: 예전엔 토스트 창이 하나뿐이라(toastWindow 단일 변수), 새 메시지가 오면
+// 아직 확인도 답장도 안 한 이전 토스트를 그냥 닫고 그 자리를 차지했다 — 여러 명에게서
+// 몰아서 메시지가 오면 맨 마지막 것만 보이고 앞의 것들은 확인할 새도 없이 사라졌다.
+// 채널(발신자)별로 토스트를 따로 열어 여러 개가 동시에 화면에 쌓이게 하고, 한쪽을
+// 닫으면 나머지가 자리를 채우도록 다시 배치한다.
+const toastEntries = new Map(); // channelKey -> { win, dismissTimer }
 /** 렌더러: 지금 보고 있는 대화방 + 창 포커스 (같은 방이면 토스트 생략) */
 let toastUiState = { focused: false, activeChannelKey: '' };
 let tray = null;
@@ -815,7 +819,6 @@ let toastStayUntilDismissed = true;
  *  한다. 그 대신 메시지를 입력하던 중이었다면 타이핑이 그 순간 끊긴다 — 그래서 기본은
  *  꺼짐이고, 설정에서 직접 켜야만 동작한다. */
 let toastKeyboardOpenEnabled = false;
-let pendingToastChannelKey = '';
 /** channelKey → 알림 유지 만료시각 — 동일 발신/채널은 알림 1개만 */
 const activeIncomingNotifyUntil = new Map();
 let spellCheckerEnabled = false;
@@ -1447,16 +1450,53 @@ function getDisplayForIncomingToast() {
   }
 }
 
-function closeMessageToast() {
-  clearTimeout(toastDismissTimer);
-  toastDismissTimer = null;
-  const key = pendingToastChannelKey;
-  if (key) activeIncomingNotifyUntil.delete(key);
-  if (toastWindow && !toastWindow.isDestroyed()) {
-    toastWindow.close();
+/** 화면에 지금 떠 있는 토스트 개수만큼, 위에서부터 세로로 쌓이도록 위치를 계산한다. */
+function toastStackPosition(index, display) {
+  const work = display.workArea || display.bounds;
+  const width = 420;
+  const height = 168;
+  const gap = 10;
+  const x = Math.round(work.x + (work.width - width) / 2);
+  const y = Math.round(work.y + 24 + index * (height + gap));
+  return { x, y };
+}
+
+/** 열려 있는 토스트들을 쌓인 순서대로 다시 배치한다 — 하나가 닫히면 아래 것들이
+ *  그 자리를 채우도록(일반적인 알림 스택 UX) 호출된다. */
+function repositionToasts() {
+  const display = getDisplayForIncomingToast();
+  let i = 0;
+  for (const entry of toastEntries.values()) {
+    if (!entry || !entry.win || entry.win.isDestroyed()) continue;
+    const pos = toastStackPosition(i, display);
+    try { entry.win.setPosition(pos.x, pos.y); } catch (e) { /* ignore */ }
+    i += 1;
   }
-  toastWindow = null;
-  pendingToastChannelKey = '';
+}
+
+/** channelKey 하나의 토스트만 닫는다. channelKey를 안 주면(구버전 호출 호환) 아무 것도
+ *  하지 않는다 — 예전처럼 "가장 최근 토스트 하나"라는 개념이 이제 없기 때문이다. */
+function closeMessageToast(channelKey) {
+  const key = String(channelKey || '');
+  const entry = toastEntries.get(key);
+  if (!entry) return;
+  clearTimeout(entry.dismissTimer);
+  toastEntries.delete(key);
+  activeIncomingNotifyUntil.delete(key);
+  if (entry.win && !entry.win.isDestroyed()) {
+    entry.win.close();
+  }
+  repositionToasts();
+}
+
+/** event.sender(토스트 창의 webContents)로 그 창이 어느 channelKey인지 역으로 찾는다. */
+function channelKeyForToastSender(senderWebContents) {
+  for (const [key, entry] of toastEntries) {
+    if (entry && entry.win && !entry.win.isDestroyed() && entry.win.webContents === senderWebContents) {
+      return key;
+    }
+  }
+  return '';
 }
 
 function truncateToastText(text, maxLen) {
@@ -1468,27 +1508,39 @@ function truncateToastText(text, maxLen) {
 
 function showMessageToast({ title, body, urgent, channelKey, force }) {
   if (!force && !notifyIncomingMessages) return;
+  const key = String(channelKey || '');
+
+  // 같은 상대(채널)에게서 온 메시지라면 새 토스트를 또 띄우지 않고 기존 것을 새 내용으로
+  // 갱신한다 — 그래야 그 사람에게서 여러 통이 와도 토스트가 계속 쌓이지 않는다.
+  const existing = toastEntries.get(key);
+  if (existing && existing.win && !existing.win.isDestroyed()) {
+    clearTimeout(existing.dismissTimer);
+    existing.dismissTimer = null;
+    const q = new URLSearchParams({
+      title: truncateToastText(title || '새 메시지', 48),
+      body: truncateToastText(body || '', 72),
+      urgent: urgent ? '1' : '0',
+      keyboardOpen: toastKeyboardOpenEnabled ? '1' : '0'
+    });
+    existing.win.loadFile(path.join(__dirname, 'toast.html'), { search: `?${q.toString()}` });
+    if (!toastStayUntilDismissed) {
+      const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
+      const ms = (urgent ? secs + 2 : secs) * 1000;
+      existing.dismissTimer = setTimeout(() => closeMessageToast(key), ms);
+    }
+    return;
+  }
+
   const display = getDisplayForIncomingToast();
-  const work = display.workArea || display.bounds;
+  const pos = toastStackPosition(toastEntries.size, display);
   const width = 420;
   const height = 168;
-  // 화면(작업 영역) 정중앙
-  const x = Math.round(work.x + (work.width - width) / 2);
-  const y = Math.round(work.y + (work.height - height) / 2);
 
-  clearTimeout(toastDismissTimer);
-  toastDismissTimer = null;
-  if (toastWindow && !toastWindow.isDestroyed()) {
-    toastWindow.close();
-  }
-  toastWindow = null;
-  pendingToastChannelKey = String(channelKey || '');
-
-  toastWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width,
     height,
-    x,
-    y,
+    x: pos.x,
+    y: pos.y,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -1505,6 +1557,9 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
     }
   });
 
+  const entry = { win, dismissTimer: null };
+  toastEntries.set(key, entry);
+
   const q = new URLSearchParams({
     title: truncateToastText(title || '새 메시지', 48),
     body: truncateToastText(body || '', 72),
@@ -1512,23 +1567,31 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
     keyboardOpen: toastKeyboardOpenEnabled ? '1' : '0'
   });
 
-  toastWindow.loadFile(path.join(__dirname, 'toast.html'), { search: `?${q.toString()}` });
-  toastWindow.once('ready-to-show', () => {
-    if (!toastWindow || toastWindow.isDestroyed()) return;
+  win.loadFile(path.join(__dirname, 'toast.html'), { search: `?${q.toString()}` });
+  win.once('ready-to-show', () => {
+    if (win.isDestroyed()) return;
     // 기본은 포커스를 뺏지 않는 showInactive() — 메시지를 입력하던 중이면 타이핑이 안
     // 끊긴다. 설정에서 "스페이스바/엔터로 열기"를 켠 경우에만 포커스를 가져가 키 입력을
     // 받을 수 있게 한다(사용자가 그 트레이드오프를 직접 선택했을 때만).
-    if (toastKeyboardOpenEnabled) toastWindow.show();
-    else toastWindow.showInactive();
+    if (toastKeyboardOpenEnabled) win.show();
+    else win.showInactive();
   });
-  toastWindow.on('closed', () => { toastWindow = null; });
+  win.on('closed', () => {
+    // X 버튼 없이 다른 방식(예: Alt+F4)으로 창이 닫혔을 수도 있으니 안전하게 정리한다.
+    if (toastEntries.get(key) === entry) {
+      toastEntries.delete(key);
+      activeIncomingNotifyUntil.delete(key);
+      repositionToasts();
+    }
+  });
 
   // 「확인할 때까지 유지」가 켜져 있으면 자동으로 닫는 타이머를 아예 걸지 않는다 —
-  // 사용자가 「닫기」·「읽기」·X를 눌러야만(또는 새 메시지가 이 토스트를 대체할 때) 사라진다.
+  // 사용자가 「닫기」·「읽기」·X를 눌러야만 사라진다. 이제 새 메시지가 다른 토스트를
+  // 대체하지 않으므로(채널별로 각자 쌓임), 이 설정이 이름 그대로 지켜진다.
   if (!toastStayUntilDismissed) {
     const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
     const ms = (urgent ? secs + 2 : secs) * 1000;
-    toastDismissTimer = setTimeout(() => closeMessageToast(), ms);
+    entry.dismissTimer = setTimeout(() => closeMessageToast(key), ms);
   }
 }
 
@@ -5961,22 +6024,23 @@ ipcMain.handle('close-schedule-board-window', async (event) => {
   return { success: false };
 });
 
-ipcMain.on('message-toast-activate', () => {
-  const key = pendingToastChannelKey;
-  closeMessageToast();
+ipcMain.on('message-toast-activate', (event) => {
+  const key = channelKeyForToastSender(event.sender);
+  closeMessageToast(key);
   showAndFocusWindow();
   if (key && mainWindow) safeWebContentsSend('open-chat-from-toast', { channelKey: key });
 });
 
-ipcMain.on('message-toast-open', () => {
-  const key = pendingToastChannelKey;
-  closeMessageToast();
+ipcMain.on('message-toast-open', (event) => {
+  const key = channelKeyForToastSender(event.sender);
+  closeMessageToast(key);
   showAndFocusWindow();
   if (key && mainWindow) safeWebContentsSend('open-chat-from-toast', { channelKey: key });
 });
 
-ipcMain.on('message-toast-close', () => {
-  closeMessageToast();
+ipcMain.on('message-toast-close', (event) => {
+  const key = channelKeyForToastSender(event.sender);
+  closeMessageToast(key);
 });
 
 ipcMain.on('toast-ui-state', (_, state) => {
