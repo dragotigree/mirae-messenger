@@ -12264,24 +12264,39 @@
       if (btn) { btn.disabled = true; btn.textContent = '전송 중…'; }
       let ok = 0;
       let fail = 0;
+      let firstError = '';
       for (const ip of ips) {
         try {
-          await window.api.sendMessage(ip, html, false);
-          ok += 1;
+          const res = await window.api.sendMessage(ip, html, false);
+          // ⚠️ 실사고: 예전엔 예외만 잡고 반환값(status)은 보지 않았다. 그런데 send-message는
+          // 첨부가 전송 한도(약 400KB)를 넘거나·DB 저장에 실패하거나·메신저 사용이 중지된
+          // 경우 예외를 던지지 않고 {status:'ERROR'}를 정상적으로 "반환"한다. 그래서 실제로는
+          // 저장도 전송도 대기열 등록도 전혀 안 됐는데(완전 유실) "N명에게 쪽지를 보냈습니다"
+          // 라고 성공으로 알려, 보낸 사람은 사라진 걸 알 방법이 없었다. 쪽지에 사진 첨부가
+          // 생긴 뒤로는 여러 장 넣으면 한도를 넘기 쉬워 실제로 발생할 수 있는 상황이다.
+          // 일반 대화 전송(sendCurrentMessage)은 이미 status를 확인하고 있다 — 동일하게 맞춘다.
+          if (!res || res.status === 'ERROR') {
+            fail += 1;
+            if (!firstError) firstError = (res && (res.error || res.msg)) || '';
+          } else {
+            ok += 1;
+          }
         } catch (e) {
           fail += 1;
         }
       }
       if (btn) { btn.disabled = false; btn.textContent = '보내기'; }
+      if (ok > 0) invalidateCompactRecentConversations();
       if (fail === 0) {
         closeIpmsgSendModal();
         await appAlert(`${ok}명에게 쪽지를 보냈습니다.`);
-        return;
       } else {
-        await appAlert(`${ok}명 성공, ${fail}명 실패했습니다. 네트워크·상대 접속 상태를 확인해 주세요.`);
-        return;
+        // 실패가 있으면 창을 닫지 않는다 — 사진을 빼거나 내용을 줄여 바로 다시 보낼 수 있게.
+        await appAlert(
+          `${ok}명 성공, ${fail}명 실패했습니다.\n\n`
+          + (firstError || '네트워크·상대 접속 상태를 확인해 주세요.')
+        );
       }
-      renderUserListTree();
     }
 
     async function snapCompactWindowEdge(edge) {
