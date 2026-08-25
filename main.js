@@ -3201,6 +3201,34 @@ function getAppNativeIcon() {
   return cachedAppIcon;
 }
 
+let cachedTrayIconDot = null;
+/**
+ * ⚠️ 실사고: 작업 표시줄 배지(setOverlayIcon)는 메인 창의 "작업 표시줄 버튼" 위에
+ * 그리는 것이다. 그런데 이 앱은 X 버튼으로 닫을 때 종료하지 않고 mainWindow.hide()로
+ * 트레이에 숨긴다(사생활 보호 목적으로 의도된 동작) — 창이 숨겨지면 Windows 작업
+ * 표시줄에서 그 창의 버튼 자체가 사라지므로, Windows 설정을 아무리 맞춰도 배지를 그릴
+ * 자리가 없다. 메신저는 대부분 이렇게 트레이에 숨겨둔 채로 쓰는 게 정상적인 사용
+ * 방식이라("타 부서에서 안 된다"는 신고가 이 케이스일 가능성이 높다), 창이 숨겨져
+ * 있어도 항상 보이는 트레이 아이콘에 빨간 점을 얹어 안읽음이 있음을 알려준다.
+ */
+function getTrayIconWithUnreadDot() {
+  if (cachedTrayIconDot) return cachedTrayIconDot;
+  const base = getTrayIcon();
+  try {
+    const size = 16;
+    const pngDataUrl = base.toDataURL();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">`
+      + `<image href="${pngDataUrl}" width="${size}" height="${size}" />`
+      + `<circle cx="${size - 4}" cy="4" r="4.2" fill="#ef4444" stroke="#ffffff" stroke-width="1.4" />`
+      + `</svg>`;
+    const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
+    cachedTrayIconDot = img.isEmpty() ? base : img.resize({ width: size, height: size, quality: 'best' });
+  } catch (e) {
+    cachedTrayIconDot = base;
+  }
+  return cachedTrayIconDot;
+}
+
 /** Windows 트레이: 16px 전용 아이콘 (큰 PNG 축소 시 깨짐 방지) */
 function getTrayIcon() {
   if (cachedTrayIcon) return cachedTrayIcon;
@@ -15050,12 +15078,18 @@ ipcMain.handle('update-unread-badge', async (event, payload) => {
     const enabled = !!(payload && payload.enabled);
     const count = Math.max(0, Number(payload && payload.count) || 0);
     if (process.platform === 'win32') {
-      if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
-      if (enabled && count > 0) {
-        const icon = getTaskbarBadgeIcon(count);
-        if (icon) mainWindow.setOverlayIcon(icon, `안읽은 메시지 ${count}개`);
-      } else {
-        mainWindow.setOverlayIcon(null, '');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (enabled && count > 0) {
+          const icon = getTaskbarBadgeIcon(count);
+          if (icon) mainWindow.setOverlayIcon(icon, `안읽은 메시지 ${count}개`);
+        } else {
+          mainWindow.setOverlayIcon(null, '');
+        }
+      }
+      // 창을 트레이로 숨겨 놓은 동안엔 작업 표시줄 버튼 자체가 없어 위 오버레이가 안
+      // 보인다 — 그 경우에도 확인 가능하도록 트레이 아이콘에도 같은 표시를 얹는다.
+      if (tray && !tray.isDestroyed()) {
+        tray.setImage((enabled && count > 0) ? getTrayIconWithUnreadDot() : getTrayIcon());
       }
     } else if (app.setBadgeCount) {
       app.setBadgeCount(enabled ? count : 0);
