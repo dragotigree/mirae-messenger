@@ -15089,7 +15089,17 @@ ipcMain.handle('update-unread-badge', async (event, payload) => {
       // 창을 트레이로 숨겨 놓은 동안엔 작업 표시줄 버튼 자체가 없어 위 오버레이가 안
       // 보인다 — 그 경우에도 확인 가능하도록 트레이 아이콘에도 같은 표시를 얹는다.
       if (tray && !tray.isDestroyed()) {
-        tray.setImage((enabled && count > 0) ? getTrayIconWithUnreadDot() : getTrayIcon());
+        const hasUnread = enabled && count > 0;
+        tray.setImage(hasUnread ? getTrayIconWithUnreadDot() : getTrayIcon());
+        // 점만으로는 "누구에게서 왔는지" 알 수 없다는 요청 — 트레이 아이콘에 마우스를
+        // 올리면 안읽음 개수와 보낸 사람 요약이 툴팁으로 보이게 한다.
+        const summary = String((payload && payload.summary) || '').trim();
+        // Windows 트레이 툴팁은 대략 127자 제한이 있다 — 넘으면 그냥 잘리거나 안 보일 수
+        // 있어 미리 넉넉히 잘라 안전하게 맞춘다.
+        const tip = hasUnread
+          ? `미래병원 사내 메신저\n안읽은 메시지 ${count}개${summary ? `\n${summary}` : ''}`
+          : '미래병원 사내 메신저';
+        tray.setToolTip(tip.length > 120 ? `${tip.slice(0, 119)}…` : tip);
       }
     } else if (app.setBadgeCount) {
       app.setBadgeCount(enabled ? count : 0);
