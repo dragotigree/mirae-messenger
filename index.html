@@ -1451,7 +1451,7 @@
     .msg-row.msg-actions-open, .msg-row-bubble.msg-actions-open { z-index: 5; }
 
     .pin-btn, .copy-btn, .msg-edit-btn, .msg-delete-btn, .msg-react-btn, .share-btn, .reply-btn,
-    .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn {
+    .bubble-copy-btn, .bubble-share-btn, .bubble-edit-btn, .bubble-delete-btn, .msg-quick-react-btn {
       position: static; flex-shrink: 0;
       background: rgba(255, 255, 255, 0.96); color: var(--text-primary);
       border: 1px solid rgba(226, 232, 240, 0.95); border-radius: var(--radius-md);
@@ -1462,7 +1462,7 @@
       -webkit-app-region: no-drag;
     }
     .pin-btn:hover, .copy-btn:hover, .msg-edit-btn:hover, .msg-delete-btn:hover, .msg-react-btn:hover, .share-btn:hover, .reply-btn:hover,
-    .bubble-copy-btn:hover, .bubble-share-btn:hover, .bubble-edit-btn:hover, .bubble-delete-btn:hover {
+    .bubble-copy-btn:hover, .bubble-share-btn:hover, .bubble-edit-btn:hover, .bubble-delete-btn:hover, .msg-quick-react-btn:hover {
       transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1); background: #fff;
     }
     .msg-delete-btn, .bubble-delete-btn { color: #dc2626; }
@@ -23867,6 +23867,14 @@
         deleteThisMessage(uid);
         return;
       }
+      const quickReactBtn = e.target.closest('.msg-quick-react-btn');
+      if (quickReactBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        submitMessageReaction(quickReactBtn.getAttribute('data-quick-react-key'), quickReactBtn.getAttribute('data-quick-react-emoji'));
+        closeOpenMsgActions();
+        return;
+      }
       const reactBtn = e.target.closest('.msg-react-btn, .reaction-add-btn');
       if (reactBtn) {
         e.preventDefault();
@@ -23947,6 +23955,9 @@
       if (!list.length) html = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">검색 결과가 없습니다</div>`;
       body.innerHTML = html;
     }
+
+    // 메시지 위에서 바로 클릭 가능한 기본 반응 3개 — 개인 설정 없이 고정값으로 시작.
+    const QUICK_REACTION_EMOJIS = ['👍', '✅', '❤️'];
 
     function openReactionPicker(anchorEl, msgKey) {
       if (!msgKey) return;
@@ -24271,6 +24282,13 @@
         : '';
       const canReact = reactionKey && !isDeletedAlready && !isSystemNotice && activeChatUser;
       const reactBtnHtml = canReact ? `<button type="button" class="msg-react-btn" data-reaction-key="${escapeMsgUidAttr(reactionKey)}" title="리액션">😊</button>` : '';
+      // 자주 쓰는 반응(👍✅❤️)은 전체 선택창을 열지 않고 바로 한 번에 누를 수 있게 —
+      // "이모티콘 눌러서 진입해야 하는 게 불편하다"는 요청으로 추가.
+      const quickReactBtnHtml = canReact
+        ? QUICK_REACTION_EMOJIS.map((e) =>
+            `<button type="button" class="msg-quick-react-btn" data-quick-react-key="${escapeMsgUidAttr(reactionKey)}" data-quick-react-emoji="${e}" title="${e} 바로 반응">${e}</button>`
+          ).join('')
+        : '';
       const canReply = reactionKey && !isDeletedAlready && !isSystemNotice && activeChatUser;
       const replyBtnHtml = canReply ? `<button type="button" class="reply-btn" title="답장" onclick="replyThisMessage(this)">↩️</button>` : '';
       const reactionsHostHtml = canReact ? `<div class="msg-reactions" data-reaction-host="${escapeMsgUidAttr(reactionKey)}"></div>` : '';
@@ -24317,7 +24335,7 @@
                 <div class="chat-bubble">${displayMsg}</div>
                 ${bubbleMetaAfter}
               </div>
-              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button></span>
+              <span class="bubble-action-btns">${bubbleEditBtnsHtml}${replyBtnHtml}${quickReactBtnHtml}${reactBtnHtml}<button type="button" class="bubble-copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button><button type="button" class="share-btn bubble-share-btn" title="전달" onclick="shareThisMessage(this)">↪️</button></span>
             </div>
             ${pendingNoticeHtml}
             ${reactionsHostHtml}
@@ -24348,6 +24366,7 @@
               <div class="msg-action-btns">
                 ${editDeleteActionHtml}
                 ${replyBtnHtml}
+                ${quickReactBtnHtml}
                 ${reactBtnHtml}
                 <button type="button" class="copy-btn" title="복사" onclick="copyThisMessage(this)">📋</button>
                 <button type="button" class="share-btn" title="다른 사람에게 전달" onclick="shareThisMessage(this)">↪️</button>
