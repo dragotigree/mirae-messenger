@@ -11845,6 +11845,11 @@
         // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
         pendingDmReadPeers.add(data.senderIP);
         if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
+      } else if (data.openInStandaloneWindow && !document.body.classList.contains('chat-window-standalone')) {
+        // 이 창(메인 창)에서는 안 보고 있지만, 별도 채팅창에서 이미 보고 있는 대화다.
+        // 별도 창 쪽 스크립트가 실제로 화면에 그려주므로, 여기서는 안읽음만 올리지 않는다.
+        rememberPendingInbound(data.senderIP, data);
+        markRecentDmUiFingerprint(fp);
       } else {
         bumpUnread(data.senderIP);
         rememberPendingInbound(data.senderIP, data);
@@ -12709,6 +12714,12 @@
         compactListFilter = 'all';
         localStorage.setItem('compactListFilter', 'all');
       }
+      // 일반 모드(setSidebarRailFilter)와 동일한 이유 — 검색 중에 즐겨찾기·그룹채팅방
+      // 탭으로 넘어가면 검색어가 그대로 남아, 검색 결과 안에서만 걸러져 목록이 텅 비어
+      // 보였다. 이 두 탭으로 이동할 때는 검색을 초기화한다.
+      if ((tab === 'favorites' || tab === 'groups') && userFilterKeyword) {
+        filterUserList('');
+      }
       document.querySelectorAll('.compact-rail-btn[data-rail]').forEach((btn) => {
         btn.classList.toggle('is-active', btn.dataset.rail === tab);
       });
@@ -12928,7 +12939,7 @@
       subNames.forEach((subName) => {
         const subUsers = subGroups[subName];
         const subCollapseKey = `${groupingKey}:${groupName}::sub:${subName}`;
-        const subCollapsed = collapsedGroups.has(subCollapseKey);
+        const subCollapsed = !userFilterKeyword && collapsedGroups.has(subCollapseKey);
         const subBlock = document.createElement('div');
         subBlock.className = 'compact-subdept-block';
 
@@ -12956,7 +12967,7 @@
     function createCompactPanel(titleHtml, badgeHtml, collapseKey) {
       const panel = document.createElement('div');
       panel.className = 'compact-list-panel';
-      const collapsed = !!(collapseKey && collapsedGroups.has(collapseKey));
+      const collapsed = !!(collapseKey && !userFilterKeyword && collapsedGroups.has(collapseKey));
       const label = document.createElement('div');
       label.className = `compact-section-label${collapseKey ? ' is-toggle' : ''}${collapsed ? ' is-collapsed' : ''}`;
       const chevronHtml = collapseKey ? '<span class="group-chevron">▾</span>' : '';
@@ -16694,7 +16705,7 @@
       subNames.forEach((subName) => {
         const subUsers = subGroups[subName];
         const subCollapseKey = `${groupingKey}:${groupName}::sub:${subName}`;
-        const subCollapsed = collapsedGroups.has(subCollapseKey);
+        const subCollapsed = !userFilterKeyword && collapsedGroups.has(subCollapseKey);
         const subBlock = document.createElement('div');
         subBlock.className = 'user-subdept-block';
         subBlock.dataset.subDeptName = subName;
@@ -16915,7 +16926,10 @@
         groupUsers.sort(compareUsersSidebarOrder);
 
         const collapseKey = `${groupingKey}:${groupName}`;
-        const isCollapsed = collapsedGroups.has(collapseKey);
+        // 검색 중에는 저장된 접힘 상태를 무시하고 항상 펼쳐서 보여준다 — 검색으로 찾은
+        // 사람이 접혀 있는 부서/층 안에 숨어 있으면 결과가 안 보이는 것처럼 느껴졌다.
+        // localStorage는 건드리지 않으므로 검색을 지우면 원래 접힘 상태로 돌아간다.
+        const isCollapsed = !userFilterKeyword && collapsedGroups.has(collapseKey);
         const groupUnread = getGroupHeaderUnread(groupingKey, groupName, groupUsers);
 
         const block = document.createElement('div');

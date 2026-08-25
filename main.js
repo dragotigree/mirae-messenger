@@ -8124,7 +8124,13 @@ function handleIncomingChat(payload, senderIP) {
         message: payload.message,
         urgent: !!payload.urgent,
         createdAt: currentTime,
-        uid
+        uid,
+        // ⚠️ 실사고: 이 대화를 별도 창(chatWindows)으로 띄워 놓고 실제로 보고 있어도,
+        // 메인 창은 그 사실을 전혀 모른 채 자기 activeChatUser 기준으로만 안읽음을
+        // 올렸다. 그래서 별도 창에서 방금 읽은 메시지인데도 작업표시줄 배지 숫자가
+        // 올라가는 불일치가 생겼다("배지 숫자가 실제 메시지 개수와 안 맞는다"의 원인
+        // 중 하나). 별도 창이 이미 떠 있으면 메인 창에 알려 안읽음을 올리지 않게 한다.
+        openInStandaloneWindow: chatWindows.has(senderIP)
       };
       if (mainWindow) {
         sendChatEvent('receive-message', uiPayload);
