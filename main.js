@@ -1461,9 +1461,9 @@ function toastStackPosition(index, display) {
   const x = Math.round(work.x + (work.width - width) / 2);
   // ⚠️ 예전엔 화면 맨 위(work.y + 24)에 띄웠는데, "화면 중앙에서 살짝 위" 정도가
   // 눈에 더 잘 들어온다는 요청 — 화면 맨 위는 다른 창 제목 표시줄 등에 가려지거나
-  // 시선이 잘 안 가서 놓치기 쉬웠다. 세로 중앙보다 살짝 위(35% 지점)를 시작점으로
-  // 삼고, 여러 개가 쌓이면 그 아래로 이어서 배치한다.
-  const baseY = Math.round(work.y + work.height * 0.35);
+  // 시선이 잘 안 가서 놓치기 쉬웠다. 35% 지점으로 옮겼는데도 "아직 너무 위쪽"이라는
+  // 후속 의견이 있어 정중앙(50%)보다 살짝 위인 44% 지점으로 다시 내렸다.
+  const baseY = Math.round(work.y + work.height * 0.44);
   const y = Math.round(baseY + index * (height + gap));
   return { x, y };
 }
