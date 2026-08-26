@@ -379,18 +379,28 @@
     #sidebar-alpha-sort-btn { width: auto; padding: 0 6px; }
     #sidebar-alpha-sort-btn.is-active { background: var(--accent-soft); color: var(--accent-dark); }
     .sidebar-header-icon-btn .icon-glyph { width: 14px; height: 14px; }
-    /* "층별"/"부서별" 이동 선택상자 — 옆의 아이콘 버튼들(24px, 옅은 배경, 테두리 없음)과
-     * 높이·모양을 맞춰서 한 줄이 하나의 툴바처럼 보이게 통일했다. */
-    .sidebar-jump-select {
-      height: 24px; padding: 0 17px 0 7px; border: none; border-radius: var(--radius-sm);
-      background-color: var(--surface-muted); color: var(--sidebar-text-dim);
-      font-size: 11.5px; font-weight: 700; cursor: pointer; max-width: 76px;
-      appearance: none; -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 6px center;
-      transition: background-color var(--transition-fast), color var(--transition-fast);
+    .sidebar-header-divider {
+      width: 1px; height: 14px; background: var(--border-soft); flex-shrink: 0; margin: 0 1px;
     }
-    .sidebar-jump-select:hover { background-color: var(--surface); color: var(--text-primary); }
+    /* "층"/"부서" 바로가기 — 원래 <select>였는데, 이 Electron 버전의 Chromium이
+     * HTMLSelectElement.showPicker()를 아직 지원하지 않아(막 그 다음 버전에서 추가됨)
+     * 숨긴 select를 여는 방식이 통하지 않았다. 아이콘 버튼 + 직접 그린 목록(팝오버)으로 교체. */
+    .sidebar-jump-trigger-wrap { position: relative; }
+    .sidebar-jump-menu {
+      position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+      min-width: 108px; max-height: 260px; overflow-y: auto;
+      background: var(--surface); border: 1px solid var(--border-soft);
+      border-radius: 12px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+      padding: 5px; display: none; flex-direction: column; gap: 1px;
+    }
+    .sidebar-jump-trigger-wrap.is-open .sidebar-jump-menu { display: flex; }
+    .sidebar-jump-menu-item {
+      border: none; background: transparent; border-radius: 8px; padding: 7px 9px;
+      font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
+      white-space: nowrap;
+    }
+    .sidebar-jump-menu-item:hover { background: var(--surface-muted); color: var(--text-primary); }
+    .sidebar-jump-menu-empty { padding: 8px 9px; font-size: 12px; color: #94a3b8; }
     #toolbar-refresh-btn.is-spinning .icon-glyph { animation: toolbar-refresh-spin 0.7s linear infinite; }
     @keyframes toolbar-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -5765,23 +5775,22 @@
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; flex-direction:column; row-gap:4px; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
-          <span style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="display:flex; align-items:center; gap:6px; min-width:0;"><span data-ui-icon="users"></span> 사용자</span>
-            <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-              <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em;">가나다</span>
-              <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
-              <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
-              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
+        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
+          <span style="display:flex; align-items:center; gap:6px; min-width:0; flex-shrink:0;"><span data-ui-icon="users"></span> 사용자</span>
+          <span style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em;">가나다</span>
+            <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
+            <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
+            <span class="sidebar-header-divider"></span>
+            <span class="sidebar-jump-trigger-wrap" id="sidebar-floor-jump-wrap">
+              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('floor')" title="층별로 보기 · 해당 층으로 이동" style="font-size:10.5px; font-weight:800; line-height:1;">층</span>
+              <div class="sidebar-jump-menu" id="sidebar-floor-jump-menu"></div>
             </span>
-          </span>
-          <span style="display:flex; justify-content:flex-end; flex-wrap:wrap; row-gap:4px; align-items:center; gap:4px;">
-            <select id="sidebar-floor-jump-select" class="sidebar-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('floor', this.value); this.value='';" title="층별로 보기 · 해당 층으로 이동">
-              <option value="">층별</option>
-            </select>
-            <select id="sidebar-dept-jump-select" class="sidebar-jump-select" onclick="event.stopPropagation()" onchange="event.stopPropagation(); jumpToUserGroupWithMode('dept', this.value); this.value='';" title="부서별로 보기 · 해당 부서로 이동">
-              <option value="">부서별</option>
-            </select>
+            <span class="sidebar-jump-trigger-wrap" id="sidebar-dept-jump-wrap">
+              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('dept')" title="부서별로 보기 · 해당 부서로 이동" style="font-size:10.5px; font-weight:800; line-height:1;">부서</span>
+              <div class="sidebar-jump-menu" id="sidebar-dept-jump-menu"></div>
+            </span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
           </span>
         </div>
@@ -15485,21 +15494,50 @@
      *  역할이 겹치지 않도록, 이 두 선택상자는 고르는 즉시 그 기준으로 바꾸고 그 자리로
      *  이동만 하는 "바로가기" 용도로만 쓴다. */
     function syncSidebarFloorDeptJumpSelects() {
-      const floorEl = document.getElementById('sidebar-floor-jump-select');
-      const deptEl = document.getElementById('sidebar-dept-jump-select');
-      if (!floorEl && !deptEl) return;
+      const floorMenu = document.getElementById('sidebar-floor-jump-menu');
+      const deptMenu = document.getElementById('sidebar-dept-jump-menu');
+      if (!floorMenu && !deptMenu) return;
+      const buildItems = (keys, kind) => keys.length
+        ? keys.map((name) => `<button type="button" class="sidebar-jump-menu-item" onclick="event.stopPropagation(); pickSidebarJump('${kind}', '${escapeHtml(name).replace(/'/g, "\\'")}')">${escapeHtml(name)}</button>`).join('')
+        : '<div class="sidebar-jump-menu-empty">항목 없음</div>';
       const restAll = allUsers || [];
-      if (floorEl) {
+      if (floorMenu) {
         const floorKeys = getOrderedUserGroupKeys('floor', collectUserGroupKeys('floor', restAll));
-        floorEl.innerHTML = '<option value="">층별</option>' +
-          floorKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+        floorMenu.innerHTML = buildItems(floorKeys, 'floor');
       }
-      if (deptEl) {
+      if (deptMenu) {
         const deptKeys = getOrderedUserGroupKeys('dept', collectUserGroupKeys('dept', restAll));
-        deptEl.innerHTML = '<option value="">부서별</option>' +
-          deptKeys.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+        deptMenu.innerHTML = buildItems(deptKeys, 'dept');
       }
     }
+
+    function toggleSidebarJumpMenu(kind) {
+      const targetId = kind === 'floor' ? 'sidebar-floor-jump-wrap' : 'sidebar-dept-jump-wrap';
+      const otherId = kind === 'floor' ? 'sidebar-dept-jump-wrap' : 'sidebar-floor-jump-wrap';
+      const other = document.getElementById(otherId);
+      if (other) other.classList.remove('is-open');
+      const wrap = document.getElementById(targetId);
+      if (wrap) wrap.classList.toggle('is-open');
+    }
+
+    function closeSidebarJumpMenus() {
+      const floorWrap = document.getElementById('sidebar-floor-jump-wrap');
+      const deptWrap = document.getElementById('sidebar-dept-jump-wrap');
+      if (floorWrap) floorWrap.classList.remove('is-open');
+      if (deptWrap) deptWrap.classList.remove('is-open');
+    }
+
+    function pickSidebarJump(kind, name) {
+      closeSidebarJumpMenus();
+      jumpToUserGroupWithMode(kind, name);
+    }
+
+    document.addEventListener('click', (e) => {
+      ['sidebar-floor-jump-wrap', 'sidebar-dept-jump-wrap'].forEach((id) => {
+        const wrap = document.getElementById(id);
+        if (wrap && wrap.classList.contains('is-open') && !wrap.contains(e.target)) wrap.classList.remove('is-open');
+      });
+    });
 
     /** 사이드바 상단 "층별"/"부서별" 바로가기 선택상자 — 고른 기준으로 목록을 묶어 보여주고
      *  (기존 setDirectoryListPref 재사용, 하단 토글 버튼과 완전히 같은 동작), 고른 층·부서
