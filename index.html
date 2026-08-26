@@ -3996,6 +3996,34 @@
       font-size: 11.5px; color: #475569; font-style: italic; line-height: 1.55;
     }
 
+    /* ⌨️ 기능 가이드 — 단축키 탭 */
+    .feature-guide-shortcut-section-label { font-size: 12px; font-weight: 800; color: #64748b; margin-bottom: 10px; letter-spacing: -0.1px; }
+    .feature-guide-shortcut-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    @media (max-width: 720px) { .feature-guide-shortcut-grid { grid-template-columns: 1fr; } }
+    .feature-guide-shortcut-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      background: #f8fafc; border: 1px solid #eef1f5; border-radius: var(--radius-md);
+    }
+    .feature-guide-kbd-group { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+    .feature-guide-kbd {
+      font-family: inherit; font-size: 11px; font-weight: 700; color: #1e293b;
+      background: #fff; border: 1px solid #cbd5e1; border-bottom-width: 2px;
+      border-radius: 6px; padding: 3px 7px; min-width: 18px; text-align: center; line-height: 1.3;
+    }
+    .feature-guide-kbd-plus { font-size: 10px; color: #94a3b8; padding: 0 1px; }
+    .feature-guide-shortcut-desc { font-size: 12px; color: #475569; line-height: 1.4; }
+    .feature-guide-shortcut-global {
+      display: inline-block; font-size: 9.5px; font-weight: 800; color: #0369a1;
+      background: #e0f2fe; border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px;
+    }
+    .feature-guide-workflow-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (max-width: 720px) { .feature-guide-workflow-list { grid-template-columns: 1fr; } }
+    .feature-guide-workflow-card { background: #f2f9ff; border: 1px solid #dceefc; border-radius: var(--radius-lg); padding: 14px 16px; }
+    .feature-guide-workflow-title { font-size: 12.5px; font-weight: 700; color: var(--accent-dark); margin-bottom: 8px; }
+    .feature-guide-workflow-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
+    .feature-guide-workflow-steps li { font-size: 12px; color: #475569; line-height: 1.5; }
+    .feature-guide-workflow-steps b { color: #1e293b; }
+
     /* 📜 전체 대화 기록 모달 */
     .modal-card.all-logs-modal-card {
       width: min(720px, 94vw); height: min(720px, 90vh); max-height: 90vh;
@@ -17439,11 +17467,84 @@
         tip: null
       }
     ];
+    /* ⌨️ 단축키 목록 — 코드 안의 실제 keydown 핸들러(위쪽 window.addEventListener('keydown', ...))와
+     * main.js의 globalShortcut.register 목록을 그대로 옮겨 적은 것. 단축키를 추가·변경·삭제할 때는
+     * 이 배열도 같은 커밋에서 함께 갱신한다(CLAUDE.md 규칙과 동일). */
+    const FEATURE_GUIDE_SHORTCUTS = [
+      { keys: ['Ctrl', '1'], desc: '최근 대화 빠른 전환(검색해서 바로 이동)' },
+      { keys: ['Ctrl', '2'], desc: '전체 대화 기록 열기' },
+      { keys: ['Ctrl', '3'], desc: '병동 일정 현황판 열기' },
+      { keys: ['Ctrl', '4'], desc: '즐겨찾기만 보기' },
+      { keys: ['Ctrl', '5'], desc: '채널 및 그룹 대화방만 보기' },
+      { keys: ['Ctrl', '`'], desc: '공지사항 열기' },
+      { keys: ['Ctrl', 'Shift', 'F'], desc: '사람(직원) 검색창 열기' },
+      { keys: ['Ctrl', 'F'], desc: '지금 보고 있는 대화 내용 검색' },
+      { keys: ['Ctrl', 'U'], desc: '다음 안읽은 대화로 바로 이동' },
+      { keys: ['Ctrl', 'W'], desc: '창을 트레이로 숨기기' },
+      { keys: ['Ctrl', 'V'], desc: '복사한 사진을 채팅창에 바로 붙여넣기' },
+      { keys: ['Enter'], desc: '메시지 전송(설정에서 「Enter로 줄바꿈」을 고르면 반대로 동작)' },
+      { keys: ['Shift', 'Enter'], desc: '메시지 줄바꿈' },
+      { keys: ['Esc'], desc: '검색·선택 취소, 대화창 닫기, 또는 화면 잠금(상황에 따라 다르게 동작)' },
+      { keys: ['Ctrl', 'Alt', 'S'], desc: '메신저가 안 켜져 있어도 어디서든 눌러서 바로 사람 검색', global: true },
+      { keys: ['Ctrl', 'Alt', 'E'], desc: '어디서든 눌러서 전체 대화 기록 열기', global: true }
+    ];
+    const FEATURE_GUIDE_WORKFLOWS = [
+      {
+        title: '어디서든 바로 대화 시작하기',
+        steps: ['다른 프로그램 쓰던 중이어도 <b>Ctrl+Alt+S</b>', '메신저가 앞으로 나오면서 검색창에 커서가 감', '이름을 치고 <b>Enter</b>로 대화 열기', '메시지를 쓰고 <b>Enter</b>로 전송']
+      },
+      {
+        title: '안읽은 대화 빠르게 훑어보기',
+        steps: ['<b>Ctrl+U</b>로 안읽은 대화가 있는 사람에게 바로 이동', '확인하거나 답장', '다시 <b>Ctrl+U</b>를 누르면 그다음 안읽은 대화로 이어서 이동']
+      },
+      {
+        title: '최근 대화로 빠르게 왔다갔다하기',
+        steps: ['<b>Ctrl+1</b>로 빠른 전환창 열기', '이름 일부만 입력해서 찾기', '화살표로 고르고 <b>Enter</b>로 바로 그 대화 열기']
+      },
+      {
+        title: '공지·현황판 빠르게 확인하기',
+        steps: ['<b>Ctrl+`</b>로 공지사항 바로 열기', '<b>Ctrl+3</b>으로 병동 일정 현황판 바로 열기', '<b>Esc</b>로 닫고 원래 보던 대화로 복귀']
+      }
+    ];
     let featureGuideActiveCat = 'all';
 
     function setFeatureGuideCat(key) {
       featureGuideActiveCat = key;
       renderFeatureGuide();
+    }
+
+    function renderFeatureGuideShortcutView(q) {
+      const listEl = document.getElementById('feature-guide-list');
+      const shortcuts = FEATURE_GUIDE_SHORTCUTS.filter((s) => !q || s.desc.toLowerCase().includes(q) || s.keys.join('+').toLowerCase().includes(q));
+      const workflows = FEATURE_GUIDE_WORKFLOWS.filter((w) => !q || (w.title + ' ' + w.steps.join(' ')).toLowerCase().includes(q));
+      if (!shortcuts.length && !workflows.length) {
+        listEl.innerHTML = `<div class="feature-guide-empty">일치하는 단축키가 없습니다.</div>`;
+        return;
+      }
+      listEl.innerHTML = `
+        ${shortcuts.length ? `
+          <div class="feature-guide-shortcut-section-label">키보드 단축키</div>
+          <div class="feature-guide-shortcut-grid">
+            ${shortcuts.map((s) => `
+              <div class="feature-guide-shortcut-item">
+                <span class="feature-guide-kbd-group">${s.keys.map((k) => `<kbd class="feature-guide-kbd">${escapeHtml(k)}</kbd>`).join('<span class="feature-guide-kbd-plus">+</span>')}</span>
+                <span class="feature-guide-shortcut-desc">${escapeHtml(s.desc)}${s.global ? ' <span class="feature-guide-shortcut-global">전역</span>' : ''}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${workflows.length ? `
+          <div class="feature-guide-shortcut-section-label" style="margin-top:22px;">빠르게 쓰는 법</div>
+          <div class="feature-guide-workflow-list">
+            ${workflows.map((w) => `
+              <div class="feature-guide-workflow-card">
+                <div class="feature-guide-workflow-title">${escapeHtml(w.title)}</div>
+                <ol class="feature-guide-workflow-steps">${w.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      `;
     }
 
     function renderFeatureGuide() {
@@ -17459,27 +17560,32 @@
       const matches = (item) => (featureGuideActiveCat === 'all' || item.cat === featureGuideActiveCat) && matchesQuery(item);
       const counts = { all: FEATURE_GUIDE_ITEMS.filter(matchesQuery).length };
       FEATURE_GUIDE_CATS.forEach((c) => { counts[c.key] = FEATURE_GUIDE_ITEMS.filter((it) => it.cat === c.key && matchesQuery(it)).length; });
-      const catButtons = [{ key: 'all', label: '전체' }, ...FEATURE_GUIDE_CATS];
+      counts.shortcut = FEATURE_GUIDE_SHORTCUTS.filter((s) => !q || s.desc.toLowerCase().includes(q) || s.keys.join('+').toLowerCase().includes(q)).length;
+      const catButtons = [{ key: 'all', label: '전체' }, ...FEATURE_GUIDE_CATS, { key: 'shortcut', label: '단축키' }];
       catsEl.innerHTML = catButtons.map((c) => `
         <button type="button" class="feature-guide-rail-cat${featureGuideActiveCat === c.key ? ' is-active' : ''}" onclick="setFeatureGuideCat('${c.key}')">
           <span>${c.label}</span><span class="feature-guide-rail-cat-count">${counts[c.key] ?? 0}</span>
         </button>
       `).join('');
-      const filtered = FEATURE_GUIDE_ITEMS.filter(matches);
-      listEl.innerHTML = filtered.length ? filtered.map((item, idx) => `
-        <div class="feature-guide-row">
-          <div class="feature-guide-row-index" style="background:${item.color};">${item.icon}</div>
-          <div class="feature-guide-row-body">
-            <div class="feature-guide-row-head">
-              <span class="feature-guide-row-title">${item.title}</span>
-              <span class="feature-guide-row-tag">${item.tag}</span>
+      if (featureGuideActiveCat === 'shortcut') {
+        renderFeatureGuideShortcutView(q);
+      } else {
+        const filtered = FEATURE_GUIDE_ITEMS.filter(matches);
+        listEl.innerHTML = filtered.length ? filtered.map((item, idx) => `
+          <div class="feature-guide-row">
+            <div class="feature-guide-row-index" style="background:${item.color};">${item.icon}</div>
+            <div class="feature-guide-row-body">
+              <div class="feature-guide-row-head">
+                <span class="feature-guide-row-title">${item.title}</span>
+                <span class="feature-guide-row-tag">${item.tag}</span>
+              </div>
+              <div class="feature-guide-row-path">➔ ${item.path}</div>
+              <div class="feature-guide-row-chips">${item.chips.map((c) => `<span class="feature-guide-row-chip">${c}</span>`).join('')}</div>
+              ${item.tip ? `<div class="feature-guide-row-tip">${item.tip}</div>` : ''}
             </div>
-            <div class="feature-guide-row-path">➔ ${item.path}</div>
-            <div class="feature-guide-row-chips">${item.chips.map((c) => `<span class="feature-guide-row-chip">${c}</span>`).join('')}</div>
-            ${item.tip ? `<div class="feature-guide-row-tip">${item.tip}</div>` : ''}
           </div>
-        </div>
-      `).join('') : `<div class="feature-guide-empty">일치하는 기능이 없습니다.</div>`;
+        `).join('') : `<div class="feature-guide-empty">일치하는 기능이 없습니다.</div>`;
+      }
       const badge = document.getElementById('feature-guide-version-badge');
       if (badge && window.api && window.api.getAppVersion) {
         window.api.getAppVersion().then((v) => { if (v) badge.textContent = `v${v}`; }).catch(() => {});
