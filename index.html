@@ -28923,7 +28923,7 @@
         renderStorageDetail(data);
         if (summaryEl) summaryEl.dataset.loadedOnce = '1';
       } catch (e) {
-        if (summaryEl) summaryEl.textContent = '불러오지 못했습니다.';
+        if (summaryEl) summaryEl.textContent = '불러오지 못했습니다.' + (e && e.message ? ` (${e.message})` : '');
       } finally {
         storageDetailLoading = false;
         if (refreshBtn) refreshBtn.classList.remove('is-spinning');

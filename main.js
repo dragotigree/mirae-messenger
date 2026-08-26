@@ -4304,6 +4304,7 @@ ipcMain.handle('get-storage-detail', async () => {
       }
     };
   } catch (e) {
+    try { writeToLogFile('error', `[storage-detail] 실패: ${e && e.stack ? e.stack : e}`); } catch (e2) { /* ignore */ }
     return { success: false, msg: e && e.message ? e.message : String(e) };
   }
 });
