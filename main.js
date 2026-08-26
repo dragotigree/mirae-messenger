@@ -3211,22 +3211,44 @@ let cachedTrayIconDot = null;
  * 방식이라("타 부서에서 안 된다"는 신고가 이 케이스일 가능성이 높다), 창이 숨겨져
  * 있어도 항상 보이는 트레이 아이콘에 빨간 점을 얹어 안읽음이 있음을 알려준다.
  */
+/** 아이콘을 그대로 두되, 뒤에 빨간 둥근 배경을 깔아 카카오톡처럼 "안읽음이 있다"가
+ * 한눈에 보이게 한다. base64 PNG를 <image>로 얹은 SVG를 다시 래스터화하는, 위
+ * createMessengerIcon과 같은 방식이다. */
+function iconWithRedBackground(baseIcon, size) {
+  const pngDataUrl = baseIcon.toDataURL();
+  const pad = Math.round(size * 0.08);
+  const inner = size - pad * 2;
+  const radius = Math.round(size * 0.28);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">`
+    + `<rect x="0" y="0" width="${size}" height="${size}" rx="${radius}" fill="#ef4444" />`
+    + `<image href="${pngDataUrl}" x="${pad}" y="${pad}" width="${inner}" height="${inner}" />`
+    + `</svg>`;
+  const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
+  return img.isEmpty() ? baseIcon : img.resize({ width: size, height: size, quality: 'best' });
+}
+
 function getTrayIconWithUnreadDot() {
   if (cachedTrayIconDot) return cachedTrayIconDot;
-  const base = getTrayIcon();
   try {
-    const size = 16;
-    const pngDataUrl = base.toDataURL();
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">`
-      + `<image href="${pngDataUrl}" width="${size}" height="${size}" />`
-      + `<circle cx="${size - 4}" cy="4" r="4.2" fill="#ef4444" stroke="#ffffff" stroke-width="1.4" />`
-      + `</svg>`;
-    const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
-    cachedTrayIconDot = img.isEmpty() ? base : img.resize({ width: size, height: size, quality: 'best' });
+    cachedTrayIconDot = iconWithRedBackground(getTrayIcon(), 16);
   } catch (e) {
-    cachedTrayIconDot = base;
+    cachedTrayIconDot = getTrayIcon();
   }
   return cachedTrayIconDot;
+}
+
+let cachedTaskbarIconRedBg = null;
+/** 작업 표시줄에 실제로 보이는 창 아이콘 자체를 빨간 배경으로 바꿔서(win.setIcon),
+ * 카카오톡처럼 안읽음이 있을 때 아이콘 통째로 눈에 띄게 한다. 기존 숫자 배지
+ * (setOverlayIcon)와 함께 쓰인다 — 색은 "새 메시지가 있다", 숫자는 "몇 개인지". */
+function getTaskbarIconWithUnreadBg() {
+  if (cachedTaskbarIconRedBg) return cachedTaskbarIconRedBg;
+  try {
+    cachedTaskbarIconRedBg = iconWithRedBackground(getAppNativeIcon(), 64);
+  } catch (e) {
+    cachedTaskbarIconRedBg = getAppNativeIcon();
+  }
+  return cachedTaskbarIconRedBg;
 }
 
 /** Windows 트레이: 16px 전용 아이콘 (큰 PNG 축소 시 깨짐 방지) */
@@ -4061,6 +4083,379 @@ ipcMain.handle('cleanup-leftover-db-files', async () => {
     return { success: false, msg: e && e.message ? e.message : String(e) };
   }
 });
+
+// ================= 저장공간 상세 (환경설정 > 데이터) =================
+
+/** 폴더 하나의 총 용량·파일 개수를 재귀적으로 센다. 폴더가 없으면 0을 반환(에러 아님). */
+async function statDirRecursive(dir) {
+  let bytes = 0;
+  let count = 0;
+  async function walk(p) {
+    let entries;
+    try {
+      entries = await fs.promises.readdir(p, { withFileTypes: true });
+    } catch (e) {
+      return;
+    }
+    for (const ent of entries) {
+      const full = path.join(p, ent.name);
+      if (ent.isDirectory()) {
+        await walk(full);
+      } else if (ent.isFile()) {
+        try {
+          const st = await fs.promises.stat(full);
+          bytes += st.size;
+          count += 1;
+        } catch (e) { /* 그 사이 삭제됐을 수 있음 — 무시 */ }
+      }
+    }
+  }
+  await walk(dir);
+  return { bytes, count };
+}
+
+/** 파일 하나의 크기. 없으면 0. */
+async function statFileSize(p) {
+  try {
+    const st = await fs.promises.stat(p);
+    return st.size;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/** userData 바로 아래에서, 이 앱이 이름 붙여 관리하는 폴더가 아닌 나머지(Electron/Chromium이
+ * 자체적으로 만드는 Cache·GPUCache·Local Storage 등)를 모아 "브라우저 캐시"로 묶는다. */
+const KNOWN_APP_SUBDIRS = new Set(['attachments', 'backups', 'logs', 'chat_logs', 'preload-cache', 'pending-update']);
+async function statUnknownUserDataSubdirs(userDataDir) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(userDataDir, { withFileTypes: true });
+  } catch (e) {
+    return { bytes: 0, count: 0 };
+  }
+  let bytes = 0;
+  let count = 0;
+  for (const ent of entries) {
+    if (!ent.isDirectory()) continue;
+    if (KNOWN_APP_SUBDIRS.has(ent.name)) continue;
+    if (ent.name.startsWith('pre_update_backup_')) continue;
+    const sub = await statDirRecursive(path.join(userDataDir, ent.name));
+    bytes += sub.bytes;
+    count += sub.count;
+  }
+  return { bytes, count };
+}
+
+/** messages.message / notices.content 안에 인라인으로 들어있는 data:image 첨부(사진 미리보기·
+ * 그림판 등)의 base64 부분만 골라 바이트 수를 센다. 나머지(순수 텍스트·태그)는 "텍스트"로 잡힌다. */
+function splitTextAndInlineImageBytes(html) {
+  const s = String(html || '');
+  let imageB64Chars = 0;
+  const re = /data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/g;
+  let m;
+  while ((m = re.exec(s))) {
+    imageB64Chars += m[1].length;
+  }
+  const imageBytes = Math.round(imageB64Chars * 3 / 4);
+  const totalBytes = Buffer.byteLength(s, 'utf8');
+  const textBytes = Math.max(0, totalBytes - Math.round(imageB64Chars));
+  return { textBytes, imageBytes };
+}
+
+function queryAllAsync(sql, params) {
+  return new Promise((resolve) => {
+    db.all(sql, params || [], (err, rows) => resolve(err ? [] : (rows || [])));
+  });
+}
+
+ipcMain.handle('get-storage-detail', async () => {
+  try {
+    const userDataDir = app.getPath('userData');
+
+    const [dbMainBytes, dbWalBytes, dbShmBytes] = await Promise.all([
+      statFileSize(dbPath),
+      statFileSize(`${dbPath}-wal`),
+      statFileSize(`${dbPath}-shm`)
+    ]);
+
+    const [attachStat, backupStat, logsStat, chatLogsStat, unknownStat] = await Promise.all([
+      statDirRecursive(getAttachmentStoreDir()),
+      statDirRecursive(path.join(userDataDir, 'backups')),
+      statDirRecursive(path.join(userDataDir, 'logs')),
+      statDirRecursive(getChatLogDir()),
+      statUnknownUserDataSubdirs(userDataDir)
+    ]);
+
+    // pre_update_backup_* 폴더들 — 이름이 매번 달라 폴더 목록을 훑어야 한다.
+    let preUpdateBytes = 0;
+    let preUpdateCount = 0;
+    try {
+      const names = await fs.promises.readdir(userDataDir);
+      for (const name of names) {
+        if (!name.startsWith('pre_update_backup_')) continue;
+        const sub = await statDirRecursive(path.join(userDataDir, name));
+        preUpdateBytes += sub.bytes;
+        preUpdateCount += 1;
+      }
+    } catch (e) { /* ignore */ }
+
+    // userData 바로 아래 흩어진 낱개 파일들(토큰·마커 텍스트 파일 등) — "기타 설정·로그"로 묶는다.
+    let looseFilesBytes = 0;
+    let looseFilesCount = 0;
+    try {
+      const entries = await fs.promises.readdir(userDataDir, { withFileTypes: true });
+      for (const ent of entries) {
+        if (ent.isFile()) {
+          if (ent.name === path.basename(dbPath) || ent.name === `${path.basename(dbPath)}-wal` || ent.name === `${path.basename(dbPath)}-shm`) continue;
+          looseFilesBytes += await statFileSize(path.join(userDataDir, ent.name));
+          looseFilesCount += 1;
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    // DB 내부: 메시지·공지 본문에서 텍스트 대 인라인 사진(base64) 비중을 계산.
+    const [msgRows, noticeRows] = await Promise.all([
+      queryAllAsync(`SELECT message FROM messages`, []),
+      queryAllAsync(`SELECT content, images FROM notices`, [])
+    ]);
+    let msgTextBytes = 0;
+    let msgImageBytes = 0;
+    for (const row of msgRows) {
+      const { textBytes, imageBytes } = splitTextAndInlineImageBytes(row.message);
+      msgTextBytes += textBytes;
+      msgImageBytes += imageBytes;
+    }
+    let noticeTextBytes = 0;
+    let noticeImageBytes = 0;
+    for (const row of noticeRows) {
+      noticeTextBytes += Buffer.byteLength(String(row.content || ''), 'utf8');
+      // images 컬럼은 보통 base64 JSON 배열 문자열 자체 — 통째로 "이미지"로 센다.
+      const imagesStr = String(row.images || '');
+      noticeImageBytes += imagesStr === '[]' ? 0 : Buffer.byteLength(imagesStr, 'utf8');
+    }
+    const dbFileTotal = dbMainBytes + dbWalBytes + dbShmBytes;
+    const dbKnownContentBytes = msgTextBytes + msgImageBytes + noticeTextBytes + noticeImageBytes;
+    // 인덱스·다른 테이블(공지 목록 제외 나머지)·SQLite 자체 오버헤드 등 — 실제 파일 크기에서
+    // 위에서 센 것을 뺀 나머지. 음수가 나오지 않게 방어(페이지 정렬 등으로 근사치이기 때문).
+    const dbOtherBytes = Math.max(0, dbFileTotal - dbKnownContentBytes);
+
+    // 첨부 캐시 중 어떤 메시지에서도 더 이상 참조되지 않는(=완전히 안 쓰는) 파일이 얼마나 되는지.
+    let orphanAttachmentBytes = 0;
+    let orphanAttachmentCount = 0;
+    try {
+      const referenced = new Set();
+      const fileRe = /mirae-file:\/\/([^"'\s)]+)/g;
+      for (const row of msgRows) {
+        const s = String(row.message || '');
+        let fm;
+        while ((fm = fileRe.exec(s))) {
+          try { referenced.add(path.basename(decodeURIComponent(fm[1]))); } catch (e) { /* ignore */ }
+        }
+      }
+      const dir = getAttachmentStoreDir();
+      const names = await fs.promises.readdir(dir).catch(() => []);
+      const SAFETY_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 최근 3일 이내 파일은 아직 전송 중일 수 있어 건드리지 않음
+      const now = Date.now();
+      for (const name of names) {
+        if (referenced.has(name)) continue;
+        const full = path.join(dir, name);
+        const st = await fs.promises.stat(full).catch(() => null);
+        if (!st || now - st.mtimeMs < SAFETY_AGE_MS) continue;
+        orphanAttachmentBytes += st.size;
+        orphanAttachmentCount += 1;
+      }
+    } catch (e) { /* ignore */ }
+
+    const messageCount = msgRows.length;
+    const noticeCount = noticeRows.length;
+
+    const totalManaged = dbFileTotal + attachStat.bytes + backupStat.bytes + preUpdateBytes
+      + logsStat.bytes + chatLogsStat.bytes + unknownStat.bytes + looseFilesBytes;
+
+    return {
+      success: true,
+      totalBytes: totalManaged,
+      composition: [
+        { key: 'dbMain', label: 'DB 본체', bytes: dbMainBytes },
+        { key: 'dbTemp', label: 'DB WAL·임시', bytes: dbWalBytes + dbShmBytes },
+        { key: 'attachments', label: '전송·임시 파일', bytes: attachStat.bytes, count: attachStat.count },
+        { key: 'backups', label: '자동 백업', bytes: backupStat.bytes, count: backupStat.count },
+        { key: 'preUpdate', label: '업데이트 안전복구', bytes: preUpdateBytes, count: preUpdateCount },
+        { key: 'logs', label: '로그', bytes: logsStat.bytes + chatLogsStat.bytes, count: logsStat.count + chatLogsStat.count },
+        { key: 'browserCache', label: '브라우저 캐시', bytes: unknownStat.bytes, count: unknownStat.count },
+        { key: 'other', label: '기타 설정', bytes: looseFilesBytes, count: looseFilesCount }
+      ],
+      dbBreakdown: [
+        { key: 'text', label: '텍스트', bytes: msgTextBytes + noticeTextBytes },
+        { key: 'preview', label: '사진 미리보기', bytes: msgImageBytes },
+        { key: 'noticeImages', label: '공지 이미지', bytes: noticeImageBytes },
+        { key: 'meta', label: '인덱스·메타데이터 등', bytes: dbOtherBytes }
+      ],
+      detail: {
+        dbFile: { mainBytes: dbMainBytes, walBytes: dbWalBytes, shmBytes: dbShmBytes },
+        dbAnalysis: { messageCount, noticeCount, msgTextBytes, msgImageBytes, noticeTextBytes, noticeImageBytes },
+        attachments: { count: attachStat.count, bytes: attachStat.bytes, orphanCount: orphanAttachmentCount, orphanBytes: orphanAttachmentBytes },
+        autoBackup: { count: backupStat.count, bytes: backupStat.bytes },
+        preUpdateBackup: { count: preUpdateCount, bytes: preUpdateBytes },
+        logs: { count: logsStat.count + chatLogsStat.count, bytes: logsStat.bytes + chatLogsStat.bytes },
+        browserCache: { count: unknownStat.count, bytes: unknownStat.bytes },
+        other: { count: looseFilesCount, bytes: looseFilesBytes }
+      }
+    };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+/** ⚠️ 안전 정리는 "확실히 안 쓰는 것"만 지운다 — 손상 복구용 사본, 기한 지난 백업,
+ * 메시지에서 더 이상 참조되지 않는 첨부 캐시, Chromium이 알아서 다시 만드는 캐시 폴더.
+ * 대화 내용·DB 본체·최근 백업은 절대 건드리지 않는다. */
+ipcMain.handle('storage-safe-cleanup', async () => {
+  try {
+    let freedBytes = 0;
+    let freedCount = 0;
+
+    // 1) 손상/복구 사본 (기존 cleanup-leftover-db-files와 동일한 로직 재사용)
+    {
+      const dir = path.dirname(dbPath);
+      const base = path.basename(dbPath);
+      const names = await fs.promises.readdir(dir).catch(() => []);
+      for (const n of names) {
+        if (n === base || n === `${base}-wal` || n === `${base}-shm`) continue;
+        const isCorrupted = n.startsWith(`${base}.corrupted_`);
+        const isRecovered = /^mirae_messenger\.recovered_\d+\.db(-wal|-shm)?$/.test(n);
+        if (!isCorrupted && !isRecovered) continue;
+        const p = path.join(dir, n);
+        const size = await statFileSize(p);
+        try { await fs.promises.unlink(p); freedBytes += size; freedCount += 1; } catch (e) { /* ignore */ }
+      }
+    }
+
+    // 2) 업데이트 직전 백업 — 가장 최근 1개만 남기고 정리(오래된 것 기준 cleanupOldPreUpdateBackups
+    //    보다 한 걸음 더 나아가되, 롤백용으로 최신 1개는 항상 보존).
+    {
+      const userDataDir = app.getPath('userData');
+      const names = await fs.promises.readdir(userDataDir).catch(() => []);
+      const preDirs = names.filter((n) => n.startsWith('pre_update_backup_')).sort();
+      const toRemove = preDirs.slice(0, Math.max(0, preDirs.length - 1));
+      for (const name of toRemove) {
+        const p = path.join(userDataDir, name);
+        const sub = await statDirRecursive(p);
+        try { await fs.promises.rm(p, { recursive: true, force: true }); freedBytes += sub.bytes; freedCount += 1; } catch (e) { /* ignore */ }
+      }
+    }
+
+    // 3) 기한 지난 자동 백업(AUTO_BACKUP_RETENTION_DAYS 초과분)
+    {
+      const dir = path.join(app.getPath('userData'), 'backups');
+      const cutoff = Date.now() - AUTO_BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const names = await fs.promises.readdir(dir).catch(() => []);
+      for (const name of names) {
+        if (!name.startsWith('auto_backup_')) continue;
+        const p = path.join(dir, name);
+        const st = await fs.promises.stat(p).catch(() => null);
+        if (!st || st.mtimeMs >= cutoff) continue;
+        const size = st.size;
+        try { await fs.promises.unlink(p); freedBytes += size; freedCount += 1; } catch (e) { /* ignore */ }
+      }
+    }
+
+    // 4) 메시지에서 더 이상 참조되지 않는 첨부 캐시(3일 이상 지난 것만 — 전송 중 안전장치)
+    {
+      const msgRows = await queryAllAsync(`SELECT message FROM messages`, []);
+      const referenced = new Set();
+      const fileRe = /mirae-file:\/\/([^"'\s)]+)/g;
+      for (const row of msgRows) {
+        const s = String(row.message || '');
+        let fm;
+        while ((fm = fileRe.exec(s))) {
+          try { referenced.add(path.basename(decodeURIComponent(fm[1]))); } catch (e) { /* ignore */ }
+        }
+      }
+      const dir = getAttachmentStoreDir();
+      const names = await fs.promises.readdir(dir).catch(() => []);
+      const SAFETY_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      for (const name of names) {
+        if (referenced.has(name)) continue;
+        const full = path.join(dir, name);
+        const st = await fs.promises.stat(full).catch(() => null);
+        if (!st || now - st.mtimeMs < SAFETY_AGE_MS) continue;
+        try { await fs.promises.unlink(full); freedBytes += st.size; freedCount += 1; } catch (e) { /* ignore */ }
+      }
+    }
+
+    // 5) Chromium이 스스로 다시 만드는 캐시 폴더들 — 지워도 다음 실행 때 자동 재생성됨.
+    {
+      const userDataDir = app.getPath('userData');
+      const safeToClear = ['Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'GraphiteDawnCache', 'blob_storage'];
+      for (const name of safeToClear) {
+        const p = path.join(userDataDir, name);
+        const sub = await statDirRecursive(p);
+        if (!sub.bytes) continue;
+        try { await fs.promises.rm(p, { recursive: true, force: true }); freedBytes += sub.bytes; freedCount += sub.count; } catch (e) { /* ignore */ }
+      }
+    }
+
+    writeToLogFile('info', `[저장공간] 안전 정리: ${freedCount}개, ${Math.round(freedBytes / 1048576)}MB 확보`);
+    return { success: true, freedBytes, freedCount };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+/** DB 최적화(VACUUM) — 삭제된 대화 등으로 생긴 빈 공간을 실제로 회수해 파일을 압축한다.
+ * ⚠️ 실사고(2026-08-12): 주기적으로 도는 배경 작업들이 DB 연결을 닫았다 다시 여는 스키마
+ * 복구와 겹쳐 실제 손상으로 이어진 적이 있다. VACUUM은 연결을 새로 열진 않지만 같은 이유로
+ * 신중하게, 배경 작업들이 잠깐 쉬는 dbRepairInProgress 구간 안에서만 실행한다. */
+ipcMain.handle('storage-vacuum-db', async () => {
+  if (dbRepairInProgress) {
+    return { success: false, msg: '지금은 다른 데이터베이스 작업이 진행 중입니다. 잠시 후 다시 시도해 주세요.' };
+  }
+  const beforeBytes = await statFileSize(dbPath);
+  dbRepairInProgress = true;
+  try {
+    await new Promise((resolve, reject) => {
+      db.run('VACUUM', (err) => (err ? reject(err) : resolve()));
+    });
+    const afterBytes = await statFileSize(dbPath);
+    writeToLogFile('info', `[저장공간] DB 최적화 완료: ${Math.round(beforeBytes / 1048576)}MB → ${Math.round(afterBytes / 1048576)}MB`);
+    return { success: true, beforeBytes, afterBytes };
+  } catch (e) {
+    writeToLogFile('error', `[저장공간] DB 최적화 실패: ${e && e.message}`);
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  } finally {
+    dbRepairInProgress = false;
+  }
+});
+
+/** 전송 캐시(첨부 보관 폴더) 전체 삭제 — 이미 주고받은 메시지 기록·텍스트는 그대로 남고,
+ * 다시 받기를 눌러야 하는 첨부파일 원본 사본만 지워진다(안 읽은 대화의 자동 재전송용
+ * 대기열과는 무관 — pending_file_xfers에 걸린 미전송 파일은 이 폴더가 아니라 그 파일 자체가
+ * 없어지면 재전송도 실패하므로, 매우 최근 파일은 여기서도 보호한다). */
+ipcMain.handle('storage-clear-attachment-cache', async () => {
+  try {
+    const dir = getAttachmentStoreDir();
+    const names = await fs.promises.readdir(dir).catch(() => []);
+    const SAFETY_AGE_MS = 10 * 60 * 1000; // 방금 보낸/받은 파일(대기 전송 등)은 10분간 보호
+    const now = Date.now();
+    let freedBytes = 0;
+    let freedCount = 0;
+    for (const name of names) {
+      const full = path.join(dir, name);
+      const st = await fs.promises.stat(full).catch(() => null);
+      if (!st || now - st.mtimeMs < SAFETY_AGE_MS) continue;
+      try { await fs.promises.unlink(full); freedBytes += st.size; freedCount += 1; } catch (e) { /* ignore */ }
+    }
+    writeToLogFile('info', `[저장공간] 전송 캐시 삭제: ${freedCount}개, ${Math.round(freedBytes / 1048576)}MB 확보`);
+    return { success: true, freedBytes, freedCount };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : String(e) };
+  }
+});
+
+// ================= /저장공간 상세 =================
 
 ipcMain.handle('recover-corrupt-database', async () => {
   try {
@@ -11693,6 +12088,7 @@ const fileXferRetryInflight = new Set();
  * 텍스트 메시지(flushAllPendingOutboundMessages)와 동일한 주기로 호출된다. */
 function flushPendingGroupMessages() {
   if (!profileLoaded) return;
+  if (dbRepairInProgress) return;
   db.all(
     `SELECT DISTINCT member_ip FROM pending_group_messages WHERE created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
     [],
@@ -15085,6 +15481,9 @@ ipcMain.handle('update-unread-badge', async (event, payload) => {
         } else {
           mainWindow.setOverlayIcon(null, '');
         }
+        // 카카오톡처럼 안읽음이 있을 때는 작업 표시줄 아이콘 자체 뒤에 빨간 배경을
+        // 깔아 눈에 띄게 하고, 없으면 원래 아이콘으로 되돌린다.
+        mainWindow.setIcon(enabled && count > 0 ? getTaskbarIconWithUnreadBg() : getAppNativeIcon());
       }
       // 창을 트레이로 숨겨 놓은 동안엔 작업 표시줄 버튼 자체가 없어 위 오버레이가 안
       // 보인다 — 그 경우에도 확인 가능하도록 트레이 아이콘에도 같은 표시를 얹는다.
@@ -15092,13 +15491,14 @@ ipcMain.handle('update-unread-badge', async (event, payload) => {
         const hasUnread = enabled && count > 0;
         tray.setImage(hasUnread ? getTrayIconWithUnreadDot() : getTrayIcon());
         // 점만으로는 "누구에게서 왔는지" 알 수 없다는 요청 — 트레이 아이콘에 마우스를
-        // 올리면 안읽음 개수와 보낸 사람 요약이 툴팁으로 보이게 한다.
+        // 올리면 안읽음 개수와 보낸 사람 요약이 툴팁으로 보이게 한다. 안읽음이
+        // 없을 때도 "받은 메시지가 없다"는 걸 바로 알 수 있게 명시적으로 적어준다.
         const summary = String((payload && payload.summary) || '').trim();
         // Windows 트레이 툴팁은 대략 127자 제한이 있다 — 넘으면 그냥 잘리거나 안 보일 수
         // 있어 미리 넉넉히 잘라 안전하게 맞춘다.
         const tip = hasUnread
           ? `미래병원 사내 메신저\n안읽은 메시지 ${count}개${summary ? `\n${summary}` : ''}`
-          : '미래병원 사내 메신저';
+          : '미래병원 사내 메신저\n받은 메시지 없음';
         tray.setToolTip(tip.length > 120 ? `${tip.slice(0, 119)}…` : tip);
       }
     } else if (app.setBadgeCount) {

@@ -169,6 +169,10 @@ contextBridge.exposeInMainWorld('api', {
   applyRecoveredDatabase: (recoveredPath) => ipcRenderer.invoke('apply-recovered-database', recoveredPath),
   resetDatabaseFresh: () => ipcRenderer.invoke('reset-database-fresh'),
   cleanupLeftoverDbFiles: () => ipcRenderer.invoke('cleanup-leftover-db-files'),
+  getStorageDetail: () => ipcRenderer.invoke('get-storage-detail'),
+  storageSafeCleanup: () => ipcRenderer.invoke('storage-safe-cleanup'),
+  storageVacuumDb: () => ipcRenderer.invoke('storage-vacuum-db'),
+  storageClearAttachmentCache: () => ipcRenderer.invoke('storage-clear-attachment-cache'),
   // 🖊 화면 문구 덮어쓰기(마스터 전용 기능이지만, 적용은 모든 PC에서 이뤄진다)
   logUiError: (message) => ipcRenderer.invoke('log-ui-error', message),
   getUiTextOverrides: () => ipcRenderer.invoke('get-ui-text-overrides'),
