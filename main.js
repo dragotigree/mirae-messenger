@@ -1512,6 +1512,15 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
   if (!force && !notifyIncomingMessages) return;
   const key = String(channelKey || '');
 
+  // ⚠️ "메시지가 왔는지 몰랐다"는 신고가 잦았다 — 토스트·배지는 화면을 보고 있지 않으면
+  // 놓치기 쉽다. Windows 작업 표시줄 아이콘을 깜빡이게(flashFrame) 하면, 사용자가 다른
+  // 프로그램을 쓰고 있어도 작업 표시줄 자체가 눈에 띄게 반짝여 훨씬 확실하게 알아챌 수
+  // 있다(카카오톡 등 대부분의 메신저가 쓰는 방식). 이미 메신저 창을 보고 있는 중이면
+  // 굳이 깜빡일 필요가 없어 그때는 건너뛴다.
+  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed() && !toastUiState.focused) {
+    try { mainWindow.flashFrame(true); } catch (e) { /* ignore */ }
+  }
+
   // 같은 상대(채널)에게서 온 메시지라면 새 토스트를 또 띄우지 않고 기존 것을 새 내용으로
   // 갱신한다 — 그래야 그 사람에게서 여러 통이 와도 토스트가 계속 쌓이지 않는다.
   const existing = toastEntries.get(key);
@@ -5836,7 +5845,15 @@ function createWindow() {
       mainWindow.webContents.setBackgroundThrottling(false);
     }
   });
-  mainWindow.on('focus', () => { toastUiState.focused = true; });
+  mainWindow.on('focus', () => {
+    toastUiState.focused = true;
+    // 작업 표시줄 깜빡임은 사용자가 창으로 돌아오면 바로 멈춰야 한다 — 계속 깜빡이면
+    // 오히려 거슬린다. Windows는 보통 포커스를 주면 알아서 멈추지만, 확실히 멈추도록
+    // 명시적으로도 꺼준다.
+    if (process.platform === 'win32') {
+      try { mainWindow.flashFrame(false); } catch (e) { /* ignore */ }
+    }
+  });
   mainWindow.on('blur', () => { toastUiState.focused = false; });
 
   // 📁 채팅에서 파일/사진을 "다운로드"하면 브라우저 기본 위치 대신 설정에서 지정한 폴더로 저장한다.
