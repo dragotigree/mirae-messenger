@@ -5676,9 +5676,10 @@
             <span class="group-count-badge" id="favorites-section-count">0</span>
           </span>
         </div>
-        <div id="favorites-section-body"></div>
-        <div id="favorites-channels-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:8px 16px 2px;">채널</div>
+        <div id="favorites-channels-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:6px 16px 2px;">⭐ 즐겨찾기 채널</div>
         <div id="favorites-channels-body"></div>
+        <div id="favorites-people-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:8px 16px 2px;">⭐ 즐겨찾기 직원</div>
+        <div id="favorites-section-body"></div>
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
@@ -9415,11 +9416,14 @@
       syncTaskbarBadge();
     }
 
-    /** 작업 표시줄 안읽음 배지 — 기본값은 꺼짐(설정에서 직접 켜야만 표시). Windows 자체
-     *  설정("작업 표시줄 앱에 배지 표시")도 켜져 있어야 실제로 보인다(설정 화면에 안내 문구
-     *  넣어 둠). 값이 자주 바뀔 수 있어 짧게 묶어서 보낸다. */
+    /** 작업 표시줄 안읽음 배지 — 기본값은 켜짐("기본값으로 나오게 해달라"는 요청). 아직
+     *  한 번도 값을 저장한 적 없는 PC(localStorage에 키 자체가 없음)는 켜진 것으로 보고,
+     *  사용자가 설정에서 직접 껐던 적이 있으면(명시적으로 'false' 저장) 그 선택을 그대로
+     *  존중한다. Windows 자체 설정("작업 표시줄 앱에 배지 표시")도 켜져 있어야 실제로
+     *  보인다(설정 화면에 안내 문구 넣어 둠). 값이 자주 바뀔 수 있어 짧게 묶어서 보낸다. */
     function isTaskbarBadgeEnabled() {
-      return localStorage.getItem('taskbarBadgeEnabled') === 'true';
+      const v = localStorage.getItem('taskbarBadgeEnabled');
+      return v === null ? true : v === 'true';
     }
 
     let taskbarBadgeSyncTimer = null;
@@ -15111,12 +15115,13 @@
     }
 
     /** 즐겨찾기 — 「채널 및 대화방」·「사용자」와 같은 독립 섹션으로 표시.
-     *  사람(favorites)과 그룹채팅방·부서/층 채널(favoriteChannelEntries)을 같은 섹션
-     *  안에서 "채널" 소제목으로 구분해 따로 보여준다("채널 및 대화방보기도 즐겨찾기에
-     *  추가할 수 있을까?" 요청). */
+     *  즐겨찾기 채널(그룹채팅방·부서/층)을 위, 즐겨찾기 직원을 아래에 두고 각각
+     *  "⭐ 즐겨찾기 채널"/"⭐ 즐겨찾기 직원" 소제목으로 구분해 보여준다("채널이 위에
+     *  있고 사용자 목록이 밑에 있는게 좋을거 같다" 요청). */
     function renderFavoritesSection(favorites, favoriteChannelEntries) {
       const block = document.getElementById('sidebar-block-favorites');
       const body = document.getElementById('favorites-section-body');
+      const peopleLabelEl = document.getElementById('favorites-people-label');
       const channelsLabelEl = document.getElementById('favorites-channels-label');
       const channelsBody = document.getElementById('favorites-channels-body');
       const countEl = document.getElementById('favorites-section-count');
@@ -15143,6 +15148,7 @@
         unreadEl.style.display = favUnread > 0 ? '' : 'none';
         unreadEl.textContent = formatUnreadBadge(favUnread);
       }
+      if (peopleLabelEl) peopleLabelEl.style.display = hasPeople ? '' : 'none';
       body.innerHTML = '';
       (favorites || []).forEach((u) => {
         const card = buildUserCard(u);
@@ -17202,6 +17208,12 @@
         if (!subGroups[sub]) subGroups[sub] = [];
         subGroups[sub].push(u);
       });
+      // ⚠️ 실사고: 부서별 보기에서는 여기(층별 보기와 갈라지는 전용 렌더 경로)가
+      // compareUsersSidebarOrder를 한 번도 안 부르고 있었다 — 그래서 "가나다" 버튼을
+      // 눌러도 부서별 보기에서는 순서가 전혀 안 바뀌었다(층별 보기에서는 정상 동작해서
+      // 그동안 못 잡았다). 층별 보기와 같은 정렬 기준을 그대로 적용한다.
+      flatUsers.sort(compareUsersSidebarOrder);
+      Object.keys(subGroups).forEach((sub) => subGroups[sub].sort(compareUsersSidebarOrder));
       flatUsers.forEach((u) => block.appendChild(buildUserCard(u)));
       const subNames = defaultSortGroupKeys(Object.keys(subGroups));
       subNames.forEach((subName) => {
