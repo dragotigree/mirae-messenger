@@ -13823,19 +13823,13 @@
       if (compactListFilter === 'unread') filtered = filtered.slice();
 
       const sorted = [...filtered].sort(compareUsersSidebarOrder);
-      const favorites = compactListFilter !== 'favorite' ? sortFavoritesByOrder(sorted.filter(isFavoriteUser)) : [];
-      // 즐겨찾기해도 아래 일반 목록에서 사라지지 않도록 — 위 즐겨찾기 패널은 빠른 접근용
-      // "복사본"일 뿐, 원래 목록에서 빼는 용도가 아니다.
-      const rest = sorted;
-
-      if (favorites.length > 0) {
-        const favPanel = createCompactPanel('즐겨찾는 직원', '');
-        favorites.forEach(u => {
-          const item = appendCompactUserItem(favPanel.compactItemsWrap, u);
-          bindFavoriteReorderTarget(item, u.ip);
-        });
-        userPanels.push(favPanel);
-      }
+      // ⚠️ 실사고: 예전엔 즐겨찾기한 직원을 "즐겨찾는 직원" 패널로 위에 한 번 더 보여주면서도
+      // 아래 부서/층 목록에도 그대로 남겨둬서, 같은 사람이 미니 모드 「직원」 탭 안에 두 번
+      // 보였다("즐겨찾기한 직원이 직원 목록에도 나온다"는 신고). 즐겨찾기는 이제 별도의
+      // ⭐ 즐겨찾기 탭에서만 보여주고, 「직원」 탭에는 즐겨찾기 여부와 상관없이 전체 목록만
+      // 한 번씩만 보여준다 — compactListFilter로 명시적으로 "즐겨찾기만 보기"를 고른
+      // 경우에는 예외로 그 결과만 남긴다.
+      const rest = compactListFilter === 'favorite' ? sorted : sorted.filter(u => !isFavoriteUser(u));
 
       const groupingKey = appSettings.userGrouping || 'floor';
       const groups = {};
@@ -13847,7 +13841,7 @@
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, Object.keys(groups));
 
       let emptyHintEl = null;
-      if (sortedGroupKeys.length === 0 && favorites.length === 0) {
+      if (sortedGroupKeys.length === 0) {
         emptyHintEl = document.createElement('div');
         emptyHintEl.className = 'compact-empty-hint';
         emptyHintEl.textContent = (compactDeptFilter || compactFloorFilter)
@@ -13940,8 +13934,20 @@
       rows.forEach((row) => {
         appendCompactConversationItem(container, row);
         const item = container.lastElementChild;
-        if (reorderMode === 'favorites') bindFavoriteReorderTarget(item, row.key);
-        else if (reorderMode === 'groups') bindGroupReorderTarget(item, row.key);
+        if (reorderMode === 'favorites') {
+          // ⚠️ 그룹채팅방·부서/층 채널도 이 탭(즐겨찾기)에 함께 나오게 되면서, 사람 전용
+          // 재정렬(bindFavoriteReorderTarget, IP 기준)을 채널 행에도 그대로 걸면 드래그해도
+          // 아무 반응이 없었다(isFavoriteIp가 채널 키를 IP로 착각해 항상 실패) — 행 종류에
+          // 맞는 재정렬 바인딩으로 나눈다.
+          if (row.kind === 'group' || row.kind === 'dept' || row.kind === 'floor') {
+            bindFavoriteChannelDragSource(item, row.key);
+            bindFavoriteChannelReorderTarget(item, row.key);
+          } else {
+            bindFavoriteReorderTarget(item, row.key);
+          }
+        } else if (reorderMode === 'groups') {
+          bindGroupReorderTarget(item, row.key);
+        }
       });
     }
 
