@@ -24793,10 +24793,13 @@
     function downloadLightboxImage() {
       const src = document.getElementById('image-lightbox-img').src;
       if (!src) return;
+      const t = new Date();
+      const stamp = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}_${String(t.getHours()).padStart(2, '0')}${String(t.getMinutes()).padStart(2, '0')}${String(t.getSeconds()).padStart(2, '0')}`;
+      const fileName = `사진_${stamp}`;
       saveChatFileFromLink({
         href: src,
-        download: '사진',
-        getAttribute: (k) => (k === 'href' ? src : (k === 'download' ? '사진' : null))
+        download: fileName,
+        getAttribute: (k) => (k === 'href' ? src : (k === 'download' ? fileName : null))
       }).catch((err) => {
         console.error('downloadLightboxImage', err);
         appAlert('사진 저장 중 오류가 발생했습니다.');
