@@ -378,6 +378,12 @@
     .sidebar-header-icon-btn:hover { background: var(--surface-muted); color: var(--text-primary); }
     #sidebar-alpha-sort-btn { width: auto; padding: 0 6px; }
     #sidebar-alpha-sort-btn.is-active { background: var(--accent-soft); color: var(--accent-dark); }
+    /* "층"/"부서" — 아이콘만으로는 둘이 비슷해 보여 구분이 잘 안 된다는 의견이 있어
+     * 아이콘 옆에 짧은 글자를 같이 둔다. */
+    .sidebar-header-icon-btn-labeled {
+      width: auto; padding: 0 7px 0 5px; gap: 3px; font-size: 10.5px; font-weight: 800;
+    }
+    .sidebar-header-icon-btn-labeled .icon-glyph { width: 13px; height: 13px; }
     .sidebar-header-icon-btn .icon-glyph { width: 14px; height: 14px; }
     .sidebar-header-divider {
       width: 1px; height: 14px; background: var(--border-soft); flex-shrink: 0; margin: 0 1px;
@@ -5784,11 +5790,11 @@
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
             <span class="sidebar-header-divider"></span>
             <span class="sidebar-jump-trigger-wrap" id="sidebar-floor-jump-wrap">
-              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('floor')" title="층별로 보기 · 해당 층으로 이동" data-ui-icon="layers"></span>
+              <span class="sidebar-header-icon-btn sidebar-header-icon-btn-labeled" onclick="event.stopPropagation(); toggleSidebarJumpMenu('floor')" title="층별로 보기 · 해당 층으로 이동"><span data-ui-icon="layers"></span>층</span>
               <div class="sidebar-jump-menu" id="sidebar-floor-jump-menu"></div>
             </span>
             <span class="sidebar-jump-trigger-wrap" id="sidebar-dept-jump-wrap">
-              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('dept')" title="부서별로 보기 · 해당 부서로 이동" data-ui-icon="buildingDept"></span>
+              <span class="sidebar-header-icon-btn sidebar-header-icon-btn-labeled" onclick="event.stopPropagation(); toggleSidebarJumpMenu('dept')" title="부서별로 보기 · 해당 부서로 이동"><span data-ui-icon="buildingDept"></span>부서</span>
               <div class="sidebar-jump-menu" id="sidebar-dept-jump-menu"></div>
             </span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" data-ui-icon="rotateCcw"></span>
