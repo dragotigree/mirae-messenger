@@ -7909,7 +7909,22 @@
   <div id="image-lightbox" class="modal-overlay" style="background:rgba(0,0,0,0.85); backdrop-filter:none; overflow:hidden;" onclick="closeImageLightbox()">
     <img id="image-lightbox-img" src="" onwheel="onLightboxWheel(event)" onmousedown="onLightboxImgMouseDown(event)" onclick="onLightboxImgClick(event)" style="max-width:90vw; max-height:90vh; border-radius: 12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); transform-origin:center center; user-select:none; -webkit-user-drag:none; touch-action:none;">
     <div id="image-lightbox-zoom-hint" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.65); font-size:12px; pointer-events:none;">마우스 휠로 확대·축소 · 드래그로 이동</div>
+    <div id="image-lightbox-toolbar" onclick="event.stopPropagation()" style="position:fixed; bottom:56px; left:50%; transform:translateX(-50%); display:flex; gap:8px; background:rgba(20,20,24,0.55); backdrop-filter:blur(6px); padding:8px; border-radius:14px;">
+      <button type="button" onclick="lightboxZoomOut()" title="축소" style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:18px; cursor:pointer; font-weight:700;">－</button>
+      <button type="button" onclick="lightboxZoomIn()" title="확대" style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:18px; cursor:pointer; font-weight:700;">＋</button>
+      <button type="button" onclick="downloadLightboxImage()" title="다운로드" style="height:40px; padding:0 16px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:13px; cursor:pointer; font-weight:600;">⬇ 다운로드</button>
+      <button type="button" onclick="openLightboxForwardPicker()" title="전달하기" style="height:40px; padding:0 16px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:13px; cursor:pointer; font-weight:600;">↪ 전달하기</button>
+    </div>
     <button onclick="closeImageLightbox()" style="position:fixed; top:20px; right:20px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); color:#fff; border:none; font-size:20px; cursor:pointer;">✕</button>
+  </div>
+
+  <div id="lightbox-forward-picker" class="modal-overlay" style="display:none; z-index:100000;" onclick="closeLightboxForwardPicker()">
+    <div style="width:340px; max-height:70vh; background:var(--panel-bg,#fff); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:10px;" onclick="event.stopPropagation()">
+      <div style="font-size:15px; font-weight:700;">전달할 대상 선택</div>
+      <input type="text" id="lightbox-forward-search" placeholder="이름 검색" oninput="renderLightboxForwardPickerList()" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-soft); font-size:13px;">
+      <div id="lightbox-forward-picker-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:2px;"></div>
+      <button type="button" onclick="closeLightboxForwardPicker()" style="align-self:flex-end; padding:6px 14px; background:var(--border-soft); border:none; border-radius:10px; font-size:12px; cursor:pointer; font-weight:600;">닫기</button>
+    </div>
   </div>
 
   <div id="transport-request-modal" class="modal-overlay">
@@ -17672,6 +17687,12 @@
         tip: null
       },
       {
+        cat: 'chat', icon: '🖼️', color: '#7c3aed', title: '사진 크게 보기', tag: '1:1·그룹 공통',
+        path: '채팅창의 사진 클릭 → 확대창 하단 툴바',
+        chips: ['마우스 휠 또는 －/＋ 버튼으로 확대·축소', '⬇ 다운로드로 내 PC에 저장', '↪ 전달하기로 다른 직원에게 바로 전송'],
+        tip: '확대된 상태에서는 사진을 드래그해서 이동할 수 있고, 전달하기는 대상을 검색해서 바로 보낼 수 있습니다.'
+      },
+      {
         cat: 'chat', icon: '📸', color: '#0284c7', title: '화면 캡처', tag: '1:1·그룹 공통',
         path: '채팅창 하단 <b>카메라 아이콘</b>',
         chips: ['모니터 전체 캡처', '드래그로 영역만 잘라 보내기'],
@@ -24749,6 +24770,70 @@
         lightboxPanY = 0;
       }
       applyLightboxTransform();
+    }
+
+    function lightboxZoomIn() {
+      const next = Math.min(6, lightboxZoomLevel * 1.15);
+      lightboxZoomLevel = next;
+      applyLightboxTransform();
+    }
+    function lightboxZoomOut() {
+      const next = Math.max(1, lightboxZoomLevel / 1.15);
+      lightboxZoomLevel = next;
+      if (lightboxZoomLevel <= 1) { lightboxZoomLevel = 1; lightboxPanX = 0; lightboxPanY = 0; }
+      applyLightboxTransform();
+    }
+    function downloadLightboxImage() {
+      const src = document.getElementById('image-lightbox-img').src;
+      if (!src) return;
+      saveChatFileFromLink({
+        href: src,
+        download: '사진',
+        getAttribute: (k) => (k === 'href' ? src : (k === 'download' ? '사진' : null))
+      }).catch((err) => {
+        console.error('downloadLightboxImage', err);
+        appAlert('사진 저장 중 오류가 발생했습니다.');
+      });
+    }
+
+    function openLightboxForwardPicker() {
+      const search = document.getElementById('lightbox-forward-search');
+      if (search) search.value = '';
+      renderLightboxForwardPickerList();
+      document.getElementById('lightbox-forward-picker').style.display = 'flex';
+    }
+    function closeLightboxForwardPicker() {
+      document.getElementById('lightbox-forward-picker').style.display = 'none';
+    }
+    function renderLightboxForwardPickerList() {
+      const wrap = document.getElementById('lightbox-forward-picker-list');
+      if (!wrap) return;
+      const q = String(document.getElementById('lightbox-forward-search')?.value || '').trim().toLowerCase();
+      const list = (typeof allUsers !== 'undefined' ? allUsers : []).filter((u) => {
+        if (!u || !u.ip) return false;
+        if (myProfile && u.ip === myProfile.ip) return false;
+        if (!q) return true;
+        return userDisplayLabel(u).toLowerCase().includes(q);
+      });
+      wrap.innerHTML = list.map((u) => {
+        const label = userDisplayLabel(u).replace(/</g, '&lt;');
+        return `<div class="lightbox-forward-item" data-ip="${u.ip}" onclick="forwardLightboxImageTo('${u.ip}')" style="padding:8px 10px; border-radius:10px; cursor:pointer; font-size:13px;" onmouseenter="this.style.background='var(--border-soft)'" onmouseleave="this.style.background=''">${label}</div>`;
+      }).join('') || '<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12px;">대상이 없습니다.</div>';
+    }
+    async function forwardLightboxImageTo(ip) {
+      const user = (typeof allUsers !== 'undefined' ? allUsers : []).find((u) => u && u.ip === ip);
+      if (!user) return;
+      const src = document.getElementById('image-lightbox-img').src;
+      if (!src) return;
+      const label = userDisplayLabel(user);
+      if (!await appConfirm(`${label}님에게 이 사진을 전달하시겠습니까?`)) return;
+      try {
+        await window.api.sendMessage(ip, `<img src="${src}" class="chat-img-preview" alt="전달된 사진" />`, false);
+        closeLightboxForwardPicker();
+        await appAlert('사진을 전달했습니다.');
+      } catch (e) {
+        await appAlert('전달에 실패했습니다. 네트워크 상태를 확인해 주세요.');
+      }
     }
 
     function onLightboxImgMouseDown(e) {
