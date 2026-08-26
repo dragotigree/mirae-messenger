@@ -10438,6 +10438,43 @@
           host.appendChild(wrap);
         }
 
+        // ⚠️ 실사고: 달력 날짜를 고르면 그 아래 나오는 줄(날짜 + 병동 필터 + 종류 필터,
+        // #sidebar-calendar-day .sidebar-cal-day-toprow)이 이 최소폭 측정에서 빠져 있었다.
+        // 병동 필터를 나중에 추가하면서 이 줄이 제법 넓어졌는데, 측정에 안 잡히다 보니
+        // 오른쪽 사이드바를 좁게 끌면 이 줄만 화면 밖으로 잘렸다. 실제 있는 데이터로
+        // 채워진 상태를 그대로 복제해 재는 게 가장 정확하므로, 하루보기가 열려 있으면
+        // 그 시점의 실제 toprow를 복제하고, 비어 있으면(달력 날짜를 아직 안 고른 상태)
+        // 필터 두 개가 다 보이는 기준 텍스트로 채운 대역폭을 만든다.
+        const dayToprow = right.querySelector('.sidebar-cal-day-toprow');
+        if (dayToprow) {
+          const trClone = dayToprow.cloneNode(true);
+          trClone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          trClone.style.cssText = 'display:flex;align-items:center;gap:8px;width:max-content;flex-shrink:0;padding:0;';
+          const dateEl = trClone.querySelector('.sidebar-cal-day-date');
+          if (dateEl) {
+            dateEl.style.cssText = 'white-space:nowrap;overflow:visible;text-overflow:clip;flex-shrink:0;';
+            if (!dateEl.textContent.trim()) dateEl.textContent = '12월 31일(수)';
+          }
+          trClone.querySelectorAll('.sidebar-cal-day-filter').forEach((f) => {
+            f.style.cssText = 'position:static;flex-shrink:0;';
+            const trigger = f.querySelector('.cal-day-filter-trigger');
+            if (trigger) trigger.style.whiteSpace = 'nowrap';
+            if (!f.querySelector('.cal-day-filter-trigger span:nth-child(2)')?.textContent?.trim()) {
+              const label = f.id === 'sidebar-cal-day-ward-filter' ? '전체 병동' : '외진외출';
+              const span = f.querySelector('.cal-day-filter-trigger span:nth-child(2)');
+              if (span) span.textContent = label;
+            }
+          });
+          // 필터가 아직 한 번도 렌더링 안 됐으면(달력을 아직 안 열어봤으면) 비어 있을 수
+          // 있어, 그 경우 기준이 되는 두 필터 트리거를 직접 채워 넣는다.
+          if (!trClone.querySelector('.cal-day-filter-trigger')) {
+            trClone.insertAdjacentHTML('beforeend',
+              '<span class="cal-day-filter-trigger" style="white-space:nowrap;">전체 병동 ▾</span>' +
+              '<span class="cal-day-filter-trigger" style="white-space:nowrap;">외진외출 ▾</span>');
+          }
+          host.appendChild(trClone);
+        }
+
         document.body.appendChild(host);
         const measured = Math.ceil(host.getBoundingClientRect().width);
         host.remove();
