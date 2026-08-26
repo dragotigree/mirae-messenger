@@ -8447,9 +8447,19 @@
       if (!window.api || !window.api.pushToastUiState) return;
       // 토스트 억제 상태는 메인 창 기준으로만 관리한다(별도 채팅창이 덮어쓰지 않도록).
       if (document.body.classList.contains('chat-window-standalone')) return;
-      window.api.pushToastUiState({
-        activeChannelKey: activeChatUser && activeChatUser.ip ? String(activeChatUser.ip) : ''
-      });
+      let keys = [];
+      if (activeChatUser) {
+        if (activeChatUser.isGroup && activeChatUser.groupUid) {
+          keys = [`GROUP:${activeChatUser.groupUid}`];
+        } else if (activeChatUser.ip) {
+          // ⚠️ 실사고: 같은 사람이 노트북·데스크톱 등 여러 IP로 잡히면(aliasIps), 지금
+          // 실제로 메시지를 보낸 IP가 대표 IP(activeChatUser.ip)가 아닐 수 있어 억제
+          // 비교가 어긋나 "채팅 중인데도 토스트가 뜬다"는 신고가 있었다. 별칭 IP까지
+          // 전부 포함해서 보낸다.
+          keys = [String(activeChatUser.ip), ...((activeChatUser.aliasIps || []).map(String))];
+        }
+      }
+      window.api.pushToastUiState({ activeChannelKeys: keys });
     }
     let channelReadNotifyWatermark = '';
     let isMasterAuthenticated = false;

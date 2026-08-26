@@ -242,8 +242,13 @@ const profileOverrides = new Map();
 // 채널(발신자)별로 토스트를 따로 열어 여러 개가 동시에 화면에 쌓이게 하고, 한쪽을
 // 닫으면 나머지가 자리를 채우도록 다시 배치한다.
 const toastEntries = new Map(); // channelKey -> { win, dismissTimer }
-/** 렌더러: 지금 보고 있는 대화방 + 창 포커스 (같은 방이면 토스트 생략) */
-let toastUiState = { focused: false, activeChannelKey: '' };
+/** 렌더러: 지금 보고 있는 대화방 + 창 포커스 (같은 방이면 토스트 생략)
+ *  activeChannelKeys: 지금 열려 있는 대화방을 가리킬 수 있는 모든 키의 집합.
+ *  ⚠️ 실사고: DM은 원래 activeChatUser.ip 하나만 보냈는데, 같은 사람이 노트북·데스크톱
+ *  등 여러 IP로 잡히면(aliasIps) 지금 실제 메시지를 보낸 IP가 그 중 대표 IP가 아닌
+ *  경우가 있어("A와 채팅 중인데 A가 보내면 토스트가 뜬다" 신고) 키가 서로 달라 억제가
+ *  안 됐다. 그 사람의 별칭 IP를 모두 포함해서 보내도록 고치고, 여기서도 집합으로 받는다. */
+let toastUiState = { focused: false, activeChannelKeys: new Set() };
 let tray = null;
 let trayLaunchViewMode = 'normal'; // 트레이·단축키로 창을 열 때 사용할 화면 (normal | compact)
 let isQuitting = false;
@@ -1441,7 +1446,7 @@ function previewBody(rawMessage) {
 function shouldSuppressMessageToast(channelKey) {
   const key = String(channelKey || '').trim();
   if (!key || !toastUiState.focused) return false;
-  return toastUiState.activeChannelKey === key;
+  return toastUiState.activeChannelKeys.has(key);
 }
 
 function getDisplayForIncomingToast() {
@@ -6650,10 +6655,13 @@ ipcMain.on('message-toast-close', (event) => {
 });
 
 ipcMain.on('toast-ui-state', (_, state) => {
-  if (state && typeof state.activeChannelKey === 'string') {
-    toastUiState.activeChannelKey = state.activeChannelKey;
-  } else if (!state || state.activeChannelKey == null) {
-    toastUiState.activeChannelKey = '';
+  if (state && Array.isArray(state.activeChannelKeys)) {
+    toastUiState.activeChannelKeys = new Set(state.activeChannelKeys.map((k) => String(k || '')).filter(Boolean));
+  } else if (state && typeof state.activeChannelKey === 'string') {
+    // 구버전 호환: 단일 키만 오면 그 하나만 담는다.
+    toastUiState.activeChannelKeys = state.activeChannelKey ? new Set([state.activeChannelKey]) : new Set();
+  } else {
+    toastUiState.activeChannelKeys = new Set();
   }
 });
 
