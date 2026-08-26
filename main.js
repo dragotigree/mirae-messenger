@@ -11748,12 +11748,23 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
     }
 
     if (ask && mainWindow && !mainWindow.isDestroyed()) {
+      const wantedExt = path.extname(destPath).replace(/^\./, '');
       const result = await dialog.showSaveDialog(mainWindow, {
         defaultPath: destPath,
-        filters: [{ name: 'All Files', extensions: ['*'] }]
+        filters: wantedExt
+          ? [{ name: `${wantedExt.toUpperCase()} 파일`, extensions: [wantedExt] }, { name: '모든 파일', extensions: ['*'] }]
+          : [{ name: '모든 파일', extensions: ['*'] }]
       });
       if (result.canceled || !result.filePath) return { success: false, canceled: true };
       destPath = result.filePath;
+      // ⚠️ 실사고: 탐색기에서 "알려진 파일 형식의 확장명 숨기기"가 켜져 있고 필터가
+      // "모든 파일(*.*)"이면, 대화상자 입력칸에 확장자가 안 보인 채로 뜨고 그대로
+      // 저장을 누르면 Windows가 반환하는 경로에도 확장자가 정말로 빠져 있는 경우가
+      // 있다("확장자 없이 저장된다" 재신고의 실제 원인). 원래 붙이려던 확장자가
+      // 빠진 채로 돌아오면 여기서 강제로 다시 붙인다.
+      if (wantedExt && !path.extname(destPath)) {
+        destPath = `${destPath}.${wantedExt}`;
+      }
     }
 
     if (buffer) {
