@@ -5677,6 +5677,8 @@
           </span>
         </div>
         <div id="favorites-section-body"></div>
+        <div id="favorites-channels-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:8px 16px 2px;">채널</div>
+        <div id="favorites-channels-body"></div>
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
@@ -7645,6 +7647,7 @@
   <div id="master-client-menu"></div>
 
   <div id="channel-context-menu">
+    <div class="ctx-menu-item" id="ctx-channel-favorite-item" style="display:none;" onclick="ctxToggleChannelFavorite()">⭐ 즐겨찾기 추가</div>
     <div class="ctx-menu-item" onclick="ctxChannelViewInfo()">ℹ️ 정보보기</div>
     <div class="ctx-menu-item" onclick="ctxChannelRenameDisplay()">✏️ 표시 이름 변경 (나만)</div>
     <div class="ctx-menu-item" id="ctx-channel-reset-name" style="display:none;" onclick="ctxChannelResetDisplayName()">↩️ 기본 이름으로</div>
@@ -9441,6 +9444,19 @@
       syncTaskbarBadge();
     }
     let favoriteIps = new Set(JSON.parse(localStorage.getItem('favoriteIps') || '[]'));
+    /* ⭐ 그룹채팅방·부서/층 채널 즐겨찾기 — "채널 및 대화방 보기도 즐겨찾기에 추가할 수
+     * 있을까?" 요청으로 추가. 사람(favoriteIps)과는 별도 저장소를 쓰고, 사이드바
+     * 즐겨찾기 섹션에서도 사람과 채널을 구분해 따로 표시한다. */
+    let favoriteChannelKeys = new Set(JSON.parse(localStorage.getItem('favoriteChannelKeys') || '[]'));
+    function isChannelKeyFavoritable(key) {
+      return typeof key === 'string' && (key.startsWith('GROUP:') || key.startsWith('DEPT:') || key.startsWith('FLOOR:'));
+    }
+    function toggleChannelFavorite(key) {
+      if (!isChannelKeyFavoritable(key)) return;
+      if (favoriteChannelKeys.has(key)) favoriteChannelKeys.delete(key);
+      else favoriteChannelKeys.add(key);
+      localStorage.setItem('favoriteChannelKeys', JSON.stringify([...favoriteChannelKeys]));
+    }
     // 즐겨찾기 사람들을 손으로 끌어서 바꾼 순서 — 아직 순서를 안 정한 새 즐겨찾기는
     // 이 목록 맨 뒤(기존 정렬 기준)에 자연스럽게 붙는다. 일반 모드·미니 모드가 이
     // 저장소를 그대로 공유해 어느 화면에서 바꾸든 서로 똑같이 반영된다.
@@ -13503,43 +13519,46 @@
         const uid = key.slice(6);
         const g = (myGroupChats || []).find((x) => x.uid === uid);
         if (!g) return null;
+        const favG = favoriteChannelKeys.has(key);
         return {
           kind: 'group',
-          name: g.name || '그룹',
+          name: `${favG ? '⭐ ' : ''}${g.name || '그룹'}`,
           avatarClass: 'compact-avatar-group',
           avatarHtml: getChannelSidebarIcon({ key, icon: '👥' }),
           user: makeGroupChannel(g),
           onClick: () => openChatTargetFromClick(makeGroupChannel(g)),
           isOnline: true,
-          isFavorite: false,
+          isFavorite: favG,
           searchText: `${g.name || ''} 그룹`
         };
       }
       if (key.startsWith('DEPT:')) {
         const dept = key.slice(5);
+        const favD = favoriteChannelKeys.has(key);
         return {
           kind: 'dept',
-          name: dept,
+          name: `${favD ? '⭐ ' : ''}${dept}`,
           avatarClass: 'compact-avatar-dept',
           avatarHtml: '🏢',
           user: makeDeptChannel(dept),
           onClick: () => openChatTargetFromClick(makeDeptChannel(dept)),
           isOnline: true,
-          isFavorite: false,
+          isFavorite: favD,
           searchText: `${dept} 부서`
         };
       }
       if (key.startsWith('FLOOR:')) {
         const floor = key.slice(6);
+        const favF = favoriteChannelKeys.has(key);
         return {
           kind: 'floor',
-          name: floor,
+          name: `${favF ? '⭐ ' : ''}${floor}`,
           avatarClass: 'compact-avatar-floor',
           avatarHtml: '🏬',
           user: makeFloorChannel(floor),
           onClick: () => openChatTargetFromClick(makeFloorChannel(floor)),
           isOnline: true,
-          isFavorite: false,
+          isFavorite: favF,
           searchText: `${floor} 층`
         };
       }
@@ -15020,14 +15039,22 @@
       if (body) body.style.display = 'block';
     }
 
-    /** 즐겨찾기 — 「채널 및 대화방」·「사용자」와 같은 독립 섹션으로 표시 */
-    function renderFavoritesSection(favorites) {
+    /** 즐겨찾기 — 「채널 및 대화방」·「사용자」와 같은 독립 섹션으로 표시.
+     *  사람(favorites)과 그룹채팅방·부서/층 채널(favoriteChannelEntries)을 같은 섹션
+     *  안에서 "채널" 소제목으로 구분해 따로 보여준다("채널 및 대화방보기도 즐겨찾기에
+     *  추가할 수 있을까?" 요청). */
+    function renderFavoritesSection(favorites, favoriteChannelEntries) {
       const block = document.getElementById('sidebar-block-favorites');
       const body = document.getElementById('favorites-section-body');
+      const channelsLabelEl = document.getElementById('favorites-channels-label');
+      const channelsBody = document.getElementById('favorites-channels-body');
       const countEl = document.getElementById('favorites-section-count');
       const unreadEl = document.getElementById('favorites-section-unread-badge');
       if (!block || !body) return;
-      if (!favorites || !favorites.length) {
+      const chEntries = favoriteChannelEntries || [];
+      const hasPeople = favorites && favorites.length > 0;
+      const hasChannels = chEntries.length > 0;
+      if (!hasPeople && !hasChannels) {
         // ⚠️ 실사고: 즐겨찾기 0명일 때 블록만 숨기고 return 해버려서, 배지(countEl/
         // unreadEl)가 마지막으로 찍혔던 값(예: 1)에 그대로 멈춰 있었다. 즐겨찾기를
         // 해제해서 0명이 돼도 옆의 숫자 배지가 안 줄어드는 버그라 여기서도 초기화한다.
@@ -15038,18 +15065,35 @@
       }
       block.style.display = '';
       applyFavoritesSectionCollapseState();
-      if (countEl) countEl.textContent = String(favorites.length);
-      const favUnread = sumUnreadForUsers(favorites);
+      const totalCount = (favorites ? favorites.length : 0) + chEntries.length;
+      if (countEl) countEl.textContent = String(totalCount);
+      const favUnread = sumUnreadForUsers(favorites || []) + chEntries.reduce((sum, e) => sum + (e.unread || 0), 0);
       if (unreadEl) {
         unreadEl.style.display = favUnread > 0 ? '' : 'none';
         unreadEl.textContent = formatUnreadBadge(favUnread);
       }
       body.innerHTML = '';
-      favorites.forEach((u) => {
+      (favorites || []).forEach((u) => {
         const card = buildUserCard(u);
         bindFavoriteReorderTarget(card, u.ip);
         body.appendChild(card);
       });
+      if (channelsLabelEl) channelsLabelEl.style.display = hasChannels ? '' : 'none';
+      if (channelsBody) {
+        channelsBody.innerHTML = '';
+        chEntries.forEach((entry) => {
+          const label = getChannelDisplayName(entry.key, entry.defaultName);
+          const sidebarIcon = getChannelSidebarIcon(entry);
+          const iconClass = getChannelTitleEmoji(entry.key) ? 'channel-hash is-custom-emoji' : 'channel-hash';
+          const el = document.createElement('div');
+          el.className = `channel-item${entry.isActive ? ' active' : ''}`;
+          const badgeHtml = entry.unread > 0 ? `<span class="unread-badge">${entry.unread > 99 ? '99+' : entry.unread}</span>` : '';
+          el.innerHTML = `<span class="${iconClass}">${escapeHtml(sidebarIcon)}</span><span class="channel-label">${escapeHtml(label)}</span>${badgeHtml}`;
+          el.onclick = () => entry.onClick();
+          el.oncontextmenu = (e) => showChannelContextMenu(e, entry);
+          channelsBody.appendChild(el);
+        });
+      }
     }
 
     /** 일반 화면(3단) 사이드바 "최근 대화" — 미니 모드에서 쓰는 최근 대화 목록과 완전히
@@ -15455,6 +15499,15 @@
       const resetEmojiEl = document.getElementById('ctx-channel-reset-emoji');
       const groupExtra = document.getElementById('channel-ctx-group-extra');
       const deleteGroupEl = document.getElementById('ctx-channel-delete-group');
+      const favoriteEl = document.getElementById('ctx-channel-favorite-item');
+      if (favoriteEl) {
+        if (isChannelKeyFavoritable(entry.key)) {
+          favoriteEl.style.display = 'block';
+          favoriteEl.textContent = favoriteChannelKeys.has(entry.key) ? '⭐ 즐겨찾기 해제' : '⭐ 즐겨찾기 추가';
+        } else {
+          favoriteEl.style.display = 'none';
+        }
+      }
       const names = loadChannelDisplayNamesMap();
       if (resetEl) resetEl.style.display = names[entry.key] ? 'block' : 'none';
       if (resetEmojiEl) resetEmojiEl.style.display = getChannelTitleEmoji(entry.key) ? 'block' : 'none';
@@ -15469,10 +15522,23 @@
       const isOwnerOrOwnerless = !!entry.group && (!entry.group.owner_ip || myIpSetForCtx.has(entry.group.owner_ip));
       if (deleteGroupEl) deleteGroupEl.style.display = isOwnerOrOwnerless ? 'block' : 'none';
       const menuWidth = 220;
-      const menuHeight = entry.group ? 250 : 150;
+      const menuHeight = (entry.group ? 250 : 150) + (isChannelKeyFavoritable(entry.key) ? 36 : 0);
       menu.style.left = Math.min(e.clientX, window.innerWidth - menuWidth) + 'px';
       menu.style.top = Math.min(e.clientY, window.innerHeight - menuHeight) + 'px';
       menu.style.display = 'block';
+    }
+
+    function ctxToggleChannelFavorite() {
+      document.getElementById('channel-context-menu').style.display = 'none';
+      const entry = ctxMenuTargetChannel;
+      if (!entry || !isChannelKeyFavoritable(entry.key)) return;
+      toggleChannelFavorite(entry.key);
+      renderChannelsSection();
+      if (typeof renderUserListTree === 'function') renderUserListTree(true);
+      invalidateCompactRecentConversations();
+      if (document.body.classList.contains('compact-mode')) {
+        try { renderCompactList(); } catch (e) { /* ignore */ }
+      }
     }
 
     function ctxChannelRenameDisplay() {
@@ -17256,7 +17322,8 @@
       const allGroupKeys = collectUserGroupKeys(groupingKey, restAll);
       const sortedGroupKeys = getOrderedUserGroupKeys(groupingKey, allGroupKeys).filter((k) => groups[k]);
       syncSidebarFloorDeptJumpSelects();
-      renderFavoritesSection(favorites);
+      const favoriteChannelEntries = getOrderedChannelEntries().filter((e) => favoriteChannelKeys.has(e.key));
+      renderFavoritesSection(favorites, favoriteChannelEntries);
       renderRecentChatsSection();
 
       const structureKey = buildUserListStructureKey([], sortedGroupKeys, groups, groupingKey);
