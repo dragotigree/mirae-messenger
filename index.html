@@ -5777,21 +5777,21 @@
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:6px; min-width:0; flex-shrink:0;"><span data-ui-icon="users"></span> 사용자</span>
-          <span style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
-            <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em;">가나다</span>
-            <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1;">⇕</span>
+          <span style="display:flex; align-items:center; gap:2px; flex-shrink:0;">
+            <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; letter-spacing:-0.03em;">가나다</span>
+            <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" data-ui-icon="chevronsUpDown"></span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
             <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleUserSearchBox()" title="검색 (Ctrl+Shift+F)" data-ui-icon="search"></span>
             <span class="sidebar-header-divider"></span>
             <span class="sidebar-jump-trigger-wrap" id="sidebar-floor-jump-wrap">
-              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('floor')" title="층별로 보기 · 해당 층으로 이동" style="font-size:10.5px; font-weight:800; line-height:1;">층</span>
+              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('floor')" title="층별로 보기 · 해당 층으로 이동" data-ui-icon="layers"></span>
               <div class="sidebar-jump-menu" id="sidebar-floor-jump-menu"></div>
             </span>
             <span class="sidebar-jump-trigger-wrap" id="sidebar-dept-jump-wrap">
-              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('dept')" title="부서별로 보기 · 해당 부서로 이동" style="font-size:10.5px; font-weight:800; line-height:1;">부서</span>
+              <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); toggleSidebarJumpMenu('dept')" title="부서별로 보기 · 해당 부서로 이동" data-ui-icon="buildingDept"></span>
               <div class="sidebar-jump-menu" id="sidebar-dept-jump-menu"></div>
             </span>
-            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" style="font-size:12px; line-height:1;">↺</span>
+            <span class="sidebar-header-icon-btn" onclick="event.stopPropagation(); resetUserGroupOrder()" title="묶음 순서 초기화 (손으로 바꾼 순서를 원래대로)" data-ui-icon="rotateCcw"></span>
           </span>
         </div>
         <div class="user-search-box" id="user-search-box">
@@ -8401,7 +8401,11 @@
       layers: _uiSvg('<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>'),
       buildingDept: _uiSvg('<path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/>'),
       /* 최근 대화 — 시계+되돌아가는 화살표 */
-      history: _uiSvg('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>')
+      history: _uiSvg('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'),
+      /* 부서·층 전체 접기/펴기 — 위아래로 함께 움직이는 화살표(chevrons) */
+      chevronsUpDown: _uiSvg('<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>'),
+      /* 순서 초기화 — 되돌리기(반시계 화살표) */
+      rotateCcw: _uiSvg('<path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.36"/><path d="M3 3v5h5"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
