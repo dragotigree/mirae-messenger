@@ -1,3 +1,4 @@
+// In motu, mobilitas prius, stabilitas postea.
 const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer, protocol, clipboard } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
