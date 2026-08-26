@@ -3020,7 +3020,14 @@
     .sidebar-ad-row > span {
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
     }
-    .sidebar-ad-room { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--text-muted); font-weight: 700; flex: 0 0 auto; }
+    /* 호실 번호를 병동별 색(파랑4·초록5·주황7·보라8·분홍9 — sidebar-ward-badge와 같은 팔레트)의
+     * 연한 알약 배지로 표시 — 어느 병동 환자인지 한눈에 구분되게 한다. */
+    .sidebar-ad-room {
+      font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 800; flex: 0 0 auto;
+      padding: 2px 8px; border-radius: 999px;
+      background: color-mix(in srgb, var(--room-c, #94a3b8) 16%, #ffffff);
+      color: color-mix(in srgb, var(--room-c, #94a3b8) 72%, #1e293b);
+    }
     .sidebar-ad-name { font-size: 12.5px; font-weight: 700; letter-spacing: -0.01em; flex: 1 1 auto; min-width: 0; color: var(--text-primary); }
     .sidebar-ad-rm-badge {
       flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px;
@@ -27212,6 +27219,13 @@
       return '';
     }
 
+    /** .sidebar-ward-badge와 같은 병동별 팔레트를 색상 값(hex)으로 그대로 돌려준다 —
+     *  호실 알약 배지(--room-c)처럼 CSS 커스텀 프로퍼티로 넘겨써야 하는 곳에서 쓴다. */
+    const SIDEBAR_WARD_COLOR_HEX = { '4': '#2563eb', '5': '#22c55e', '7': '#f97316', '8': '#a855f7', '9': '#ec4899' };
+    function wardColorHex(ward) {
+      return SIDEBAR_WARD_COLOR_HEX[String(ward || '').trim()] || '#94a3b8';
+    }
+
     function sidebarCalendarTypeRank(type) {
       const t = type || 'GENERAL';
       if (t === 'ADMISSION') return 0;
@@ -27427,7 +27441,7 @@
             formatSidebarAdmitDischargeTime(sch)
           ].filter(Boolean).join(' · ');
           row.innerHTML =
-            `<span class="sidebar-ad-room">${escapeHtml(formatSidebarAdmitDischargeRoom(sch, norm))}</span>` +
+            `<span class="sidebar-ad-room" style="--room-c:${wardColorHex(norm.ward)};">${escapeHtml(formatSidebarAdmitDischargeRoom(sch, norm))}</span>` +
             `<span class="sidebar-ad-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '—')}</span>` +
             formatSidebarAdmitDischargeRmBadgeHtml(sch, norm) +
             `<span class="sidebar-ad-time">${escapeHtml(formatSidebarAdmitDischargeTime(sch))}</span>`;
