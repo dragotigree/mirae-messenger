@@ -619,6 +619,29 @@
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: var(--border-soft); border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
+    /* 🖼 사진 확대창 하단 툴바 */
+    #image-lightbox-toolbar .lb-btn {
+      height: 38px; padding: 0 14px; border: none; border-radius: 10px;
+      background: rgba(255,255,255,0.12); color: #fff; cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: background 0.12s, transform 0.08s;
+    }
+    #image-lightbox-toolbar .lb-btn:hover { background: rgba(255,255,255,0.24); }
+    #image-lightbox-toolbar .lb-btn:active { transform: scale(0.95); }
+    #image-lightbox-toolbar .lb-btn-icon { width: 38px; padding: 0; justify-content: center; }
+    #image-lightbox-toolbar .lb-zoom-level {
+      min-width: 62px; height: 38px; padding: 0 8px; border: none; border-radius: 10px;
+      background: transparent; color: #fff; cursor: pointer;
+      font-size: 13px; font-weight: 700; font-family: inherit;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+      transition: background 0.12s;
+    }
+    #image-lightbox-toolbar .lb-zoom-level:hover { background: rgba(255,255,255,0.16); }
+    #image-lightbox-toolbar .lb-sep {
+      width: 1px; height: 22px; background: rgba(255,255,255,0.22); margin: 0 4px; flex-shrink: 0;
+    }
+
     /* 🖱 우클릭 컨텍스트 메뉴 */
     #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu, #calendar-day-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
     /* 관리자 창(.modal-overlay z-index:2000) 위에서 열리는 메뉴라 그보다 높아야 함 — 안 그러면 창 뒤에 가려 안 보임 */
@@ -7921,10 +7944,30 @@
     <img id="image-lightbox-img" src="" onwheel="onLightboxWheel(event)" onmousedown="onLightboxImgMouseDown(event)" onclick="onLightboxImgClick(event)" style="max-width:90vw; max-height:90vh; border-radius: 12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); transform-origin:center center; user-select:none; -webkit-user-drag:none; touch-action:none;">
     <div id="image-lightbox-zoom-hint" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.65); font-size:12px; pointer-events:none;">마우스 휠로 확대·축소 · 드래그로 이동</div>
     <div id="image-lightbox-toolbar" onclick="event.stopPropagation()" style="position:fixed; bottom:56px; left:50%; transform:translateX(-50%); display:flex; gap:8px; background:rgba(20,20,24,0.55); backdrop-filter:blur(6px); padding:8px; border-radius:14px;">
-      <button type="button" onclick="lightboxZoomOut()" title="축소" style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:18px; cursor:pointer; font-weight:700;">－</button>
-      <button type="button" onclick="lightboxZoomIn()" title="확대" style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:18px; cursor:pointer; font-weight:700;">＋</button>
-      <button type="button" onclick="downloadLightboxImage()" title="다운로드" style="height:40px; padding:0 16px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:13px; cursor:pointer; font-weight:600;">⬇ 다운로드</button>
-      <button type="button" onclick="openLightboxForwardPicker()" title="전달하기" style="height:40px; padding:0 16px; border-radius:10px; background:rgba(255,255,255,0.12); color:#fff; border:none; font-size:13px; cursor:pointer; font-weight:600;">↪ 전달하기</button>
+      <button type="button" class="lb-btn lb-btn-icon" onclick="lightboxZoomOut()" title="축소 (마우스 휠로도 가능)">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/></svg>
+      </button>
+      <button type="button" id="lightbox-zoom-level" class="lb-zoom-level" onclick="lightboxZoomReset()" title="클릭하면 100%로 되돌립니다">100%</button>
+      <button type="button" class="lb-btn lb-btn-icon" onclick="lightboxZoomIn()" title="확대 (마우스 휠로도 가능)">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6M11 8v6"/></svg>
+      </button>
+      <span class="lb-sep"></span>
+      <button type="button" class="lb-btn" onclick="copyLightboxImage(event)" title="클립보드로 복사 — 다른 프로그램에 붙여넣기">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        복사
+      </button>
+      <button type="button" class="lb-btn" onclick="editLightboxImage()" title="그림판에서 열어 표시를 그려 넣기">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        편집
+      </button>
+      <button type="button" class="lb-btn" onclick="downloadLightboxImage()" title="내 PC에 저장">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg>
+        저장
+      </button>
+      <button type="button" class="lb-btn" onclick="openLightboxForwardPicker()" title="다른 직원에게 전달">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9a4 4 0 0 1 4-4h11"/><path d="M15 2l5 3-5 3"/></svg>
+        전달
+      </button>
     </div>
     <button onclick="closeImageLightbox()" style="position:fixed; top:20px; right:20px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); color:#fff; border:none; font-size:20px; cursor:pointer;">✕</button>
   </div>
@@ -17718,14 +17761,14 @@
       {
         cat: 'chat', icon: '🖼️', color: '#7c3aed', title: '사진 크게 보기', tag: '1:1·그룹 공통',
         path: '채팅창의 사진 클릭 → 확대창 하단 툴바',
-        chips: ['마우스 휠 또는 －/＋ 버튼으로 확대·축소', '⬇ 다운로드로 내 PC에 저장', '↪ 전달하기로 다른 직원에게 바로 전송'],
-        tip: '확대된 상태에서는 사진을 드래그해서 이동할 수 있고, 전달하기는 대상을 검색해서 바로 보낼 수 있습니다.'
+        chips: ['확대·축소 (배율 숫자를 누르면 100%로 복귀)', '복사 — 다른 프로그램에 붙여넣기', '편집 — 그림판에서 표시 그려 넣기', '저장 / 전달'],
+        tip: '확대된 상태에서는 사진을 드래그해서 이동할 수 있습니다. 편집을 누르면 그림판에 사진이 깔린 채로 열려, 화살표·동그라미·글씨로 표시한 뒤 그대로 다시 보낼 수 있습니다.'
       },
       {
         cat: 'chat', icon: '🖱️', color: '#0d9488', title: '사진 우클릭 (복사·편집)', tag: '1:1·그룹 공통',
         path: '채팅창의 사진 위에서 <b>마우스 오른쪽 클릭</b>',
         chips: ['사진 복사하기 — 다른 프로그램에 바로 붙여넣기', '사진 편집하기 — 그림판으로 열어 표시 추가'],
-        tip: '편집하기를 누르면 그림판에 사진이 깔린 채로 열립니다. 화살표·동그라미·글씨로 표시한 뒤 「이미지로 보내기」로 그대로 다시 보낼 수 있습니다.'
+        tip: '사진을 클릭해서 크게 본 뒤 하단 툴바의 「복사」·「편집」을 눌러도 똑같이 됩니다.'
       },
       {
         cat: 'chat', icon: '📸', color: '#0284c7', title: '화면 캡처', tag: '1:1·그룹 공통',
@@ -24808,6 +24851,16 @@
       img.style.cursor = lightboxZoomLevel > 1 ? 'grab' : 'zoom-in';
       const hint = document.getElementById('image-lightbox-zoom-hint');
       if (hint) hint.style.display = lightboxZoomLevel > 1.02 ? 'none' : '';
+      const lvl = document.getElementById('lightbox-zoom-level');
+      if (lvl) lvl.textContent = `${Math.round(lightboxZoomLevel * 100)}%`;
+    }
+
+    /** 배율 숫자를 누르면 원래 크기(100%)로 되돌린다. */
+    function lightboxZoomReset() {
+      lightboxZoomLevel = 1;
+      lightboxPanX = 0;
+      lightboxPanY = 0;
+      applyLightboxTransform();
     }
 
     function onLightboxWheel(e) {
@@ -24849,6 +24902,46 @@
         console.error('downloadLightboxImage', err);
         appAlert('사진 저장 중 오류가 발생했습니다.');
       });
+    }
+
+    /** 클립보드로 복사 — 한글·메일 등 다른 프로그램에 바로 붙여넣을 수 있다.
+     *  확대창이 화면을 덮고 있어 일반 토스트가 안 보이므로, 누른 버튼 자체를
+     *  잠깐 「복사됨」으로 바꿔 결과를 알린다. */
+    async function copyLightboxImage(ev) {
+      const src = lightboxCurrentSrc;
+      if (!src) return;
+      const btn = ev && ev.currentTarget;
+      try {
+        const res = await window.api.copyImageToClipboard(src);
+        if (res && res.success) {
+          if (btn && !btn.dataset.busy) {
+            btn.dataset.busy = '1';
+            const original = btn.innerHTML;
+            btn.innerHTML = '✓ 복사됨';
+            setTimeout(() => { btn.innerHTML = original; delete btn.dataset.busy; }, 1400);
+          }
+        } else {
+          await appAlert((res && res.msg) || '사진을 복사하지 못했습니다.');
+        }
+      } catch (e) {
+        await appAlert('사진 복사 중 오류가 발생했습니다.');
+      }
+    }
+
+    /** 그림판에서 열기 — 사진이 깔린 채로 열려 표시를 그린 뒤 다시 보낼 수 있다. */
+    async function editLightboxImage() {
+      const src = lightboxCurrentSrc;
+      if (!src) return;
+      try {
+        const res = await window.api.editImageInDrawEditor(src);
+        if (res && res.success) {
+          closeImageLightbox();
+        } else {
+          await appAlert((res && res.msg) || '그림판을 열지 못했습니다.');
+        }
+      } catch (e) {
+        await appAlert('그림판을 여는 중 오류가 발생했습니다.');
+      }
     }
 
     function openLightboxForwardPicker() {

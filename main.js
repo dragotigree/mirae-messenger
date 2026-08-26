@@ -6549,6 +6549,31 @@ function openExcalidrawWindow(purpose) {
 
 ipcMain.handle('open-excalidraw-editor', async (event, purpose) => openExcalidrawWindow(purpose));
 
+/** 사진 확대창의 「복사」 — 채팅 사진을 클립보드에 이미지로 올린다. */
+ipcMain.handle('copy-image-to-clipboard', async (event, srcURL) => {
+  const img = await imageFromChatSrc(srcURL);
+  if (!img || img.isEmpty()) return { success: false, msg: '사진을 읽지 못했습니다.' };
+  try {
+    clipboard.writeImage(img);
+    return { success: true };
+  } catch (e) {
+    return { success: false, msg: e.message || String(e) };
+  }
+});
+
+/** 사진 확대창의 「편집」 — 그 사진을 배경으로 깔아 그림판을 연다. */
+ipcMain.handle('edit-image-in-draw-editor', async (event, srcURL) => {
+  const img = await imageFromChatSrc(srcURL);
+  if (!img || img.isEmpty()) return { success: false, msg: '사진을 읽지 못했습니다.' };
+  pendingDrawEditorImage = img.toDataURL();
+  const res = openExcalidrawWindow('chat');
+  if (!res || res.success === false) {
+    pendingDrawEditorImage = null;
+    return res || { success: false, msg: '그림판을 열지 못했습니다.' };
+  }
+  return { success: true };
+});
+
 ipcMain.handle('excalidraw-get-context', async () => {
   const base = excalidrawSession || getExcalidrawPurposeMeta('chat');
   // 「사진 편집하기」로 연 경우엔 편집할 사진을 딱 한 번만 실어 보낸다(다음에 그냥

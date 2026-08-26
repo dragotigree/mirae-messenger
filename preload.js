@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld('api', {
   openChatWindow: (payload) => ipcRenderer.invoke('open-chat-window', payload || {}),
   onChatWindowOpen: (callback) => ipcRenderer.on('chat-window-open', (e, data) => callback(data)),
   openExcalidrawEditor: (purpose) => ipcRenderer.invoke('open-excalidraw-editor', purpose || 'chat'),
+  copyImageToClipboard: (srcURL) => ipcRenderer.invoke('copy-image-to-clipboard', srcURL),
+  editImageInDrawEditor: (srcURL) => ipcRenderer.invoke('edit-image-in-draw-editor', srcURL),
   onExcalidrawPngReady: (callback) => ipcRenderer.on('excalidraw-png-ready', (e, data) => callback(data)),
   onScheduleBoardOpen: (callback) => ipcRenderer.on('schedule-board-open', (e, data) => callback(data)),
   addSchedule: (data) => ipcRenderer.invoke('add-schedule', data),
