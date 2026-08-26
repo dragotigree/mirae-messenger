@@ -2918,6 +2918,22 @@
     .cal-day-filter-trigger[data-key="DISCHARGE"] .cal-day-filter-dot { background: #ef4444; }
     .cal-day-filter-trigger[data-key="ROOM_CHANGE"] .cal-day-filter-dot { background: #2563eb; }
     .cal-day-filter-trigger[data-key="FLOW"] .cal-day-filter-dot { background: #f97316; }
+    /* 병동 필터 — 현황판·사이드바 배지와 같은 병동별 색상(sidebar-ward-badge)을 그대로 씀 */
+    .cal-day-filter-option[data-key="4"] .cal-day-filter-dot,
+    .cal-day-filter-trigger[data-key="4"] .cal-day-filter-dot { background: var(--accent); }
+    .cal-day-filter-option[data-key="5"] .cal-day-filter-dot,
+    .cal-day-filter-trigger[data-key="5"] .cal-day-filter-dot { background: #22c55e; }
+    .cal-day-filter-option[data-key="7"] .cal-day-filter-dot,
+    .cal-day-filter-trigger[data-key="7"] .cal-day-filter-dot { background: #f97316; }
+    .cal-day-filter-option[data-key="8"] .cal-day-filter-dot,
+    .cal-day-filter-trigger[data-key="8"] .cal-day-filter-dot { background: #a855f7; }
+    .cal-day-filter-option[data-key="9"] .cal-day-filter-dot,
+    .cal-day-filter-trigger[data-key="9"] .cal-day-filter-dot { background: #ec4899; }
+    .cal-day-filter-option[data-key="4"].active { background: var(--sidebar-active); color: var(--accent-dark); }
+    .cal-day-filter-option[data-key="5"].active { background: #dcfce7; color: #15803d; }
+    .cal-day-filter-option[data-key="7"].active { background: #ffedd5; color: #c2410c; }
+    .cal-day-filter-option[data-key="8"].active { background: #f3e8ff; color: #6b21a8; }
+    .cal-day-filter-option[data-key="9"].active { background: #fce7f3; color: #9d174d; }
     .sidebar-cal-day-body {
       flex: 1; min-height: 160px; max-height: none; overflow-y: auto;
       padding: 6px; scrollbar-width: thin;
@@ -6100,7 +6116,7 @@
           <div id="chat-attach-preview" class="chat-attach-preview" style="display:none;"></div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력해주세요&#10;Enter 전송 · Shift+Enter 줄바꿈 · / 명령어" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력해주세요&#10;(Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
@@ -11282,8 +11298,8 @@
       const textarea = document.getElementById('chat-textarea');
       if (textarea) {
         textarea.placeholder = enabled
-          ? '메시지를 입력해주세요\nEnter 전송 · Shift+Enter 줄바꿈 · / 명령어'
-          : '메시지를 입력해주세요\nCtrl+Enter 전송 · Enter 줄바꿈 · / 명령어';
+          ? '메시지를 입력해주세요\n(Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)'
+          : '메시지를 입력해주세요\n(Ctrl+Enter 전송 · Enter 줄바꿈 · / 명령어)';
       }
     }
 
@@ -12997,8 +13013,8 @@
       const ta = document.getElementById('chat-textarea');
       const enterHint = isEnterToSendEnabled() ? 'Enter 전송 · Shift+Enter 줄바꿈' : 'Ctrl+Enter 전송 · Enter 줄바꿈';
       if (ta) ta.placeholder = isCompactMode
-        ? `메시지를 입력해주세요\n${enterHint}`
-        : `메시지를 입력해주세요\n${enterHint} · Ctrl+V 사진`;
+        ? `메시지를 입력해주세요\n(${enterHint})`
+        : `메시지를 입력해주세요\n(${enterHint} · Ctrl+V 사진)`;
       updateMainPanelVisibility();
       if (activeChatUser) loadChatHistory();
       resizeChatTextarea();
@@ -27450,7 +27466,7 @@
       if (dateEl) {
         const d = new Date(`${dateStr}T12:00:00`);
         const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-        dateEl.textContent = Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}월 ${d.getDate()}일 ${weekdays[d.getDay()]}요일`;
+        dateEl.textContent = Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}월 ${d.getDate()}일(${weekdays[d.getDay()]})`;
       }
 
       const wardFilter = sidebarCalDayWardFilter || 'all';
