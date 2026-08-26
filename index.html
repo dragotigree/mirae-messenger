@@ -24735,8 +24735,14 @@
     let lightboxDragMoved = false;
     let lightboxDragStartX = 0;
     let lightboxDragStartY = 0;
+    // ⚠️ 실사고: 다운로드·전달하기 버튼이 img.src를 DOM에서 다시 읽었는데, 드물게
+    // 그 시점에 속성이 비어있으면 브라우저가 문서 자체 주소로 되돌려버려 확장자 없는
+    // 엉뚱한 파일이 저장되는 사고가 있었다("확장자 없이 저장된다" 신고). 연 시점의
+    // 원본 데이터 URL을 별도 변수에 그대로 붙잡아 두고 그것만 쓴다.
+    let lightboxCurrentSrc = '';
 
     function openImageLightbox(src) {
+      lightboxCurrentSrc = src || '';
       document.getElementById('image-lightbox-img').src = src;
       lightboxZoomLevel = 1;
       lightboxPanX = 0;
@@ -24747,6 +24753,7 @@
     function closeImageLightbox() {
       document.getElementById('image-lightbox').style.display = 'none';
       document.getElementById('image-lightbox-img').src = '';
+      lightboxCurrentSrc = '';
       lightboxZoomLevel = 1;
       lightboxPanX = 0;
       lightboxPanY = 0;
@@ -24791,7 +24798,7 @@
       applyLightboxTransform();
     }
     function downloadLightboxImage() {
-      const src = document.getElementById('image-lightbox-img').src;
+      const src = lightboxCurrentSrc;
       if (!src) return;
       const t = new Date();
       const stamp = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}_${String(t.getHours()).padStart(2, '0')}${String(t.getMinutes()).padStart(2, '0')}${String(t.getSeconds()).padStart(2, '0')}`;
@@ -24833,7 +24840,7 @@
     async function forwardLightboxImageTo(ip) {
       const user = (typeof allUsers !== 'undefined' ? allUsers : []).find((u) => u && u.ip === ip);
       if (!user) return;
-      const src = document.getElementById('image-lightbox-img').src;
+      const src = lightboxCurrentSrc;
       if (!src) return;
       const label = userDisplayLabel(user);
       if (!await appConfirm(`${label}님에게 이 사진을 전달하시겠습니까?`)) return;

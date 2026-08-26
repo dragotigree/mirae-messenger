@@ -3271,16 +3271,22 @@ let trayIconDotPromise = null;
  * 방식이라("타 부서에서 안 된다"는 신고가 이 케이스일 가능성이 높다), 창이 숨겨져
  * 있어도 항상 보이는 트레이 아이콘에 빨간 점을 얹어 안읽음이 있음을 알려준다.
  */
-/** 아이콘을 그대로 두되, 뒤에 빨간 둥근 배경을 깔아 카카오톡처럼 "안읽음이 있다"가
- * 한눈에 보이게 한다. */
+/** ⚠️ 실사고: 처음엔 아이콘 뒤에 얇게(8% 패딩) 빨간 배경만 까는 방식으로 만들었는데,
+ * 16px 트레이 아이콘에서는 그 8%가 1px 안팎이라 사실상 안 보였다("겉에 빨간색만
+ * 살짝 쳐져있다, 티도 안 난다" 신고). 카카오톡처럼 한눈에 띄게 하려면 아이콘 전체를
+ * 흐리게 만들기보다, 원본 아이콘은 그대로 두고 눈에 확 띄는 빨간 배지(점)를 아이콘
+ * 모서리에 큼직하게 얹는 쪽이 훨씬 잘 보인다. 흰 테두리를 둘러 어떤 배경(밝은
+ * 작업표시줄이든 어두운 트레이든)에서도 대비가 생기게 한다. */
 async function iconWithRedBackground(baseIcon, size) {
   const pngDataUrl = baseIcon.toDataURL();
-  const pad = Math.round(size * 0.08);
-  const inner = size - pad * 2;
-  const radius = Math.round(size * 0.28);
+  const dotSize = Math.max(6, Math.round(size * 0.52));
+  const ringWidth = Math.max(1, Math.round(size * 0.06));
+  const offset = Math.round(size * 0.02);
   const html = `<html><body style="margin:0;padding:0;width:${size}px;height:${size}px;background:transparent;overflow:hidden;">`
-    + `<div style="width:${size}px;height:${size}px;border-radius:${radius}px;background:#ef4444;box-sizing:border-box;padding:${pad}px;">`
-    + `<img src="${pngDataUrl}" width="${inner}" height="${inner}" style="display:block;" />`
+    + `<div style="position:relative;width:${size}px;height:${size}px;">`
+    + `<img src="${pngDataUrl}" width="${size}" height="${size}" style="display:block;position:absolute;top:0;left:0;" />`
+    + `<div style="position:absolute;top:${-offset}px;right:${-offset}px;width:${dotSize}px;height:${dotSize}px;border-radius:50%;`
+    + `background:#ef4444;box-shadow:0 0 0 ${ringWidth}px #ffffff;"></div>`
     + `</div></body></html>`;
   const img = await renderHtmlToNativeImage(html, size, size);
   return img.isEmpty() ? baseIcon : img;
@@ -11724,6 +11730,9 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
     }
     const targetDir = getReceivedFilesDir();
     let destPath = uniqueSavePath(targetDir, preferredName);
+    if (!path.extname(destPath)) {
+      writeToLogFile('warn', `[진단] save-chat-file-attachment 확장자 없음 — href scheme=${href.slice(0, 16)}, fileName=${p.fileName || ''}, preferredName=${preferredName}, destPath=${destPath}`);
+    }
 
     if (ask && mainWindow && !mainWindow.isDestroyed()) {
       const result = await dialog.showSaveDialog(mainWindow, {
