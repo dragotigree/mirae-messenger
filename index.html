@@ -6088,7 +6088,7 @@
           <div id="chat-attach-preview" class="chat-attach-preview" style="display:none;"></div>
           <div class="reply-input-row">
             <span class="reply-input-arrow" aria-hidden="true">↳</span>
-            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
+            <textarea id="chat-textarea" spellcheck="false" placeholder="메시지를 입력해주세요&#10;Enter 전송 · Shift+Enter 줄바꿈 · / 명령어" onkeydown="onChatKeyDown(event)" onpaste="handleChatPaste(event)" oninput="onChatTextareaInput()" oncompositionstart="onChatComposingStart()" oncompositionend="onChatComposingEnd()"></textarea>
           </div>
           <div class="input-bottom-actions">
             <div class="chat-tool-row">
@@ -11261,8 +11261,8 @@
       const textarea = document.getElementById('chat-textarea');
       if (textarea) {
         textarea.placeholder = enabled
-          ? '메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈 · / 명령어)'
-          : '메시지 입력 (Ctrl+Enter 전송 · Enter 줄바꿈 · / 명령어)';
+          ? '메시지를 입력해주세요\nEnter 전송 · Shift+Enter 줄바꿈 · / 명령어'
+          : '메시지를 입력해주세요\nCtrl+Enter 전송 · Enter 줄바꿈 · / 명령어';
       }
     }
 
@@ -12976,8 +12976,8 @@
       const ta = document.getElementById('chat-textarea');
       const enterHint = isEnterToSendEnabled() ? 'Enter 전송 · Shift+Enter 줄바꿈' : 'Ctrl+Enter 전송 · Enter 줄바꿈';
       if (ta) ta.placeholder = isCompactMode
-        ? `메시지 입력 (${enterHint})`
-        : `메시지를 입력하세요 (${enterHint} · Ctrl+V 사진)`;
+        ? `메시지를 입력해주세요\n${enterHint}`
+        : `메시지를 입력해주세요\n${enterHint} · Ctrl+V 사진`;
       updateMainPanelVisibility();
       if (activeChatUser) loadChatHistory();
       resizeChatTextarea();
