@@ -3271,31 +3271,44 @@ let trayIconDotPromise = null;
  * 방식이라("타 부서에서 안 된다"는 신고가 이 케이스일 가능성이 높다), 창이 숨겨져
  * 있어도 항상 보이는 트레이 아이콘에 빨간 점을 얹어 안읽음이 있음을 알려준다.
  */
-/** ⚠️ 실사고: 처음엔 아이콘 뒤에 얇게(8% 패딩) 빨간 배경만 까는 방식으로 만들었는데,
- * 16px 트레이 아이콘에서는 그 8%가 1px 안팎이라 사실상 안 보였다("겉에 빨간색만
- * 살짝 쳐져있다, 티도 안 난다" 신고). 카카오톡처럼 한눈에 띄게 하려면 아이콘 전체를
- * 흐리게 만들기보다, 원본 아이콘은 그대로 두고 눈에 확 띄는 빨간 배지(점)를 아이콘
- * 모서리에 큼직하게 얹는 쪽이 훨씬 잘 보인다. 흰 테두리를 둘러 어떤 배경(밝은
- * 작업표시줄이든 어두운 트레이든)에서도 대비가 생기게 한다. */
-async function iconWithRedBackground(baseIcon, size) {
-  const pngDataUrl = baseIcon.toDataURL();
-  const dotSize = Math.max(6, Math.round(size * 0.52));
-  const ringWidth = Math.max(1, Math.round(size * 0.06));
-  const offset = Math.round(size * 0.02);
-  const html = `<html><body style="margin:0;padding:0;width:${size}px;height:${size}px;background:transparent;overflow:hidden;">`
-    + `<div style="position:relative;width:${size}px;height:${size}px;">`
-    + `<img src="${pngDataUrl}" width="${size}" height="${size}" style="display:block;position:absolute;top:0;left:0;" />`
-    + `<div style="position:absolute;top:${-offset}px;right:${-offset}px;width:${dotSize}px;height:${dotSize}px;border-radius:50%;`
-    + `background:#ef4444;box-shadow:0 0 0 ${ringWidth}px #ffffff;"></div>`
-    + `</div></body></html>`;
-  const img = await renderHtmlToNativeImage(html, size, size);
-  return img.isEmpty() ? baseIcon : img;
+/** ⚠️ 실사고: 처음엔 아이콘 뒤에 얇게(8% 패딩) 빨간 배경만 까는 방식 → 16px에서 거의
+ * 안 보임. 그 다음엔 모서리에 빨간 배지(점)를 얹는 방식으로 바꿨는데, 사용자가 원한 건
+ * "카카오톡처럼 아이콘 자체가 눈에 띄게 바뀌는 것" — 배지 말고 아이콘 배경색 자체를
+ * (파란색 → 주홍색) 통째로 바꿔달라는 요청이었다. 원본 icon.png는 색이 이미 박힌
+ * 래스터라 색만 바꿔치기할 수 없으므로, 같은 모양(말풍선+점 3개)을 그린
+ * MESSENGER_ICON_SVG를 그대로 가져다 배경 그라디언트만 주홍색으로 바꾼 버전을 만들어,
+ * (nativeImage.createFromDataURL은 SVG를 지원하지 않는 걸 이전에 확인했으므로) 실제
+ * BrowserWindow에 그려서 캡처하는 renderHtmlToNativeImage로 렌더링한다. */
+const MESSENGER_ICON_SVG_UNREAD = MESSENGER_ICON_SVG
+  .replace(/#0EA5E9/gi, '#FB923C')
+  .replace(/#0369A1/gi, '#C2410C');
+
+let cachedUnreadIcon256 = null;
+let unreadIcon256Promise = null;
+function getUnreadAppIcon256() {
+  if (cachedUnreadIcon256) return Promise.resolve(cachedUnreadIcon256);
+  if (unreadIcon256Promise) return unreadIcon256Promise;
+  const html = `<html><body style="margin:0;padding:0;width:256px;height:256px;background:transparent;overflow:hidden;">${MESSENGER_ICON_SVG_UNREAD}</body></html>`;
+  unreadIcon256Promise = renderHtmlToNativeImage(html, 256, 256)
+    .catch(() => nativeImage.createEmpty())
+    .then((img) => {
+      cachedUnreadIcon256 = img.isEmpty() ? getAppNativeIcon() : img;
+      unreadIcon256Promise = null;
+      return cachedUnreadIcon256;
+    });
+  return unreadIcon256Promise;
+}
+
+async function unreadIconAtSize(size) {
+  const base = await getUnreadAppIcon256();
+  const { width } = base.getSize();
+  return width === size ? base : base.resize({ width: size, height: size, quality: 'best' });
 }
 
 function getTrayIconWithUnreadDot() {
   if (cachedTrayIconDot) return Promise.resolve(cachedTrayIconDot);
   if (trayIconDotPromise) return trayIconDotPromise;
-  trayIconDotPromise = iconWithRedBackground(getTrayIcon(), 16)
+  trayIconDotPromise = unreadIconAtSize(16)
     .catch(() => getTrayIcon())
     .then((img) => { cachedTrayIconDot = img; trayIconDotPromise = null; return img; });
   return trayIconDotPromise;
@@ -3303,13 +3316,13 @@ function getTrayIconWithUnreadDot() {
 
 let cachedTaskbarIconRedBg = null;
 let taskbarIconRedBgPromise = null;
-/** 작업 표시줄에 실제로 보이는 창 아이콘 자체를 빨간 배경으로 바꿔서(win.setIcon),
- * 카카오톡처럼 안읽음이 있을 때 아이콘 통째로 눈에 띄게 한다. 기존 숫자 배지
+/** 작업 표시줄에 실제로 보이는 창 아이콘 자체를 주홍색 버전으로 바꿔서(win.setIcon),
+ * 카카오톡처럼 안읽음이 있을 때 아이콘 배경색이 통째로 바뀌게 한다. 기존 숫자 배지
  * (setOverlayIcon)와 함께 쓰인다 — 색은 "새 메시지가 있다", 숫자는 "몇 개인지". */
 function getTaskbarIconWithUnreadBg() {
   if (cachedTaskbarIconRedBg) return Promise.resolve(cachedTaskbarIconRedBg);
   if (taskbarIconRedBgPromise) return taskbarIconRedBgPromise;
-  taskbarIconRedBgPromise = iconWithRedBackground(getAppNativeIcon(), 64)
+  taskbarIconRedBgPromise = unreadIconAtSize(64)
     .catch(() => getAppNativeIcon())
     .then((img) => { cachedTaskbarIconRedBg = img; taskbarIconRedBgPromise = null; return img; });
   return taskbarIconRedBgPromise;
