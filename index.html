@@ -9541,6 +9541,71 @@
         reorderFavoriteIps(draggedIp, ip);
       });
     }
+    /* ⭐ 즐겨찾기한 채널(그룹채팅방·부서/층)도 사람처럼 손으로 끌어서 순서를 바꿀 수 있게
+     * 한다("즐겨찾기 채널도 사람처럼 위치를 옮길 수 있게 해줘" 요청). 사람 즐겨찾기 순서와
+     * 완전히 같은 방식(저장소만 별도)이고, 채널 드래그 식별에는 이미 있는
+     * CHANNEL_DRAG_MIME/isChannelDragEvent/getDraggedChannelKey를 그대로 재사용한다 —
+     * 단, 드롭 시 일반 채널 목록(channelSidebarOrder)이 아니라 즐겨찾기 전용 순서
+     * (favoriteChannelsOrder)만 바꾸도록 별도 저장소·별도 재정렬 함수를 쓴다. */
+    let favoriteChannelsOrderList = JSON.parse(localStorage.getItem('favoriteChannelsOrder') || '[]');
+    function saveFavoriteChannelsOrderList(order) {
+      favoriteChannelsOrderList = order;
+      localStorage.setItem('favoriteChannelsOrder', JSON.stringify(order));
+    }
+    function sortFavoriteChannelEntriesByOrder(entries) {
+      const orderIndex = new Map(favoriteChannelsOrderList.map((k, i) => [k, i]));
+      return [...entries].sort((a, b) => {
+        const ia = orderIndex.has(a.key) ? orderIndex.get(a.key) : Infinity;
+        const ib = orderIndex.has(b.key) ? orderIndex.get(b.key) : Infinity;
+        return ia - ib;
+      });
+    }
+    function reorderFavoriteChannelKeys(draggedKey, targetKey) {
+      if (!draggedKey || !targetKey || draggedKey === targetKey) return;
+      if (!favoriteChannelKeys.has(draggedKey) || !favoriteChannelKeys.has(targetKey)) return;
+      const currentFavEntries = getOrderedChannelEntries().filter((e) => favoriteChannelKeys.has(e.key));
+      const ordered = sortFavoriteChannelEntriesByOrder(currentFavEntries).map((e) => e.key);
+      const from = ordered.indexOf(draggedKey);
+      const to = ordered.indexOf(targetKey);
+      if (from < 0 || to < 0) return;
+      ordered.splice(from, 1);
+      ordered.splice(to, 0, draggedKey);
+      saveFavoriteChannelsOrderList(ordered);
+      renderUserListTree(true);
+      if (document.body.classList.contains('compact-mode') && !activeChatUser) renderCompactList();
+    }
+    function bindFavoriteChannelDragSource(el, key) {
+      if (!el || !key) return;
+      el.draggable = true;
+      el.addEventListener('dragstart', (ev) => {
+        ev.stopPropagation();
+        ev.dataTransfer.setData(CHANNEL_DRAG_MIME, key);
+        ev.dataTransfer.effectAllowed = 'move';
+        el.classList.add('is-channel-dragging');
+      });
+      el.addEventListener('dragend', () => el.classList.remove('is-channel-dragging'));
+    }
+    function bindFavoriteChannelReorderTarget(el, key) {
+      if (!el || !key) return;
+      el.addEventListener('dragover', (ev) => {
+        if (!isChannelDragEvent(ev)) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        el.classList.add('is-channel-drop-target');
+      });
+      el.addEventListener('dragleave', (ev) => {
+        if (!el.contains(ev.relatedTarget)) el.classList.remove('is-channel-drop-target');
+      });
+      el.addEventListener('drop', (ev) => {
+        if (!isChannelDragEvent(ev)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        el.classList.remove('is-channel-drop-target');
+        const draggedKey = getDraggedChannelKey(ev);
+        if (!draggedKey || draggedKey === key || !favoriteChannelKeys.has(draggedKey)) return;
+        reorderFavoriteChannelKeys(draggedKey, key);
+      });
+    }
     let myGroupChats = [];
     // 그룹채팅방을 손으로 끌어서 바꾼 순서 — 즐겨찾기와 같은 저장 방식(일반 모드·미니 모드
     // 공유)이지만 키가 IP가 아니라 "GROUP:uid"라 별도 저장소를 쓴다.
@@ -15081,16 +15146,18 @@
       if (channelsLabelEl) channelsLabelEl.style.display = hasChannels ? '' : 'none';
       if (channelsBody) {
         channelsBody.innerHTML = '';
-        chEntries.forEach((entry) => {
+        sortFavoriteChannelEntriesByOrder(chEntries).forEach((entry) => {
           const label = getChannelDisplayName(entry.key, entry.defaultName);
           const sidebarIcon = getChannelSidebarIcon(entry);
           const iconClass = getChannelTitleEmoji(entry.key) ? 'channel-hash is-custom-emoji' : 'channel-hash';
           const el = document.createElement('div');
           el.className = `channel-item${entry.isActive ? ' active' : ''}`;
           const badgeHtml = entry.unread > 0 ? `<span class="unread-badge">${entry.unread > 99 ? '99+' : entry.unread}</span>` : '';
-          el.innerHTML = `<span class="${iconClass}">${escapeHtml(sidebarIcon)}</span><span class="channel-label">${escapeHtml(label)}</span>${badgeHtml}`;
+          el.innerHTML = `<span class="channel-reorder-grip" title="드래그하여 순서 변경">⠿</span><span class="${iconClass}">${escapeHtml(sidebarIcon)}</span><span class="channel-label">${escapeHtml(label)}</span>${badgeHtml}`;
           el.onclick = () => entry.onClick();
           el.oncontextmenu = (e) => showChannelContextMenu(e, entry);
+          bindFavoriteChannelDragSource(el, entry.key);
+          bindFavoriteChannelReorderTarget(el, entry.key);
           channelsBody.appendChild(el);
         });
       }
