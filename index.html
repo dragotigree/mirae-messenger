@@ -3984,10 +3984,16 @@
       border-bottom: 1px solid #eef1f5;
     }
     .feature-guide-row:last-child { border-bottom: none; }
+    /* ⚠️ 예전엔 분류색(item.color)을 배경에 그대로 깔고 그 위에 이모지를 얹었는데,
+     * 진한 남색·보라·빨강 위에서는 이모지 자체 색과 겹쳐 뭐가 그려져 있는지 안 보였다
+     * ("아이콘이 올바르게 보이지 않는다" 신고). 배경은 같은 색의 연한 톤으로 깔고
+     * 테두리로만 색을 살려, 이모지가 항상 또렷하게 보이게 한다. */
     .feature-guide-row-index {
-      flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 800; color: #fff;
+      font-size: 16px; line-height: 1;
+      background: color-mix(in srgb, var(--fg-c, #64748b) 13%, #ffffff);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg-c, #64748b) 28%, #ffffff);
     }
     .feature-guide-row-body { flex: 1; min-width: 0; }
     .feature-guide-row-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
@@ -17670,6 +17676,22 @@
       document.getElementById('all-logs-modal').style.display = 'none';
     }
 
+    /** 기능 안내에서 실제 앱 아이콘 모양을 그대로 보여주기 위한 인라인 SVG.
+     *  main.js의 MESSENGER_ICON_SVG와 같은 도형이며, 색만 인자로 받아 바꾼다
+     *  (파란색=안읽음 없음 / 주황색=안읽음 있음). */
+    function featureGuideAppIconSvg(from, to, size) {
+      const gid = `fg-icon-${from.replace('#', '')}`;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" style="vertical-align:middle; border-radius:${Math.round(size * 0.22)}px;" xmlns="http://www.w3.org/2000/svg">`
+        + `<defs><linearGradient id="${gid}" x1="0%" y1="0%" x2="100%" y2="100%">`
+        + `<stop offset="0%" stop-color="${from}"/><stop offset="100%" stop-color="${to}"/></linearGradient></defs>`
+        + `<rect width="256" height="256" rx="55" fill="url(#${gid})"/>`
+        + `<path d="M75 190 L57.5 200 L75 155 Z" fill="#ffffff"/>`
+        + `<rect x="47.5" y="57.5" width="161" height="105" rx="30" fill="#ffffff"/>`
+        + `<circle cx="90.5" cy="110" r="9.5" fill="${to}"/>`
+        + `<circle cx="128" cy="110" r="9.5" fill="${to}"/>`
+        + `<circle cx="165.5" cy="110" r="9.5" fill="${to}"/></svg>`;
+    }
+
     /* ✨ 새 기능 안내 — 기능이 많아져 사용자가 놓치기 쉬운 것들을 분류·검색해서 볼 수 있게 한다.
      * ⚠️ 유지보수 규칙(CLAUDE.md 참고): 사용자가 체감하는 기능을 추가·제거·변경할 때는
      * 이 배열도 같은 커밋에서 함께 갱신한다. 별도 요청이 없어도 항상 지킨다. */
@@ -17756,8 +17778,18 @@
       {
         cat: 'notify', icon: '🔴', color: '#dc2626', title: '안읽음 배지 · 작업 표시줄 깜빡임', tag: '작업 표시줄·트레이',
         path: '작업 표시줄·트레이의 메신저 아이콘',
-        chips: ['숫자 배지 + 빨간 배경 표시', '다른 창을 쓰고 있으면 작업 표시줄이 깜빡임', '트레이 마우스오버 시 발신자 요약'],
+        chips: ['숫자 배지 표시', '다른 창을 쓰고 있으면 작업 표시줄이 깜빡임', '트레이 마우스오버 시 발신자 요약'],
         tip: '메신저 창으로 돌아오면(포커스) 깜빡임은 자동으로 멈춥니다.'
+      },
+      {
+        cat: 'notify', icon: '🎨', color: '#f97316', title: '아이콘 색으로 알림 확인', tag: '작업 표시줄·트레이',
+        path: `<span style="display:inline-flex; align-items:center; gap:10px; vertical-align:middle; margin-top:4px;">
+          <span style="display:inline-flex; align-items:center; gap:5px;">${featureGuideAppIconSvg('#0EA5E9', '#0369A1', 26)}<b>안 읽은 메시지 없음</b></span>
+          <span style="color:#94a3b8;">/</span>
+          <span style="display:inline-flex; align-items:center; gap:5px;">${featureGuideAppIconSvg('#FB923C', '#C2410C', 26)}<b>안 읽은 메시지 있음</b></span>
+        </span>`,
+        chips: ['파란색 = 새 메시지 없음', '주황색 = 안 읽은 메시지 있음', '작업 표시줄·트레이 아이콘 모두 동일'],
+        tip: '메시지를 읽으면 아이콘이 다시 파란색으로 돌아옵니다. 창을 트레이로 숨겨둬도 색으로 바로 확인할 수 있습니다.'
       },
       {
         cat: 'schedule', icon: '📅', color: '#0891b2', title: '병동 일정 현황판', tag: '전체 게시판',
@@ -17948,7 +17980,7 @@
         const filtered = FEATURE_GUIDE_ITEMS.filter(matches);
         listEl.innerHTML = filtered.length ? filtered.map((item, idx) => `
           <div class="feature-guide-row">
-            <div class="feature-guide-row-index" style="background:${item.color};">${item.icon}</div>
+            <div class="feature-guide-row-index" style="--fg-c:${item.color};">${item.icon}</div>
             <div class="feature-guide-row-body">
               <div class="feature-guide-row-head">
                 <span class="feature-guide-row-title">${item.title}</span>

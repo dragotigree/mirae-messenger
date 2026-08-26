@@ -11735,11 +11735,18 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
     }
 
     preferredName = repairMimeDisguisedFileName(sanitizeFileName(preferredName || 'download'));
-    // ⚠️ 실사고: 확장자 없는 이름으로 저장되면 탐색기에서 "파일" 형식으로만 뜨고
-    // 더블클릭해도 안 열린다("확장자도 없이 저장되네" 사용자 신고). 위에서 확장자를
-    // 붙였어도 이후 sanitize 단계에서 유실될 가능성을 아예 차단하는 최종 안전장치.
-    if (buffer && !path.extname(preferredName)) {
-      preferredName = `${preferredName}.${extensionFromMime(dataUrlMime)}`;
+    // ⚠️ 실사고(여러 번 재발): 확장자 없는 이름으로 저장되면 탐색기에서 "파일" 형식으로만
+    // 뜨고 더블클릭해도 안 열린다. 원인은 호출한 쪽이 확장자 없는 fileName(예: 사진 확대창의
+    // "사진_20260826_163559")을 넘기는 경우인데, 채팅 사진은 data: URL이 아니라
+    // mirae-file:// 실제 파일로 저장돼 있어서 위 data: 분기의 확장자 보정이 아예 안 탔고,
+    // 이전에 넣은 안전장치도 buffer(=data: 전용)가 있을 때만 동작해 이 경로를 놓쳤다.
+    // 여기서는 어느 경로로 왔든 확장자가 없으면 반드시 붙인다 — data:는 MIME에서,
+    // 실제 파일(mirae-file://·file://)은 원본 파일의 확장자에서 가져온다.
+    if (!path.extname(preferredName)) {
+      const fallbackExt = buffer
+        ? extensionFromMime(dataUrlMime)
+        : (path.extname(sourcePath || '').replace(/^\./, '') || 'png');
+      preferredName = `${preferredName}.${fallbackExt}`;
     }
     const targetDir = getReceivedFilesDir();
     let destPath = uniqueSavePath(targetDir, preferredName);
