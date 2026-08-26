@@ -5438,6 +5438,17 @@
     .settings-card.danger {
       background: #fef2f2;
     }
+    /* ⚠️ 실사고: 처음엔 브라우저 기본 title 툴팁만 달았는데, Electron에서는 창이나
+     * 마우스 상태에 따라 안 뜨거나 한참 있어야 뜬다는 신고가 있었다("롤오버해도 안
+     * 나온다"). 마우스 진입 즉시 직접 그려서 보여주는 방식으로 바꿨다. */
+    .storage-tooltip {
+      position: fixed; z-index: 3000; max-width: 260px;
+      background: #0f172a; color: #f1f5f9; font-size: 12px; line-height: 1.5;
+      padding: 9px 12px; border-radius: 10px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+      pointer-events: none;
+    }
+    .storage-tooltip strong { display: block; font-size: 12.5px; margin-bottom: 3px; color: #fff; }
+
     /* ===== 저장공간 상세 카드 ===== */
     .storage-detail-card {
       background: linear-gradient(180deg, #fbfdff 0%, #f6f9fc 100%);
@@ -7326,6 +7337,7 @@
           <div id="storage-detail-rows" class="storage-detail-rows"></div>
 
           <p class="storage-detail-footnote">DB 내부 분석값은 원인 파악 목적의 근사값이며 DB 실제 파일 크기에 이미 포함됩니다. 받은 파일 폴더의 실제 파일과 대화 본문은 자동으로 정리하지 않습니다.</p>
+          <div id="storage-tooltip" class="storage-tooltip" style="display:none;"></div>
 
           <div class="storage-detail-actions">
             <button type="button" class="settings-btn-secondary" id="storage-safe-cleanup-btn" onclick="runStorageSafeCleanup()">안전 정리</button>
@@ -30162,21 +30174,48 @@
         const pct = Math.max(0.6, (it.bytes / total) * 100);
         const color = STORAGE_PALETTE[it.key] || '#cbd5e1';
         const desc = STORAGE_ITEM_DESC[it.key] || '';
-        const tooltip = desc ? `${it.label} · ${formatStorageBytes(it.bytes)}\n${desc}` : `${it.label} · ${formatStorageBytes(it.bytes)}`;
+        const titleLine = `${it.label} · ${formatStorageBytes(it.bytes)}`;
         const seg = document.createElement('div');
         seg.className = 'storage-bar-seg';
         seg.style.width = `${pct}%`;
         seg.style.background = color;
-        seg.title = tooltip;
+        bindStorageTooltip(seg, titleLine, desc);
         bar.appendChild(seg);
 
         const item = document.createElement('span');
         item.className = 'storage-legend-item';
-        item.title = tooltip;
+        bindStorageTooltip(item, titleLine, desc);
         const countTxt = it.count != null ? ` · ${it.count.toLocaleString()}개` : '';
         item.innerHTML = `<span class="storage-legend-dot" style="background:${color};"></span>${escapeHtml(it.label)} <span class="storage-legend-value">${formatStorageBytes(it.bytes)}${countTxt}</span>`;
         legend.appendChild(item);
       });
+    }
+
+    /** 브라우저 기본 title 툴팁이 Electron에서 안 뜨거나 늦게 뜬다는 신고가 있어,
+     *  마우스가 올라가는 즉시 직접 그려서 보여주는 커스텀 툴팁으로 대체한다. */
+    function bindStorageTooltip(el, titleLine, desc) {
+      const tip = document.getElementById('storage-tooltip');
+      if (!tip) return;
+      el.addEventListener('mouseenter', (e) => {
+        tip.innerHTML = `<strong>${escapeHtml(titleLine)}</strong>${desc ? escapeHtml(desc) : ''}`;
+        tip.style.display = 'block';
+        positionStorageTooltip(e);
+      });
+      el.addEventListener('mousemove', positionStorageTooltip);
+      el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    }
+
+    function positionStorageTooltip(e) {
+      const tip = document.getElementById('storage-tooltip');
+      if (!tip || tip.style.display === 'none') return;
+      const margin = 14;
+      let x = e.clientX + margin;
+      let y = e.clientY + margin;
+      const rect = tip.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth - 8) x = e.clientX - rect.width - margin;
+      if (y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - margin;
+      tip.style.left = `${Math.max(8, x)}px`;
+      tip.style.top = `${Math.max(8, y)}px`;
     }
 
     function renderStorageDetail(data) {
