@@ -6568,13 +6568,14 @@
         <nav class="settings-nav" aria-label="설정 메뉴">
           <button type="button" class="settings-nav-btn active" data-settings-tab="profile" onclick="setSettingsTab('profile')">프로필</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="list" onclick="setSettingsTab('list')">목록·상태</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="chat" onclick="setSettingsTab('chat')">채팅</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="notify" onclick="setSettingsTab('notify')">알림</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="appearance" onclick="setSettingsTab('appearance')">화면·글꼴</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="files" onclick="setSettingsTab('files')">파일</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="privacy" onclick="setSettingsTab('privacy')">화면 잠금</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
-          <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">업데이트</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">시스템</button>
           <!-- 관리자화면은 설정 탭이 아니라 별도 화면으로 나가는 항목이라, 탭 목록과 섞이지 않게
                맨 아래로 내리고 위쪽에 여백·구분선을 둔다. -->
           <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
@@ -6773,22 +6774,24 @@
                 </span>
               </label>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section-title">작업 표시줄</div>
+            <label class="settings-inline-check">
+              <input type="checkbox" id="setting-taskbar-badge" onchange="onTaskbarBadgeSettingChange()"> 작업 표시줄에 안읽음 배지 표시
+            </label>
+            <div style="font-size:11px; color:#94a3b8; margin-top:-6px; line-height:1.6;">
+              켜도 숫자가 안 보이면, Windows 자체 설정에서도 배지 표시가 꺼져 있을 수 있습니다.<br>
+              <b>Windows 설정 → 개인 설정 → 작업 표시줄 → 「작업 표시줄 동작」에서 「작업 표시줄 앱에 배지 표시」</b>를 함께 켜 주세요.
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="settings-panel" data-settings-panel="appearance">
-        <h3 class="settings-panel-title">화면·글꼴</h3>
-        <p class="settings-panel-desc">화면 모드와 글꼴을 조정합니다.</p>
+      <div class="settings-panel" data-settings-panel="chat">
+        <h3 class="settings-panel-title">채팅</h3>
+        <p class="settings-panel-desc">대화창이 열리는 방식과 입력·표시를 정합니다.</p>
         <div class="settings-card">
           <div class="settings-form-grid settings-form-stack">
-            <label class="settings-field">화면 모드
-              <select id="setting-default-view" class="settings-select">
-                <option value="normal">기본 화면 (3단)</option>
-                <option value="compact">미니 모드</option>
-              </select>
-            </label>
-            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">「기본 화면」은 직원목록·대화목록·채팅창이 한 창에 나란히 보이는 넓은 화면, 「미니 모드」는 자리를 적게 차지하는 작은 창입니다. 다음 실행부터 적용됩니다.</p>
             <label class="settings-field">미니 모드에서 직원 클릭
               <select id="setting-compact-person-click" class="settings-select">
                 <option value="ipmsg">쪽지 보내기</option>
@@ -6810,22 +6813,6 @@
                 <span class="settings-toggle-desc">미니 모드에서 직원·대화방을 클릭하면 대화가 별도 창으로 열립니다(여러 명 동시 가능). 기본 화면(3단)에서는 지금처럼 오른쪽 대화창에서 열리며, 위의 「직원 클릭」이 쪽지 보내기여도 이 설정이 우선합니다.</span>
               </span>
             </label>
-            <label class="settings-toggle-row span-2" for="setting-sidebar-right-start-collapsed">
-              <input type="checkbox" id="setting-sidebar-right-start-collapsed" onchange="setSidebarRightStartCollapsed(this.checked)">
-              <span class="settings-toggle-text">
-                <span class="settings-toggle-title">우측 사이드바 접어서 시작</span>
-                <span class="settings-toggle-desc">켜면 앱을 시작할 때마다 오른쪽 병원 일정 패널이 접힌 채로 시작합니다. 상단의 펼치기 버튼을 눌러야 보이며, 지난번에 펼쳐 둔 채로 껐어도 다음 시작 때는 다시 접힌 채로 시작합니다.</span>
-              </span>
-            </label>
-            <label class="settings-field">시스템 폰트
-              <select id="setting-font-family" class="settings-select">
-                <option value="suit">수트 (SUIT)</option>
-                <option value="pretendard">프리텐다드</option>
-                <option value="gmarketSans">G마켓 산스</option>
-                <option value="spoqa">스포카</option>
-              </select>
-            </label>
-            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">메뉴·버튼·직원 목록 등 화면 전체 글꼴입니다. (채팅 말풍선 안 글씨는 아래 「채팅방 폰트」가 따로 적용됩니다)</p>
             <label class="settings-field">채팅방 폰트
               <select id="setting-chat-font-family" class="settings-select">
                 <option value="suit">SUIT (기본)</option>
@@ -6851,6 +6838,38 @@
                 <span class="settings-toggle-desc">채팅·글 입력 시 밑줄 표시 (우클릭으로 제안)</span>
               </span>
             </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-panel" data-settings-panel="appearance">
+        <h3 class="settings-panel-title">화면·글꼴</h3>
+        <p class="settings-panel-desc">화면 모드·애니메이션·글꼴 등 앱 전체의 겉모습을 조정합니다.</p>
+        <div class="settings-card">
+          <div class="settings-form-grid settings-form-stack">
+            <label class="settings-field">화면 모드
+              <select id="setting-default-view" class="settings-select">
+                <option value="normal">기본 화면 (3단)</option>
+                <option value="compact">미니 모드</option>
+              </select>
+            </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">「기본 화면」은 직원목록·대화목록·채팅창이 한 창에 나란히 보이는 넓은 화면, 「미니 모드」는 자리를 적게 차지하는 작은 창입니다. 다음 실행부터 적용됩니다.</p>
+            <label class="settings-toggle-row span-2" for="setting-sidebar-right-start-collapsed">
+              <input type="checkbox" id="setting-sidebar-right-start-collapsed" onchange="setSidebarRightStartCollapsed(this.checked)">
+              <span class="settings-toggle-text">
+                <span class="settings-toggle-title">우측 사이드바 접어서 시작</span>
+                <span class="settings-toggle-desc">켜면 앱을 시작할 때마다 오른쪽 병원 일정 패널이 접힌 채로 시작합니다. 상단의 펼치기 버튼을 눌러야 보이며, 지난번에 펼쳐 둔 채로 껐어도 다음 시작 때는 다시 접힌 채로 시작합니다.</span>
+              </span>
+            </label>
+            <label class="settings-field">시스템 폰트
+              <select id="setting-font-family" class="settings-select">
+                <option value="suit">수트 (SUIT)</option>
+                <option value="pretendard">프리텐다드</option>
+                <option value="gmarketSans">G마켓 산스</option>
+                <option value="spoqa">스포카</option>
+              </select>
+            </label>
+            <p class="settings-field-hint" style="margin:-6px 0 0;font-size:12px;opacity:.72;line-height:1.45;">메뉴·버튼·직원 목록 등 화면 전체 글꼴입니다. (채팅 말풍선 안 글씨는 「채팅」 탭의 「채팅방 폰트」가 따로 적용됩니다)</p>
             <div class="settings-section-title span-2" style="margin-top:4px;">UI 애니메이션</div>
             <div class="settings-radio-stack span-2">
               <label class="settings-radio-row"><input type="radio" name="setting-ui-animations" value="on" id="setting-ui-animations-on" checked> <span><b>On</b><small>채팅·모달·빈 화면 등 가벼운 모션</small></span></label>
@@ -6860,16 +6879,6 @@
             <div class="settings-radio-stack span-2">
               <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="sky" id="setting-avatar-color-mode-sky"> <span><b>하늘색 계열만</b><small>차분한 파스텔 하늘색 톤 안에서만 배정</small></span></label>
               <label class="settings-radio-row"><input type="radio" name="setting-avatar-color-mode" value="full" id="setting-avatar-color-mode-full" checked> <span><b>다양한 색상</b><small>더 다채로운 색으로 사람 구분이 잘 되게</small></span></label>
-            </div>
-            <label class="settings-inline-check span-2">
-              <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
-            </label>
-            <label class="settings-inline-check span-2">
-              <input type="checkbox" id="setting-taskbar-badge" onchange="onTaskbarBadgeSettingChange()"> 작업 표시줄에 안읽음 배지 표시
-            </label>
-            <div class="span-2" style="font-size:11px; color:#94a3b8; margin-top:-6px; line-height:1.6;">
-              켜도 숫자가 안 보이면, Windows 자체 설정에서도 배지 표시가 꺼져 있을 수 있습니다.<br>
-              <b>Windows 설정 → 개인 설정 → 작업 표시줄 → 「작업 표시줄 동작」에서 「작업 표시줄 앱에 배지 표시」</b>를 함께 켜 주세요.
             </div>
           </div>
         </div>
@@ -7007,8 +7016,14 @@
       </div>
 
       <div class="settings-panel" data-settings-panel="system">
-        <h3 class="settings-panel-title">네트워크·업데이트</h3>
-        <p class="settings-panel-desc">연결 상태를 확인하고 프로그램 업데이트를 관리합니다.</p>
+        <h3 class="settings-panel-title">시스템</h3>
+        <p class="settings-panel-desc">시작 방식, 안정성, 네트워크 연결, 프로그램 업데이트를 관리합니다.</p>
+        <div class="settings-card">
+          <div class="settings-section-title">시작</div>
+          <label class="settings-inline-check">
+            <input type="checkbox" id="setting-auto-launch"> 부팅 시 자동 실행
+          </label>
+        </div>
         <div class="settings-card">
           <div class="settings-section-title">병원 안정성 모드</div>
           <p class="settings-field-hint" style="margin:0 0 8px;font-size:12px;opacity:.72;line-height:1.5;">화면이 갑자기 멈추거나(응답없음) 예고 없이 재시작되는 상황을 최대한 줄이기 위해, 부담을 주는 기능 3가지를 한꺼번에 꺼주는 스위치입니다. 진료·업무 중 컴퓨터에는 켜두는 것을 권장합니다.</p>
