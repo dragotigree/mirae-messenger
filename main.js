@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer, protocol, clipboard } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
 const net = require('net');
@@ -1782,6 +1782,31 @@ function resolveAttachmentPath(storedName) {
   if (fs.existsSync(legacy)) return legacy;
   return primary;
 }
+
+/** 채팅 사진 우클릭(복사/편집)에서 쓰는 헬퍼 — 말풍선 안 <img>의 src는 실제 파일
+ *  (mirae-file://)일 수도, 인라인 data: URL일 수도 있어 둘 다 받아 nativeImage로 만든다. */
+async function imageFromChatSrc(srcURL) {
+  try {
+    const src = String(srcURL || '');
+    if (/^data:image/i.test(src)) return nativeImage.createFromDataURL(src);
+    if (/^mirae-file:\/\//i.test(src)) {
+      const raw = src.replace(/^mirae-file:\/\//i, '').split(/[?#]/)[0];
+      const filePath = resolveAttachmentPath(path.basename(decodeURIComponent(raw)));
+      if (filePath && fs.existsSync(filePath)) return nativeImage.createFromPath(filePath);
+      return null;
+    }
+    if (/^file:\/\//i.test(src)) {
+      const filePath = decodeURIComponent(src.replace(/^file:\/\//i, '').replace(/^\/([A-Za-z]:)/, '$1'));
+      if (filePath && fs.existsSync(filePath)) return nativeImage.createFromPath(filePath);
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 「사진 편집하기」로 그림판을 열 때, 그림판이 뜬 뒤 처음 불러갈 배경 사진(data URL). */
+let pendingDrawEditorImage = null;
 
 /** xferUid → { meta, chunks: Map<index, Buffer>, timer, senderIP } */
 const pendingFileXfers = new Map();
@@ -5843,6 +5868,27 @@ function attachEditableContextMenu(webContents) {
       });
       menu.append(new MenuItem({ type: 'separator' }));
     }
+    // 🖼 주고받은 사진 우클릭 — 클립보드로 복사하거나, 그림판으로 열어 표시를 그려 넣는다.
+    if (params.mediaType === 'image' && params.srcURL) {
+      const srcURL = params.srcURL;
+      menu.append(new MenuItem({
+        label: '사진 복사하기',
+        click: async () => {
+          const img = await imageFromChatSrc(srcURL);
+          if (img && !img.isEmpty()) clipboard.writeImage(img);
+        }
+      }));
+      menu.append(new MenuItem({
+        label: '사진 편집하기',
+        click: async () => {
+          const img = await imageFromChatSrc(srcURL);
+          if (!img || img.isEmpty()) return;
+          pendingDrawEditorImage = img.toDataURL();
+          await openExcalidrawWindow('chat');
+        }
+      }));
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
     if (params.isEditable) {
       menu.append(new MenuItem({ role: 'cut', enabled: params.editFlags.canCut }));
       menu.append(new MenuItem({ role: 'copy', enabled: params.editFlags.canCopy }));
@@ -6405,7 +6451,14 @@ function openExcalidrawWindow(purpose) {
   if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
     try {
       excalidrawWindow.focus();
-      excalidrawWindow.webContents.send('excalidraw-context', excalidrawSession);
+      // 편집할 사진을 들고 왔는데 그림판이 이미 떠 있으면, 배경 사진은 창이 처음
+      // 뜰 때(getContext) 한 번만 읽어가므로 그냥 focus만 해서는 안 실린다.
+      // 이 경우에만 새로 읽어가도록 다시 로드한다.
+      if (pendingDrawEditorImage) {
+        excalidrawWindow.reload();
+      } else {
+        excalidrawWindow.webContents.send('excalidraw-context', excalidrawSession);
+      }
     } catch (e) {}
     return { success: true };
   }
@@ -6497,7 +6550,15 @@ function openExcalidrawWindow(purpose) {
 ipcMain.handle('open-excalidraw-editor', async (event, purpose) => openExcalidrawWindow(purpose));
 
 ipcMain.handle('excalidraw-get-context', async () => {
-  return excalidrawSession || getExcalidrawPurposeMeta('chat');
+  const base = excalidrawSession || getExcalidrawPurposeMeta('chat');
+  // 「사진 편집하기」로 연 경우엔 편집할 사진을 딱 한 번만 실어 보낸다(다음에 그냥
+  // 그림판을 열었을 때 지난 사진이 다시 깔리지 않도록 넘긴 뒤 비운다).
+  if (pendingDrawEditorImage) {
+    const image = pendingDrawEditorImage;
+    pendingDrawEditorImage = null;
+    return { ...base, backgroundImage: image };
+  }
+  return base;
 });
 
 ipcMain.handle('excalidraw-submit-png', async (event, payload) => {

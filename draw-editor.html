@@ -576,12 +576,34 @@
     }
   };
 
+  /* 「사진 편집하기」로 열렸을 때 — 편집할 사진을 맨 아래 레이어로 깔아 준다.
+     붙여넣기(Ctrl+V)로 넣을 때와 같은 방식이라, 그 위에 펜·도형·화살표·텍스트로
+     표시한 뒤 그대로 「이미지로 보내기」나 PNG 저장을 할 수 있다. */
+  function loadBackgroundImage(dataUrl) {
+    if (!dataUrl) return;
+    var img = new Image();
+    img.onload = function () {
+      var maxW = window.innerWidth * 0.8, maxH = window.innerHeight * 0.7;
+      var sc = Math.min(1, maxW / img.width, maxH / img.height);
+      var w = img.width * sc, h = img.height * sc;
+      state.shapes.unshift({
+        type: 'image', img: img, size: 1, color: '#000',
+        x: (window.innerWidth - w) / 2, y: (window.innerHeight - h) / 2, w: w, h: h
+      });
+      if (state.sel >= 0) state.sel += 1;
+      state.redo = [];
+      render();
+    };
+    img.src = dataUrl;
+  }
+
   // 어디에 쓰이는 그림인지(공지/쪽지/채팅) 받아 제목과 목적지를 맞춘다
   if (bridge && bridge.getContext) {
     bridge.getContext().then(function (meta) {
       if (!meta) return;
       state.purpose = meta.purpose || 'chat';
       if (meta.title) document.title = meta.title;
+      if (meta.backgroundImage) loadBackgroundImage(meta.backgroundImage);
     }).catch(function () {});
   }
 
