@@ -10593,6 +10593,17 @@
       if ((kind === 'favorites' || kind === 'channels') && userFilterKeyword) {
         filterUserList('');
       }
+      // "안읽음만 보기"를 켜 둔 채로 최근대화·채널 및 대화방으로 넘어가면, 그 목록
+      // 안에 안읽은 게 하나도 없을 경우 전부 걸러져 텅 비어 보였다("안읽음 해놓고
+      // 최근대화만 보기 하면 안 나온다"). 이 두 필터로 이동할 때는 안읽음 필터를
+      // 풀어 원래 목록이 다시 보이게 한다. persistDirectoryListPrefsAndRefresh가
+      // 안읽음만 보기가 걸리는 모든 화면(사용자 목록·최근 대화·채널 목록·미니모드
+      // 목록)을 한 번에 다시 그려 주므로 그대로 재사용한다.
+      if ((kind === 'recent' || kind === 'channels') && sidebarUnreadOnly) {
+        sidebarUnreadOnly = false;
+        localStorage.setItem('sidebarUnreadOnly', 'false');
+        persistDirectoryListPrefsAndRefresh();
+      }
       sidebarRailFilter = kind;
       // ⚠️ 실사고: 미니 모드로 앱을 시작하면 일반 모드 전용 부팅 코드(아래 setSidebarRailFilter
       // 호출)가 아예 실행되지 않아 필터가 한 번도 안 걸린 채로 남았다. 그 상태에서 나중에
@@ -12748,7 +12759,10 @@
       if (tab === 'more') tab = 'chat';
       compactRailTab = tab;
       localStorage.setItem('compactRailTab', tab);
-      if (tab === 'friends' && compactListFilter === 'unread') {
+      // 일반 모드와 같은 이유 — "안읽음만 보기"를 켠 채로 다른 탭으로 넘어가면 그
+      // 탭 안에 안읽은 게 없을 경우 텅 비어 보였다("안읽음 해놓고 최근대화만 보기
+      // 하면 안 나온다"). 대화 목록이 아닌 탭으로 넘어갈 때는 안읽음 필터를 푼다.
+      if ((tab === 'friends' || tab === 'groups') && compactListFilter === 'unread') {
         compactListFilter = 'all';
         localStorage.setItem('compactListFilter', 'all');
       }
