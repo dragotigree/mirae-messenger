@@ -6264,12 +6264,14 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div style="font-size:12px; color:#64748b;">기준 버전: <strong id="master-ref-version" style="color:#0f172a;">-</strong></div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" id="master-bulk-force-update-btn" onclick="masterForceUpdateSelected()" disabled style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요">⚡ 선택한 PC 강제 업데이트</button>
+                <button type="button" id="master-bulk-subdept-btn" onclick="openMasterBulkSubDeptModal()" disabled style="padding:6px 10px; background:#e0f2fe; border:1px solid #bae6fd; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#0369a1; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요 (부서가 서로 달라도 됩니다)">🏷️ 선택한 인원 소부서 일괄 변경</button>
+                <button type="button" id="master-bulk-force-update-btn" onclick="masterForceUpdateSelected()" disabled style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요 (온라인 대상만 가능)">⚡ 선택한 PC 강제 업데이트</button>
                 <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
                 <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
             <input type="text" id="master-clients-filter" placeholder="이름, 부서, 층 또는 IP로 찾기 (Ctrl+F)" oninput="onMasterClientsFilterInput(this.value)" onkeydown="onMasterClientsFilterKeyDown(event)" style="width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12.5px; margin-top:8px;">
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">체크박스는 온라인·오프라인 상관없이 고를 수 있습니다. 부서가 서로 다른 사람을 함께 골라도 소부서 일괄 변경은 정상 동작합니다.</div>
             <div id="master-clients-filter-count" style="font-size:11px; color:#64748b; min-height:14px;"></div>
 
             <div style="margin-top:16px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
@@ -6679,6 +6681,23 @@
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
         <button type="button" onclick="closeMasterUserEditModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: 12px; font-size:12px; cursor:pointer;">취소</button>
         <button type="button" onclick="saveMasterUserProfile()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🏷️ 여러 부서 사람을 한 번에 골라 소부서를 일괄 변경 -->
+  <div id="master-bulk-subdept-modal" class="modal-overlay" style="z-index:5100;">
+    <div class="modal-card" style="width:440px; gap:14px;">
+      <div style="font-size:16px; font-weight:700; color:#0369a1;">🏷️ 소부서 일괄 변경</div>
+      <div style="font-size:11.5px; color:#64748b; line-height:1.55;">부서가 서로 달라도 상관없이, 아래 선택된 인원 전부의 「소부서」 값을 한 번에 같은 값으로 바꿉니다. 이름·직급·부서·층 등 다른 정보는 그대로 유지됩니다.</div>
+      <div id="master-bulk-subdept-target-list" style="max-height:160px; overflow-y:auto; background:#f8fafc; border:1px solid var(--border-soft); border-radius: var(--radius-md); padding:8px 10px; font-size:12px; color:#334155; display:flex; flex-direction:column; gap:3px;"></div>
+      <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">새 소부서 값
+        <input type="text" id="master-bulk-subdept-value" placeholder="예: 5병동 1팀 (비워두면 소부서를 지웁니다)" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius: var(--radius-md); font-size:13px;">
+      </label>
+      <div id="master-bulk-subdept-result" style="font-size:12px; min-height:16px;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
+        <button type="button" onclick="closeMasterBulkSubDeptModal()" style="padding:8px 14px; background:var(--border-soft); border:none; border-radius: 12px; font-size:12px; cursor:pointer;">취소</button>
+        <button type="button" id="master-bulk-subdept-apply-btn" onclick="applyMasterBulkSubDept()" style="padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius: 12px; font-size:12px; font-weight:700; cursor:pointer;">일괄 적용</button>
       </div>
     </div>
   </div>
@@ -20367,12 +20386,15 @@
         const wipePendingBadge = wipePending
           ? ' <span class="master-pill is-wipe">삭제예약</span>'
           : '';
-        // 강제 업데이트는 온라인 + 이 PC 자신이 아닌 대상에만 뜻이 있다 — 나머지는 체크박스를
-        // 아예 못 누르게 해서, 골라 놓고 눌러도 안 되는 상황을 애초에 막는다.
-        const selectable = !!u.online && !isMe;
+        // ⚠️ 예전엔 "강제 업데이트"만 염두에 두고 온라인인 사람만 체크할 수 있게 막아뒀는데,
+        // 소부서 일괄 변경은 프로필 값을 고쳐서 동기화해 두는 것뿐이라 오프라인 PC도 문제
+        // 없이 적용된다("일일이 들어가서 바꾸기 힘들다"는 요청). 이제 이 PC 자신만 못 고르게
+        // 막고, 온라인 여부와 상관없이 선택할 수 있게 했다 — 온라인 전용 동작(강제 업데이트)은
+        // masterForceUpdateSelected()에서 실행할 때 따로 온라인 대상만 걸러낸다.
+        const selectable = !isMe;
         const checked = masterClientsSelectedIps.has(u.ip) ? 'checked' : '';
         return `<tr class="${u.online && !usageDisabled ? '' : 'is-dim'}">
-          <td><input type="checkbox" class="master-client-select-box" data-ip="${escAttr(u.ip)}" ${checked} ${selectable ? '' : 'disabled'} title="${selectable ? '선택' : '오프라인이거나 이 PC라 선택할 수 없습니다'}"></td>
+          <td><input type="checkbox" class="master-client-select-box" data-ip="${escAttr(u.ip)}" ${checked} ${selectable ? '' : 'disabled'} title="${selectable ? '선택' : '이 PC는 선택할 수 없습니다'}"></td>
           <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:var(--accent-dark); font-size:10px;">(이 PC)</span>' : ''}${wipePendingBadge}</td>
           <td style="color:#64748b;" title="${escAttr(deptFloor)}">${escapeHtml(deptFloor)}</td>
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
@@ -20403,6 +20425,7 @@
           else masterClientsSelectedIps.delete(ip);
           syncMasterClientsSelectAllUi();
           updateMasterBulkForceUpdateBtn();
+          updateMasterBulkSubDeptBtn();
         });
       });
       const selectAllBox = document.getElementById('master-clients-select-all');
@@ -20417,10 +20440,12 @@
             else masterClientsSelectedIps.delete(ip);
           });
           updateMasterBulkForceUpdateBtn();
+          updateMasterBulkSubDeptBtn();
         });
       }
       syncMasterClientsSelectAllUi();
       updateMasterBulkForceUpdateBtn();
+      updateMasterBulkSubDeptBtn();
     }
 
     /** 선택 가능한 행이 전부 체크됐는지에 맞춰 헤더의 「전체 선택」 체크박스 상태를 맞춘다. */
@@ -20441,18 +20466,122 @@
       btn.disabled = n === 0;
     }
 
-    /** 체크박스로 고른 PC 몇 대를 한 번에 강제 업데이트한다. */
+    function updateMasterBulkSubDeptBtn() {
+      const btn = document.getElementById('master-bulk-subdept-btn');
+      if (!btn) return;
+      const n = masterClientsSelectedIps.size;
+      btn.textContent = n > 0 ? `🏷️ 선택한 ${n}명 소부서 일괄 변경` : '🏷️ 선택한 인원 소부서 일괄 변경';
+      btn.disabled = n === 0;
+    }
+
+    /** 체크박스로 고른 PC 몇 대를 한 번에 강제 업데이트한다. 강제 업데이트는 온라인 대상에만
+     *  뜻이 있으므로, 소부서 일괄 변경 등 다른 목적으로 오프라인 PC까지 함께 체크해 뒀을 수
+     *  있는 선택 목록에서 온라인 대상만 걸러 쓰고, 걸러진 인원이 있으면 알려준다. */
     function masterForceUpdateSelected() {
-      const ips = [...masterClientsSelectedIps];
-      if (!ips.length) {
+      const allIps = [...masterClientsSelectedIps];
+      if (!allIps.length) {
         appAlert('먼저 접속 PC 표에서 업데이트할 대상을 체크해 주세요.');
         return;
       }
-      const names = ips
-        .map((ip) => (allUsers || []).find((u) => u.ip === ip))
-        .filter(Boolean)
-        .map((u) => `${u.rank || ''} ${u.username || ip}`.trim());
-      openMasterForceUpdateModal({ bulkIps: ips, bulkNames: names });
+      const selectedUsers = allIps.map((ip) => (allUsers || []).find((u) => u.ip === ip)).filter(Boolean);
+      const onlineUsers = selectedUsers.filter((u) => u.online);
+      if (!onlineUsers.length) {
+        appAlert('선택한 인원이 모두 오프라인이라 강제 업데이트를 보낼 수 없습니다.');
+        return;
+      }
+      const skipped = selectedUsers.length - onlineUsers.length;
+      const ips = onlineUsers.map((u) => u.ip);
+      const names = onlineUsers.map((u) => `${u.rank || ''} ${u.username || u.ip}`.trim());
+      openMasterForceUpdateModal({ bulkIps: ips, bulkNames: names, skippedOfflineCount: skipped });
+    }
+
+    /** 여러 부서 사람을 한 번에 골라 소부서만 같은 값으로 일괄 변경한다("일일이 들어가서
+     *  바꾸기 힘들다"는 요청). 온라인 여부와 상관없이 선택된 전원에게 적용되며, 소부서 외
+     *  다른 필드(이름·직급·부서·층·내선·전화·비고)는 그대로 유지한 채 프로필 override로
+     *  저장되고 연결된 PC에 동기화된다 — 개별 「정보 수정」과 같은 저장 경로(saveMasterUserProfile)를
+     *  선택된 인원 수만큼 반복 호출하는 방식이다. */
+    function openMasterBulkSubDeptModal() {
+      const ips = [...masterClientsSelectedIps];
+      if (!ips.length) {
+        appAlert('먼저 접속 PC 표에서 소부서를 바꿀 인원을 체크해 주세요.');
+        return;
+      }
+      const users = ips.map((ip) => (allUsers || []).find((u) => u.ip === ip)).filter(Boolean);
+      const listEl = document.getElementById('master-bulk-subdept-target-list');
+      if (listEl) {
+        listEl.innerHTML = users.map((u) => {
+          const name = `${u.rank || ''} ${u.username || u.ip}`.trim();
+          const deptFloor = [u.dept, u.floor].filter(Boolean).join(' · ') || '-';
+          const curSub = u.subDept ? ` · 현재 소부서: ${escapeHtml(u.subDept)}` : '';
+          return `<div>${escapeHtml(name)} <span style="color:#94a3b8;">(${escapeHtml(deptFloor)}${curSub})</span></div>`;
+        }).join('') || '<div style="color:#94a3b8;">선택된 인원이 없습니다.</div>';
+      }
+      const valueEl = document.getElementById('master-bulk-subdept-value');
+      if (valueEl) valueEl.value = '';
+      const resultEl = document.getElementById('master-bulk-subdept-result');
+      if (resultEl) resultEl.textContent = '';
+      document.getElementById('master-bulk-subdept-modal').style.display = 'flex';
+    }
+
+    function closeMasterBulkSubDeptModal() {
+      document.getElementById('master-bulk-subdept-modal').style.display = 'none';
+    }
+
+    async function applyMasterBulkSubDept() {
+      if (!isMasterAuthenticated) {
+        await appAlert('마스터 관리자 로그인이 필요합니다.');
+        return;
+      }
+      const ips = [...masterClientsSelectedIps];
+      if (!ips.length) {
+        closeMasterBulkSubDeptModal();
+        return;
+      }
+      const users = ips.map((ip) => (allUsers || []).find((u) => u.ip === ip)).filter(Boolean);
+      if (!users.length) {
+        closeMasterBulkSubDeptModal();
+        return;
+      }
+      const newSubDept = (document.getElementById('master-bulk-subdept-value').value || '').trim();
+      const confirmMsg = newSubDept
+        ? `선택한 ${users.length}명의 소부서를 「${newSubDept}」로 한 번에 바꿀까요? (부서·층 등 다른 정보는 그대로 유지됩니다)`
+        : `선택한 ${users.length}명의 소부서 값을 모두 지울까요?`;
+      const ok = await appConfirm(confirmMsg);
+      if (!ok) return;
+      const applyBtn = document.getElementById('master-bulk-subdept-apply-btn');
+      const resultEl = document.getElementById('master-bulk-subdept-result');
+      if (applyBtn) applyBtn.disabled = true;
+      if (resultEl) { resultEl.style.color = '#64748b'; resultEl.textContent = `적용 중... (0/${users.length})`; }
+      let okCount = 0;
+      let failCount = 0;
+      for (const u of users) {
+        try {
+          const res = await window.api.masterUpdateUserProfile({
+            ip: u.ip,
+            username: u.username || '',
+            rank: u.rank || '',
+            dept: u.dept || '',
+            subDept: newSubDept,
+            floor: u.floor || '',
+            extNo: u.extNo || '',
+            phone: u.phone || '',
+            note: u.note || ''
+          });
+          if (res && res.success) okCount++; else failCount++;
+        } catch (e) { failCount++; }
+        if (resultEl) resultEl.textContent = `적용 중... (${okCount + failCount}/${users.length})`;
+      }
+      if (applyBtn) applyBtn.disabled = false;
+      if (resultEl) {
+        resultEl.style.color = failCount ? '#b91c1c' : '#15803d';
+        resultEl.textContent = failCount ? `${okCount}명 성공, ${failCount}명 실패했습니다.` : `${okCount}명 모두 적용됐습니다.`;
+      }
+      await manualRefreshUsers();
+      renderMasterOnlineClients();
+      if (!failCount) {
+        closeMasterBulkSubDeptModal();
+        await appAlert(`${okCount}명의 소부서가 변경되었습니다. 연결된 PC에 동기화됩니다.`);
+      }
     }
 
     /** 「접속 PC」 행마다 5개까지 늘어서 있던 버튼을 하나의 「⋮ 관리」 드롭다운으로 정리 */
@@ -20511,7 +20640,8 @@
         document.getElementById('master-force-update-target').value = '';
         const names = Array.isArray(o.bulkNames) ? o.bulkNames : [];
         const preview = names.slice(0, 5).join(', ') + (names.length > 5 ? ` 외 ${names.length - 5}명` : '');
-        desc.textContent = `선택한 ${masterForceUpdateBulkIps.length}대에 강제 업데이트를 보냅니다.${preview ? ` (${preview})` : ''}`;
+        const skippedNote = o.skippedOfflineCount > 0 ? ` (오프라인 ${o.skippedOfflineCount}명은 제외됨)` : '';
+        desc.textContent = `선택한 ${masterForceUpdateBulkIps.length}대에 강제 업데이트를 보냅니다.${preview ? ` (${preview})` : ''}${skippedNote}`;
       } else {
         const targetIp = o.targetIp || 'ALL_OUTDATED';
         document.getElementById('master-force-update-target').value = targetIp;

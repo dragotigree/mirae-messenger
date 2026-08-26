@@ -7203,6 +7203,20 @@ function startUdpDiscovery() {
             if (opErr || !opRows || !opRows.length) return;
             sendJsonToPeer(rinfo.address, { type: 'NOTICE_SYNC_RESPONSE', operators: opRows });
           });
+          // ⚠️ 실사고(888 이상인데도 소부서·비고가 계속 "리셋"돼 보이던 진짜 원인):
+          // profileOverrides도 notice_operators와 완전히 같은 구멍이 있었다. 관리자가
+          // 소부서 등을 고치면 PROFILE_OVERRIDE_SYNC는 "그 순간 온라인이던 PC"에만 딱 한 번
+          // 방송되고 끝이었다. 그 순간 꺼져 있던 동료·다른 관리자 PC는 그 소식을 영원히 못
+          // 받아, 그 PC 화면에는 계속 "고치기 전" 값이 남아 있었다 — 실제로는 리셋된 게
+          // 아니라 애초에 그 PC로 전달된 적이 없었던 것이다(방금 위에서 고친 것과 똑같은
+          // 원리의 해결책). 재접속하는 피어에게, 이 PC가 들고 있는 override를 (당사자 자신에
+          // 대한 override는 기존 이유대로 계속 제외하고) 모두 먼저 나서서 보내준다.
+          if (profileOverrides.size) {
+            profileOverrides.forEach((ov) => {
+              if (ov.ip === rinfo.address || ov.ip === MY_IP) return;
+              sendJsonToPeer(rinfo.address, { type: 'PROFILE_OVERRIDE_SYNC', profile: ov });
+            });
+          }
           // 부팅 직후엔 대량 동기화 폭주를 피한다 (TCP 버퍼 초과·클릭 불가의 원인)
           if (!isNetworkQuietPeriod()) {
             resendPendingMessages(rinfo.address);
