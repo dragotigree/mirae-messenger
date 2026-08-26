@@ -12312,6 +12312,15 @@
 
     function getEscapeCloseOverlayStack() {
       return [
+        { test: () => {
+          const input = document.getElementById('user-search-input');
+          return !!(input && input.value);
+        }, close: () => {
+          filterUserList('');
+          const input = document.getElementById('user-search-input');
+          if (input) { input.value = ''; input.blur(); }
+          hideUserSearchBox();
+        }, confirm: false },
         { test: () => isFlexOverlay('screen-capture-crop-modal'), close: () => cancelScreenCrop(), confirm: true, name: '화면 캡처' },
         { test: () => isFlexOverlay('screen-capture-source-modal'), close: () => closeScreenCaptureSourceModal(), confirm: true, name: '화면 캡처' },
         { test: () => isFlexOverlay('image-lightbox'), close: () => closeImageLightbox(), confirm: false },
