@@ -17491,6 +17491,18 @@
         if (e.relatedTarget && card.contains(e.relatedTarget)) return;
         hideFastUserTooltip();
       });
+      // ⚠️ 실사고: 부팅 중 버벅거릴 때 목록이 다시 그려지면서(최근 대화·사용자 목록이
+      // 데이터가 들어올 때마다 갱신됨) 마우스가 올라가 있던 카드 자체가 DOM에서
+      // 통째로 사라지는 경우가 있다. 이때는 그 요소를 벗어나는 mouseout이 애초에
+      // 발생하지 않아(요소 자체가 없어졌으므로) 툴팁이 화면에 영구히 남았다
+      // ("부팅 중 버벅거리다 이렇게 남아있다" 신고). 마우스가 사이드바를 완전히
+      // 벗어나면 무조건 닫고(mouseleave), 움직일 때마다 지금 띄운 카드가 아직도
+      // 실제 화면에 붙어있는지(isConnected, 비용이 매우 싼 검사)만 확인해 떨어져
+      // 나갔으면 즉시 닫는다.
+      scope.addEventListener('mouseleave', hideFastUserTooltip);
+      scope.addEventListener('mousemove', () => {
+        if (fastUserTipEl && !fastUserTipEl.isConnected) hideFastUserTooltip();
+      });
     })();
 
     function buildUserCard(u) {
