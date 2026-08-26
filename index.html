@@ -620,7 +620,7 @@
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: var(--border-soft); border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
-    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
+    #dm-context-menu, #group-context-menu, #channel-context-menu, #dept-floor-context-menu, #master-client-menu, #calendar-day-context-menu { display: none; position: fixed; z-index: 300; background: rgba(255,255,255,0.98); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 6px; min-width: 170px; /* backdrop-filter removed (Win CPU) */ animation: menu-pop 0.18s var(--ease-spring); }
     /* 관리자 창(.modal-overlay z-index:2000) 위에서 열리는 메뉴라 그보다 높아야 함 — 안 그러면 창 뒤에 가려 안 보임 */
     #master-client-menu { z-index: 2100; }
     /* 참여자 모달(group-members-modal) 안에서 멤버 우클릭 시 dm-context-menu가 뜨는데
@@ -7648,6 +7648,11 @@
       <div class="ctx-menu-item" onclick="ctxEditMyProfile()">👤 프로필 수정</div>
       <div class="ctx-menu-item" onclick="ctxEditMyDetails()">📋 상세정보 수정</div>
     </div>
+  </div>
+
+  <div id="calendar-day-context-menu">
+    <div class="ctx-menu-item" onclick="ctxCalendarDayQuickAdd()">📝 일정 추가</div>
+    <div class="ctx-menu-item" onclick="ctxCalendarDayDutyRoster()">🩺 당직의·주치의 OFF 등록</div>
   </div>
 
   <div id="dept-floor-context-menu">
@@ -16013,6 +16018,8 @@
       if (dfmenu) dfmenu.style.display = 'none';
       const mcmenu = document.getElementById('master-client-menu');
       if (mcmenu) mcmenu.style.display = 'none';
+      const cdmenu = document.getElementById('calendar-day-context-menu');
+      if (cdmenu) cdmenu.style.display = 'none';
     });
 
     let ctxMenuTargetGroup = null;
@@ -17760,8 +17767,8 @@
       },
       {
         cat: 'schedule', icon: '🩺', color: '#4f46e5', title: '일정등록(주치의 OFF·당직의)', tag: '현황판',
-        path: '현황판 상단 → <b>일정등록</b> 버튼',
-        chips: ['주치의 OFF·당직의를 쉼표로 여러 명 한 번에 등록', '달력에서 고른 날짜에 반영', '비워두고 저장하면 그 날짜 기록 삭제'],
+        path: '현황판 상단 → <b>일정등록</b> 버튼 또는 사이드바 달력 날짜 <b>우클릭</b>',
+        chips: ['주치의 OFF·당직의를 쉼표로 여러 명 한 번에 등록', '달력 날짜 우클릭으로 그 날짜에 바로 일정 추가·등록', '비워두고 저장하면 그 날짜 기록 삭제'],
         tip: '작성 권한자 계정이나 마스터 로그인이 필요합니다.'
       },
       {
@@ -29076,9 +29083,31 @@
         el.className = cls;
         if (!cell.other && cell.dateStr === todayStr) el.title = '오늘';
         el.textContent = String(cell.dayNum);
-        if (!cell.other) el.onclick = () => calendarSelectDate(cell.dateStr);
+        if (!cell.other) {
+          el.onclick = () => calendarSelectDate(cell.dateStr);
+          el.oncontextmenu = (e) => showCalendarDayContextMenu(e, cell.dateStr);
+        }
         grid.appendChild(el);
       });
+    }
+
+    let ctxMenuCalendarDayDateStr = null;
+    function showCalendarDayContextMenu(e, dateStr) {
+      e.preventDefault();
+      e.stopPropagation();
+      ctxMenuCalendarDayDateStr = dateStr;
+      calendarSelectDate(dateStr);
+      const menu = document.getElementById('calendar-day-context-menu');
+      positionContextMenuNearPoint(menu, e.clientX, e.clientY);
+    }
+    function ctxCalendarDayQuickAdd() {
+      document.getElementById('calendar-day-context-menu').style.display = 'none';
+      const dateStr = ctxMenuCalendarDayDateStr || selectedCalendarDateStr;
+      openScheduleBoardForQuickAdd(dateStr, { focusQuickAdd: true });
+    }
+    function ctxCalendarDayDutyRoster() {
+      document.getElementById('calendar-day-context-menu').style.display = 'none';
+      openDutyRosterModal();
     }
 
     function renderSchedules() {
