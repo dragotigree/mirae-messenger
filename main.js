@@ -6448,17 +6448,18 @@ function openExcalidrawWindow(purpose) {
     return { success: false, msg };
   }
 
-  if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
+  // ⚠️ 실사고: 편집할 사진을 들고 왔는데 그림판이 이미 떠 있으면, 배경 사진은 창이
+  // 처음 뜰 때(getContext) 한 번만 읽어가므로 focus만 해서는 안 실린다. 처음엔 그
+  // 경우 reload()로 다시 읽어가게 했는데, "편집 → 다시 편집" 시 드물게 그림판 창을
+  // 여는 중 오류가 나는 신고가 있었다 — reload()는 같은 창의 이전 진행 중이던 상태
+  // (예: 아직 다 안 그려진 첫 배경 이미지 로드)와 겹치면 불안정할 수 있다. 재사용
+  // 대신 아예 창을 닫고 새로 띄우는 쪽이 훨씬 단순하고 예측 가능해 그렇게 바꿨다.
+  if (excalidrawWindow && !excalidrawWindow.isDestroyed() && pendingDrawEditorImage) {
+    closeExcalidrawWindow();
+  } else if (excalidrawWindow && !excalidrawWindow.isDestroyed()) {
     try {
       excalidrawWindow.focus();
-      // 편집할 사진을 들고 왔는데 그림판이 이미 떠 있으면, 배경 사진은 창이 처음
-      // 뜰 때(getContext) 한 번만 읽어가므로 그냥 focus만 해서는 안 실린다.
-      // 이 경우에만 새로 읽어가도록 다시 로드한다.
-      if (pendingDrawEditorImage) {
-        excalidrawWindow.reload();
-      } else {
-        excalidrawWindow.webContents.send('excalidraw-context', excalidrawSession);
-      }
+      excalidrawWindow.webContents.send('excalidraw-context', excalidrawSession);
     } catch (e) {}
     return { success: true };
   }
@@ -6561,17 +6562,26 @@ ipcMain.handle('copy-image-to-clipboard', async (event, srcURL) => {
   }
 });
 
-/** 사진 확대창의 「편집」 — 그 사진을 배경으로 깔아 그림판을 연다. */
+/** 사진 확대창의 「편집」 — 그 사진을 배경으로 깔아 그림판을 연다.
+ *  ⚠️ 실사고: 여기서 예외가 그대로 던져지면 렌더러 쪽 invoke가 reject되어
+ *  "그림판을 여는 중 오류가 발생했습니다" 같은 원인 불명 알림만 뜨고 끝난다.
+ *  무슨 일이 있어도 success:false + 이유를 담아 정상 반환하도록 감싼다. */
 ipcMain.handle('edit-image-in-draw-editor', async (event, srcURL) => {
-  const img = await imageFromChatSrc(srcURL);
-  if (!img || img.isEmpty()) return { success: false, msg: '사진을 읽지 못했습니다.' };
-  pendingDrawEditorImage = img.toDataURL();
-  const res = openExcalidrawWindow('chat');
-  if (!res || res.success === false) {
+  try {
+    const img = await imageFromChatSrc(srcURL);
+    if (!img || img.isEmpty()) return { success: false, msg: '사진을 읽지 못했습니다.' };
+    pendingDrawEditorImage = img.toDataURL();
+    const res = openExcalidrawWindow('chat');
+    if (!res || res.success === false) {
+      pendingDrawEditorImage = null;
+      return res || { success: false, msg: '그림판을 열지 못했습니다.' };
+    }
+    return { success: true };
+  } catch (e) {
     pendingDrawEditorImage = null;
-    return res || { success: false, msg: '그림판을 열지 못했습니다.' };
+    writeToLogFile('warn', `[진단] edit-image-in-draw-editor 실패: ${e && e.message}`);
+    return { success: false, msg: (e && e.message) || '그림판을 열지 못했습니다.' };
   }
-  return { success: true };
 });
 
 ipcMain.handle('excalidraw-get-context', async () => {
