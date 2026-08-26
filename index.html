@@ -3907,6 +3907,13 @@
       box-shadow: 0 28px 64px rgba(15, 23, 42, 0.18);
       background: #fff;
       display: flex; flex-direction: row;
+      position: relative;
+      /* ⚠️ 스크롤 시 밀림(지연) 현상 — 이 모달이 뒤쪽 메인 화면과 같은 페인트 레이어를
+         공유하면, 안에서 스크롤할 때마다 브라우저가 뒤에 깔린 전체 채팅 화면까지 다시
+         그리려고 해서 저사양 Windows PC에서 버벅였다. 별도 합성 레이어로 격리해 스크롤이
+         이 카드 안에서만 다시 그려지게 한다(backdrop-filter를 CPU 문제로 뺀 것과 같은 이유). */
+      transform: translateZ(0);
+      contain: layout paint;
     }
     .feature-guide-rail {
       width: 200px; flex-shrink: 0; display: flex; flex-direction: column;
@@ -3920,13 +3927,16 @@
       display: flex; align-items: center; justify-content: center; font-size: 15px;
     }
     .feature-guide-rail-brand-text { font-size: 13.5px; font-weight: 800; letter-spacing: -0.2px; color: var(--accent-dark); }
-    .feature-guide-rail-close {
-      margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: none;
-      background: rgba(33, 150, 243, 0.12); color: var(--accent-dark); font-size: 13px; cursor: pointer;
+    /* 닫기(X) 버튼은 왼쪽 레일이 아니라 카드 전체 기준 우상단에 고정해 다른 모달들과
+       위치를 맞춘다("X는 오른쪽 우상단에 해줘"). */
+    .feature-guide-close-btn {
+      position: absolute; top: 16px; right: 16px; z-index: 2;
+      width: 28px; height: 28px; border-radius: 50%; border: none;
+      background: rgba(33, 150, 243, 0.1); color: #64748b; font-size: 13px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       transition: background 0.12s;
     }
-    .feature-guide-rail-close:hover { background: rgba(33, 150, 243, 0.22); }
+    .feature-guide-close-btn:hover { background: rgba(33, 150, 243, 0.18); color: var(--accent-dark); }
     .feature-guide-rail-search {
       width: 100%; padding: 8px 11px; border-radius: 999px; border: 1px solid #cfe2f7;
       background: #ffffff; color: var(--text-primary); font-size: 12px; margin-bottom: 16px; outline: none;
@@ -5758,6 +5768,9 @@
         <button type="button" class="compact-rail-btn" id="compact-rail-expand-btn" onclick="toggleCompactMode()" title="기본 화면">
           <span class="compact-rail-icon" data-ui-icon="monitor"></span>
         </button>
+        <button type="button" class="compact-rail-btn" onclick="openFeatureGuideModal()" title="새 기능 안내">
+          <span class="compact-rail-icon" data-ui-icon="question"></span>
+        </button>
         <button type="button" class="compact-rail-btn" onclick="openSettingsModal()" title="설정">
           <span class="compact-rail-icon" data-ui-icon="settings"></span>
         </button>
@@ -6087,11 +6100,11 @@
   <!-- ✨ 새 기능 안내 -->
   <div id="feature-guide-modal" class="modal-overlay" onclick="if(event.target===this) closeFeatureGuideModal()">
     <div class="modal-card feature-guide-modal-card">
+      <button type="button" class="feature-guide-close-btn" onclick="closeFeatureGuideModal()" title="닫기">✕</button>
       <div class="feature-guide-rail">
         <div class="feature-guide-rail-brand">
           <div class="feature-guide-rail-brand-icon" aria-hidden="true">✨</div>
           <div class="feature-guide-rail-brand-text">기능 가이드</div>
-          <button type="button" class="feature-guide-rail-close" onclick="closeFeatureGuideModal()" title="닫기">✕</button>
         </div>
         <input type="text" id="feature-guide-search" class="feature-guide-rail-search" placeholder="기능 검색..." autocomplete="off" oninput="renderFeatureGuide()">
         <div class="feature-guide-rail-cats" id="feature-guide-cats"></div>
@@ -17351,6 +17364,24 @@
         cat: 'chat', icon: '📎', color: '#059669', title: '사진·파일 전송', tag: '1:1·그룹 공통',
         path: '채팅창 하단 클립 아이콘 또는 <b>붙여넣기(Ctrl+V)</b>',
         chips: ['사진 미리보기', '원본 그대로 전달', '받은 파일 폴더에서 모아보기'],
+        tip: null
+      },
+      {
+        cat: 'chat', icon: '📸', color: '#0284c7', title: '화면 캡처', tag: '1:1·그룹 공통',
+        path: '채팅창 하단 <b>카메라 아이콘</b>',
+        chips: ['모니터 전체 캡처', '드래그로 영역만 잘라 보내기'],
+        tip: '영역 캡처는 원하는 부분만 드래그로 지정한 뒤 바로 대화에 첨부합니다.'
+      },
+      {
+        cat: 'chat', icon: '✏️', color: '#c026d3', title: '그림 그리기', tag: '1:1·그룹 공통',
+        path: '채팅창 하단 <b>연필 아이콘</b>',
+        chips: ['펜·도형·화살표로 직접 그려서 전달', '완성한 그림을 이미지로 바로 전송'],
+        tip: null
+      },
+      {
+        cat: 'chat', icon: '💬', color: '#65a30d', title: '빠른 문구', tag: '1:1·그룹 공통',
+        path: '채팅창 하단 <b>말풍선 아이콘</b>',
+        chips: ['자주 쓰는 문장을 등록해 바로 삽입', '문구 목록에서 추가·삭제 관리'],
         tip: null
       },
       {

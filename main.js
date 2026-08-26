@@ -532,7 +532,9 @@ function getToastPreloadPath() {
 
 // 미니 모드 상단 툴바(공지·관리·파일·기록·새로고침 등)가 잘리지 않도록 최소 너비 확보
 const COMPACT_DEFAULT_WIDTH = 480;
-const COMPACT_DEFAULT_HEIGHT = 680;
+// ⚠️ 실사고: 680px이면 미니 모드로 켜자마자 목록이 두어 줄만 보이고 바로 스크롤을
+// 해야 해서 답답하다는 요청 — 기본 세로 높이를 넉넉하게 키웠다.
+const COMPACT_DEFAULT_HEIGHT = 800;
 const COMPACT_MIN_WIDTH = 480;
 const COMPACT_MIN_HEIGHT = 520;
 /** 미니 모드에서 오른쪽 「병원 달력」 패널을 펼쳤을 때 늘어나는 폭.
