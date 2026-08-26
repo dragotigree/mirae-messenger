@@ -5237,6 +5237,88 @@
     .settings-card.danger {
       background: #fef2f2;
     }
+    /* ===== 저장공간 상세 카드 ===== */
+    .storage-detail-card {
+      background: linear-gradient(180deg, #fbfdff 0%, #f6f9fc 100%);
+      border: 1px solid #eaf0f7;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+    .storage-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .storage-detail-summary { font-size: 12px; color: #64748b; line-height: 1.5; }
+    .storage-refresh-icon { display: inline-block; transition: transform 0.4s ease; }
+    .storage-detail-refresh-btn.is-spinning .storage-refresh-icon { animation: storage-spin 0.7s linear infinite; }
+    @keyframes storage-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .storage-detail-section-label { font-size: 11.5px; font-weight: 800; color: #334155; letter-spacing: -0.01em; margin-bottom: 6px; }
+    .storage-bar {
+      display: flex;
+      width: 100%;
+      height: 16px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #eef2f7;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+    .storage-bar-sm { height: 12px; }
+    .storage-bar-seg {
+      height: 100%;
+      min-width: 2px;
+      transition: filter 0.15s ease, transform 0.15s ease;
+      position: relative;
+    }
+    .storage-bar-seg:hover { filter: brightness(1.08); }
+    .storage-bar-seg:not(:last-child) { border-right: 1.5px solid rgba(255,255,255,0.55); }
+    .storage-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-top: 10px;
+    }
+    .storage-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      color: #475569;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .storage-legend-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px #fff, 0 1px 2px rgba(15,23,42,0.12);
+    }
+    .storage-legend-value { color: #94a3b8; font-weight: 500; }
+    .storage-detail-rows {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 20px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px dashed #e2e8f0;
+    }
+    .storage-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .storage-detail-row-label { color: #64748b; font-weight: 600; flex-shrink: 0; }
+    .storage-detail-row-value { color: #0f172a; font-weight: 700; text-align: right; }
+    .storage-detail-footnote {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin: 14px 0 0;
+      padding-top: 12px;
+      border-top: 1px solid #eef2f7;
+    }
+    .storage-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .storage-detail-actions .settings-btn-secondary.is-danger-ish { color: #b91c1c; border-color: #fecaca; }
+    @media (max-width: 720px) {
+      .storage-detail-rows { grid-template-columns: 1fr; }
+    }
     .settings-profile-layout {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
@@ -6969,6 +7051,37 @@
           </div>
           <div id="chat-backup-result" class="settings-hint"></div>
         </div>
+        <div class="settings-card storage-detail-card">
+          <div class="storage-detail-head">
+            <div>
+              <div class="settings-section-title" style="margin-bottom:2px;">저장공간 상세</div>
+              <div id="storage-detail-summary" class="storage-detail-summary">불러오는 중…</div>
+            </div>
+            <button type="button" class="settings-btn-secondary storage-detail-refresh-btn" id="storage-detail-refresh-btn" onclick="loadStorageDetail()">
+              <span class="storage-refresh-icon">↻</span> 새로고침
+            </button>
+          </div>
+
+          <div class="storage-detail-section-label">전체 저장공간 구성</div>
+          <div id="storage-comp-bar" class="storage-bar"></div>
+          <div id="storage-comp-legend" class="storage-legend"></div>
+
+          <div class="storage-detail-section-label" style="margin-top:16px;">DB 내부 주요 데이터</div>
+          <div id="storage-db-bar" class="storage-bar storage-bar-sm"></div>
+          <div id="storage-db-legend" class="storage-legend"></div>
+
+          <div id="storage-detail-rows" class="storage-detail-rows"></div>
+
+          <p class="storage-detail-footnote">DB 내부 분석값은 원인 파악 목적의 근사값이며 DB 실제 파일 크기에 이미 포함됩니다. 받은 파일 폴더의 실제 파일과 대화 본문은 자동으로 정리하지 않습니다.</p>
+
+          <div class="storage-detail-actions">
+            <button type="button" class="settings-btn-secondary" id="storage-safe-cleanup-btn" onclick="runStorageSafeCleanup()">안전 정리</button>
+            <button type="button" class="settings-btn-secondary" id="storage-vacuum-btn" onclick="runStorageVacuum()">DB 최적화</button>
+            <button type="button" class="settings-btn-secondary" id="storage-clear-attach-btn" onclick="runStorageClearAttachments()">전송 캐시 정리</button>
+          </div>
+          <div id="storage-detail-action-result" class="settings-hint"></div>
+        </div>
+
         <div class="settings-card">
           <div class="settings-section-title">저장 공간 정리</div>
           <p class="settings-hint">
@@ -11955,10 +12068,16 @@
 
     window.api.onReceiveGroupMessage((data) => {
       const key = `GROUP:${data.uid}`;
+      // ⚠️ 실사고: "OO님이 입장했습니다"·이름 변경 같은 시스템 알림도 일반 메시지와
+      // 똑같은 receive-group-message 이벤트로 온다. 그런데 여기서는 진짜 메시지인지
+      // 구분 없이 무조건 안읽음을 올렸다 — 여러 명이 한꺼번에 초대되면(입장 알림이
+      // 줄줄이 옴) 실제로는 대화가 1건뿐인데 배지가 9+로 뜨는 원인이었다. 시스템
+      // 알림(system-notice-flag 표식)은 안읽음에서 제외한다.
+      const isSystemNotice = typeof data.message === 'string' && data.message.indexOf('class="system-notice-flag"') !== -1;
       if (activeChatUser && activeChatUser.isGroup && activeChatUser.ip === key) {
         appendMessageRow(data.message, data.createdAt, data.senderName, isMessageFromMe(data.senderIP, data.senderName), false, data.msgUid, data.messageId, data.senderIP);
         afterChannelMessageVisible(data.msgUid);
-      } else {
+      } else if (!isSystemNotice) {
         bumpUnread(key);
       }
     });
@@ -15418,6 +15537,7 @@
       });
       const panels = modal.querySelector('.settings-panels');
       if (panels) panels.scrollTop = 0;
+      if (key === 'data') loadStorageDetail();
     }
 
     function focusSettingsSection(focusKey) {
@@ -28770,6 +28890,192 @@
       currentProfilePhotoValue = '';
       renderSettingPhotoPreview(document.getElementById('setting-name').value, '');
     }
+
+    // ================= 저장공간 상세 (환경설정 > 데이터) =================
+    const STORAGE_PALETTE = {
+      dbMain: '#2563eb', dbTemp: '#60a5fa', attachments: '#f59e0b', backups: '#10b981',
+      preUpdate: '#8b5cf6', logs: '#94a3b8', browserCache: '#ec4899', other: '#cbd5e1',
+      text: '#f59e0b', preview: '#8b5cf6', noticeImages: '#2563eb', meta: '#cbd5e1'
+    };
+
+    function formatStorageBytes(n) {
+      const bytes = Math.max(0, Number(n) || 0);
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+
+    let storageDetailLoading = false;
+    async function loadStorageDetail() {
+      if (storageDetailLoading) return;
+      storageDetailLoading = true;
+      const refreshBtn = document.getElementById('storage-detail-refresh-btn');
+      if (refreshBtn) refreshBtn.classList.add('is-spinning');
+      const summaryEl = document.getElementById('storage-detail-summary');
+      if (summaryEl && !summaryEl.dataset.loadedOnce) summaryEl.textContent = '불러오는 중…';
+      try {
+        const data = await window.api.getStorageDetail();
+        if (!data || !data.success) {
+          if (summaryEl) summaryEl.textContent = '불러오지 못했습니다.' + (data && data.msg ? ` (${data.msg})` : '');
+          return;
+        }
+        renderStorageDetail(data);
+        if (summaryEl) summaryEl.dataset.loadedOnce = '1';
+      } catch (e) {
+        if (summaryEl) summaryEl.textContent = '불러오지 못했습니다.';
+      } finally {
+        storageDetailLoading = false;
+        if (refreshBtn) refreshBtn.classList.remove('is-spinning');
+      }
+    }
+
+    function renderStorageBar(barId, legendId, items) {
+      const bar = document.getElementById(barId);
+      const legend = document.getElementById(legendId);
+      if (!bar || !legend) return;
+      const total = items.reduce((sum, it) => sum + (it.bytes || 0), 0);
+      bar.innerHTML = '';
+      legend.innerHTML = '';
+      if (!total) {
+        bar.innerHTML = '<div class="storage-bar-seg" style="width:100%; background:#e2e8f0;"></div>';
+        legend.innerHTML = '<span class="storage-legend-item"><span class="storage-legend-value">데이터가 없습니다.</span></span>';
+        return;
+      }
+      items.filter((it) => (it.bytes || 0) > 0).forEach((it) => {
+        const pct = Math.max(0.6, (it.bytes / total) * 100);
+        const color = STORAGE_PALETTE[it.key] || '#cbd5e1';
+        const seg = document.createElement('div');
+        seg.className = 'storage-bar-seg';
+        seg.style.width = `${pct}%`;
+        seg.style.background = color;
+        seg.title = `${it.label} · ${formatStorageBytes(it.bytes)}`;
+        bar.appendChild(seg);
+
+        const item = document.createElement('span');
+        item.className = 'storage-legend-item';
+        const countTxt = it.count != null ? ` · ${it.count.toLocaleString()}개` : '';
+        item.innerHTML = `<span class="storage-legend-dot" style="background:${color};"></span>${escapeHtml(it.label)} <span class="storage-legend-value">${formatStorageBytes(it.bytes)}${countTxt}</span>`;
+        legend.appendChild(item);
+      });
+    }
+
+    function renderStorageDetail(data) {
+      const summaryEl = document.getElementById('storage-detail-summary');
+      if (summaryEl) {
+        const d = data.detail || {};
+        const dbBytes = (d.dbFile ? (d.dbFile.mainBytes + d.dbFile.walBytes + d.dbFile.shmBytes) : 0);
+        const cacheBytes = (d.attachments ? d.attachments.bytes : 0);
+        summaryEl.textContent = `메신저 관리 파일 합계 ${formatStorageBytes(data.totalBytes)} · DB 실제 ${formatStorageBytes(dbBytes)} · 캐시·임시 ${formatStorageBytes(cacheBytes)}`;
+      }
+      renderStorageBar('storage-comp-bar', 'storage-comp-legend', data.composition || []);
+      renderStorageBar('storage-db-bar', 'storage-db-legend', data.dbBreakdown || []);
+
+      const d = data.detail || {};
+      const rows = [];
+      if (d.dbFile) {
+        rows.push(['DB 실제 파일', `본체 ${formatStorageBytes(d.dbFile.mainBytes)} · WAL ${formatStorageBytes(d.dbFile.walBytes)} · SHM ${formatStorageBytes(d.dbFile.shmBytes)}`]);
+      }
+      if (d.dbAnalysis) {
+        const a = d.dbAnalysis;
+        rows.push(['DB 내부 분석', `대화 ${a.messageCount.toLocaleString()}건 · 텍스트 ${formatStorageBytes(a.msgTextBytes + a.noticeTextBytes)} · 사진 미리보기 ${formatStorageBytes(a.msgImageBytes)} · 공지 이미지 ${a.noticeCount.toLocaleString()}개 / ${formatStorageBytes(a.noticeImageBytes)}`]);
+      }
+      if (d.autoBackup) rows.push(['DB 자동 백업', `${d.autoBackup.count.toLocaleString()}개 · ${formatStorageBytes(d.autoBackup.bytes)}`]);
+      if (d.attachments) {
+        rows.push(['전송·임시 파일', `${d.attachments.count.toLocaleString()}개 · ${formatStorageBytes(d.attachments.bytes)}`
+          + (d.attachments.orphanCount ? ` (안 쓰는 것 ${d.attachments.orphanCount.toLocaleString()}개 / ${formatStorageBytes(d.attachments.orphanBytes)})` : '')]);
+      }
+      if (d.preUpdateBackup) rows.push(['업데이트 관련', `안전복구 ${d.preUpdateBackup.count.toLocaleString()}개 · ${formatStorageBytes(d.preUpdateBackup.bytes)}`]);
+      const logsBytes = (d.logs ? d.logs.bytes : 0) + (d.other ? d.other.bytes : 0);
+      rows.push(['기타 설정·로그', `${formatStorageBytes(logsBytes)} · 전체 데이터 폴더 ${(data.composition || []).length}개 항목 기준`]);
+
+      const rowsEl = document.getElementById('storage-detail-rows');
+      if (rowsEl) {
+        rowsEl.innerHTML = rows.map(([label, value]) =>
+          `<div class="storage-detail-row"><span class="storage-detail-row-label">${escapeHtml(label)}</span><span class="storage-detail-row-value">${escapeHtml(value)}</span></div>`
+        ).join('');
+      }
+    }
+
+    function setStorageActionsDisabled(disabled) {
+      ['storage-safe-cleanup-btn', 'storage-vacuum-btn', 'storage-clear-attach-btn'].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = disabled;
+      });
+    }
+
+    async function runStorageSafeCleanup() {
+      const resultEl = document.getElementById('storage-detail-action-result');
+      setStorageActionsDisabled(true);
+      if (resultEl) { resultEl.textContent = '정리하는 중…'; resultEl.style.color = '#64748b'; }
+      try {
+        const res = await window.api.storageSafeCleanup();
+        if (res && res.success) {
+          if (resultEl) {
+            resultEl.textContent = res.freedCount
+              ? `✅ ${res.freedCount}개 정리 · ${formatStorageBytes(res.freedBytes)} 확보`
+              : '✅ 지울 만한 불필요한 파일이 없었습니다.';
+            resultEl.style.color = '#059669';
+          }
+          await loadStorageDetail();
+        } else if (resultEl) {
+          resultEl.textContent = `정리 실패: ${(res && res.msg) || '알 수 없는 오류'}`;
+          resultEl.style.color = '#dc2626';
+        }
+      } finally {
+        setStorageActionsDisabled(false);
+      }
+    }
+
+    async function runStorageVacuum() {
+      if (!await appConfirm('DB 최적화를 실행할까요?\n삭제된 대화 등으로 생긴 빈 공간을 회수해 파일을 압축합니다. 대화 내용은 그대로 유지되며, DB 크기에 따라 몇 초~수십 초 걸릴 수 있습니다.')) return;
+      const resultEl = document.getElementById('storage-detail-action-result');
+      setStorageActionsDisabled(true);
+      if (resultEl) { resultEl.textContent = '최적화하는 중… 잠시만 기다려 주세요.'; resultEl.style.color = '#64748b'; }
+      try {
+        const res = await window.api.storageVacuumDb();
+        if (res && res.success) {
+          const saved = Math.max(0, res.beforeBytes - res.afterBytes);
+          if (resultEl) {
+            resultEl.textContent = saved > 0
+              ? `✅ 최적화 완료 · ${formatStorageBytes(saved)} 절약 (${formatStorageBytes(res.beforeBytes)} → ${formatStorageBytes(res.afterBytes)})`
+              : '✅ 최적화 완료 · 이미 정돈된 상태였습니다.';
+            resultEl.style.color = '#059669';
+          }
+          await loadStorageDetail();
+        } else if (resultEl) {
+          resultEl.textContent = `최적화 실패: ${(res && res.msg) || '알 수 없는 오류'}`;
+          resultEl.style.color = '#dc2626';
+        }
+      } finally {
+        setStorageActionsDisabled(false);
+      }
+    }
+
+    async function runStorageClearAttachments() {
+      if (!await appConfirm('전송 캐시를 정리할까요?\n대화 기록·텍스트는 그대로 남고, 주고받은 첨부파일의 내부 보관 사본만 지워집니다. 이미 「받기」로 저장한 파일에는 영향이 없습니다.')) return;
+      const resultEl = document.getElementById('storage-detail-action-result');
+      setStorageActionsDisabled(true);
+      if (resultEl) { resultEl.textContent = '정리하는 중…'; resultEl.style.color = '#64748b'; }
+      try {
+        const res = await window.api.storageClearAttachmentCache();
+        if (res && res.success) {
+          if (resultEl) {
+            resultEl.textContent = res.freedCount
+              ? `✅ ${res.freedCount}개 정리 · ${formatStorageBytes(res.freedBytes)} 확보`
+              : '✅ 지울 만한 캐시 파일이 없었습니다.';
+            resultEl.style.color = '#059669';
+          }
+          await loadStorageDetail();
+        } else if (resultEl) {
+          resultEl.textContent = `정리 실패: ${(res && res.msg) || '알 수 없는 오류'}`;
+          resultEl.style.color = '#dc2626';
+        }
+      } finally {
+        setStorageActionsDisabled(false);
+      }
+    }
+    // ================= /저장공간 상세 =================
 
     async function backupChatHistory() {
       const el = document.getElementById('chat-backup-result');
