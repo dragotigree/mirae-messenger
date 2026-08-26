@@ -1512,15 +1512,6 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
   if (!force && !notifyIncomingMessages) return;
   const key = String(channelKey || '');
 
-  // ⚠️ "메시지가 왔는지 몰랐다"는 신고가 잦았다 — 토스트·배지는 화면을 보고 있지 않으면
-  // 놓치기 쉽다. Windows 작업 표시줄 아이콘을 깜빡이게(flashFrame) 하면, 사용자가 다른
-  // 프로그램을 쓰고 있어도 작업 표시줄 자체가 눈에 띄게 반짝여 훨씬 확실하게 알아챌 수
-  // 있다(카카오톡 등 대부분의 메신저가 쓰는 방식). 이미 메신저 창을 보고 있는 중이면
-  // 굳이 깜빡일 필요가 없어 그때는 건너뛴다.
-  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed() && !toastUiState.focused) {
-    try { mainWindow.flashFrame(true); } catch (e) { /* ignore */ }
-  }
-
   // 같은 상대(채널)에게서 온 메시지라면 새 토스트를 또 띄우지 않고 기존 것을 새 내용으로
   // 갱신한다 — 그래야 그 사람에게서 여러 통이 와도 토스트가 계속 쌓이지 않는다.
   const existing = toastEntries.get(key);
@@ -1647,6 +1638,15 @@ function notifyIncomingMessageNotification(opts) {
   const secs = Math.max(2, Math.min(60, Number(toastDurationSeconds) || 7));
   const ms = (o.urgent ? secs + 2 : secs) * 1000;
   activeIncomingNotifyUntil.set(key, now + ms);
+
+  // ⚠️ 실사고: 처음엔 이 깜빡임 코드를 showMessageToast() 안에 넣었었는데, 알림 방식을
+  // "데스크탑"(Windows 자체 알림)으로 바꾼 사람은 showMessageToast가 아예 호출되지 않아
+  // ("토스트가 아니라 데스크탑 방식을 쓰면 더 확실하다"고 안내했던 바로 그 설정) 깜빡임도
+  // 전혀 일어나지 않았다("깜빡이지 않는 것 같다"는 신고의 원인). 알림 방식(토스트/데스크탑)과
+  // 무관하게 항상 적용되도록 분기 이전, 이 함수 자체로 옮긴다.
+  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed() && !toastUiState.focused) {
+    try { mainWindow.flashFrame(true); } catch (e) { /* ignore */ }
+  }
 
   const mode = incomingNotifyMode === 'desktop' ? 'desktop' : 'toast';
   if (mode === 'desktop') {
@@ -3218,7 +3218,45 @@ function getAppNativeIcon() {
   return cachedAppIcon;
 }
 
+/** ⚠️ 실사고(중대): nativeImage.createFromDataURL은 SVG를 지원하지 않는다 — Electron
+ * 문서에도 없고, 실제로 아무리 단순한 SVG(사각형 하나)를 넣어도 항상 빈(isEmpty) 이미지를
+ * 반환한다. 그런데 아래 iconWithRedBackground와 예전 getTaskbarBadgeIcon은 이 방법으로
+ * SVG를 그려 왔고, 실패하면 원본 아이콘으로 "조용히" 되돌아가게(fallback) 짜여 있었다.
+ * 그 결과 "카카오톡처럼 빨간 배경" 기능은 배포된 뒤로 한 번도 실제로 그려진 적이 없이
+ * 계속 원래 아이콘 그대로 나갔을 가능성이 크다 — 실기 테스트에서도 "함수가 안 터지고
+ * 비어있지 않은 이미지를 반환하는지"만 확인했지, 그 이미지가 실제로 빨갛게 바뀌었는지는
+ * 확인하지 못했다(항상 폴백값도 "비어있지 않은 이미지"이므로 같은 결과로 보였다).
+ * SVG 대신, Chromium이 확실히 지원하는 실제 HTML/CSS 렌더링 + 화면 캡처로 바꾼다 —
+ * 숨겨진(show:false) 작은 BrowserWindow에 HTML을 띄우고 capturePage()로 PNG를 뜬다. */
+function renderHtmlToNativeImage(html, width, height) {
+  return new Promise((resolve) => {
+    let win;
+    try {
+      win = new BrowserWindow({
+        width, height, show: false, frame: false, transparent: true, resizable: false,
+        webPreferences: { offscreen: false }
+      });
+    } catch (e) {
+      resolve(nativeImage.createEmpty());
+      return;
+    }
+    const finish = (image) => {
+      try { if (!win.isDestroyed()) win.destroy(); } catch (e) { /* ignore */ }
+      resolve(image);
+    };
+    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      // ⚠️ loadURL()이 끝났다는 건 탐색(navigation)이 끝났다는 뜻일 뿐, 그 시점에 바로
+      // capturePage()를 부르면 아직 한 프레임도 실제로 그려지기 전이라 빈(0x0) 이미지가
+      // 나온다(직접 재현해서 확인함). 첫 페인트가 끝날 시간을 짧게 준 뒤에 캡처한다.
+      .then(() => new Promise((r) => setTimeout(r, 80)))
+      .then(() => win.webContents.capturePage())
+      .then((image) => finish(image))
+      .catch(() => finish(nativeImage.createEmpty()));
+  });
+}
+
 let cachedTrayIconDot = null;
+let trayIconDotPromise = null;
 /**
  * ⚠️ 실사고: 작업 표시줄 배지(setOverlayIcon)는 메인 창의 "작업 표시줄 버튼" 위에
  * 그리는 것이다. 그런데 이 앱은 X 버튼으로 닫을 때 종료하지 않고 mainWindow.hide()로
@@ -3229,43 +3267,41 @@ let cachedTrayIconDot = null;
  * 있어도 항상 보이는 트레이 아이콘에 빨간 점을 얹어 안읽음이 있음을 알려준다.
  */
 /** 아이콘을 그대로 두되, 뒤에 빨간 둥근 배경을 깔아 카카오톡처럼 "안읽음이 있다"가
- * 한눈에 보이게 한다. base64 PNG를 <image>로 얹은 SVG를 다시 래스터화하는, 위
- * createMessengerIcon과 같은 방식이다. */
-function iconWithRedBackground(baseIcon, size) {
+ * 한눈에 보이게 한다. */
+async function iconWithRedBackground(baseIcon, size) {
   const pngDataUrl = baseIcon.toDataURL();
   const pad = Math.round(size * 0.08);
   const inner = size - pad * 2;
   const radius = Math.round(size * 0.28);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">`
-    + `<rect x="0" y="0" width="${size}" height="${size}" rx="${radius}" fill="#ef4444" />`
-    + `<image href="${pngDataUrl}" x="${pad}" y="${pad}" width="${inner}" height="${inner}" />`
-    + `</svg>`;
-  const img = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
-  return img.isEmpty() ? baseIcon : img.resize({ width: size, height: size, quality: 'best' });
+  const html = `<html><body style="margin:0;padding:0;width:${size}px;height:${size}px;background:transparent;overflow:hidden;">`
+    + `<div style="width:${size}px;height:${size}px;border-radius:${radius}px;background:#ef4444;box-sizing:border-box;padding:${pad}px;">`
+    + `<img src="${pngDataUrl}" width="${inner}" height="${inner}" style="display:block;" />`
+    + `</div></body></html>`;
+  const img = await renderHtmlToNativeImage(html, size, size);
+  return img.isEmpty() ? baseIcon : img;
 }
 
 function getTrayIconWithUnreadDot() {
-  if (cachedTrayIconDot) return cachedTrayIconDot;
-  try {
-    cachedTrayIconDot = iconWithRedBackground(getTrayIcon(), 16);
-  } catch (e) {
-    cachedTrayIconDot = getTrayIcon();
-  }
-  return cachedTrayIconDot;
+  if (cachedTrayIconDot) return Promise.resolve(cachedTrayIconDot);
+  if (trayIconDotPromise) return trayIconDotPromise;
+  trayIconDotPromise = iconWithRedBackground(getTrayIcon(), 16)
+    .catch(() => getTrayIcon())
+    .then((img) => { cachedTrayIconDot = img; trayIconDotPromise = null; return img; });
+  return trayIconDotPromise;
 }
 
 let cachedTaskbarIconRedBg = null;
+let taskbarIconRedBgPromise = null;
 /** 작업 표시줄에 실제로 보이는 창 아이콘 자체를 빨간 배경으로 바꿔서(win.setIcon),
  * 카카오톡처럼 안읽음이 있을 때 아이콘 통째로 눈에 띄게 한다. 기존 숫자 배지
  * (setOverlayIcon)와 함께 쓰인다 — 색은 "새 메시지가 있다", 숫자는 "몇 개인지". */
 function getTaskbarIconWithUnreadBg() {
-  if (cachedTaskbarIconRedBg) return cachedTaskbarIconRedBg;
-  try {
-    cachedTaskbarIconRedBg = iconWithRedBackground(getAppNativeIcon(), 64);
-  } catch (e) {
-    cachedTaskbarIconRedBg = getAppNativeIcon();
-  }
-  return cachedTaskbarIconRedBg;
+  if (cachedTaskbarIconRedBg) return Promise.resolve(cachedTaskbarIconRedBg);
+  if (taskbarIconRedBgPromise) return taskbarIconRedBgPromise;
+  taskbarIconRedBgPromise = iconWithRedBackground(getAppNativeIcon(), 64)
+    .catch(() => getAppNativeIcon())
+    .then((img) => { cachedTaskbarIconRedBg = img; taskbarIconRedBgPromise = null; return img; });
+  return taskbarIconRedBgPromise;
 }
 
 /** Windows 트레이: 16px 전용 아이콘 (큰 PNG 축소 시 깨짐 방지) */
@@ -15492,21 +15528,39 @@ ipcMain.handle('get-auto-launch', async () => app.getLoginItemSettings().openAtL
 
 /** 작업 표시줄 안읽음 배지. 렌더러가 안읽음 총합이 바뀔 때마다 호출한다.
  *  ⚠️ Windows는 dock 배지가 없어 app.setBadgeCount가 안 먹힌다 — 대신 작업 표시줄 아이콘
- *  위에 작은 오버레이 아이콘을 얹는 setOverlayIcon을 쓴다. 매번 캔버스로 숫자를 그리면
- *  네이티브 의존성이 늘어나므로, 1~9·9+ 열 개짜리 배지 이미지를 미리 만들어 두고
- *  그중 하나를 골라 붙인다(assets/badges). 그 외 플랫폼(macOS·Linux)은 Electron
- *  기본 제공 app.setBadgeCount를 그대로 쓴다. */
-function getTaskbarBadgeIcon(n) {
+ *  위에 작은 오버레이 아이콘을 얹는 setOverlayIcon을 쓴다. 그 외 플랫폼(macOS·Linux)은
+ *  Electron 기본 제공 app.setBadgeCount를 그대로 쓴다.
+ *  ⚠️ 실사고: 예전엔 미리 만들어 둔 PNG 파일(assets/badges/badge-1.png 등)을 그대로
+ *  붙였는데, 흰 테두리 링이 있는 촌스러운 모양이었다("챗지피티처럼 이쁘게 안 되냐"는
+ *  요청). SVG를 직접 그려 래스터화하는 기존 방식(createMessengerIcon과 동일한 기법)으로
+ *  바꿔, 테두리 없는 깔끔한 플랫 스타일 원형 배지로 만들었다 — 숫자마다 파일을 미리
+ *  준비할 필요도 없어졌다. */
+const taskbarBadgeIconPromises = new Map();
+async function getTaskbarBadgeIcon(n) {
   const key = n > 9 ? '9plus' : String(n);
   if (taskbarBadgeIconCache.has(key)) return taskbarBadgeIconCache.get(key);
-  try {
-    const file = path.join(__dirname, 'assets', 'badges', `badge-${key}.png`);
-    const img = nativeImage.createFromPath(file);
-    taskbarBadgeIconCache.set(key, img.isEmpty() ? null : img);
+  if (taskbarBadgeIconPromises.has(key)) return taskbarBadgeIconPromises.get(key);
+  const p = (async () => {
+    try {
+      const label = key === '9plus' ? '9+' : key;
+      const size = 64;
+      const fontSize = label.length > 1 ? 30 : 38;
+      // 테두리 없는 깔끔한 플랫 스타일 원형 배지(HTML/CSS 렌더링 — SVG는 nativeImage가
+      // 지원하지 않아 위 renderHtmlToNativeImage와 같은 이유로 이 방식을 쓴다).
+      const html = `<html><body style="margin:0;padding:0;width:${size}px;height:${size}px;background:transparent;overflow:hidden;">`
+        + `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#ef4444;display:flex;align-items:center;justify-content:center;box-sizing:border-box;">`
+        + `<span style="font-family:'Segoe UI',Arial,sans-serif;font-weight:700;color:#ffffff;font-size:${fontSize}px;line-height:1;">${label}</span>`
+        + `</div></body></html>`;
+      const img = await renderHtmlToNativeImage(html, size, size);
+      taskbarBadgeIconCache.set(key, img.isEmpty() ? null : img);
+    } catch (e) {
+      taskbarBadgeIconCache.set(key, null);
+    }
+    taskbarBadgeIconPromises.delete(key);
     return taskbarBadgeIconCache.get(key);
-  } catch (e) {
-    return null;
-  }
+  })();
+  taskbarBadgeIconPromises.set(key, p);
+  return p;
 }
 
 ipcMain.handle('update-unread-badge', async (event, payload) => {
@@ -15516,20 +15570,21 @@ ipcMain.handle('update-unread-badge', async (event, payload) => {
     if (process.platform === 'win32') {
       if (mainWindow && !mainWindow.isDestroyed()) {
         if (enabled && count > 0) {
-          const icon = getTaskbarBadgeIcon(count);
-          if (icon) mainWindow.setOverlayIcon(icon, `안읽은 메시지 ${count}개`);
+          const icon = await getTaskbarBadgeIcon(count);
+          if (icon && mainWindow && !mainWindow.isDestroyed()) mainWindow.setOverlayIcon(icon, `안읽은 메시지 ${count}개`);
         } else {
           mainWindow.setOverlayIcon(null, '');
         }
         // 카카오톡처럼 안읽음이 있을 때는 작업 표시줄 아이콘 자체 뒤에 빨간 배경을
         // 깔아 눈에 띄게 하고, 없으면 원래 아이콘으로 되돌린다.
-        mainWindow.setIcon(enabled && count > 0 ? getTaskbarIconWithUnreadBg() : getAppNativeIcon());
+        const taskbarIcon = enabled && count > 0 ? await getTaskbarIconWithUnreadBg() : getAppNativeIcon();
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setIcon(taskbarIcon);
       }
       // 창을 트레이로 숨겨 놓은 동안엔 작업 표시줄 버튼 자체가 없어 위 오버레이가 안
       // 보인다 — 그 경우에도 확인 가능하도록 트레이 아이콘에도 같은 표시를 얹는다.
       if (tray && !tray.isDestroyed()) {
         const hasUnread = enabled && count > 0;
-        tray.setImage(hasUnread ? getTrayIconWithUnreadDot() : getTrayIcon());
+        tray.setImage(hasUnread ? await getTrayIconWithUnreadDot() : getTrayIcon());
         // 점만으로는 "누구에게서 왔는지" 알 수 없다는 요청 — 트레이 아이콘에 마우스를
         // 올리면 안읽음 개수와 보낸 사람 요약이 툴팁으로 보이게 한다. 안읽음이
         // 없을 때도 "받은 메시지가 없다"는 걸 바로 알 수 있게 명시적으로 적어준다.
