@@ -8703,7 +8703,7 @@ function handleIncomingChat(payload, senderIP) {
       if (mainWindow) {
         sendChatEvent('receive-message', uiPayload);
         notifyIncomingMessageNotification({
-          title: payload.urgent ? `🚨 [긴급] ${payload.sender}님의 메시지` : `💬 ${payload.sender}님의 메시지`,
+          title: payload.urgent ? `[긴급] ${payload.sender}님의 메시지` : `${payload.sender}님의 메시지`,
           body: previewBody(payload.message),
           urgent: !!payload.urgent,
           channelKey: senderIP
@@ -8822,7 +8822,7 @@ function handleIncomingDeptMessage(payload, senderIP) {
       });
     }
     notifyIncomingMessageNotification({
-      title: `👥 [${payload.dept}] ${senderName}님의 메시지`,
+      title: `[${payload.dept}] ${senderName}님의 메시지`,
       body: previewBody(payload.message),
       channelKey: receiverKey
     });
@@ -8865,7 +8865,7 @@ function handleIncomingFloorMessage(payload, senderIP) {
       });
     }
     notifyIncomingMessageNotification({
-      title: `🏢 [${payload.floor}] ${senderName}님의 메시지`,
+      title: `[${payload.floor}] ${senderName}님의 메시지`,
       body: previewBody(payload.message),
       channelKey: receiverKey
     });
@@ -10745,7 +10745,7 @@ function handleIncomingGroupMessage(payload, senderIP) {
         messageId: null
       });
       notifyIncomingMessageNotification({
-        title: `👥 [${payload.groupName || '그룹'}] ${senderName}님의 메시지`,
+        title: `[${payload.groupName || '그룹'}] ${senderName}님의 메시지`,
         body: previewBody(payload.message),
         channelKey: receiverKey
       });
@@ -11672,6 +11672,7 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
 
     let sourcePath = '';
     let buffer = null;
+    let dataUrlMime = '';
 
     if (/^mirae-file:\/\//i.test(href)) {
       const raw = href.replace(/^mirae-file:\/\//i, '').split(/[?#]/)[0];
@@ -11695,9 +11696,10 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
       const m = href.match(/^data:([^;]+);base64,(.+)$/i);
       if (!m) return { success: false, msg: '파일 데이터 형식이 올바르지 않습니다.' };
       buffer = Buffer.from(m[2], 'base64');
+      dataUrlMime = m[1] || '';
       if (!preferredName) preferredName = `file_${Date.now()}`;
       if (!path.extname(preferredName)) {
-        preferredName = `${preferredName}.${extensionFromMime(m[1])}`;
+        preferredName = `${preferredName}.${extensionFromMime(dataUrlMime)}`;
       }
     } else if (/^file:\/\//i.test(href)) {
       try {
@@ -11714,6 +11716,12 @@ ipcMain.handle('save-chat-file-attachment', async (event, payload) => {
     }
 
     preferredName = repairMimeDisguisedFileName(sanitizeFileName(preferredName || 'download'));
+    // ⚠️ 실사고: 확장자 없는 이름으로 저장되면 탐색기에서 "파일" 형식으로만 뜨고
+    // 더블클릭해도 안 열린다("확장자도 없이 저장되네" 사용자 신고). 위에서 확장자를
+    // 붙였어도 이후 sanitize 단계에서 유실될 가능성을 아예 차단하는 최종 안전장치.
+    if (buffer && !path.extname(preferredName)) {
+      preferredName = `${preferredName}.${extensionFromMime(dataUrlMime)}`;
+    }
     const targetDir = getReceivedFilesDir();
     let destPath = uniqueSavePath(targetDir, preferredName);
 
