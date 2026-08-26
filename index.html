@@ -6145,7 +6145,10 @@
       <div id="sidebar-calendar-day" class="sidebar-calendar-day">
         <div class="sidebar-cal-day-toprow">
           <div class="sidebar-cal-day-date" id="sidebar-cal-day-date"></div>
-          <div class="sidebar-cal-day-filter" id="sidebar-cal-day-filter"></div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div class="sidebar-cal-day-filter" id="sidebar-cal-day-ward-filter"></div>
+            <div class="sidebar-cal-day-filter" id="sidebar-cal-day-filter"></div>
+          </div>
         </div>
         <div class="sidebar-cal-day-duty" id="sidebar-cal-day-duty"></div>
         <div class="sidebar-cal-day-body" id="sidebar-cal-day-body"></div>
@@ -8373,6 +8376,12 @@
       { key: 'ROOM_CHANGE', label: '전실' },
       { key: 'FLOW', label: '외진외출' }
     ];
+    /** 사이드바 달력 하루보기 — 병동별 필터. 위 종류(입원/퇴원/…) 필터 옆에 나란히 두고
+     *  둘을 동시에 적용한다(예: "5병동" + "입원"만 보기). */
+    let sidebarCalDayWardFilter = 'all';
+    function getSidebarCalDayWardFilters() {
+      return [{ key: 'all', label: '전체 병동' }, ...Object.keys(SCHEDULE_BOARD_WARD_LABELS).map((w) => ({ key: w, label: SCHEDULE_BOARD_WARD_LABELS[w] }))];
+    }
 
     let activeChatUser = null;
 
@@ -17863,6 +17872,12 @@
         path: '현황판 상단 → <b>일정등록</b> 버튼 또는 사이드바 달력 날짜 <b>우클릭</b>',
         chips: ['주치의 OFF·당직의를 쉼표로 여러 명 한 번에 등록', '달력 날짜 우클릭으로 그 날짜에 바로 일정 추가·등록', '비워두고 저장하면 그 날짜 기록 삭제'],
         tip: '작성 권한자 계정이나 마스터 로그인이 필요합니다.'
+      },
+      {
+        cat: 'schedule', icon: '🏥', color: '#0e7490', title: '달력 하루보기 병동·종류 필터', tag: '사이드바 달력',
+        path: '사이드바 달력에서 날짜 클릭 → 하루보기 상단 필터 두 개',
+        chips: ['병동 필터(전체·4·5·7·8·9병동)', '종류 필터(입원·퇴원·전실·외진외출)', '두 필터를 동시에 적용해 좁혀보기 가능'],
+        tip: '예: 「5병동」+「입원」을 함께 고르면 그날 5병동 입원 환자만 보입니다.'
       },
       {
         cat: 'manage', icon: '💾', color: '#334155', title: '저장공간 상세', tag: '환경설정 · 데이터',
@@ -27356,9 +27371,29 @@
       if (el) el.classList.remove('is-open');
     }
 
+    function setSidebarCalDayWardFilter(key) {
+      sidebarCalDayWardFilter = key;
+      closeSidebarCalDayWardFilterMenu();
+      if (selectedCalendarDateStr) renderSidebarCalendarDay(selectedCalendarDateStr);
+    }
+
+    function toggleSidebarCalDayWardFilterMenu(e) {
+      if (e) e.stopPropagation();
+      const el = document.getElementById('sidebar-cal-day-ward-filter');
+      if (!el) return;
+      el.classList.toggle('is-open');
+    }
+
+    function closeSidebarCalDayWardFilterMenu() {
+      const el = document.getElementById('sidebar-cal-day-ward-filter');
+      if (el) el.classList.remove('is-open');
+    }
+
     document.addEventListener('click', (e) => {
       const el = document.getElementById('sidebar-cal-day-filter');
       if (el && el.classList.contains('is-open') && !el.contains(e.target)) closeSidebarCalDayFilterMenu();
+      const wardEl = document.getElementById('sidebar-cal-day-ward-filter');
+      if (wardEl && wardEl.classList.contains('is-open') && !wardEl.contains(e.target)) closeSidebarCalDayWardFilterMenu();
     });
 
     function renderSidebarCalDayFilterBar() {
@@ -27382,12 +27417,35 @@
       if (wasOpen) el.classList.add('is-open');
     }
 
+    function renderSidebarCalDayWardFilterBar() {
+      const el = document.getElementById('sidebar-cal-day-ward-filter');
+      if (!el) return;
+      const wasOpen = el.classList.contains('is-open');
+      const options = getSidebarCalDayWardFilters();
+      const current = options.find((f) => f.key === sidebarCalDayWardFilter) || options[0];
+      el.innerHTML =
+        `<button type="button" class="cal-day-filter-trigger" data-key="${current.key}" onclick="toggleSidebarCalDayWardFilterMenu(event)">` +
+          `<span class="cal-day-filter-dot"></span>` +
+          `<span>${escapeHtml(current.label)}</span>` +
+          `<span class="cal-day-filter-chevron">${uiIcon('chevronDown') || '▾'}</span>` +
+        `</button>` +
+        `<div class="cal-day-filter-menu">` +
+          options.map((f) =>
+            `<button type="button" class="cal-day-filter-option${sidebarCalDayWardFilter === f.key ? ' active' : ''}" data-key="${f.key}" onclick="setSidebarCalDayWardFilter('${f.key}')">` +
+              `<span class="cal-day-filter-label"><span class="cal-day-filter-dot"></span>${escapeHtml(f.label)}</span><span class="cal-day-filter-check">✓</span>` +
+            `</button>`
+          ).join('') +
+        `</div>`;
+      if (wasOpen) el.classList.add('is-open');
+    }
+
     function renderSidebarCalendarDay(dateStr) {
       const bodyEl = document.getElementById('sidebar-cal-day-body');
       const dutyEl = document.getElementById('sidebar-cal-day-duty');
       const dateEl = document.getElementById('sidebar-cal-day-date');
       if (!bodyEl || !dateStr) return;
       renderSidebarCalDayFilterBar();
+      renderSidebarCalDayWardFilterBar();
 
       if (dateEl) {
         const d = new Date(`${dateStr}T12:00:00`);
@@ -27395,7 +27453,8 @@
         dateEl.textContent = Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}월 ${d.getDate()}일 ${weekdays[d.getDay()]}요일`;
       }
 
-      const list = getSchedulesForDate(dateStr);
+      const wardFilter = sidebarCalDayWardFilter || 'all';
+      const list = getSchedulesForDate(dateStr).filter((s) => wardFilter === 'all' || normalizeSchedulePatient(s).ward === wardFilter);
       const dutyNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'duty').map((r) => r.name);
       const offNames = dutyRosterCache.filter((r) => r.date_str === dateStr && r.kind === 'off').map((r) => r.name);
       bodyEl.onclick = null;
