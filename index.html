@@ -2791,6 +2791,10 @@
     .detail-info-row { background: var(--surface-muted); padding: 5px 8px; border-radius: var(--radius-md); font-size: 11px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-soft); min-height: 0; line-height: 1.3; gap: 6px; }
     .detail-info-row .detail-info-label { color: var(--text-secondary); font-size: 10px; flex-shrink: 0; }
     .detail-info-row .detail-info-value { font-weight: 700; color: var(--text-primary); font-size: 11px; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* "직급"(RM6 진료과장 등)을 누르면 같은 RM끼리 검색 — 클릭 가능하다는 걸 알 수 있게
+     * 살짝 강조하고 손 커서로 바꾼다. */
+    .detail-rank-clickable { cursor: pointer; color: var(--accent-dark); transition: opacity 0.12s; }
+    .detail-rank-clickable:hover { opacity: 0.7; text-decoration: underline; }
     .detail-self-edit-btn {
       margin-top: 10px; width: 100%; padding: 8px 12px; border: 1px solid var(--sidebar-active);
       border-radius: 12px; background: var(--sidebar-active); color: var(--accent-dark); font-size: 12px; font-weight: 700;
@@ -6221,7 +6225,7 @@
         <div class="detail-dept-line" id="detail-dept">왼쪽 목록에서 상대를 선택하세요</div>
 
         <div class="detail-info-group">
-          <div class="detail-info-row"><span class="detail-info-label">직급</span><span class="detail-info-value" id="detail-rank">-</span></div>
+          <div class="detail-info-row"><span class="detail-info-label">직급</span><span class="detail-info-value detail-rank-clickable" id="detail-rank" onclick="searchByRankToken(this.textContent)" title="클릭하면 같은 RM 소속인 다른 직원을 검색합니다">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">부서</span><span class="detail-info-value" id="detail-dept-val">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">내선번호</span><span class="detail-info-value" id="detail-ext">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">휴대폰번호</span><span class="detail-info-value" id="detail-phone">-</span></div>
@@ -11754,11 +11758,21 @@
           console.error('그룹 상세 패널 갱신 실패:', e);
         }
       } else if (activeChatUser && isDmPeerIp(activeChatUser.ip)) {
-        try {
-          const live = findUserByIp(activeChatUser.ip);
-          if (live) renderContactDetailPanel(userWithSavedContactSnapshot(live));
-        } catch (e) {
-          console.error('연락처 상세 패널 갱신 실패:', e);
+        // ⚠️ 실사고: 여기서 activeChatUser 기준으로 무조건 새로고침했더니, 우클릭
+        // "정보보기"로 지금 열려 있는 프로필이 활성 대화 상대와 다른 사람이어도
+        // 하트비트가 올 때마다 그 사람 정보로 화면이 바뀌어버렸다("보고 있던
+        // 프로필이 선택된 사람으로 갑자기 바뀐다" 신고). 지금 정말 보이는 프로필이
+        // activeChatUser 것일 때만(모달이 안 열려있으면 userInfoModalTargetIp가
+        // 비어 있어 조건이 자연히 거짓이 됨) 새로고침한다.
+        const modalOpen = document.getElementById('user-info-modal')?.style.display === 'flex';
+        const showingActiveChatUser = modalOpen && userInfoModalTargetIp && userInfoModalTargetIp === activeChatUser.ip;
+        if (showingActiveChatUser) {
+          try {
+            const live = findUserByIp(activeChatUser.ip);
+            if (live) renderContactDetailPanel(userWithSavedContactSnapshot(live));
+          } catch (e) {
+            console.error('연락처 상세 패널 갱신 실패:', e);
+          }
         }
       }
     }
@@ -16128,6 +16142,28 @@
       modal.style.display = 'flex';
     }
 
+    /** 프로필의 "직급"(예: RM6 진료과장)을 클릭하면, 그 RM 소속(RM6)이 같은 다른
+     *  직원들을 사용자 목록 검색으로 바로 찾아준다. u.rank 필드는 이미 사이드바
+     *  검색 대상에 포함돼 있어(filterUserList) 그대로 재사용한다. */
+    function searchByRankToken(rankText) {
+      const raw = String(rankText || '').trim();
+      if (!raw || raw === '-' || raw === '없음') return;
+      const m = raw.match(/RM\s*\d+/i);
+      const token = m ? m[0].replace(/\s+/g, '').toUpperCase() : raw;
+      closeUserInfoModal();
+      if (document.body.classList.contains('compact-mode')) {
+        setCompactRailTab('friends');
+      } else {
+        setSidebarRailFilter('users');
+        const box = document.getElementById('user-search-box');
+        if (box) box.classList.add('is-visible');
+      }
+      filterUserList(token);
+      requestAnimationFrame(() => {
+        (document.getElementById('user-search-input') || document.getElementById('compact-search-input-friends'))?.focus();
+      });
+    }
+
     function editUserInfoAsMaster() {
       if (!isMasterAuthenticated) {
         appAlert('마스터 관리자로 로그인한 경우에만 수정할 수 있습니다.');
@@ -18030,6 +18066,12 @@
         cat: 'manage', icon: '🗂️', color: '#9333ea', title: '미니 모드', tag: '화면 전환',
         path: '왼쪽 아이콘 레일 하단 <b>미니 모드</b> 버튼',
         chips: ['화면을 작게 접어 항상 위에 띄우기', '최근 대화·즐겨찾기 그대로 사용'],
+        tip: null
+      },
+      {
+        cat: 'manage', icon: '🔎', color: '#4338ca', title: '같은 RM 소속 직원 검색', tag: '직원 정보',
+        path: '직원 프로필 → <b>직급</b> 항목 클릭 (예: RM6 진료과장)',
+        chips: ['클릭 시 사용자 목록 검색이 RM 번호로 바로 채워짐', '같은 RM팀 다른 직원을 한 번에 찾기'],
         tip: null
       },
       {
