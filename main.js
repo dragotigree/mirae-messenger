@@ -1567,6 +1567,12 @@ function showMessageToast({ title, body, urgent, channelKey, force }) {
       nodeIntegration: false
     }
   });
+  // ⚠️ 창을 트레이로 숨겨(작업 표시줄에 아이콘이 없는 상태) 놓고 다른 프로그램(특히 병원
+  // 전자의무기록처럼 전체화면으로 띄우는 프로그램)을 쓰고 있으면, alwaysOnTop:true만으로는
+  // 그 전체화면 창에 토스트가 가려질 수 있다("메시지가 왔는지 확실히 모르겠다"는 요청).
+  // 화면 잠금 오버레이·메신저 항상 위 고정에도 이미 쓰고 있는 최상위 단계(screen-saver)를
+  // 그대로 적용해, 어떤 창을 띄워놔도 토스트가 반드시 그 위에 보이게 한다.
+  try { win.setAlwaysOnTop(true, 'screen-saver'); } catch (e) { /* ignore */ }
 
   const entry = { win, dismissTimer: null };
   toastEntries.set(key, entry);
