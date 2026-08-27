@@ -14151,13 +14151,14 @@
       if (compactListFilter === 'unread') filtered = filtered.slice();
 
       const sorted = [...filtered].sort(compareUsersSidebarOrder);
-      // ⚠️ 실사고: 예전엔 즐겨찾기한 직원을 "즐겨찾는 직원" 패널로 위에 한 번 더 보여주면서도
-      // 아래 부서/층 목록에도 그대로 남겨둬서, 같은 사람이 미니 모드 「직원」 탭 안에 두 번
-      // 보였다("즐겨찾기한 직원이 직원 목록에도 나온다"는 신고). 즐겨찾기는 이제 별도의
-      // ⭐ 즐겨찾기 탭에서만 보여주고, 「직원」 탭에는 즐겨찾기 여부와 상관없이 전체 목록만
-      // 한 번씩만 보여준다 — compactListFilter로 명시적으로 "즐겨찾기만 보기"를 고른
-      // 경우에는 예외로 그 결과만 남긴다.
-      const rest = compactListFilter === 'favorite' ? sorted : sorted.filter(u => !isFavoriteUser(u));
+      // ⚠️ 실사고: 한때 즐겨찾기한 직원을 「직원」 탭의 부서/층 목록에서 통째로 뺀 적이
+      // 있었다("즐겨찾기한 직원이 직원 목록에도 나온다"는 신고에 대응하려던 것) — 그런데
+      // 이건 별도의 ⭐ 즐겨찾기 탭(다른 화면)과 헷갈린 과잉 수정이었다: 일반 모드
+      // 사이드바도 즐겨찾기 섹션은 "복사본"일 뿐 아래 부서/층 목록에서 빼지 않는데
+      // (renderUserListTree 참고), 미니 모드만 아예 빼버려서 "즐겨찾기해 둔 직원이
+      // 미니 모드 직원 탭에서 안 보인다"(예: 온라인인데도 안 나옴)는 새 신고로 이어졌다.
+      // 일반 모드와 똑같이 즐겨찾기 여부와 무관하게 전체 목록을 그대로 보여준다.
+      const rest = sorted;
 
       const groupingKey = appSettings.userGrouping || 'floor';
       const groups = {};
