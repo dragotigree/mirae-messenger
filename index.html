@@ -8902,6 +8902,16 @@
 
     function compareUsersSidebarOrder(a, b) {
       if (sidebarAlphaSortEnabled) {
+        // 표시 형식이 "직급 이름"이면 앞에 보이는 직급자 기준으로, "이름(직급)"이면
+        // 앞에 보이는 이름 기준으로 가나다순 정렬한다 — 화면에 먼저 보이는 글자 순서로
+        // 정렬돼야 사용자가 기대하는 "가나다순"이 되기 때문.
+        if (appSettings.nameOrder === 'nameFirst') {
+          return (a.username || '').localeCompare(b.username || '', 'ko');
+        }
+        const ra = normalizeRankText(a.rank) || '';
+        const rb = normalizeRankText(b.rank) || '';
+        const dr = ra.localeCompare(rb, 'ko');
+        if (dr !== 0) return dr;
         return (a.username || '').localeCompare(b.username || '', 'ko');
       }
       if (!!a.online !== !!b.online) return a.online ? -1 : 1;
