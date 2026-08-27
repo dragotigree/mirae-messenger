@@ -25423,15 +25423,28 @@
         if (window.api && window.api.openSharedDriveFile) {
           const originalLabel = sharedOpenBtn.textContent;
           sharedOpenBtn.disabled = true;
-          sharedOpenBtn.textContent = '여는 중…';
+          sharedOpenBtn.textContent = '여는 중… 0%';
           const box = sharedOpenBtn.closest('.chat-shared-drive-box');
           const nameEl = box && box.querySelector('.chat-file-name');
+          // ⚠️ 실사고: 예전엔 복호화하는 동안 "여는 중…" 글자만 그대로 떠 있어서, 큰
+          // 파일은 진행 중인지 멈춘 건지 구분이 안 됐다("확인이 잘 안 된다" 신고) —
+          // 업로드 때처럼 진행률(%)을 버튼 글자에 바로 반영한다.
+          const downloadId = `sd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const stopProgressListener = window.api.onSharedDriveDownloadProgress
+            ? window.api.onSharedDriveDownloadProgress((data) => {
+                if (!data || data.downloadId !== downloadId) return;
+                const total = data.totalBytes || 0;
+                const pct = total > 0 ? Math.min(100, Math.round((data.copiedBytes / total) * 100)) : 0;
+                sharedOpenBtn.textContent = `여는 중… ${pct}%`;
+              })
+            : null;
           window.api.openSharedDriveFile({
             sharedPath: sharedOpenBtn.getAttribute('data-shared-path') || '',
             key: box ? box.getAttribute('data-enc-key') : '',
             iv: box ? box.getAttribute('data-enc-iv') : '',
             tag: box ? box.getAttribute('data-enc-tag') : '',
-            fileName: nameEl ? nameEl.textContent : ''
+            fileName: nameEl ? nameEl.textContent : '',
+            downloadId
           }).then((res) => {
             if (res && res.success === false) {
               appAlert(res.msg || '파일을 열 수 없습니다.');
@@ -25440,6 +25453,7 @@
               setTimeout(() => { sharedOpenBtn.textContent = originalLabel; }, 1500);
             }
           }).finally(() => {
+            if (stopProgressListener) stopProgressListener();
             sharedOpenBtn.disabled = false;
           });
         }

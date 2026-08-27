@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('shared-drive-upload-progress', listener);
     return () => ipcRenderer.removeListener('shared-drive-upload-progress', listener);
   },
+  onSharedDriveDownloadProgress: (callback) => {
+    const listener = (e, data) => callback(data);
+    ipcRenderer.on('shared-drive-download-progress', listener);
+    return () => ipcRenderer.removeListener('shared-drive-download-progress', listener);
+  },
   sendBroadcastMessage: (message) => ipcRenderer.invoke('send-broadcast-message', message),
   sendDeptMessage: (dept, message) => ipcRenderer.invoke('send-dept-message', { dept, message }),
   sendFloorMessage: (floor, message) => ipcRenderer.invoke('send-floor-message', { floor, message }),

@@ -1897,6 +1897,11 @@ async function cleanupOldSharedDriveFiles() {
  *  시도하게 만들었고("딜레이가 크다" 신고), (2) Z: 드라이브를 볼 수 있는 사람이면
  *  누구나 내용을 그대로 열어볼 수 있었다("보안이 걱정된다" 신고). 키·IV·태그는
  *  호출한 쪽(ipcMain 핸들러)이 만들어 넘겨주고, 여기서는 스트리밍 암호화만 담당한다. */
+// 기본 64KB보다 크게 잡아 네트워크 드라이브(Z:) 왕복 횟수를 줄인다 — 속도 자체는
+// 결국 SMB 네트워크 대역폭에 달려 있어 극적으로 빨라지진 않지만, 청크가 작을 때보다는
+// 낫다.
+const SHARED_DRIVE_STREAM_CHUNK_BYTES = 1024 * 1024;
+
 function encryptFileToSharedDrive(srcPath, destPath, key, iv, onProgress) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -1908,8 +1913,8 @@ function encryptFileToSharedDrive(srcPath, destPath, key, iv, onProgress) {
     let copied = 0;
     let lastReportAt = 0;
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const rs = fs.createReadStream(srcPath);
-    const ws = fs.createWriteStream(destPath);
+    const rs = fs.createReadStream(srcPath, { highWaterMark: SHARED_DRIVE_STREAM_CHUNK_BYTES });
+    const ws = fs.createWriteStream(destPath, { highWaterMark: SHARED_DRIVE_STREAM_CHUNK_BYTES });
     rs.on('error', (e) => finish(e));
     ws.on('error', (e) => finish(e));
     cipher.on('error', (e) => finish(e));
@@ -1927,8 +1932,11 @@ function encryptFileToSharedDrive(srcPath, destPath, key, iv, onProgress) {
 }
 
 /** 복호화해서 받는 사람 PC의 다운로드 폴더로 꺼낸다 — 열기 전에 이 PC에만 평문
- *  사본을 남긴다(Z: 드라이브에는 암호화된 채로만 남아 있음). */
-function decryptFileFromSharedDrive(srcPath, destPath, key, iv, tag) {
+ *  사본을 남긴다(Z: 드라이브에는 암호화된 채로만 남아 있음).
+ *  ⚠️ 실사고: 예전엔 진행 표시가 전혀 없어서 "여는 중…"이 오래 떠 있으면 진행
+ *  중인지 멈춘 건지 알 수 없었다("확인이 잘 안 된다" 신고) — 올릴 때와 똑같이
+ *  진행 바이트 수를 알려준다. */
+function decryptFileFromSharedDrive(srcPath, destPath, key, iv, tag, onProgress) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (err) => {
@@ -1936,14 +1944,24 @@ function decryptFileFromSharedDrive(srcPath, destPath, key, iv, tag) {
       settled = true;
       if (err) reject(err); else resolve();
     };
+    let copied = 0;
+    let lastReportAt = 0;
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(tag);
-    const rs = fs.createReadStream(srcPath);
-    const ws = fs.createWriteStream(destPath);
+    const rs = fs.createReadStream(srcPath, { highWaterMark: SHARED_DRIVE_STREAM_CHUNK_BYTES });
+    const ws = fs.createWriteStream(destPath, { highWaterMark: SHARED_DRIVE_STREAM_CHUNK_BYTES });
     rs.on('error', finish);
     ws.on('error', finish);
     decipher.on('error', finish);
     ws.on('close', () => finish());
+    rs.on('data', (chunk) => {
+      copied += chunk.length;
+      const now = Date.now();
+      if (onProgress && now - lastReportAt >= 200) {
+        lastReportAt = now;
+        try { onProgress(copied); } catch (e) { /* ignore */ }
+      }
+    });
     rs.pipe(decipher).pipe(ws);
   });
 }
@@ -2023,8 +2041,20 @@ ipcMain.handle('open-shared-drive-file', async (event, opts) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outDir = getReceivedFilesDir();
     const outPath = path.join(outDir, `${timestamp}_${safeName}`);
+    // AES-GCM은 길이를 안 바꾸는 스트림 암호라 암호문 파일 크기 ≈ 원본 크기 — 렌더러가
+    // 굳이 원본 크기를 안 보내줘도 이걸로 진행률(%) 분모를 구할 수 있다.
+    const srcStat = await fs.promises.stat(p).catch(() => null);
+    const totalBytes = srcStat ? srcStat.size : (Number(o.size) || 0);
     try {
-      await decryptFileFromSharedDrive(p, outPath, key, iv, tag);
+      await decryptFileFromSharedDrive(p, outPath, key, iv, tag, (copiedBytes) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('shared-drive-download-progress', {
+            downloadId: o.downloadId || '',
+            copiedBytes,
+            totalBytes
+          });
+        }
+      });
     } catch (e) {
       await fs.promises.unlink(outPath).catch(() => {});
       return { success: false, msg: '파일을 복호화하지 못했습니다. 공유 드라이브 연결 상태를 확인해 주세요.\n' + (e && e.message ? e.message : '') };
