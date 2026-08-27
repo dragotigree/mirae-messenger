@@ -7973,11 +7973,11 @@
         <div class="ipmsg-recipient-summary" id="ipmsg-recipient-summary">
           <span class="ipmsg-controls-stats">받는 사람 <strong id="ipmsg-selected-count-summary">0</strong>명</span>
           <span style="display:flex; align-items:center; gap:6px;">
-            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-saved-toggle-btn" onclick="toggleIpmsgSavedListsInline()" title="자주 보내는 명단 저장·불러오기">📋 저장된 명단 ▾</button>
+            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-saved-toggle-btn" onclick="toggleIpmsgSavedListsInline()" title="자주 보내는 사람들을 즐겨찾기 명단으로 저장·불러오기">⭐ 즐겨찾기 명단 ▾</button>
             <button type="button" class="ipmsg-mini-btn ipmsg-recipient-toggle-btn" id="ipmsg-recipient-toggle-btn" onclick="toggleIpmsgRecipientSection()">받는 사람 편집 ▾</button>
           </span>
         </div>
-        <div class="ipmsg-saved-lists-inline is-collapsed" id="ipmsg-saved-lists-inline" aria-label="저장된 명단">
+        <div class="ipmsg-saved-lists-inline is-collapsed" id="ipmsg-saved-lists-inline" aria-label="즐겨찾기 명단">
           <div id="ipmsg-saved-lists-items"></div>
           <div class="ipmsg-saved-list-save-row">
             <input type="text" id="ipmsg-saved-list-name-input" placeholder="현재 선택을 이 이름으로 저장" onkeydown="if(event.key==='Enter') saveCurrentIpmsgSelectionAsList()">
@@ -12938,7 +12938,7 @@
       const btn = document.getElementById('ipmsg-saved-toggle-btn');
       if (!el) return;
       const collapsed = el.classList.toggle('is-collapsed');
-      if (btn) btn.textContent = collapsed ? '📋 저장된 명단 ▾' : '📋 저장된 명단 접기 ▴';
+      if (btn) btn.textContent = collapsed ? '⭐ 즐겨찾기 명단 ▾' : '⭐ 즐겨찾기 명단 접기 ▴';
       if (!collapsed) renderIpmsgSavedListsPanel();
     }
 
@@ -12947,15 +12947,18 @@
       if (!box) return;
       const lists = loadIpmsgSavedLists();
       if (!lists.length) {
-        box.innerHTML = `<div style="font-size:11.5px; color:#94a3b8; padding:4px 2px;">아직 저장된 명단이 없습니다. 아래에서 이름을 붙여 저장해 보세요.</div>`;
+        box.innerHTML = `<div style="font-size:11.5px; color:#94a3b8; padding:4px 2px;">아직 즐겨찾기 명단이 없습니다. 아래에서 이름을 붙여 저장해 보세요.</div>`;
         return;
       }
+      // ⚠️ 클릭 한 번으로 바로 불러와지도록, "불러오기" 버튼을 따로 안 두고 행 전체를
+      // 클릭 영역으로 만든다(사용자 요청: "더 간단하게 더 빠르게"). 이름 수정 입력칸·삭제
+      // 버튼만 클릭을 가로채 자기 동작을 하고, 그 외 영역 클릭은 전부 불러오기로 처리한다.
       box.innerHTML = lists.map((list) => `
-        <div class="ipmsg-saved-list-manage-row" style="display:flex; align-items:center; gap:6px; padding:5px 8px; background:#f8fafc; border:1px solid #eef1f5; border-radius:10px;">
-          <input type="text" value="${escapeHtml(list.name)}" data-prev-name="${escapeHtml(list.name)}" onchange="renameIpmsgSavedList(this.dataset.prevName, this.value, this)">
+        <div class="ipmsg-saved-list-manage-row" style="display:flex; align-items:center; gap:6px; padding:6px 8px; background:#f8fafc; border:1px solid #eef1f5; border-radius:10px; cursor:pointer;" title="클릭하면 이 명단을 바로 불러옵니다" onclick="loadIpmsgSavedListByName('${escapeHtml(list.name).replace(/'/g, "\\'")}')">
+          <span style="flex-shrink:0;">⭐</span>
+          <input type="text" value="${escapeHtml(list.name)}" data-prev-name="${escapeHtml(list.name)}" onclick="event.stopPropagation()" onchange="renameIpmsgSavedList(this.dataset.prevName, this.value, this)">
           <span style="font-size:10.5px; color:#94a3b8; flex-shrink:0;">${(list.ips || []).length}명</span>
-          <button type="button" class="ipmsg-mini-btn" style="flex-shrink:0;" onclick="loadIpmsgSavedListByName('${escapeHtml(list.name).replace(/'/g, "\\'")}')">불러오기</button>
-          <button type="button" class="ipmsg-mini-btn" style="flex-shrink:0; color:#ef4444;" onclick="deleteIpmsgSavedList('${escapeHtml(list.name).replace(/'/g, "\\'")}')">삭제</button>
+          <button type="button" class="ipmsg-mini-btn" style="flex-shrink:0; color:#ef4444;" onclick="event.stopPropagation(); deleteIpmsgSavedList('${escapeHtml(list.name).replace(/'/g, "\\'")}')">삭제</button>
         </div>
       `).join('');
     }
@@ -12992,6 +12995,11 @@
       if (!list) return;
       (list.ips || []).forEach((ip) => ipmsgSelectedIps.add(ip));
       renderIpmsgRecipientTable(document.getElementById('ipmsg-user-filter')?.value || '');
+      updateIpmsgSelectionUi();
+      // 명단을 고르고 나면 곧바로 "보내기"로 넘어갈 수 있게, 열려있던 패널을 자동으로
+      // 접어서 화면을 정리해준다(사용자 요청: "더 간단하게 더 빠르게" — 매번 손으로
+      // 접을 필요 없이 바로 메시지 작성으로 이어지도록).
+      toggleIpmsgSavedListsInline();
     }
 
     async function deleteIpmsgSavedList(name) {
@@ -13086,7 +13094,7 @@
       const savedListsEl = document.getElementById('ipmsg-saved-lists-inline');
       const savedListsToggleBtn = document.getElementById('ipmsg-saved-toggle-btn');
       if (savedListsEl) savedListsEl.classList.add('is-collapsed');
-      if (savedListsToggleBtn) savedListsToggleBtn.textContent = '📋 저장된 명단 ▾';
+      if (savedListsToggleBtn) savedListsToggleBtn.textContent = '⭐ 즐겨찾기 명단 ▾';
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
       initIpmsgDragAndDrop();
@@ -18159,7 +18167,7 @@
       {
         cat: 'group', icon: '✉️', color: '#0369a1', title: '쪽지 보내기(일회성 다수 전송)', tag: '새 방을 만들지 않음',
         path: '왼쪽 아이콘 레일 → <b>편지봉투 아이콘</b>("채팅방 없이 전송")',
-        chips: ['이름·층·부서로 여러 명을 한 번에 선택', '「📋 저장된 명단」 한 곳에서 불러오기·저장·이름변경·삭제까지 바로 가능', '각자와의 1:1 대화방에 그대로 남음'],
+        chips: ['이름·층·부서로 여러 명을 한 번에 선택', '「⭐ 즐겨찾기 명단」 항목을 클릭 한 번으로 바로 불러오기', '각자와의 1:1 대화방에 그대로 남음'],
         tip: '⚠️ "그룹 대화"와 다른 점: 이건 여러 명이 함께 보는 새 대화방을 만드는 게 아니라, 그 순간 고른 사람들 각자의 1:1 대화방으로 똑같은 메시지를 한 번에 전달하는 기능입니다. 보낸 내용은 채팅 기록·검색에 일반 메시지처럼 그대로 남지만, 받은 사람들끼리 서로 보거나 답장을 주고받는 공용 공간(단체 대화방)은 생기지 않습니다. "이번 한 번만 여러 부서·층 사람들에게 공지하듯 알릴 때" 이 기능을, "앞으로 계속 같이 얘기할 사람들"이면 그룹 대화(단체 대화방)를 쓰면 됩니다.'
       },
       {
