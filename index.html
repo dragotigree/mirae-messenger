@@ -2671,6 +2671,9 @@
       display: none;
     }
     body.sidebar-recent-only #sidebar-list-prefs { justify-content: flex-end; }
+    /* 「즐겨찾기만 보기」에서는 목록 설정 줄 자체가 해당 사항이 없다 — 즐겨찾기 목록은
+       층/부서로 묶이지도, 온라인·공용 필터의 영향을 받지도 않는다. */
+    body.sidebar-favorites-only #sidebar-list-prefs { display: none; }
 
     /* 아이콘 바에서 「최근 대화만 보기」를 골라 이 섹션만 보일 때는, 260px에서 잘리지 않고
        사이드바 높이를 끝까지 채우도록 한다(아래가 텅 비어 보인다는 요청). */
@@ -11251,6 +11254,9 @@
       sections.classList.remove('rail-filter-channels', 'rail-filter-favorites', 'rail-filter-users', 'rail-filter-recent');
       // 최근 대화 전용 보기에서는 아래쪽 목록 설정 줄에서 사용자 목록 전용 항목을 감춘다.
       document.body.classList.toggle('sidebar-recent-only', kind === 'recent');
+      // 즐겨찾기 전용 보기에서는 목록 설정 줄 자체가 필요 없어 통째로 감춘다("즐겨찾기에서는
+      // 이게 필요없지 않을까" 요청).
+      document.body.classList.toggle('sidebar-favorites-only', kind === 'favorites');
       document.querySelectorAll('#icon-rail-nav .icon-rail-btn').forEach((b) => b.classList.remove('is-active'));
       if (sidebarRailFilter === 'favorites') {
         // ⚠️ 실사고: 즐겨찾기가 0명이면 renderFavoritesSection이 블록 자체를
