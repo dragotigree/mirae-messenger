@@ -566,7 +566,7 @@ const MAX_FILE_XFER_BYTES = 50 * 1024 * 1024;
 /** 50MB 넘는 파일은 P2P 대신 이 공유 드라이브 폴더를 거쳐 주고받는다 — 모든 PC에
  *  동일한 경로로 매핑돼 있어(Z:\), 굳이 우리 앱이 파일을 조각내 전송할 필요 없이
  *  복사 한 번이면 된다(용량 제한도 사실상 없어지고, 채팅용 TCP 연결 슬롯도 안 씀). */
-const SHARED_DRIVE_DIR = path.join('Z:\\', 'MiraeMessenger_공유파일');
+const SHARED_DRIVE_DIR = 'Z:\\9.재활치료실(PT&OT&언어&임상심리)\\물리치료실\\mm-backup';
 /** 계속 쌓이면 자동 백업처럼 용량이 커지므로, 일정 기간 지난 것은 자동으로 지운다. */
 const SHARED_DRIVE_FILE_RETENTION_DAYS = 7;
 /** 청크 원본 바이트 — base64(~373KB)+JSON 이 MAX_TCP_LINE_BUFFER(512KB) 아래 */
