@@ -12198,6 +12198,7 @@
         renderUserListTree();
       }
       refreshRecentChatsUnreadBadges();
+      refreshFavoritesUnreadBadges();
       renderGroupChannels();
       updateBroadcastUnreadBadge();
       setBadgeEl(document.getElementById('channels-section-unread-badge'), getChannelsSectionUnread());
@@ -12212,6 +12213,39 @@
       }
       syncUnreadInboxBars();
       syncTaskbarBadge();
+    }
+
+    /** ⚠️ 실사고: refreshUnreadBadges()의 빠른 갱신 경로는 #user-list-tree 카드만
+     *  갱신했다 — 즐겨찾기 섹션(#favorites-section-body)은 renderFavoritesSection()이
+     *  전체 목록을 다시 그릴 때만 갱신돼서, 즐겨찾기에서 빨간 배지를 눌러 읽어도
+     *  다음에 목록 구조가 바뀌기 전까진 배지가 그대로 남아있는 것처럼 보였다
+     *  ("즐겨찾기에서는 읽었을 때 배지가 바로 안 사라진다" 신고). 「최근 대화」와
+     *  같은 패턴으로 카드 하나하나의 배지만 그 자리에서 갱신한다. */
+    function refreshFavoritesUnreadBadges() {
+      const body = document.getElementById('favorites-section-body');
+      const unreadEl = document.getElementById('favorites-section-unread-badge');
+      if (!body) return;
+      let peopleUnread = 0;
+      body.querySelectorAll('.user-card-item[data-user-ip]').forEach((card) => {
+        const ip = card.getAttribute('data-user-ip');
+        const u = ip ? findUserByIp(ip) : null;
+        const unread = u ? getUnreadForUser(u) : 0;
+        peopleUnread += unread;
+        const host = card.querySelector('.user-card-unread');
+        if (!host) return;
+        host.innerHTML = unread > 0 ? `<span class="unread-badge">${formatUnreadBadge(unread)}</span>` : '';
+      });
+      let channelUnread = 0;
+      try {
+        channelUnread = getOrderedChannelEntries()
+          .filter((e) => favoriteChannelKeys.has(e.key))
+          .reduce((sum, e) => sum + (e.unread || 0), 0);
+      } catch (e) { /* ignore */ }
+      const total = peopleUnread + channelUnread;
+      if (unreadEl) {
+        unreadEl.style.display = total > 0 ? '' : 'none';
+        unreadEl.textContent = formatUnreadBadge(total);
+      }
     }
 
     /** 새 메시지가 오거나 읽었을 때, 사이드바 「최근 대화」 각 줄의 안 읽은 개수를 그 자리에서
