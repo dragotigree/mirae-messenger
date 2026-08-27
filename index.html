@@ -23077,18 +23077,24 @@
       });
     }
 
-    async function dispatchOutgoing(contentHtml) {
+    // ⚠️ 실사고: target을 안 넘기면 지금(호출 시점)의 activeChatUser를 쓰는데, 공유
+    // 드라이브 업로드처럼 오래 걸리는 작업 도중 사용자가 다른 대화로 옮겨가 버리면
+    // "그 사이 바뀐" activeChatUser로 잘못 보내질 수 있다("다른 채팅창으로 가도
+    // 계속 되냐"는 질문 확인 중 발견) — 오래 걸리는 호출부는 시작할 때(대화를
+    // 옮기기 전) 상대를 미리 붙잡아서 target으로 넘긴다.
+    async function dispatchOutgoing(contentHtml, target) {
+      const t = target || activeChatUser;
       let res;
-      if (activeChatUser && activeChatUser.isBroadcast) {
+      if (t && t.isBroadcast) {
         res = await window.api.sendBroadcastMessage(contentHtml);
-      } else if (activeChatUser && activeChatUser.isDept) {
-        res = await window.api.sendDeptMessage(activeChatUser.deptName, contentHtml);
-      } else if (activeChatUser && activeChatUser.isFloor) {
-        res = await window.api.sendFloorMessage(activeChatUser.floorName, contentHtml);
-      } else if (activeChatUser && activeChatUser.isGroup) {
-        res = await window.api.sendGroupMessage(activeChatUser.groupUid, activeChatUser.groupName, contentHtml);
+      } else if (t && t.isDept) {
+        res = await window.api.sendDeptMessage(t.deptName, contentHtml);
+      } else if (t && t.isFloor) {
+        res = await window.api.sendFloorMessage(t.floorName, contentHtml);
+      } else if (t && t.isGroup) {
+        res = await window.api.sendGroupMessage(t.groupUid, t.groupName, contentHtml);
       } else {
-        res = await window.api.sendMessage(activeChatUser.ip, contentHtml, false);
+        res = await window.api.sendMessage(t.ip, contentHtml, false);
       }
       if (res && res.status === 'ERROR') {
         await appAlert(res.error || '메시지를 저장하지 못했습니다.\n잠시 후 다시 보내 주세요.');
@@ -29813,6 +29819,10 @@
         await appAlert('이 파일의 실제 경로를 찾을 수 없습니다.\n탐색기에서 끌어다 놓거나 첨부 버튼으로 다시 선택해 주세요.');
         return;
       }
+      // ⚠️ 실사고: 업로드가 오래 걸리는 동안(확인창 대기 포함) 사용자가 다른 대화로
+      // 옮겨갈 수 있다 — 끝난 뒤 activeChatUser를 그대로 쓰면 그 사이 바뀐(엉뚱한)
+      // 대화로 잘못 보내질 수 있어서, 시작 시점의 상대를 미리 붙잡아 둔다.
+      const targetUser = activeChatUser;
       const sizeLabel = file.size >= 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
       const ok = await appConfirm(
         `50MB보다 큰 파일입니다 (${sizeLabel}).\n공유 드라이브(Z:)에 올린 뒤, 그 경로를 대화에 공유할까요?\n\n같은 경로가 매핑된 PC라면 누구나 열어볼 수 있고, 7일 뒤 자동으로 지워집니다.`,
@@ -29848,21 +29858,26 @@
           await appAlert((res && res.error) || '공유 드라이브로 파일을 보내지 못했습니다.');
           return;
         }
-        const dispatched = await dispatchOutgoing(res.messageHtml);
+        const dispatched = await dispatchOutgoing(res.messageHtml, targetUser);
         if (dispatched && dispatched.status === 'ERROR') return;
-        appendMessageRow(
-          res.messageHtml,
-          dispatched.createdAt,
-          profileDisplayName(myProfile),
-          true,
-          false,
-          dispatched.uid,
-          dispatched.id,
-          myProfile && myProfile.ip,
-          dispatched.status === 'PENDING' ? 'PENDING' : null,
-          dispatched.createdAtFull || dispatched.createdAt
-        );
-        noteDmOutboundJustSent();
+        // 업로드하는 동안 다른 대화로 옮겨갔으면, 지금 화면(다른 대화방)에 잘못
+        // 끼워 넣지 않는다 — 저장·전달은 이미 targetUser 기준으로 정확히 됐고,
+        // 나중에 그 대화로 돌아가면 기록에서 정상적으로 보인다.
+        if (activeChatUser === targetUser) {
+          appendMessageRow(
+            res.messageHtml,
+            dispatched.createdAt,
+            profileDisplayName(myProfile),
+            true,
+            false,
+            dispatched.uid,
+            dispatched.id,
+            myProfile && myProfile.ip,
+            dispatched.status === 'PENDING' ? 'PENDING' : null,
+            dispatched.createdAtFull || dispatched.createdAt
+          );
+          noteDmOutboundJustSent();
+        }
         if (dispatched.uid) refreshChannelMessageUnreadCounts();
       } catch (err) {
         if (stopProgressListener) stopProgressListener();
