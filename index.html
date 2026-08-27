@@ -13720,7 +13720,7 @@
       const flatUsers = [];
       const subGroups = {};
       groupUsers.forEach((u) => {
-        const sub = (u.subDept && String(u.subDept).trim()) || '';
+        const sub = (groupingKey === 'floor' ? (u.dept && String(u.dept).trim()) : (u.subDept && String(u.subDept).trim())) || '';
         if (!sub) { flatUsers.push(u); return; }
         if (!subGroups[sub]) subGroups[sub] = [];
         subGroups[sub].push(u);
@@ -14210,7 +14210,7 @@
         const collapseKey = `${groupingKey}:${groupName}`;
         const groupPanel = createCompactPanel(`${icon} ${groupName}`, '', collapseKey);
         bindCompactUserGroupReorderDrag(groupPanel, groupPanel.compactLabelEl, groupingKey, groupName);
-        if (groupingKey === 'dept') {
+        if (groupingKey === 'dept' || groupingKey === 'floor') {
           renderCompactDeptGroupMembers(groupPanel.compactItemsWrap, groupingKey, groupName, groupUsers);
         } else {
           groupUsers.forEach(u => appendCompactUserItem(groupPanel.compactItemsWrap, u));
@@ -17606,14 +17606,14 @@
       return card;
     }
 
-    /** 부서별 보기에서, 그 부서 사람들 중 프로필에 "소부서"를 적어둔 사람만 그 소부서
-     *  이름으로 한 번 더 묶어서 보여준다. 소부서가 없는 사람은 지금까지처럼 부서 헤더
-     *  바로 아래에 그대로 나온다 — 소부서를 안 쓰는 부서는 화면이 전혀 안 바뀐다. */
+    /** 부서별 보기에서는 프로필에 적어둔 "소부서"로, 층별 보기에서는 "부서"로 한 번 더
+     *  묶어서 보여준다("층으로 보기했을 때 층 밑에 부서로도 그룹 지을 수 있냐"는 요청).
+     *  묶을 값이 없는 사람은 지금까지처럼 그룹 헤더 바로 아래에 그대로 나온다. */
     function renderDeptGroupMembers(block, groupingKey, groupName, groupUsers) {
       const flatUsers = [];
       const subGroups = {};
       groupUsers.forEach((u) => {
-        const sub = (u.subDept && String(u.subDept).trim()) || '';
+        const sub = (groupingKey === 'floor' ? (u.dept && String(u.dept).trim()) : (u.subDept && String(u.subDept).trim())) || '';
         if (!sub) { flatUsers.push(u); return; }
         if (!subGroups[sub]) subGroups[sub] = [];
         subGroups[sub].push(u);
@@ -17657,10 +17657,14 @@
       const favIps = favorites.map((u) => u.ip).join(',');
       const parts = sortedGroupKeys.map((g) => {
         const collapseKey = `${groupingKey}:${g}`;
-        // 부서별 보기에서는 소부서 값도 키에 넣어야, 소부서를 새로 적거나 지웠을 때
-        // (아이피는 그대로라서) 구조가 안 바뀐 걸로 착각해 다시 그리기를 건너뛰지 않는다.
+        // 부서별 보기에서는 소부서 값을, 층별 보기에서는 부서 값을 키에 넣어야, 그 값을
+        // 새로 적거나 지웠을 때(아이피는 그대로라서) 구조가 안 바뀐 걸로 착각해 다시
+        // 그리기를 건너뛰지 않는다.
         const ips = (groups[g] || [])
-          .map((u) => (groupingKey === 'dept' && u.subDept ? `${u.ip}:${u.subDept}` : u.ip))
+          .map((u) => {
+            const subVal = groupingKey === 'dept' ? u.subDept : (groupingKey === 'floor' ? u.dept : '');
+            return subVal ? `${u.ip}:${subVal}` : u.ip;
+          })
           .join(',');
         return `${g}|${collapsedGroups.has(collapseKey) ? 1 : 0}|${ips}`;
       });
@@ -17677,11 +17681,17 @@
     function patchUserListTreeInPlace(favorites, sortedGroupKeys, groups, groupingKey) {
       const treeEl = document.getElementById('user-list-tree');
       if (!treeEl || !treeEl.querySelector('.user-card-item[data-user-ip]')) return false;
-      // 부서별 보기에서 소부서를 쓰는 사람이 하나라도 있으면, 이 "제자리 패치" 경로는
-      // 소부서 하위 묶음(user-subdept-block)을 새로 만들거나 없애는 걸 처리하지 못해서
-      // 안전하게 매번 통째로 다시 그리는 쪽(renderUserListTree의 전체 렌더)으로 넘긴다.
-      // 소부서를 안 쓰면(대부분의 부서) 이 조건에 안 걸려서 기존 빠른 경로 그대로 유지된다.
-      if (groupingKey === 'dept' && Object.values(groups).some((list) => (list || []).some((u) => u.subDept && String(u.subDept).trim()))) {
+      // 부서별 보기에서 소부서를, 층별 보기에서 부서를 쓰는 사람이 하나라도 있으면, 이
+      // "제자리 패치" 경로는 하위 묶음(user-subdept-block)을 새로 만들거나 없애는 걸
+      // 처리하지 못해서 안전하게 매번 통째로 다시 그리는 쪽(renderUserListTree의 전체
+      // 렌더)으로 넘긴다. 둘 다 안 쓰면 이 조건에 안 걸려서 기존 빠른 경로를 유지한다.
+      if (
+        (groupingKey === 'dept' || groupingKey === 'floor') &&
+        Object.values(groups).some((list) => (list || []).some((u) => {
+          const subVal = groupingKey === 'dept' ? u.subDept : u.dept;
+          return subVal && String(subVal).trim();
+        }))
+      ) {
         return false;
       }
 
@@ -17885,7 +17895,7 @@
         bindUserGroupReorderDrag(block, label, groupingKey, groupName);
 
         if (!isCollapsed) {
-          if (groupingKey === 'dept') {
+          if (groupingKey === 'dept' || groupingKey === 'floor') {
             renderDeptGroupMembers(block, groupingKey, groupName, groupUsers);
           } else {
             groupUsers.forEach(u => block.appendChild(buildUserCard(u)));
@@ -18125,7 +18135,7 @@
       {
         cat: 'manage', icon: '🧭', color: '#0d9488', title: '사용자 목록 층·부서만 보기', tag: '사용자 목록',
         path: '사용자 목록 하단 표시 방식 바 — <b>층 · 부서 · 전체 · 온라인 · 공용 · 숨김</b>',
-        chips: ['층별/부서별로 묶어서 보기 전환', '전체·온라인만 보기', '공용 PC 표시/숨김'],
+        chips: ['층별/부서별로 묶어서 보기 전환', '층별 보기는 각 층 안에서 부서별로 다시 묶여 나옴', '전체·온라인만 보기', '공용 PC 표시/숨김'],
         tip: '이 표시 방식은 미니 모드 「직원」 탭에도 똑같이 적용됩니다.'
       },
       {
