@@ -5768,12 +5768,13 @@
            appendCompactConversationItem) — 새 로직 없이 화면에 한 칸 더 보여주는 것뿐이라
            메시지 저장·네트워크 쪽은 전혀 건드리지 않는다. 최근 8개만, 대화가 없으면 숨김. -->
       <div id="sidebar-block-recent" class="sidebar-main-block" data-sidebar-block="recent" style="display:none;">
+        <!-- ⚠️ 실사고: 예전엔 여기 헤더에도 안읽음 합계 배지(recent-chats-section-unread-badge)를
+             달아 뒀는데, 안읽은 대화 본인 줄에도 이미 같은 배지가 붙어서(appendCompactConversationItem)
+             숫자가 두 군데(헤더 합계 + 해당 줄)에 겹쳐 보인다는 지적이 있었다. 헤더 배지는
+             빼고, 어떤 대화가 안읽었는지는 그 줄 자체의 배지로만 보여준다. -->
         <div class="section-label sidebar-block-head" id="recent-chats-section-label" style="display:flex; justify-content:space-between; align-items:center; padding-right:16px;">
           <span style="display:flex; align-items:center; gap:6px; min-width:0;">
             <span data-ui-icon="logs"></span> 최근 대화
-          </span>
-          <span style="display:flex; align-items:center; gap:6px;">
-            <span class="unread-badge" id="recent-chats-section-unread-badge" style="display:none;">0</span>
           </span>
         </div>
         <div id="recent-chats-section-body"></div>
