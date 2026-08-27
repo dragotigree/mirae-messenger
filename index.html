@@ -10365,6 +10365,15 @@
       const peers = [...pendingDmReadPeers];
       peers.forEach((ip) => {
         requestDmReadReceipt(ip, { force: true }).catch(() => {});
+        // ⚠️ 창을 보고 있지 않는 사이(최소화·다른 앱) 이미 열려 있던 대화로 메시지가
+        // 오면 안읽음 배지를 올려두는데(위 onReceiveMessage 참고), 사람이 돌아와서
+        // 그 대화를 실제로 보기 시작하면(활동 재개) 그 배지도 같이 지워줘야 한다 —
+        // 이미 activeChatUser라 selectUserChat()이 다시 불릴 일이 없어서 놓치기 쉽다.
+        if (activeChatUser && userMatchesIp(activeChatUser, ip) && getUnreadCount(ip) > 0) {
+          unreadCounts[ip] = 0;
+          saveUnreadCounts();
+          refreshUnreadBadges();
+        }
       });
     }
 
@@ -12605,11 +12614,20 @@
       }
 
       if (isChatCurrentlyOpen(data.senderIP)) {
+        // ⚠️ 실사고: "이 대화가 지금 열려 있는 탭이다"와 "지금 실제로 보고 있다"는 다르다.
+        // 창을 최소화하거나 다른 앱을 보고 있어도 activeChatUser는 그대로 그 사람을
+        // 가리키고 있어서, 예전엔 이 분기에 들어오기만 하면 무조건 "읽은 것"으로 치고
+        // 안읽음 배지를 올리지 않았다 — 실제로는 안 읽었는데 배지에 안 잡히는 원인이었다
+        // ("RM7 진료과장 이소현 메시지를 안 읽었는데 뱃지 수에 안 들어가있다" 신고).
+        // 읽음 영수증(scheduleDmReadReceipt)은 원래도 isDmChatActivelyViewed()로 실제
+        // 열람 여부를 따로 확인했으므로, 배지 집계도 똑같은 기준을 써야 한다.
+        const activelyViewed = isDmChatActivelyViewed();
         if (data.uid) {
           const existing = document.querySelector(`#chat-messages-area [data-msg-uid="${escapeMsgUidAttr(data.uid)}"]`);
           if (existing) {
             pendingDmReadPeers.add(data.senderIP);
-            if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
+            if (activelyViewed) scheduleDmReadReceipt(data.senderIP);
+            else bumpUnread(data.senderIP);
             markRecentDmUiFingerprint(fp);
             return;
           }
@@ -12621,7 +12639,8 @@
         markRecentDmUiFingerprint(fp);
         // 토스트/알림만으로 읽음 처리하지 않음. 대화 중 실제 조작이 있을 때만 읽음.
         pendingDmReadPeers.add(data.senderIP);
-        if (isDmChatActivelyViewed()) scheduleDmReadReceipt(data.senderIP);
+        if (activelyViewed) scheduleDmReadReceipt(data.senderIP);
+        else bumpUnread(data.senderIP);
       } else if (data.openInStandaloneWindow && !document.body.classList.contains('chat-window-standalone')) {
         // 이 창(메인 창)에서는 안 보고 있지만, 별도 채팅창에서 이미 보고 있는 대화다.
         // 별도 창 쪽 스크립트가 실제로 화면에 그려주므로, 여기서는 안읽음만 올리지 않는다.
