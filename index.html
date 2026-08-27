@@ -29951,6 +29951,14 @@
           return;
         }
 
+        // ⚠️ 실사고: 공유 드라이브 업로드에서 같은 문제를 고친 뒤 P2P 분할 전송도 같은
+        // 방식으로 확인 — file.arrayBuffer()·분할 전송 자체는 시간이 걸리는데(최대
+        // FILE_XFER_SEND_TIMEOUT_MS=6분), 그 사이 다른 대화로 옮겨가면 전송(chatTarget)은
+        // 이미 아래에서 값으로 고정해 안전하지만, 완료 뒤 appendMessageRow·
+        // noteDmOutboundJustSent가 그 시점의(바뀐) activeChatUser를 기준으로 동작해
+        // 엉뚱한 대화창에 표시되거나 읽음 상태를 잘못 건드릴 수 있었다. 시작 시점의
+        // 상대를 미리 붙잡아 뒀다가 끝난 뒤 같은 대화를 보고 있을 때만 화면을 갱신한다.
+        const targetUser = activeChatUser;
         let chatTarget = null;
         if (activeChatUser.isGroup) {
           let groupUid = activeChatUser.groupUid;
@@ -29987,19 +29995,21 @@
             await appAlert((res && res.error) || '파일 전송에 실패했습니다.');
             return;
           }
-          appendMessageRow(
-            res.messageHtml,
-            res.createdAt,
-            profileDisplayName(myProfile),
-            true,
-            false,
-            res.uid,
-            res.id,
-            myProfile && myProfile.ip,
-            res.status === 'PENDING' ? 'PENDING' : null,
-            res.createdAtFull || res.createdAt
-          );
-          noteDmOutboundJustSent();
+          if (activeChatUser === targetUser) {
+            appendMessageRow(
+              res.messageHtml,
+              res.createdAt,
+              profileDisplayName(myProfile),
+              true,
+              false,
+              res.uid,
+              res.id,
+              myProfile && myProfile.ip,
+              res.status === 'PENDING' ? 'PENDING' : null,
+              res.createdAtFull || res.createdAt
+            );
+            noteDmOutboundJustSent();
+          }
           if (res.uid) refreshChannelMessageUnreadCounts();
         } catch (err) {
           console.error('대용량 파일 전송 실패:', err);
