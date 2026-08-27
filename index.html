@@ -2254,33 +2254,39 @@
 
     .chat-img-preview { max-width: 260px; max-height: 220px; border-radius: var(--radius-lg); display: block; margin-top: 6px; cursor: zoom-in; transition: opacity var(--transition-fast); box-shadow: none; }
     .chat-img-preview:hover { opacity: 0.94; transform: none; }
-    .chat-file-box {
+    .chat-file-box, .chat-shared-drive-box {
       display: flex; align-items: center; gap: 10px;
       background: #ffffff; color: var(--text-primary);
       padding: 10px 12px; border-radius: var(--radius-lg); margin-top: 4px;
       border: none; max-width: 300px; min-width: 0;
       box-shadow: none; transition: background 0.12s;
     }
-    .chat-file-box:hover { background: #f8fafc; box-shadow: none; }
+    .chat-file-box:hover, .chat-shared-drive-box:hover { background: #f8fafc; box-shadow: none; }
     .msg-row.is-me .msg-text .chat-file-box,
-    .is-me .chat-bubble .chat-file-box {
+    .is-me .chat-bubble .chat-file-box,
+    .msg-row.is-me .msg-text .chat-shared-drive-box,
+    .is-me .chat-bubble .chat-shared-drive-box {
       color: var(--text-primary);
       background: rgba(255, 255, 255, 0.96);
     }
     .chat-file-box .chat-file-icon,
-    .chat-file-box > span:first-child {
+    .chat-file-box > span:first-child,
+    .chat-shared-drive-box .chat-file-icon,
+    .chat-shared-drive-box > span:first-child {
       flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
       background: var(--accent-soft); display: inline-flex; align-items: center; justify-content: center;
       font-size: 15px; line-height: 1;
     }
-    .chat-file-box .chat-file-meta { min-width: 0; flex: 1; }
-    .chat-file-box .chat-file-name { font-weight: 650; font-size: 12.5px; color: #0f172a; line-height: 1.3; word-break: break-all; }
-    .chat-file-box .chat-file-size { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+    .chat-file-box .chat-file-meta, .chat-shared-drive-box .chat-file-meta { min-width: 0; flex: 1; }
+    .chat-file-box .chat-file-name, .chat-shared-drive-box .chat-file-name { font-weight: 650; font-size: 12.5px; color: #0f172a; line-height: 1.3; word-break: break-all; }
+    .chat-file-box .chat-file-size, .chat-shared-drive-box .chat-file-size { font-size: 11px; color: #94a3b8; margin-top: 1px; }
     .chat-file-box > a,
-    .chat-file-box .chat-file-dl {
+    .chat-file-box .chat-file-dl,
+    .chat-shared-drive-box .chat-shared-drive-open {
       margin-left: auto; flex-shrink: 0; padding: 5px 10px; min-width: 40px; box-sizing: border-box;
       background: var(--accent); color: #fff !important; border-radius: 8px; text-decoration: none;
       font-size: 11px; font-weight: 700; white-space: nowrap; text-align: center;
+      border: none; cursor: pointer; font-family: inherit;
     }
 
     /* 🔴 안 읽은 메시지 배지 */
@@ -17980,6 +17986,12 @@
         tip: null
       },
       {
+        cat: 'chat', icon: '🗄️', color: '#0f766e', title: '50MB 넘는 큰 파일 보내기', tag: '1:1·그룹 공통',
+        path: '50MB보다 큰 파일을 첨부하면 자동으로 안내',
+        chips: ['공유 드라이브(Z:)에 올려 그 경로를 대화로 공유', '같은 경로가 매핑된 PC라면 누구나 「열기」로 바로 확인', '7일 뒤 자동 삭제'],
+        tip: '용량 제한 없이 보낼 수 있지만, 7일이 지나면 공유 드라이브에서 자동으로 지워지니 오래 보관할 파일은 따로 저장해 두세요.'
+      },
+      {
         cat: 'chat', icon: '🖼️', color: '#7c3aed', title: '사진 크게 보기', tag: '1:1·그룹 공통',
         path: '채팅창의 사진 클릭 → 확대창 하단 툴바',
         chips: ['확대·축소 (배율 숫자를 누르면 100%로 복귀)', '복사 — 다른 프로그램에 붙여넣기', '편집 — 그림판에서 표시 그려 넣기', '저장 / 전달'],
@@ -18422,6 +18434,7 @@
 
     function logMessagePreview(html) {
       if (!html) return '';
+      if (html.includes('chat-shared-drive-box')) return '🗄️ 공유 폴더 파일';
       const tmp = document.createElement('div');
       tmp.innerHTML = html;
       const text = (tmp.textContent || tmp.innerText || '').trim();
@@ -23219,6 +23232,7 @@
       let previewPlain = messageHtmlToPlainText(clone.innerHTML);
       if (!previewPlain && inner.indexOf('chat-img-preview') !== -1) previewPlain = '📷 사진';
       if (!previewPlain && inner.indexOf('chat-file-box') !== -1) previewPlain = '📎 파일';
+      if (inner.indexOf('chat-shared-drive-box') !== -1) previewPlain = '🗄️ 공유 폴더 파일';
       if (!previewPlain) previewPlain = '메시지';
       const senderEl = row.querySelector('.msg-sender-name, .bubble-sender');
       let senderName = senderEl ? senderEl.textContent.replace(/\s*·\s*보냄\s*$/, '').trim() : '상대방';
@@ -25375,6 +25389,18 @@
         });
         return;
       }
+      const sharedOpenBtn = e.target.closest('.chat-shared-drive-open');
+      if (sharedOpenBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const p = sharedOpenBtn.getAttribute('data-shared-path') || '';
+        if (window.api && window.api.openSharedDriveFile) {
+          window.api.openSharedDriveFile(p).then((res) => {
+            if (res && res.success === false) appAlert(res.msg || '파일을 열 수 없습니다.');
+          });
+        }
+        return;
+      }
       const editBtn = e.target.closest('[data-edit-msg]');
       if (editBtn) {
         e.preventDefault();
@@ -25793,7 +25819,7 @@
       // 텍스트는 수정·삭제, 사진·파일은 삭제만 (msg_uid 필요)
       const isDeletedAlready = typeof msg === 'string' && msg.indexOf('class="deleted-msg-flag"') !== -1;
       const isSystemNotice = typeof msg === 'string' && msg.indexOf('class="system-notice-flag"') !== -1;
-      const isAttachment = typeof msg === 'string' && (msg.indexOf('chat-img-preview') !== -1 || msg.indexOf('chat-file-box') !== -1);
+      const isAttachment = typeof msg === 'string' && (msg.indexOf('chat-img-preview') !== -1 || msg.indexOf('chat-file-box') !== -1 || msg.indexOf('chat-shared-drive-box') !== -1);
       const canDeleteThis = isMe && msgUid && !isDeletedAlready && !isSystemNotice && activeChatUser;
       // 답장 인용 블록이 포함된 메시지는 텍스트만 수정 가능 (인용은 유지하지 않음 — 수정 시 plain만)
       const canEditThis = canDeleteThis && !isAttachment &&
@@ -29721,6 +29747,52 @@
 
     initAttendingPhysicianSelects();
 
+    /** 50MB(MAX_FILE_XFER_BYTES) 넘는 파일 — P2P 분할 전송 대신 모든 PC에 같은 경로로
+     *  매핑된 공유 드라이브(Z:)에 복사해 두고, 그 경로를 담은 카드 메시지만 채팅으로
+     *  보낸다. 실제 파일 데이터는 IPC/네트워크를 거치지 않아 용량 제한이 사실상 없다. */
+    async function sendFileViaSharedDriveFlow(file) {
+      if (!file.path) {
+        await appAlert('이 파일의 실제 경로를 찾을 수 없습니다.\n탐색기에서 끌어다 놓거나 첨부 버튼으로 다시 선택해 주세요.');
+        return;
+      }
+      const sizeLabel = file.size >= 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
+      const ok = await appConfirm(
+        `50MB보다 큰 파일입니다 (${sizeLabel}).\n공유 드라이브(Z:)에 올린 뒤, 그 경로를 대화에 공유할까요?\n\n같은 경로가 매핑된 PC라면 누구나 열어볼 수 있고, 7일 뒤 자동으로 지워집니다.`,
+        { title: '공유 드라이브로 보내기', confirmText: '공유 드라이브로 보내기' }
+      );
+      if (!ok) return;
+      if (!window.api || typeof window.api.sendFileViaSharedDrive !== 'function') {
+        await appAlert('이 버전에서는 공유 드라이브 전송을 지원하지 않습니다. 업데이트 후 다시 시도해 주세요.');
+        return;
+      }
+      try {
+        const res = await window.api.sendFileViaSharedDrive({ filePath: file.path, fileName: file.name, size: file.size });
+        if (!res || res.status === 'ERROR') {
+          await appAlert((res && res.error) || '공유 드라이브로 파일을 보내지 못했습니다.');
+          return;
+        }
+        const dispatched = await dispatchOutgoing(res.messageHtml);
+        if (dispatched && dispatched.status === 'ERROR') return;
+        appendMessageRow(
+          res.messageHtml,
+          dispatched.createdAt,
+          profileDisplayName(myProfile),
+          true,
+          false,
+          dispatched.uid,
+          dispatched.id,
+          myProfile && myProfile.ip,
+          dispatched.status === 'PENDING' ? 'PENDING' : null,
+          dispatched.createdAtFull || dispatched.createdAt
+        );
+        noteDmOutboundJustSent();
+        if (dispatched.uid) refreshChannelMessageUnreadCounts();
+      } catch (err) {
+        console.error('공유 드라이브 파일 전송 실패:', err);
+        await appAlert('공유 드라이브로 파일을 보내지 못했습니다.');
+      }
+    }
+
     async function processAndSendFile(file) {
       if (!file) return;
       if (!activeChatUser) {
@@ -29732,7 +29804,7 @@
 
       if (!isImage) {
         if (file.size > MAX_FILE_XFER_BYTES) {
-          await appAlert('파일이 너무 커서 전송할 수 없습니다. (최대 50MB)\n공유 폴더를 이용해 주세요.');
+          await sendFileViaSharedDriveFlow(file);
           return;
         }
 

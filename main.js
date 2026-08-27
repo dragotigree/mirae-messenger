@@ -563,6 +563,12 @@ const NOTICE_SYNC_SAFE_LINE_BYTES = 400 * 1024;
 const MAX_CHAT_WIRE_BYTES = 400 * 1024;
 /** 분할 파일 전송 최대 크기 (이보다 크면 공유 폴더 안내) */
 const MAX_FILE_XFER_BYTES = 50 * 1024 * 1024;
+/** 50MB 넘는 파일은 P2P 대신 이 공유 드라이브 폴더를 거쳐 주고받는다 — 모든 PC에
+ *  동일한 경로로 매핑돼 있어(Z:\), 굳이 우리 앱이 파일을 조각내 전송할 필요 없이
+ *  복사 한 번이면 된다(용량 제한도 사실상 없어지고, 채팅용 TCP 연결 슬롯도 안 씀). */
+const SHARED_DRIVE_DIR = path.join('Z:\\', 'MiraeMessenger_공유파일');
+/** 계속 쌓이면 자동 백업처럼 용량이 커지므로, 일정 기간 지난 것은 자동으로 지운다. */
+const SHARED_DRIVE_FILE_RETENTION_DAYS = 7;
 /** 청크 원본 바이트 — base64(~373KB)+JSON 이 MAX_TCP_LINE_BUFFER(512KB) 아래 */
 const FILE_XFER_CHUNK_RAW_BYTES = 280 * 1024;
 /** 수신 조립 타임아웃 (50MB·느린 망 여유) */
@@ -1831,6 +1837,90 @@ function buildChatFileBoxHtml(fileName, sizeBytes, storedName) {
   const sizeLabel = formatFileSizeLabel(sizeBytes);
   return `<div class="chat-file-box"><span class="chat-file-icon" aria-hidden="true">📄</span><div class="chat-file-meta"><div class="chat-file-name">${safeName}</div><div class="chat-file-size">${sizeLabel}</div></div><a class="chat-file-dl" href="${href}" download="${safeName}">받기</a></div>`;
 }
+
+/** 공유 드라이브에 넣은 파일 하나를 가리키는 말풍선 카드. mirae-file://(P2P로 받은
+ *  파일)와 달리 절대경로를 그대로 들고 있다가 "열기"를 누르면 그 경로를 연다 —
+ *  받는 사람 PC에도 같은 경로(Z:\)로 매핑돼 있어야 열린다. */
+function buildSharedDriveFileBoxHtml(fileName, sizeBytes, sharedPath) {
+  const safeName = String(fileName || 'file').replace(/[<>&"]/g, (ch) => (
+    ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
+  ));
+  const safePath = String(sharedPath || '').replace(/[<>&"]/g, (ch) => (
+    ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
+  ));
+  const sizeLabel = formatFileSizeLabel(sizeBytes);
+  return `<div class="chat-shared-drive-box" data-shared-path="${safePath}"><span class="chat-file-icon" aria-hidden="true">🗄️</span><div class="chat-file-meta"><div class="chat-file-name">${safeName}</div><div class="chat-file-size">${sizeLabel} · 공유 폴더 (${SHARED_DRIVE_FILE_RETENTION_DAYS}일간 보관)</div></div><button type="button" class="chat-shared-drive-open" data-shared-path="${safePath}">열기</button></div>`;
+}
+
+function sanitizeSharedDriveFileNamePart(s) {
+  return String(s || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
+}
+
+async function ensureSharedDriveDir() {
+  await fs.promises.mkdir(SHARED_DRIVE_DIR, { recursive: true });
+  return SHARED_DRIVE_DIR;
+}
+
+/** 오래된 공유 파일 정리 — 자동 백업과 같은 이유(계속 쌓이면 용량 문제)로 주기적으로 돈다.
+ *  Z: 드라이브가 일시적으로 안 잡혀 있어도(네트워크 드라이브 특성상 흔함) 조용히 넘어간다. */
+async function cleanupOldSharedDriveFiles() {
+  try {
+    const names = await fs.promises.readdir(SHARED_DRIVE_DIR);
+    const cutoff = Date.now() - SHARED_DRIVE_FILE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    for (const name of names) {
+      const filePath = path.join(SHARED_DRIVE_DIR, name);
+      try {
+        const stat = await fs.promises.stat(filePath);
+        if (stat.isFile() && stat.mtimeMs < cutoff) await fs.promises.unlink(filePath);
+      } catch (e) { /* 파일 하나 실패해도 나머지는 계속 정리 */ }
+    }
+  } catch (e) {
+    // Z: 드라이브 미접속 등 — 조용히 넘어감(자동 백업과 달리 이건 매번 발생할 수 있는 정상 상황)
+  }
+}
+
+ipcMain.handle('send-file-via-shared-drive', async (event, opts) => {
+  if (isMessengerUsageBlocked()) return messengerBlockedResponse();
+  try {
+    const o = opts || {};
+    const sourcePath = String(o.filePath || '');
+    const fileName = String(o.fileName || 'file').trim() || 'file';
+    if (!sourcePath) return { status: 'ERROR', error: '파일 경로를 찾을 수 없습니다.' };
+
+    let dir;
+    try {
+      dir = await ensureSharedDriveDir();
+    } catch (e) {
+      return { status: 'ERROR', error: '공유 드라이브(Z:)에 접근할 수 없습니다. 드라이브 연결 상태를 확인해 주세요.' };
+    }
+
+    const destName = `${Date.now()}_${sanitizeSharedDriveFileNamePart(myProfile.username || MY_IP)}_${sanitizeSharedDriveFileNamePart(fileName)}`;
+    const destPath = path.join(dir, destName);
+    try {
+      await fs.promises.copyFile(sourcePath, destPath);
+    } catch (e) {
+      return { status: 'ERROR', error: '공유 드라이브로 파일을 복사하지 못했습니다.\n' + (e && e.message ? e.message : '') };
+    }
+    const stat = await fs.promises.stat(destPath).catch(() => null);
+    const size = stat ? stat.size : (Number(o.size) || 0);
+    const messageHtml = buildSharedDriveFileBoxHtml(fileName, size, destPath);
+    return { status: 'OK', messageHtml, fileName, size, sharedPath: destPath };
+  } catch (e) {
+    return { status: 'ERROR', error: e && e.message ? e.message : '공유 드라이브 전송 중 오류가 발생했습니다.' };
+  }
+});
+
+ipcMain.handle('open-shared-drive-file', async (event, filePath) => {
+  try {
+    const p = String(filePath || '');
+    if (!p) return { success: false, msg: '경로가 없습니다.' };
+    const err = await shell.openPath(p);
+    if (err) return { success: false, msg: '파일을 열 수 없습니다. 공유 드라이브 연결 상태를 확인해 주세요.\n' + err };
+    return { success: true };
+  } catch (e) {
+    return { success: false, msg: e && e.message ? e.message : '파일을 열지 못했습니다.' };
+  }
+});
 
 function clearPendingFileXfer(xferUid) {
   const entry = pendingFileXfers.get(xferUid);
@@ -16674,11 +16764,13 @@ function startAutoBackup() {
   // 설정의 「전부 포기하고 새로 시작하기」로 생긴 300MB대 사본은 아무도 안 지웠다 —
   // 하루 만에 7개, 2GB 넘게 쌓였다. 부팅 때·주기적으로도 정리한다.
   pruneCorruptedStashCopies();
+  cleanupOldSharedDriveFiles();
   setInterval(performAutoBackupIfNeeded, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldChatLogFiles, 6 * 60 * 60 * 1000);
   setInterval(cleanupOldPreUpdateBackups, 6 * 60 * 60 * 1000);
   setInterval(pruneCorruptedStashCopies, 6 * 60 * 60 * 1000);
+  setInterval(cleanupOldSharedDriveFiles, 6 * 60 * 60 * 1000);
   // 방금 보낸 메시지가 -wal 파일에만 있다가, 앱이 비정상 종료되거나 DB 손상 복구
   // 절차가 WAL을 통째로 지우는 경로를 타면서 사라지는 사고가 있었다(실제 발생).
   // 2분마다 체크포인트해 본 파일에 합쳐두면, 데이터가 노출되는 구간을 최대 2분

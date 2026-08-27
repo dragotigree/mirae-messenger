@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   // 💬 대화 및 메시지 관련
   sendMessage: (targetIP, message, urgent) => ipcRenderer.invoke('send-message', { targetIP, message, urgent }),
   sendFileTransfer: (opts) => ipcRenderer.invoke('send-file-transfer', opts),
+  sendFileViaSharedDrive: (opts) => ipcRenderer.invoke('send-file-via-shared-drive', opts),
+  openSharedDriveFile: (filePath) => ipcRenderer.invoke('open-shared-drive-file', filePath),
   sendBroadcastMessage: (message) => ipcRenderer.invoke('send-broadcast-message', message),
   sendDeptMessage: (dept, message) => ipcRenderer.invoke('send-dept-message', { dept, message }),
   sendFloorMessage: (floor, message) => ipcRenderer.invoke('send-floor-message', { floor, message }),
