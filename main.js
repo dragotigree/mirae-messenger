@@ -1879,6 +1879,36 @@ async function cleanupOldSharedDriveFiles() {
   }
 }
 
+/** 큰 파일을 공유 드라이브로 복사하면서 일정 간격으로 진행 바이트 수를 알려준다 —
+ *  예전엔 fs.promises.copyFile로 한 번에 복사해서, 다 끝날 때까지 화면에 아무 표시가
+ *  없어 "멈췄나?" 싶어 여러 번 다시 시도하게 만들었다("딜레이가 크다" 신고). */
+function copyFileWithProgress(srcPath, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      if (err) reject(err); else resolve();
+    };
+    let copied = 0;
+    let lastReportAt = 0;
+    const rs = fs.createReadStream(srcPath);
+    const ws = fs.createWriteStream(destPath);
+    rs.on('error', finish);
+    ws.on('error', finish);
+    ws.on('close', () => finish());
+    rs.on('data', (chunk) => {
+      copied += chunk.length;
+      const now = Date.now();
+      if (onProgress && now - lastReportAt >= 200) {
+        lastReportAt = now;
+        try { onProgress(copied); } catch (e) { /* ignore */ }
+      }
+    });
+    rs.pipe(ws);
+  });
+}
+
 ipcMain.handle('send-file-via-shared-drive', async (event, opts) => {
   if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   try {
@@ -1896,8 +1926,17 @@ ipcMain.handle('send-file-via-shared-drive', async (event, opts) => {
 
     const destName = `${Date.now()}_${sanitizeSharedDriveFileNamePart(myProfile.username || MY_IP)}_${sanitizeSharedDriveFileNamePart(fileName)}`;
     const destPath = path.join(dir, destName);
+    const totalBytes = Number(o.size) || 0;
     try {
-      await fs.promises.copyFile(sourcePath, destPath);
+      await copyFileWithProgress(sourcePath, destPath, (copiedBytes) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('shared-drive-upload-progress', {
+            uploadId: o.uploadId || '',
+            copiedBytes,
+            totalBytes
+          });
+        }
+      });
     } catch (e) {
       return { status: 'ERROR', error: '공유 드라이브로 파일을 복사하지 못했습니다.\n' + (e && e.message ? e.message : '') };
     }

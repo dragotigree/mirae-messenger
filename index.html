@@ -2289,6 +2289,13 @@
       border: none; cursor: pointer; font-family: inherit;
     }
 
+    .shared-drive-upload-toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 9999; white-space: nowrap; max-width: 80vw; overflow: hidden; text-overflow: ellipsis;
+    }
+
     /* 🔴 안 읽은 메시지 배지 */
     .unread-badge { background: linear-gradient(135deg, #f87171, #ef4444); color: #fff; font-size: 10px; font-weight: var(--font-weight-bold); min-width: 18px; height: 18px; border-radius: 99px; display: flex; align-items: center; justify-content: center; padding: 0 5px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
     .channel-item .unread-badge { min-width: 19px; height: 19px; font-size: 10.5px; }
@@ -25393,10 +25400,25 @@
       if (sharedOpenBtn) {
         e.preventDefault();
         e.stopPropagation();
-        const p = sharedOpenBtn.getAttribute('data-shared-path') || '';
+        // ⚠️ 실사고: 큰 파일(설치 파일 등)은 실제로 실행되기까지 몇 초 걸리는데, 그동안
+        // 화면에 아무 반응이 없어 "안 열리나?" 싶어 여러 번 눌렀더니 두 번째 클릭이
+        // "Failed to open path" 오류로 떴다(첫 번째 열기가 아직 진행 중일 때 겹쳐서 생긴
+        // 충돌로 보임) — 여는 동안 버튼을 잠깐 비활성화해 중복 클릭 자체를 막는다.
+        if (sharedOpenBtn.disabled) return;
         if (window.api && window.api.openSharedDriveFile) {
+          const originalLabel = sharedOpenBtn.textContent;
+          sharedOpenBtn.disabled = true;
+          sharedOpenBtn.textContent = '여는 중…';
+          const p = sharedOpenBtn.getAttribute('data-shared-path') || '';
           window.api.openSharedDriveFile(p).then((res) => {
-            if (res && res.success === false) appAlert(res.msg || '파일을 열 수 없습니다.');
+            if (res && res.success === false) {
+              appAlert(res.msg || '파일을 열 수 없습니다.');
+            } else {
+              sharedOpenBtn.textContent = '열림 ✓';
+              setTimeout(() => { sharedOpenBtn.textContent = originalLabel; }, 1500);
+            }
+          }).finally(() => {
+            sharedOpenBtn.disabled = false;
           });
         }
         return;
@@ -29765,8 +29787,27 @@
         await appAlert('이 버전에서는 공유 드라이브 전송을 지원하지 않습니다. 업데이트 후 다시 시도해 주세요.');
         return;
       }
+      // ⚠️ 실사고: 예전엔 복사가 끝날 때까지 화면에 아무 표시가 없어서, 큰 파일(100MB+)을
+      // 보낼 때 "멈췄나?" 싶어 다시 시도하게 만들었다("딜레이가 크다" 신고). 복사 중
+      // 진행률을 작은 배지로 보여준다.
+      const uploadId = `su_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const progressEl = document.createElement('div');
+      progressEl.className = 'shared-drive-upload-toast';
+      progressEl.textContent = `${file.name} 업로드 중… 0%`;
+      document.body.appendChild(progressEl);
+      const onProgress = (data) => {
+        if (!data || data.uploadId !== uploadId) return;
+        const total = data.totalBytes || file.size || 0;
+        const pct = total > 0 ? Math.min(100, Math.round((data.copiedBytes / total) * 100)) : 0;
+        progressEl.textContent = `${file.name} 업로드 중… ${pct}%`;
+      };
+      const stopProgressListener = window.api.onSharedDriveUploadProgress
+        ? window.api.onSharedDriveUploadProgress(onProgress)
+        : null;
       try {
-        const res = await window.api.sendFileViaSharedDrive({ filePath: file.path, fileName: file.name, size: file.size });
+        const res = await window.api.sendFileViaSharedDrive({ filePath: file.path, fileName: file.name, size: file.size, uploadId });
+        if (stopProgressListener) stopProgressListener();
+        progressEl.remove();
         if (!res || res.status === 'ERROR') {
           await appAlert((res && res.error) || '공유 드라이브로 파일을 보내지 못했습니다.');
           return;
@@ -29788,6 +29829,8 @@
         noteDmOutboundJustSent();
         if (dispatched.uid) refreshChannelMessageUnreadCounts();
       } catch (err) {
+        if (stopProgressListener) stopProgressListener();
+        progressEl.remove();
         console.error('공유 드라이브 파일 전송 실패:', err);
         await appAlert('공유 드라이브로 파일을 보내지 못했습니다.');
       }
