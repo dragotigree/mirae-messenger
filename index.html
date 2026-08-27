@@ -26832,6 +26832,11 @@
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
 
+    // ⚠️ 실사고: 이름은 "MonSat"이고 원래 월~토 6일만 돌려줬는데(현황판 메인화면 주간
+    // 표가 이걸 그대로 씀), 병동/주치의별 화면은 날짜 하나씩 보는 방식이라 이 제한이
+    // 없어서 일요일도 문제없이 보였다 — "메인화면에서는 토요일까지만 보이고 일요일은
+    // 안 보인다"는 신고. 월~일 7일로 늘려서 메인화면 주간 표에도 일요일이 나오게 한다
+    // (함수 이름은 호환을 위해 그대로 둠).
     function getScheduleBoardWeekDaysMonSat(anchorDateStr) {
       if (!anchorDateStr) return [];
       const d = new Date(anchorDateStr + 'T12:00:00');
@@ -26841,7 +26846,7 @@
       const mon = new Date(d);
       mon.setDate(d.getDate() + mondayOffset);
       const days = [];
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 7; i++) {
         const x = new Date(mon);
         x.setDate(mon.getDate() + i);
         days.push(formatDateStr(x));
@@ -27151,7 +27156,7 @@
       const wrapCls = 'sb-main-board-wrap' + (SCHEDULE_BOARD_WARDS.includes(wardKey) ? ` w${wardKey}` : '');
       return `<div class="${wrapCls}">
         <div class="sb-main-board-title">${titleInner}</div>
-        ${weekRange ? `<div class="sb-main-board-sub">${escapeHtml(weekRange)} · ${escapeHtml(typeLabelStr)} ${list.length}건 (일요일 제외)${list.length === 0 ? ` · <span style="color:#64748b">선택한 구분(<b>${escapeHtml(typeLabelStr)}</b>)으로 등록된 일정만 표시됩니다</span>` : ''}</div>` : ''}
+        ${weekRange ? `<div class="sb-main-board-sub">${escapeHtml(weekRange)} · ${escapeHtml(typeLabelStr)} ${list.length}건${list.length === 0 ? ` · <span style="color:#64748b">선택한 구분(<b>${escapeHtml(typeLabelStr)}</b>)으로 등록된 일정만 표시됩니다</span>` : ''}</div>` : ''}
         ${buildScheduleBoardMainGridTableHtml(list, weekDays)}
       </div>`;
     }
