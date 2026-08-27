@@ -879,7 +879,11 @@
 
     .user-card-item { display: flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box; padding: 3px 8px; border-radius: var(--radius-sm); margin: 0 2px 0 2px; cursor: pointer; transition: background var(--transition-fast), opacity var(--transition-fast); min-height: 0; }
     .user-card-item:hover { background: var(--sidebar-hover); }
-    .user-card-item.active { background: var(--sidebar-active) !important; box-shadow: none; }
+    /* ⚠️ 실사고: 원래 --sidebar-active(#E3F2FD, 아주 옅은 하늘색)를 그대로 썼는데,
+       "선택된 사용자가 잘 안 보인다"는 신고가 있었다. 이 변수는 칩·배지 등 다른 곳에서도
+       널리 쓰여서 변수 자체를 바꾸면 영향 범위가 너무 커진다 — 사용자 목록의 "선택됨"
+       표시만 더 진한 색으로 따로 지정한다. */
+    .user-card-item.active { background: #90CAF9 !important; box-shadow: none; }
     /* 다중선택 중 ‘현재 대화’(선택되지 않은) 표시 — 옅은 회색 배경만 남긴다.
        ⚠️ 예전에는 왼쪽에 진한 세로 띠(box-shadow)도 같이 넣었는데, 실제 선택 표시
        (.is-multi-selected의 파란 테두리)와 헷갈려서 "이건 선택된 게 아닌데 뭔가
@@ -23529,7 +23533,15 @@
     const chatDraftsByPeer = new Map();
 
     function chatDraftKeyFor(user) {
-      return user && user.ip ? String(user.ip) : '';
+      // ⚠️ 실사고: 예전엔 user.ip만 키로 썼는데, 그룹채팅방(isGroup)은 .ip 필드가
+      // 없어서(부서·층 채널은 .ip에 'DEPT:...'/'FLOOR:...'가 이미 들어있어 문제없었음)
+      // 키가 항상 빈 문자열이 됐다 — saveCurrentChatDraft()가 "!key면 그냥 반환"이라
+      // 그룹채팅방에서 글을 쓰다가 다른 대화로 옮기면 임시 보관 없이 그대로 사라졌다
+      // ("작성하다가 다른 사용자 클릭하면 메시지가 사라진다" 신고). 이미 있는
+      // getTitleKeyForChat()이 그룹·부서·층·전체공지까지 다 구분해 키를 만들어주므로
+      // 그대로 재사용한다.
+      if (!user) return '';
+      return getTitleKeyForChat(user) || '';
     }
 
     function saveCurrentChatDraft() {
