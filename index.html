@@ -210,16 +210,15 @@
     body.compact-mode #titlebar-sidebar-accent { width: 0; overflow: hidden; border: none; box-shadow: none; padding: 0; }
     body.compact-mode #titlebar-app-label { display: none; }
     body.compact-mode #titlebar-drag-region .titlebar-app-label-compact {
-      display: block;
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-      font-size: 11.5px;
-      font-weight: 700;
-      color: var(--text-secondary);
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      overflow: hidden;
+      user-select: none;
     }
+    .titlebar-app-label-compact .titlebar-logo-mark { width: 16px; height: 16px; border-radius: 5px; font-size: 9px; }
+    .titlebar-app-label-compact .titlebar-logo-text { font-size: 11.5px; }
     #titlebar-drag-region .titlebar-app-label-compact { display: none; }
 
     body { font-size: var(--chat-font-size); }
@@ -5793,7 +5792,7 @@
     </div>
     <div id="titlebar-main-strip">
       <div id="titlebar-drag-region">
-        <span class="titlebar-app-label-compact">MIRAE MESSENGER</span>
+        <span class="titlebar-app-label-compact"><span class="titlebar-logo-mark" aria-hidden="true">💬</span><span class="titlebar-logo-text"><span class="titlebar-logo-mirae">MIRAE</span><span class="titlebar-logo-messenger">MESSENGER</span></span></span>
       </div>
       <button type="button" class="titlebar-btn titlebar-sidebar-right-toggle-btn" id="sidebar-right-toggle-btn" onclick="toggleSidebarRightCollapsed()" title="병원 달력 패널 접기">
         <span data-ui-icon="chevronRight"></span>
