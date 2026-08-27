@@ -3059,6 +3059,14 @@
       font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
     }
     .sidebar-ad-rm-badge .icon-glyph { width: 10px; height: 10px; }
+    /* 병동 배지(sidebar-ward-badge)와 같은 팔레트(파랑4·초록6·주황7·보라8·분홍9)로
+       RM끼리 한눈에 구분되게 한다 — 예전엔 전부 같은 색이라 목록을 죽 훑어도 구분이
+       안 됐다는 요청. */
+    .sidebar-ad-rm-badge.rm4 { background: color-mix(in srgb, var(--accent) 16%, #ffffff); color: var(--accent); }
+    .sidebar-ad-rm-badge.rm6 { background: color-mix(in srgb, #22c55e 16%, #ffffff); color: #15803d; }
+    .sidebar-ad-rm-badge.rm7 { background: color-mix(in srgb, #f97316 16%, #ffffff); color: #c2410c; }
+    .sidebar-ad-rm-badge.rm8 { background: color-mix(in srgb, #a855f7 16%, #ffffff); color: #7e22ce; }
+    .sidebar-ad-rm-badge.rm9 { background: color-mix(in srgb, #ec4899 16%, #ffffff); color: #be185d; }
     .sidebar-ad-time { order: -1; font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--text-muted); font-weight: 700; flex: 0 0 auto; width: 34px; }
     .sidebar-ad-empty {
       padding: 0; font-size: 12px; font-weight: 600; color: var(--text-muted);
@@ -27617,7 +27625,10 @@
     function formatSidebarAdmitDischargeRmBadgeHtml(sch, norm) {
       const rm = formatSidebarAdmitDischargeRm(sch, norm);
       if (!rm) return '';
-      return `<span class="sidebar-ad-rm-badge" title="RM${escapeHtml(rm)}"><span data-ui-icon="userRound"></span>RM${escapeHtml(rm)}</span>`;
+      // 병동 배지(sidebar-ward-badge)와 같은 팔레트를 RM 번호에도 그대로 씀 — 전부 같은
+      // 파란색이라 목록에서 RM끼리 구분이 안 된다는 요청.
+      const rmClass = ['4', '6', '7', '8', '9'].includes(rm) ? `rm${rm}` : 'rm-other';
+      return `<span class="sidebar-ad-rm-badge ${rmClass}" title="RM${escapeHtml(rm)}"><span data-ui-icon="userRound"></span>RM${escapeHtml(rm)}</span>`;
     }
 
     function formatSidebarAdmitDischargeTime(sch) {
