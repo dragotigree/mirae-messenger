@@ -16575,7 +16575,10 @@ ipcMain.handle('cancel-pending-remote-wipe', async (event, targetIp) => {
 
 // 6시간 단위로 백업 파일이 4배 늘었으니(하루 4개), 보관 일수를 줄여 전체 용량은
 // 비슷하게 유지하면서 최근 구간의 복구 지점만 촘촘하게 가져간다.
-const AUTO_BACKUP_RETENTION_DAYS = 2;
+// ⚠️ DB가 커진 사용처(300MB대)에서는 2일치(최대 8개)만 쌓여도 자동 백업 용량이
+// 2GB를 넘어 "왜 이렇게 많이 쌓이냐"는 문의로 이어졌다 — 1일치(최대 4개)로 줄여
+// 용량을 절반 수준으로 낮춘다. 최근 24시간 내 복구 지점은 그대로 유지된다.
+const AUTO_BACKUP_RETENTION_DAYS = 1;
 const PRE_UPDATE_BACKUP_RETENTION_DAYS = 7;
 
 /** 업데이트할 때마다 pre_update_backup_<timestamp> 폴더가 새로 생기는데 지금까지
