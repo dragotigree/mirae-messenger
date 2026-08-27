@@ -5381,6 +5381,10 @@
       flex-shrink: 0;
     }
     .settings-nav-btn-admin:hover { background: var(--sidebar-active); color: var(--accent-dark); }
+    .settings-nav-motto {
+      flex-shrink: 0; padding: 8px 12px 2px; font-size: 10px; font-style: italic;
+      color: var(--sidebar-text-dim); text-align: center; opacity: 0.7; user-select: none;
+    }
     .settings-nav-btn.active {
       background: var(--sidebar-active);
       color: var(--accent-dark);
@@ -6969,6 +6973,7 @@
           <!-- 관리자화면은 설정 탭이 아니라 별도 화면으로 나가는 항목이라, 탭 목록과 섞이지 않게
                맨 아래로 내리고 위쪽에 여백·구분선을 둔다. -->
           <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
+          <div class="settings-nav-motto">In omnibus asperis utilis.</div>
         </nav>
         <div class="settings-panels">
 
