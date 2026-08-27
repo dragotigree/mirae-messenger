@@ -1996,8 +1996,9 @@
       width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex-shrink: 0;
     }
     .ipmsg-saved-lists-inline {
-      display: flex; flex-direction: column; gap: 6px; width: 100%;
-      padding: 8px; margin-top: 4px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      flex-shrink: 0;
+      padding: 8px; margin: 0 12px 8px; background: #f8fafc; border: 1px solid #eef1f5; border-radius: 12px;
     }
     .ipmsg-saved-lists-inline.is-collapsed { display: none; }
     #ipmsg-saved-lists-items { display: flex; flex-direction: column; gap: 5px; max-height: 140px; overflow-y: auto; }
@@ -7972,6 +7973,13 @@
             <button type="button" class="ipmsg-mini-btn ipmsg-recipient-toggle-btn" id="ipmsg-recipient-toggle-btn" onclick="toggleIpmsgRecipientSection()">받는 사람 편집 ▾</button>
           </span>
         </div>
+        <div class="ipmsg-saved-lists-inline is-collapsed" id="ipmsg-saved-lists-inline" aria-label="저장된 명단">
+          <div id="ipmsg-saved-lists-items"></div>
+          <div class="ipmsg-saved-list-save-row">
+            <input type="text" id="ipmsg-saved-list-name-input" placeholder="현재 선택을 이 이름으로 저장" onkeydown="if(event.key==='Enter') saveCurrentIpmsgSelectionAsList()">
+            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="saveCurrentIpmsgSelectionAsList()">💾 저장</button>
+          </div>
+        </div>
         <div class="ipmsg-recipient-section is-collapsed" id="ipmsg-recipient-section">
           <div class="ipmsg-controls-strip" aria-label="받는 사람 찾기·선택">
             <div class="ipmsg-controls-line ipmsg-controls-line--primary">
@@ -7996,13 +8004,6 @@
                 <span class="ipmsg-bulk-label">부서</span>
                 <select id="ipmsg-dept-select" aria-label="부서 선택"></select>
                 <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="ipmsgToggleSelectByDept()" title="해당 부서 전체 선택·해제">부서 선택</button>
-              </div>
-              <div class="ipmsg-saved-lists-inline is-collapsed" id="ipmsg-saved-lists-inline" aria-label="저장된 명단">
-                <div id="ipmsg-saved-lists-items"></div>
-                <div class="ipmsg-saved-list-save-row">
-                  <input type="text" id="ipmsg-saved-list-name-input" placeholder="현재 선택을 이 이름으로 저장" onkeydown="if(event.key==='Enter') saveCurrentIpmsgSelectionAsList()">
-                  <button type="button" class="ipmsg-mini-btn ipmsg-bulk-apply" onclick="saveCurrentIpmsgSelectionAsList()">💾 저장</button>
-                </div>
               </div>
             </div>
           </div>
@@ -13049,6 +13050,10 @@
       if (recipientSection) recipientSection.classList.add('is-collapsed');
       if (recipientToggleBtn) recipientToggleBtn.textContent = '받는 사람 편집 ▾';
       if (ipmsgCard) ipmsgCard.classList.remove('is-recipient-expanded');
+      const savedListsEl = document.getElementById('ipmsg-saved-lists-inline');
+      const savedListsToggleBtn = document.getElementById('ipmsg-saved-toggle-btn');
+      if (savedListsEl) savedListsEl.classList.add('is-collapsed');
+      if (savedListsToggleBtn) savedListsToggleBtn.textContent = '📋 저장된 명단 ▾';
       setModalOpenState(true);
       bindModalEditableFocus(document.getElementById('ipmsg-send-modal'));
       initIpmsgDragAndDrop();
@@ -18121,7 +18126,7 @@
       {
         cat: 'group', icon: '✉️', color: '#0369a1', title: '쪽지 보내기(일회성 다수 전송)', tag: '새 방을 만들지 않음',
         path: '왼쪽 아이콘 레일 → <b>편지봉투 아이콘</b>("채팅방 없이 전송")',
-        chips: ['이름·층·부서로 여러 명을 한 번에 선택', '「📋 저장된 명단」으로 자주 보내는 명단 저장·재사용', '각자와의 1:1 대화방에 그대로 남음'],
+        chips: ['이름·층·부서로 여러 명을 한 번에 선택', '「📋 저장된 명단」 버튼은 「받는 사람 편집」을 열지 않아도 바로 클릭 가능', '각자와의 1:1 대화방에 그대로 남음'],
         tip: '⚠️ "그룹 대화"와 다른 점: 이건 여러 명이 함께 보는 새 대화방을 만드는 게 아니라, 그 순간 고른 사람들 각자의 1:1 대화방으로 똑같은 메시지를 한 번에 전달하는 기능입니다. 보낸 내용은 채팅 기록·검색에 일반 메시지처럼 그대로 남지만, 받은 사람들끼리 서로 보거나 답장을 주고받는 공용 공간(단체 대화방)은 생기지 않습니다. "이번 한 번만 여러 부서·층 사람들에게 공지하듯 알릴 때" 이 기능을, "앞으로 계속 같이 얘기할 사람들"이면 그룹 대화(단체 대화방)를 쓰면 됩니다.'
       },
       {
