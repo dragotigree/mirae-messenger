@@ -7895,7 +7895,10 @@
       <div class="ipmsg-modal-body">
         <div class="ipmsg-recipient-summary" id="ipmsg-recipient-summary">
           <span class="ipmsg-controls-stats">받는 사람 <strong id="ipmsg-selected-count-summary">0</strong>명</span>
-          <button type="button" class="ipmsg-mini-btn ipmsg-recipient-toggle-btn" id="ipmsg-recipient-toggle-btn" onclick="toggleIpmsgRecipientSection()">받는 사람 편집 ▾</button>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-saved-toggle-btn" onclick="toggleIpmsgSavedListsInline()" title="자주 보내는 명단 저장·불러오기">📋 저장된 명단 ▾</button>
+            <button type="button" class="ipmsg-mini-btn ipmsg-recipient-toggle-btn" id="ipmsg-recipient-toggle-btn" onclick="toggleIpmsgRecipientSection()">받는 사람 편집 ▾</button>
+          </span>
         </div>
         <div class="ipmsg-recipient-section is-collapsed" id="ipmsg-recipient-section">
           <div class="ipmsg-controls-strip" aria-label="받는 사람 찾기·선택">
@@ -7912,7 +7915,6 @@
                 <button type="button" class="ipmsg-mini-btn" onclick="ipmsgSelectOnlineVisible()">온라인만</button>
                 <button type="button" class="ipmsg-mini-btn" onclick="ipmsgClearSelection()">선택 해제</button>
                 <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-bulk-toggle-btn" onclick="toggleIpmsgBulkInline()" title="층·부서로 한번에 선택">층·부서 선택 ▾</button>
-                <button type="button" class="ipmsg-mini-btn ipmsg-bulk-toggle-btn" id="ipmsg-saved-toggle-btn" onclick="toggleIpmsgSavedListsInline()" title="자주 보내는 명단 저장·불러오기">📋 저장된 명단 ▾</button>
               </div>
               <div class="ipmsg-bulk-inline is-collapsed" id="ipmsg-bulk-inline" aria-label="층·부서 일괄 선택">
                 <span class="ipmsg-bulk-label">층</span>
