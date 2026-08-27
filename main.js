@@ -1840,8 +1840,13 @@ function buildChatFileBoxHtml(fileName, sizeBytes, storedName) {
 
 /** 공유 드라이브에 넣은 파일 하나를 가리키는 말풍선 카드. mirae-file://(P2P로 받은
  *  파일)와 달리 절대경로를 그대로 들고 있다가 "열기"를 누르면 그 경로를 연다 —
- *  받는 사람 PC에도 같은 경로(Z:\)로 매핑돼 있어야 열린다. */
-function buildSharedDriveFileBoxHtml(fileName, sizeBytes, sharedPath) {
+ *  받는 사람 PC에도 같은 경로(Z:\)로 매핑돼 있어야 열린다.
+ *  ⚠️ 실사고: Z: 드라이브는 그 폴더를 볼 수 있는 사람이면 누구나 열어볼 수 있어서,
+ *  1:1이나 특정 그룹으로 보낸 파일도 사실상 전체 공개나 마찬가지였다("보안이 걱정된다"
+ *  신고). 그래서 파일 자체는 AES-256-GCM으로 암호화해서 올리고, 복호화 키(key/iv/tag)는
+ *  이 카드 안에만 담아 그 대화(1:1/그룹)로만 전달되게 한다 — Z:를 직접 뒤져도 암호화된
+ *  덩어리만 보이고, 이 메시지를 받은 사람만 열 수 있다. */
+function buildSharedDriveFileBoxHtml(fileName, sizeBytes, sharedPath, encMeta) {
   const safeName = String(fileName || 'file').replace(/[<>&"]/g, (ch) => (
     ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
   ));
@@ -1849,7 +1854,14 @@ function buildSharedDriveFileBoxHtml(fileName, sizeBytes, sharedPath) {
     ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
   ));
   const sizeLabel = formatFileSizeLabel(sizeBytes);
-  return `<div class="chat-shared-drive-box" data-shared-path="${safePath}"><span class="chat-file-icon" aria-hidden="true">🗄️</span><div class="chat-file-meta"><div class="chat-file-name">${safeName}</div><div class="chat-file-size">${sizeLabel} · 공유 폴더 (${SHARED_DRIVE_FILE_RETENTION_DAYS}일간 보관)</div></div><button type="button" class="chat-shared-drive-open" data-shared-path="${safePath}">열기</button></div>`;
+  const enc = encMeta || {};
+  const escAttr = (s) => String(s || '').replace(/[<>&"]/g, (ch) => (
+    ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : '&quot;'
+  ));
+  const encAttrs = enc.key
+    ? ` data-enc-key="${escAttr(enc.key)}" data-enc-iv="${escAttr(enc.iv)}" data-enc-tag="${escAttr(enc.tag)}"`
+    : '';
+  return `<div class="chat-shared-drive-box" data-shared-path="${safePath}"${encAttrs}><span class="chat-file-icon" aria-hidden="true">🔐</span><div class="chat-file-meta"><div class="chat-file-name">${safeName}</div><div class="chat-file-size">${sizeLabel} · 암호화된 공유 폴더 (${SHARED_DRIVE_FILE_RETENTION_DAYS}일간 보관)</div></div><button type="button" class="chat-shared-drive-open" data-shared-path="${safePath}">열기</button></div>`;
 }
 
 function sanitizeSharedDriveFileNamePart(s) {
@@ -1879,24 +1891,29 @@ async function cleanupOldSharedDriveFiles() {
   }
 }
 
-/** 큰 파일을 공유 드라이브로 복사하면서 일정 간격으로 진행 바이트 수를 알려준다 —
- *  예전엔 fs.promises.copyFile로 한 번에 복사해서, 다 끝날 때까지 화면에 아무 표시가
- *  없어 "멈췄나?" 싶어 여러 번 다시 시도하게 만들었다("딜레이가 크다" 신고). */
-function copyFileWithProgress(srcPath, destPath, onProgress) {
+/** 큰 파일을 공유 드라이브에 올리면서 AES-256-GCM으로 암호화하고, 일정 간격으로
+ *  진행 바이트 수를 알려준다 — 예전엔 fs.promises.copyFile로 평문 그대로, 한 번에
+ *  복사해서 (1) 다 끝날 때까지 화면에 아무 표시가 없어 "멈췄나?" 싶어 여러 번 다시
+ *  시도하게 만들었고("딜레이가 크다" 신고), (2) Z: 드라이브를 볼 수 있는 사람이면
+ *  누구나 내용을 그대로 열어볼 수 있었다("보안이 걱정된다" 신고). 키·IV·태그는
+ *  호출한 쪽(ipcMain 핸들러)이 만들어 넘겨주고, 여기서는 스트리밍 암호화만 담당한다. */
+function encryptFileToSharedDrive(srcPath, destPath, key, iv, onProgress) {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const finish = (err) => {
+    const finish = (err, tag) => {
       if (settled) return;
       settled = true;
-      if (err) reject(err); else resolve();
+      if (err) reject(err); else resolve(tag);
     };
     let copied = 0;
     let lastReportAt = 0;
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const rs = fs.createReadStream(srcPath);
     const ws = fs.createWriteStream(destPath);
-    rs.on('error', finish);
-    ws.on('error', finish);
-    ws.on('close', () => finish());
+    rs.on('error', (e) => finish(e));
+    ws.on('error', (e) => finish(e));
+    cipher.on('error', (e) => finish(e));
+    ws.on('close', () => finish(null, cipher.getAuthTag()));
     rs.on('data', (chunk) => {
       copied += chunk.length;
       const now = Date.now();
@@ -1905,7 +1922,29 @@ function copyFileWithProgress(srcPath, destPath, onProgress) {
         try { onProgress(copied); } catch (e) { /* ignore */ }
       }
     });
-    rs.pipe(ws);
+    rs.pipe(cipher).pipe(ws);
+  });
+}
+
+/** 복호화해서 받는 사람 PC의 다운로드 폴더로 꺼낸다 — 열기 전에 이 PC에만 평문
+ *  사본을 남긴다(Z: 드라이브에는 암호화된 채로만 남아 있음). */
+function decryptFileFromSharedDrive(srcPath, destPath, key, iv, tag) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      if (err) reject(err); else resolve();
+    };
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const rs = fs.createReadStream(srcPath);
+    const ws = fs.createWriteStream(destPath);
+    rs.on('error', finish);
+    ws.on('error', finish);
+    decipher.on('error', finish);
+    ws.on('close', () => finish());
+    rs.pipe(decipher).pipe(ws);
   });
 }
 
@@ -1924,11 +1963,17 @@ ipcMain.handle('send-file-via-shared-drive', async (event, opts) => {
       return { status: 'ERROR', error: '공유 드라이브(Z:)에 접근할 수 없습니다. 드라이브 연결 상태를 확인해 주세요.' };
     }
 
-    const destName = `${Date.now()}_${sanitizeSharedDriveFileNamePart(myProfile.username || MY_IP)}_${sanitizeSharedDriveFileNamePart(fileName)}`;
+    // ⚠️ 저장 파일명에 원본 이름·보낸 사람을 넣지 않는다 — 암호화해도 파일명만으로
+    // 내용을 짐작할 수 있으면(예: "환자_김철수_진단서.pdf") 의미가 없다. 무작위 이름 +
+    // .enc 확장자로만 저장한다.
+    const destName = `${crypto.randomBytes(16).toString('hex')}.enc`;
     const destPath = path.join(dir, destName);
     const totalBytes = Number(o.size) || 0;
+    const key = crypto.randomBytes(32);
+    const iv = crypto.randomBytes(12);
+    let tag;
     try {
-      await copyFileWithProgress(sourcePath, destPath, (copiedBytes) => {
+      tag = await encryptFileToSharedDrive(sourcePath, destPath, key, iv, (copiedBytes) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send('shared-drive-upload-progress', {
             uploadId: o.uploadId || '',
@@ -1938,23 +1983,54 @@ ipcMain.handle('send-file-via-shared-drive', async (event, opts) => {
         }
       });
     } catch (e) {
-      return { status: 'ERROR', error: '공유 드라이브로 파일을 복사하지 못했습니다.\n' + (e && e.message ? e.message : '') };
+      return { status: 'ERROR', error: '공유 드라이브로 파일을 암호화해 올리지 못했습니다.\n' + (e && e.message ? e.message : '') };
     }
-    const stat = await fs.promises.stat(destPath).catch(() => null);
-    const size = stat ? stat.size : (Number(o.size) || 0);
-    const messageHtml = buildSharedDriveFileBoxHtml(fileName, size, destPath);
+    const encMeta = { key: key.toString('base64'), iv: iv.toString('base64'), tag: tag.toString('base64') };
+    // 암호문 크기가 아니라 원본 파일 크기를 그대로 보여준다(AES-GCM은 길이가 거의 같지만,
+    // 사용자가 보고 확인한 원본 크기와 정확히 일치시키는 게 더 정직하다).
+    const size = Number(o.size) || 0;
+    const messageHtml = buildSharedDriveFileBoxHtml(fileName, size, destPath, encMeta);
     return { status: 'OK', messageHtml, fileName, size, sharedPath: destPath };
   } catch (e) {
     return { status: 'ERROR', error: e && e.message ? e.message : '공유 드라이브 전송 중 오류가 발생했습니다.' };
   }
 });
 
-ipcMain.handle('open-shared-drive-file', async (event, filePath) => {
+ipcMain.handle('open-shared-drive-file', async (event, opts) => {
   try {
-    const p = String(filePath || '');
+    // 구버전 호환: 예전엔 경로 문자열 하나만 받아서 그냥 열었다(암호화 이전).
+    const o = (opts && typeof opts === 'object') ? opts : { sharedPath: opts };
+    const p = String(o.sharedPath || '');
     if (!p) return { success: false, msg: '경로가 없습니다.' };
-    const err = await shell.openPath(p);
-    if (err) return { success: false, msg: '파일을 열 수 없습니다. 공유 드라이브 연결 상태를 확인해 주세요.\n' + err };
+
+    if (!o.key) {
+      // 암호화되지 않은 예전 카드 — 그대로 연다.
+      const err = await shell.openPath(p);
+      if (err) return { success: false, msg: '파일을 열 수 없습니다. 공유 드라이브 연결 상태를 확인해 주세요.\n' + err };
+      return { success: true };
+    }
+
+    let key, iv, tag;
+    try {
+      key = Buffer.from(o.key, 'base64');
+      iv = Buffer.from(o.iv, 'base64');
+      tag = Buffer.from(o.tag, 'base64');
+    } catch (e) {
+      return { success: false, msg: '복호화 정보가 손상되었습니다.' };
+    }
+
+    const safeName = sanitizeFileName(o.fileName || 'file');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const outDir = getReceivedFilesDir();
+    const outPath = path.join(outDir, `${timestamp}_${safeName}`);
+    try {
+      await decryptFileFromSharedDrive(p, outPath, key, iv, tag);
+    } catch (e) {
+      await fs.promises.unlink(outPath).catch(() => {});
+      return { success: false, msg: '파일을 복호화하지 못했습니다. 공유 드라이브 연결 상태를 확인해 주세요.\n' + (e && e.message ? e.message : '') };
+    }
+    const err = await shell.openPath(outPath);
+    if (err) return { success: false, msg: '복호화한 파일을 열 수 없습니다.\n' + err };
     return { success: true };
   } catch (e) {
     return { success: false, msg: e && e.message ? e.message : '파일을 열지 못했습니다.' };

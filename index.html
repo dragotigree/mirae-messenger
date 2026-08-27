@@ -18008,10 +18008,10 @@
         tip: null
       },
       {
-        cat: 'chat', icon: '🗄️', color: '#0f766e', title: '50MB 넘는 큰 파일 보내기', tag: '1:1·그룹 공통',
+        cat: 'chat', icon: '🔐', color: '#0f766e', title: '50MB 넘는 큰 파일 보내기', tag: '1:1·그룹 공통',
         path: '50MB보다 큰 파일을 첨부하면 자동으로 안내',
-        chips: ['공유 드라이브(Z:)에 올려 그 경로를 대화로 공유', '같은 경로가 매핑된 PC라면 누구나 「열기」로 바로 확인', '7일 뒤 자동 삭제'],
-        tip: '용량 제한 없이 보낼 수 있지만, 7일이 지나면 공유 드라이브에서 자동으로 지워지니 오래 보관할 파일은 따로 저장해 두세요.'
+        chips: ['공유 드라이브(Z:)에 암호화해서 올림', '그 대화(1:1·그룹)로 받은 사람만 「열기」로 열람 가능', '7일 뒤 자동 삭제'],
+        tip: '암호화되어 올라가므로 공유 폴더를 다른 사람이 직접 봐도 파일명·내용이 보이지 않습니다. 용량 제한은 없지만 7일이 지나면 자동으로 지워지니 오래 보관할 파일은 따로 저장해 두세요.'
       },
       {
         cat: 'chat', icon: '🖼️', color: '#7c3aed', title: '사진 크게 보기', tag: '1:1·그룹 공통',
@@ -25424,8 +25424,15 @@
           const originalLabel = sharedOpenBtn.textContent;
           sharedOpenBtn.disabled = true;
           sharedOpenBtn.textContent = '여는 중…';
-          const p = sharedOpenBtn.getAttribute('data-shared-path') || '';
-          window.api.openSharedDriveFile(p).then((res) => {
+          const box = sharedOpenBtn.closest('.chat-shared-drive-box');
+          const nameEl = box && box.querySelector('.chat-file-name');
+          window.api.openSharedDriveFile({
+            sharedPath: sharedOpenBtn.getAttribute('data-shared-path') || '',
+            key: box ? box.getAttribute('data-enc-key') : '',
+            iv: box ? box.getAttribute('data-enc-iv') : '',
+            tag: box ? box.getAttribute('data-enc-tag') : '',
+            fileName: nameEl ? nameEl.textContent : ''
+          }).then((res) => {
             if (res && res.success === false) {
               appAlert(res.msg || '파일을 열 수 없습니다.');
             } else {
