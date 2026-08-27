@@ -126,25 +126,56 @@
       -webkit-app-region: drag;
     }
     #titlebar-drag-region { flex: 1; height: 100%; min-width: 0; display: flex; align-items: center; padding: 0 14px; -webkit-app-region: drag; }
+    /* ⚠️ 실사고: 예전엔 그냥 검은 굵은 글씨 하나뿐이라 "너무 투박하다"는 지적이 있었다.
+       작은 그라데이션 배지(앱 아이콘과 같은 톤) + 이름을 두 가지 색으로 나눈 로고
+       조합으로 바꿔 브랜드 느낌을 살렸다. */
     #titlebar-app-label {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+      user-select: none;
+      /* 독립 창(채팅창·현황판·공지사항)은 이 자리에 로고 대신 상대 이름·화면 제목을
+         JS로 그대로 밀어넣는다(label.textContent = ...) — 그럴 때를 위한 기본 글자
+         스타일. 로고 조합(.titlebar-logo-text 이하)은 이 값을 각자 다시 지정한다. */
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      line-height: 1;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .titlebar-logo-mark {
+      flex-shrink: 0;
+      width: 19px; height: 19px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #0EA5E9, #0369A1);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10.5px; line-height: 1;
+      box-shadow: 0 1px 3px rgba(3, 105, 161, 0.35);
+    }
+    .titlebar-logo-text {
+      display: inline-flex;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
       /* 11.5px + font-weight 800 + 넓은 자간 조합이 이 크기에서는 잘 뭉개져 보인다
          (특히 100% 아닌 화면 배율에서). 크기를 살짝 키우고 자간을 줄이고, 안티앨리어싱을
          명시해서 작은 굵은 글씨가 더 또렷하게 보이도록 했다. */
       font-size: 13px;
-      font-weight: 700;
-      color: var(--text-primary);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      letter-spacing: 0.02em;
       line-height: 1;
-      user-select: none;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
+    .titlebar-logo-mirae { font-weight: 800; color: var(--accent-dark); }
+    .titlebar-logo-messenger { font-weight: 600; color: var(--text-secondary); margin-left: 3px; }
     #titlebar-controls {
       display: flex;
       align-items: center;
@@ -5191,12 +5222,19 @@
       padding: 0 16px;
       box-shadow: none;
     }
+    /* 독립 창(현황판)은 상단바가 어두운 색이라, 데스크톱용 아이콘 배지·2색 로고 대신
+       원래처럼 단색 흰 글자 하나로 되돌린다. */
+    body.schedule-board-standalone .titlebar-logo-mark { display: none; }
+    body.schedule-board-standalone .titlebar-logo-mirae,
+    body.schedule-board-standalone .titlebar-logo-messenger {
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+      margin-left: 0;
+    }
     body.schedule-board-standalone #titlebar-app-label {
       text-transform: none;
       letter-spacing: -0.02em;
       font-size: 12px;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.92);
     }
     body.schedule-board-standalone #titlebar-drag-region .titlebar-app-label-compact {
       display: none !important;
@@ -5248,12 +5286,17 @@
       padding: 0 16px;
       box-shadow: none;
     }
+    body.notice-board-standalone .titlebar-logo-mark { display: none; }
+    body.notice-board-standalone .titlebar-logo-mirae,
+    body.notice-board-standalone .titlebar-logo-messenger {
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.92);
+      margin-left: 0;
+    }
     body.notice-board-standalone #titlebar-app-label {
       text-transform: none;
       letter-spacing: -0.02em;
       font-size: 12px;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.92);
     }
     body.notice-board-standalone #titlebar-drag-region .titlebar-app-label-compact {
       display: none !important;
@@ -5736,7 +5779,7 @@
   <!-- 🪟 커스텀 타이틀바 (카카오톡 PC 스타일) -->
   <div id="custom-titlebar">
     <div id="titlebar-sidebar-accent">
-      <span id="titlebar-app-label">MIRAE MESSENGER</span>
+      <span id="titlebar-app-label"><span class="titlebar-logo-mark" aria-hidden="true">💬</span><span class="titlebar-logo-text"><span class="titlebar-logo-mirae">MIRAE</span><span class="titlebar-logo-messenger">MESSENGER</span></span></span>
     </div>
     <div id="titlebar-main-strip">
       <div id="titlebar-drag-region">
