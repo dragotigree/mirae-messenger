@@ -12411,7 +12411,19 @@ function chatHistoryScopeSql(targetIP) {
   }
   return {
     where: '((sender_ip = ? AND receiver_ip = ?) OR (sender_ip = ? AND receiver_ip = ?))',
-    params: [MY_IP, targetIP, targetIP, MY_IP]
+    params: [MY_IP, targetIP, targetIP, MY_IP],
+    // ⚠️ 실사고: 이 OR 조건 + ORDER BY id DESC LIMIT는 SQLite가 "MULTI-INDEX OR"로
+    // 양쪽을 각각 인덱스로 찾은 뒤 TEMP B-TREE로 합쳐서 정렬한다(EXPLAIN QUERY PLAN으로
+    // 확인) — 이 병합·정렬은 LIMIT을 못 밀어넣어서 그 사람과 주고받은 메시지 전체를
+    // 다 훑은 뒤에야 200건을 잘라낸다. 그래서 대화가 오래 쌓인 특정 상대를 열 때만
+    // 300~450ms씩 걸렸다("사용자 목록·대화 전환이 느려졌다" 신고 — 실제로는 그 상대와의
+    // 누적 대화량에 비례해 항상 있던 문제). orParts를 쓰면 양쪽을 LIMIT 200씩 따로
+    // 인덱스로 바로 끊어 가져온 뒤 병합만 하면 되므로, 아무리 대화가 많이 쌓여도 최근
+    // 200~400건만 읽는다.
+    orParts: [
+      { where: 'sender_ip = ? AND receiver_ip = ?', params: [MY_IP, targetIP] },
+      { where: 'sender_ip = ? AND receiver_ip = ?', params: [targetIP, MY_IP] }
+    ]
   };
 }
 
@@ -12582,7 +12594,13 @@ ipcMain.handle('get-chat-history', async (event, args) => {
     }));
   };
 
-  const selectCols = `DISTINCT id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
+  // ⚠️ 실사고: DISTINCT가 있으면 id가 이미 messages 테이블의 PRIMARY KEY(항상 유일)라
+  // 실질적으로 아무 행도 걸러내지 못하면서, SQLite가 ORDER BY id DESC LIMIT 200을
+  // 인덱스로 바로 끊지 못하고 조건에 맞는 행 전체를 먼저 정렬·중복제거해야 했다 —
+  // 대화가 많이 쌓인 특정 상대를 클릭할 때만 300~450ms씩 걸리던 원인("업데이트 후
+  // 사용자 목록·대화 전환이 느려졌다" 신고, 실제로는 그 사람과의 누적 대화량에 비례해
+  // 항상 있었던 문제). id가 이미 유일하므로 DISTINCT를 빼도 결과는 완전히 동일하다.
+  const selectCols = `id, sender_name, sender_ip, receiver_ip, message, status, msg_uid, strftime('%H:%M', created_at, 'localtime') as created_time, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as sent_at_full, strftime('%Y-%m-%d', created_at, 'localtime') as date_key`;
 
   // 특정 날짜로 점프: 해당일(또는 가장 가까운 이전일) 첫 메시지부터 최대 200건
   if (dateStr && !keyword) {
@@ -12658,6 +12676,33 @@ ipcMain.handle('get-chat-history', async (event, args) => {
           });
         };
         findNearestDay('<=', 'DESC', () => findNearestDay('>=', 'ASC'));
+      });
+    });
+  }
+
+  // 1:1 대화(orParts 있음) + 검색어 없음: 양쪽(내가 보낸 것/상대가 보낸 것)을 각각
+  // LIMIT 200으로 인덱스로 바로 끊어 가져온 뒤 합친다 — 대화가 아무리 쌓여도 최근
+  // 400건만 읽는다(위 chatHistoryScopeSql 주석 참고).
+  if (!keyword && scope.orParts) {
+    return new Promise((resolve) => {
+      const runPart = (part) => new Promise((res) => {
+        let sql = `SELECT ${selectCols} FROM messages WHERE ${part.where}`;
+        const params = [...part.params];
+        if (hideUpToId > 0) {
+          sql += ` AND id > ?`;
+          params.push(hideUpToId);
+        }
+        sql += ` ORDER BY id DESC LIMIT 200`;
+        db.all(sql, params, (err, rows) => {
+          if (err) logDbErr(err);
+          res(rows || []);
+        });
+      });
+      Promise.all(scope.orParts.map(runPart)).then((partsRows) => {
+        const merged = [].concat(...partsRows);
+        merged.sort((a, b) => b.id - a.id);
+        const top200 = merged.slice(0, 200).reverse();
+        resolve(mapRows(top200));
       });
     });
   }
