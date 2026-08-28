@@ -18286,8 +18286,8 @@
       },
       {
         cat: 'chat', icon: '📎', color: '#059669', title: '사진·파일 전송', tag: '1:1·그룹 공통',
-        path: '채팅창 하단 클립 아이콘 또는 <b>붙여넣기(Ctrl+V)</b>',
-        chips: ['사진 미리보기', '원본 그대로 전달', '받은 파일 폴더에서 모아보기'],
+        path: '채팅창 하단 클립 아이콘, <b>붙여넣기(Ctrl+V)</b>, 또는 파일을 대화창에 끌어다 놓기',
+        chips: ['파일을 끌어다 놓거나 골라도 "보낼까요?" 확인 후 전송', '사진 미리보기', '원본 그대로 전달', '받은 파일 폴더에서 모아보기'],
         tip: null
       },
       {
@@ -30365,15 +30365,29 @@
         await processAndSendFile(f);
       }
     }
+    // ⚠️ 실사고: 파일을 끌어다 놓거나(드래그 앤 드롭) 파일 선택창에서 고르면 확인 없이
+    // 곧바로 전송됐다 — 실수로 다른 파일을 끌어놓거나 여러 개를 한꺼번에 골랐을 때 잘못
+    // 보내기 쉬웠다("한번 확인하고 보내게 해달라"는 요청). 사진 파일도 예외 없이 이
+    // 확인을 거치도록, 크기(50MB 이하 P2P vs 공유드라이브)와 무관하게 여기서 한 번만
+    // 물어보고 processAndSendFiles로 넘긴다.
+    async function confirmAndSendFiles(files) {
+      if (!files.length || !activeChatUser) return;
+      const targetLabel = buildChatHeaderTitleText(activeChatUser) || '이 대화';
+      const nameList = files.map((f) => f.name).join(', ');
+      const label = files.length > 1 ? `파일 ${files.length}개(${nameList})` : `「${nameList}」`;
+      const ok = await appConfirm(`${targetLabel}에게 ${label}을(를) 보낼까요?`, { title: '파일 보내기', confirmText: '보내기', cancelText: '취소' });
+      if (!ok) return;
+      await processAndSendFiles(files);
+    }
     function handleFileSelect(e) {
       const files = Array.from(e.target.files || []);
-      if (files.length && activeChatUser) processAndSendFiles(files);
+      if (files.length && activeChatUser) confirmAndSendFiles(files);
       e.target.value = '';
     }
     function handleFileDrop(e) {
       e.preventDefault();
       const files = Array.from(e.dataTransfer.files || []);
-      if (files.length && activeChatUser) processAndSendFiles(files);
+      if (files.length && activeChatUser) confirmAndSendFiles(files);
     }
 
     // 붙여넣은 이미지는 바로 보내지 않고, 메시지 입력창 위에 첨부로 쌓아 두었다가
