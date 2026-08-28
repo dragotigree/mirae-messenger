@@ -1,4 +1,5 @@
 // In motu, mobilitas prius, stabilitas postea.
+// 천 일의 연습을 단(鍛)이라 하고, 만 일의 연습을 련(鍊)이라 한다. — v1.0.1000을 기념하며.
 const { app, BrowserWindow, ipcMain, Notification, Tray, Menu, MenuItem, shell, nativeImage, dialog, screen, globalShortcut, session, desktopCapturer, protocol, clipboard } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
