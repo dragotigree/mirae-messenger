@@ -201,6 +201,10 @@ let masterSessionActive = false;
 let masterSessionToken = '';
 let masterSessionHolderIp = '';
 let masterSessionAt = 0;
+/** 마스터 비밀번호를 모든 PC에 동기화하기 위한 메모리 캐시 — DB의 master_password_changed_at과
+ * 항상 같이 움직인다("한 PC에서 바꾸면 나머지도 다 바뀌게" 요청). 부팅 시 DB에서 읽어 채우고,
+ * 더 최신 소식(MASTER_PASSWORD_SYNC)을 받으면 그때마다 갱신한다 — LWW(시각이 큰 쪽이 승자). */
+let masterPasswordChangedAt = 0;
 /** 관리자가 자리에 없거나 구버전 PC가 어디 있는지 몰라 수동으로 강제 업데이트를 못 시키는
  * 문제 — 이 기능을 켜두면, 구버전 PC가 접속하는 그 순간 자동으로 강제 업데이트를 보낸다.
  * 비밀번호는 디스크에 저장하지 않고 메모리에만 두며, 로그아웃하거나 기능을 끄면 지운다. */
@@ -768,7 +772,8 @@ const TRAFFIC_TYPE_LABELS = {
   LOADTEST_CMD: '부하 테스트 명령', PING: '연결 확인', GOODBYE: '접속 종료',
   UI_TEXT_SYNC: '문구 수정 동기화', UI_TEXT_SYNC_REQUEST: '문구 수정 동기화 요청',
   LOG_EXCERPT_REQUEST: '원격 로그 요청', LOG_EXCERPT_RESPONSE: '원격 로그 응답',
-  MASTER_SESSION_STATE: '마스터 로그인 상태 동기화'
+  MASTER_SESSION_STATE: '마스터 로그인 상태 동기화',
+  MASTER_PASSWORD_SYNC: '마스터 비밀번호 동기화', MASTER_PASSWORD_SYNC_REQUEST: '마스터 비밀번호 동기화 요청'
 };
 function trafficTypeLabel(t) { return TRAFFIC_TYPE_LABELS[t] || t; }
 
@@ -5208,6 +5213,8 @@ db.serialize(() => {
     master_password TEXT DEFAULT ''
   )`, logDbErr);
   alterAddColumn('master_config', `master_id TEXT DEFAULT 'admin'`);
+  // 마스터 비밀번호를 여러 PC에 동기화하기 위한 변경 시각 — 나중에 바뀐 쪽이 이긴다(LWW).
+  alterAddColumn('master_config', `master_password_changed_at INTEGER DEFAULT 0`);
 
   db.run(`CREATE TABLE IF NOT EXISTS known_users (
     ip TEXT PRIMARY KEY, username TEXT, rank TEXT, dept TEXT, floor TEXT, ext_no TEXT, phone_no TEXT, status_state TEXT
@@ -5750,6 +5757,7 @@ db.serialize(() => {
       }, logDbErr);
       return;
     }
+    masterPasswordChangedAt = Number(row.master_password_changed_at) || 0;
     (async () => {
       // 예전 기본값(admin1234)을 아직 그대로 쓰고 있는 PC는 새 기본값으로 맞춰준다.
       // 마스터가 직접 바꾼 값이면(더 이상 예전 기본값이 아니면) 절대 건드리지 않는다.
@@ -7749,6 +7757,7 @@ function startUdpDiscovery() {
             // 부팅 시 아무도 온라인이 아니었으면 화면 문구를 못 받아온다 —
             // 동료가 접속하는 이 시점에 한 번 더 요청해 빈틈을 없앤다(위 쿨다운이 폭주를 막는다).
             sendJsonToPeer(rinfo.address, { type: 'UI_TEXT_SYNC_REQUEST' });
+            sendJsonToPeer(rinfo.address, { type: 'MASTER_PASSWORD_SYNC_REQUEST' });
             syncGroupsWithPeer(rinfo.address);
             tryDeliverPendingWipe(rinfo.address);
             maybeSyncServicePauseToPeer(rinfo.address);
@@ -9135,6 +9144,8 @@ function routeIncomingPayloadInner(payload, senderIP) {
       break;
     case 'LOG_EXCERPT_RESPONSE': handleLogExcerptResponse(payload, senderIP); break;
     case 'MASTER_SESSION_STATE': handleMasterSessionState(payload); break;
+    case 'MASTER_PASSWORD_SYNC': handleMasterPasswordSync(payload); break;
+    case 'MASTER_PASSWORD_SYNC_REQUEST': handleMasterPasswordSyncRequest(senderIP); break;
     default: break;
     }
   } catch (e) {
@@ -13373,6 +13384,43 @@ function handleMasterSessionState(payload) {
   }
 }
 
+/** 다른 PC에서 마스터 비밀번호가 바뀌었다는 소식을 받았을 때 — 내가 들고 있는 값보다
+ * 더 최신(changedAt이 더 큼)이면 내 master_config도 같은 해시로 덮어써서 "모든 PC에서
+ * 마스터 비밀번호가 똑같이 바뀌게" 한다. 평문은 절대 오가지 않고 이미 해시된 값만 저장한다. */
+function handleMasterPasswordSync(payload) {
+  const p = payload || {};
+  const changedAt = Number(p.changedAt) || 0;
+  const passwordHash = String(p.passwordHash || '');
+  if (!changedAt || !passwordHash) return;
+  if (changedAt <= masterPasswordChangedAt) return; // 이미 같거나 더 최신인 값을 갖고 있으면 무시
+  masterPasswordChangedAt = changedAt;
+  const masterId = String(p.masterId || 'admin').trim() || 'admin';
+  db.run(
+    `UPDATE master_config SET master_password = ?, master_id = ?, master_password_changed_at = ? WHERE id = 1`,
+    [passwordHash, masterId, changedAt],
+    (updErr) => {
+      if (updErr) return logDbErr(updErr);
+      writeToLogFile('info', '[마스터] 다른 PC에서 변경된 비밀번호로 동기화됨');
+    }
+  );
+}
+
+/** 새로 접속한 PC가 자신의 마스터 비밀번호 상태(MASTER_PASSWORD_SYNC_REQUEST)를 물어오면,
+ * 내가 알고 있는 최신 값을 그대로 돌려준다 — 부팅 직후라 아직 아무 변경도 못 받아본 PC가
+ * 뒤늦게라도 최신 비밀번호를 따라잡을 수 있게 한다(공지 동기화와 같은 패턴). */
+function handleMasterPasswordSyncRequest(senderIP) {
+  if (!senderIP || senderIP === MY_IP || !masterPasswordChangedAt) return;
+  db.get(`SELECT master_id, master_password, master_password_changed_at FROM master_config WHERE id = 1`, (err, row) => {
+    if (err || !row || !row.master_password_changed_at) return;
+    sendJsonToPeer(senderIP, {
+      type: 'MASTER_PASSWORD_SYNC',
+      masterId: row.master_id || 'admin',
+      passwordHash: row.master_password,
+      changedAt: Number(row.master_password_changed_at) || 0
+    });
+  });
+}
+
 /** 관리자가 물리적으로 어디 있는지 모르는 구버전 PC까지 챙길 수 있도록, 그 PC가 접속하는
  * 순간 자동으로 강제 업데이트를 보낸다("자동 구버전 업데이트" 기능이 켜져 있을 때만). */
 function maybeAutoForceUpdateOutdatedPeer(ip, appVersion) {
@@ -13464,16 +13512,28 @@ ipcMain.handle('change-master-password', async (event, payload) => {
         resolve({ success: false, msg: '현재 비밀번호가 올바르지 않습니다.' });
         return;
       }
+      const newHash = await hashMasterPassword(normalized.password);
+      const changedAt = Date.now();
       db.run(
-        `UPDATE master_config SET master_password = ? WHERE id = 1`,
-        [await hashMasterPassword(normalized.password)],
+        `UPDATE master_config SET master_password = ?, master_password_changed_at = ? WHERE id = 1`,
+        [newHash, changedAt],
         (updErr) => {
           if (updErr) {
             logDbErr(updErr);
             resolve({ success: false, msg: '비밀번호 변경에 실패했습니다.' });
             return;
           }
+          masterPasswordChangedAt = changedAt;
           writeToLogFile('info', '[마스터] 비밀번호 변경됨');
+          // 다른 PC들도 같은 마스터 비밀번호를 쓰게 방송한다("한 PC에서 바꾸면 모든
+          // 컴퓨터에서 다 바뀌게" 요청). 이미 해시된 값만 주고받으므로 평문은 네트워크에
+          // 나가지 않는다.
+          broadcastToOnlinePeers({
+            type: 'MASTER_PASSWORD_SYNC',
+            masterId: row.master_id || 'admin',
+            passwordHash: newHash,
+            changedAt
+          });
           resolve({ success: true });
         }
       );
