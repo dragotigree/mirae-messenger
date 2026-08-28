@@ -677,27 +677,39 @@
     .title-emoji-pick-btn:hover { background: #fff; border-color: #cbd5e1; transform: scale(1.06); }
     .title-emoji-preview { margin-top: 10px; padding: 10px 12px; background: var(--border-soft); border-radius: 12px; font-size: 14px; font-weight: var(--font-weight-semibold); color: #0f172a; min-height: 20px; }
 
-    /* 🖼 사진 확대창 하단 툴바 */
+    /* 🖼 사진 확대창 하단 툴바
+       ⚠️ 실사고: 기존엔 버튼들이 전부 같은 납작한 회색이라 "안 이쁘다"는 지적이 있었다.
+       확대·축소는 동그란 아이콘 버튼으로, 실행 버튼들은 알약 모양으로 서로 구분되게
+       다듬고, 툴바 전체에 그림자·테두리를 줘서 어떤 사진 위에 떠도 또렷이 보이게 했다. */
+    #image-lightbox-toolbar {
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+    }
     #image-lightbox-toolbar .lb-btn {
-      height: 38px; padding: 0 14px; border: none; border-radius: 10px;
-      background: rgba(255,255,255,0.12); color: #fff; cursor: pointer;
-      font-size: 13px; font-weight: 600; font-family: inherit;
-      display: inline-flex; align-items: center; gap: 7px;
-      transition: background 0.12s, transform 0.08s;
+      height: 40px; padding: 0 16px; border: none; border-radius: 999px;
+      background: rgba(255,255,255,0.1); color: #f1f5f9; cursor: pointer;
+      font-size: 12.5px; font-weight: 600; font-family: inherit; letter-spacing: -0.01em;
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0;
+      transition: background 0.14s, transform 0.1s, box-shadow 0.14s;
     }
-    #image-lightbox-toolbar .lb-btn:hover { background: rgba(255,255,255,0.24); }
-    #image-lightbox-toolbar .lb-btn:active { transform: scale(0.95); }
-    #image-lightbox-toolbar .lb-btn-icon { width: 38px; padding: 0; justify-content: center; }
+    #image-lightbox-toolbar .lb-btn svg { opacity: 0.9; flex-shrink: 0; }
+    #image-lightbox-toolbar .lb-btn:hover { background: rgba(255,255,255,0.22); box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+    #image-lightbox-toolbar .lb-btn:active { transform: scale(0.94); }
+    #image-lightbox-toolbar .lb-btn-icon {
+      width: 40px; padding: 0; justify-content: center; border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+    #image-lightbox-toolbar .lb-btn-icon:hover { background: rgba(255,255,255,0.2); }
     #image-lightbox-toolbar .lb-zoom-level {
-      min-width: 62px; height: 38px; padding: 0 8px; border: none; border-radius: 10px;
-      background: transparent; color: #fff; cursor: pointer;
-      font-size: 13px; font-weight: 700; font-family: inherit;
+      min-width: 58px; height: 40px; padding: 0 6px; border: none; border-radius: 999px;
+      background: rgba(255,255,255,0.06); color: #fff; cursor: pointer;
+      font-size: 12.5px; font-weight: 700; font-family: inherit;
       font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
-      transition: background 0.12s;
+      transition: background 0.14s;
     }
-    #image-lightbox-toolbar .lb-zoom-level:hover { background: rgba(255,255,255,0.16); }
+    #image-lightbox-toolbar .lb-zoom-level:hover { background: rgba(255,255,255,0.2); }
     #image-lightbox-toolbar .lb-sep {
-      width: 1px; height: 22px; background: rgba(255,255,255,0.22); margin: 0 4px; flex-shrink: 0;
+      width: 1px; height: 24px; background: rgba(255,255,255,0.16); margin: 0 6px; flex-shrink: 0;
     }
 
     /* 🖱 우클릭 컨텍스트 메뉴 */
@@ -8112,7 +8124,7 @@
   <div id="image-lightbox" class="modal-overlay" style="background:rgba(0,0,0,0.85); backdrop-filter:none; overflow:hidden;" onclick="closeImageLightbox()">
     <img id="image-lightbox-img" src="" onwheel="onLightboxWheel(event)" onmousedown="onLightboxImgMouseDown(event)" onclick="onLightboxImgClick(event)" style="max-width:90vw; max-height:90vh; border-radius: 12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); transform-origin:center center; user-select:none; -webkit-user-drag:none; touch-action:none;">
     <div id="image-lightbox-zoom-hint" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.65); font-size:12px; pointer-events:none;">마우스 휠로 확대·축소 · 드래그로 이동</div>
-    <div id="image-lightbox-toolbar" onclick="event.stopPropagation()" style="position:fixed; bottom:56px; left:50%; transform:translateX(-50%); display:flex; gap:8px; background:rgba(20,20,24,0.55); backdrop-filter:blur(6px); padding:8px; border-radius:14px;">
+    <div id="image-lightbox-toolbar" onclick="event.stopPropagation()" style="position:fixed; bottom:56px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:6px; background:rgba(24,24,28,0.7); backdrop-filter:blur(14px) saturate(1.4); padding:6px; border-radius:999px;">
       <button type="button" class="lb-btn lb-btn-icon" onclick="lightboxZoomOut()" title="축소 (마우스 휠로도 가능)">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/></svg>
       </button>
@@ -23237,7 +23249,7 @@
     async function refreshChannelMessageUnreadCounts() {
       if (!isActiveChannelChat()) return;
       const channelKey = activeChatUser.ip;
-      const rows = [...document.querySelectorAll('#chat-messages-area .is-mine-msg[data-msg-uid]')];
+      const rows = [...document.querySelectorAll('#chat-messages-area [data-msg-uid]')].filter((row) => row.querySelector('.msg-unread-count'));
       const messages = rows.map((row) => ({
         msgUid: row.getAttribute('data-msg-uid'),
         messageId: parseInt(row.getAttribute('data-msg-id'), 10) || 0
@@ -26089,7 +26101,11 @@
       const canReply = reactionKey && !isDeletedAlready && !isSystemNotice && activeChatUser;
       const replyBtnHtml = canReply ? `<button type="button" class="reply-btn" title="답장" onclick="replyThisMessage(this)">↩️</button>` : '';
       const reactionsHostHtml = canReact ? `<div class="msg-reactions" data-reaction-host="${escapeMsgUidAttr(reactionKey)}"></div>` : '';
-      const unreadCountHtml = (isMe && isGroupChannel && msgUid)
+      // ⚠️ 예전엔 내가 보낸 메시지에만 안읽은 인원 수를 보여줬는데, 다른 사람이 보낸
+      // 메시지도 몇 명이 아직 안 읽었는지 궁금하다는 요청으로 부서·층·전체공지·그룹
+      // 채팅방의 모든 메시지에 똑같이 보여주도록 넓혔다(누가 보냈든 계산 방식은 동일 —
+      // "이 메시지 이후 아직 안 읽은 채널 인원 수").
+      const unreadCountHtml = (isGroupChannel && msgUid)
         ? `<span class="msg-unread-count"></span>` : '';
       const displayMsg = (() => {
         let html = normalizeChatFileBoxHtml(
