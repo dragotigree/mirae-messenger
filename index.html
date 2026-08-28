@@ -11969,12 +11969,41 @@
       }
     }, 3000);
 
+    // ⚠️ 실사고: 프로그램을 막 켰을 때는 몇 초 동안 동료들의 PING 응답이 몰려 들어오면서
+    // (온라인 PC 수만큼) user-list-update가 짧은 간격으로 여러 번 오고, 그때마다 목록이
+    // 통째로 다시 그려진다. 이 순간 사용자가 목록을 스크롤하고 있으면 스크롤 프레임과
+    // 무거운 재구성 작업이 겹쳐 버벅거려 보인다("시작 직후 스크롤하면 버벅거린다"는 신고).
+    // 스크롤 중에는 네트워크발 재렌더를 잠깐 미뤄뒀다가, 스크롤이 멈춘 직후 한 번만
+    // 몰아서 반영한다 — 사용자가 직접 조작해서 부르는 렌더(필터·접기 등)는 그대로 즉시 실행된다.
+    let sidebarUserListIsScrolling = false;
+    let sidebarUserListRenderPending = false;
+    let sidebarUserListScrollEndTimer = null;
+    (function bindSidebarUserListScrollGuard() {
+      const treeEl = document.getElementById('user-list-tree');
+      if (!treeEl) return;
+      treeEl.addEventListener('scroll', () => {
+        sidebarUserListIsScrolling = true;
+        if (sidebarUserListScrollEndTimer) clearTimeout(sidebarUserListScrollEndTimer);
+        sidebarUserListScrollEndTimer = setTimeout(() => {
+          sidebarUserListIsScrolling = false;
+          if (sidebarUserListRenderPending) {
+            sidebarUserListRenderPending = false;
+            renderUserListTree();
+          }
+        }, 200);
+      }, { passive: true });
+    })();
+
     function applyUserListUpdate(users) {
       persistContactSnapshotsFromUserList(users);
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
       queueProfilePhotoLoads(users);
       const selecting = sidebarSelectedUserIps.size > 0;
-      renderUserListTree();
+      if (sidebarUserListIsScrolling) {
+        sidebarUserListRenderPending = true;
+      } else {
+        renderUserListTree();
+      }
       if (document.body.classList.contains('compact-mode') && !activeChatUser) {
         if (selecting) patchCompactDirectoryPresenceOnly();
         else renderCompactList();
