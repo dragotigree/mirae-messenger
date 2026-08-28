@@ -7643,6 +7643,13 @@ function startUdpDiscovery() {
         // 상대까지 "재접속 1회"로 잡히는 걸 막기 위해서다.
         if (wasOffline && previouslyKnown) {
           peerReconnectCounts.set(rinfo.address, (peerReconnectCounts.get(rinfo.address) || 0) + 1);
+          // ⚠️ 테스트망 IP나 DHCP로 계속 바뀌는 IP가 쌓이면 이 Map이 프로그램을 오래 켜둘수록
+          // 끝없이 커질 수 있어(정리하는 곳이 없었음), 너무 커지면 가장 오래된 것부터 지운다 —
+          // 실제 재접속 횟수 정확도보다 메모리 상한을 지키는 게 우선이다.
+          if (peerReconnectCounts.size > 1000) {
+            const oldestKey = peerReconnectCounts.keys().next().value;
+            peerReconnectCounts.delete(oldestKey);
+          }
         }
         userObj.reconnectCount = peerReconnectCounts.get(rinfo.address) || 0;
 
@@ -14136,6 +14143,14 @@ ipcMain.handle('set-duty-roster-for-date', async (event, payload) => {
   // 마스터 또는 작성 권한자 세션이면 당직·OFF 저장 가능
   if (!masterSessionActive && !noticeOperatorSessionActive) {
     return { success: false, msg: '마스터 또는 작성 권한자 계정으로 로그인한 뒤 저장할 수 있습니다.' };
+  }
+  // ⚠️ 실사고: 작성 권한자는 계정마다 "당직관리 권한"(can_manage_duty)을 따로 줄 수 있는데,
+  // 이 서버 쪽 핸들러는 그 권한을 전혀 확인하지 않고 로그인 여부만 봤다 — 렌더러가 권한 없는
+  // 계정에는 버튼을 숨기는 것뿐이라, 그 UI를 우회하면(직접 IPC 호출 등) 당직관리 권한이
+  // 없는 작성 권한자도 당직표를 고칠 수 있었다(권한 상승 취약점). 마스터는 항상 허용하고,
+  // 작성 권한자는 로그인 시 저장해 둔 noticeOperatorCanManageDutySession도 함께 확인한다.
+  if (!masterSessionActive && !noticeOperatorCanManageDutySession) {
+    return { success: false, msg: '이 계정은 당직·OFF 관리 권한이 없습니다.' };
   }
   const p = payload || {};
   return replaceDutyRosterForDate(p.dateStr, p.dutyNames || [], p.offNames || [], {
