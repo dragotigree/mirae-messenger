@@ -17473,9 +17473,13 @@
       return isChatCurrentlyOpen(cardIp);
     }
 
-    /** 채팅 전환 직후 사이드바 선택 하이라이트를 DOM에 반영 (목록 재구축 없이) */
+    /** 채팅 전환 직후 사이드바 선택 하이라이트를 DOM에 반영 (목록 재구축 없이)
+     *  ⚠️ 실사고: 즐겨찾기 섹션(#favorites-section-body)이 빠져 있어서, 즐겨찾기
+     *  목록 안에서 이 사람 저 사람 눌러도 파란 선택 강조가 맨 처음 눌렀던(또는
+     *  일반 목록에서 마지막으로 열었던) 카드에 그대로 남아있는 것처럼 보였다
+     *  ("즐겨찾기에서 다른 사람을 눌러도 계속 고정되어 있다" 신고). */
     function syncSidebarSelectionHighlight() {
-      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip]').forEach((card) => {
+      document.querySelectorAll('#user-list-tree .user-card-item[data-user-ip], #favorites-section-body .user-card-item[data-user-ip]').forEach((card) => {
         card.classList.toggle('active', isSidebarDmCardActive(card.dataset.userIp));
       });
       document.querySelectorAll('.compact-list-item-user[data-user-ip]').forEach((item) => {
