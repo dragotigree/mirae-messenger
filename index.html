@@ -6515,6 +6515,7 @@
           <div class="detail-info-row"><span class="detail-info-label">부서</span><span class="detail-info-value" id="detail-dept-val">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">내선번호</span><span class="detail-info-value" id="detail-ext">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">휴대폰번호</span><span class="detail-info-value" id="detail-phone">-</span></div>
+          <div class="detail-info-row"><span class="detail-info-label">IP</span><span class="detail-info-value" id="detail-ip" style="font-family:monospace; font-size:12px;">-</span></div>
           <div class="detail-info-row"><span class="detail-info-label">마지막 접속</span><span class="detail-info-value" id="detail-last-seen">-</span></div>
           <div class="detail-info-row detail-note-row" id="detail-note-row"><span class="detail-info-label">비고</span><span class="detail-info-value" id="detail-note">-</span></div>
         </div>
@@ -6601,6 +6602,11 @@
     </div>
   </div>
 
+  <!-- 마스터 관리자 「접속 PC」 표의 "진단" ℹ️ — 예전엔 마우스를 올리면 뜨는 title 툴팁이었는데,
+       표가 창 오른쪽 끝에 붙어 있으면 화면 밖으로 잘려 보기 어려웠다("보기가 어려운데 그냥
+       클릭하면 나오게 해줘"). 클릭하면 뜨고, 화면 안에 들어오도록 위치를 계산해 보여준다. -->
+  <div id="master-diag-popover" class="storage-tooltip" style="display:none; pointer-events:none;"></div>
+
   <!-- 🩺 주치의 OFF / 당직의 등록 -->
   <div id="duty-roster-modal" class="modal-overlay">
     <div class="modal-card" style="width:440px; gap:14px;">
@@ -6662,24 +6668,24 @@
                 <span class="master-tool-icon" style="background:#ecfdf5; color:#059669;">➕</span>
                 <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">신규 계정 추가</span></div>
               </div>
-              <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
-                표시 이름 (예: 물리치료실장 정용범)
-                <input type="text" id="master-op-display-name" placeholder="표시 이름을 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
-              </label>
-              <div style="display:flex; gap:10px;">
-                <label style="font-size:12px; color:#475569; flex:1; display:flex; flex-direction:column; gap:4px;">
+              <div style="display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
+                <label style="font-size:12px; color:#475569; flex:1 1 220px; min-width:180px; display:flex; flex-direction:column; gap:4px;">
+                  표시 이름 (예: 물리치료실장 정용범)
+                  <input type="text" id="master-op-display-name" placeholder="표시 이름을 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px; width:100%; box-sizing:border-box;">
+                </label>
+                <label style="font-size:12px; color:#475569; flex:1 1 160px; min-width:140px; display:flex; flex-direction:column; gap:4px;">
                   아이디
                   <input type="text" id="master-op-username" placeholder="로그인 아이디" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px; width:100%; box-sizing:border-box;">
                 </label>
-                <label style="font-size:12px; color:#475569; flex:1; display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:12px; color:#475569; flex:1 1 160px; min-width:140px; display:flex; flex-direction:column; gap:4px;">
                   비밀번호
                   <input type="password" id="master-op-password" placeholder="비밀번호" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px; width:100%; box-sizing:border-box;">
                 </label>
+                <button type="button" onclick="addMasterNoticeOperator()" style="flex:0 0 auto; padding:10px 18px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;">💾 계정 발급 및 저장</button>
               </div>
               <div style="font-size:12px; color:#475569; line-height:1.5; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 12px;">
                 발급된 계정은 <b>공지·병원 일정</b>과 달력 <b>일정등록(당직의·주치의 OFF)</b>을 모두 사용할 수 있습니다.
               </div>
-              <button type="button" onclick="addMasterNoticeOperator()" style="padding:11px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">💾 계정 발급 및 저장</button>
             </div>
             <div>
               <div class="master-tool-card-head" style="margin-bottom:8px;">
@@ -6687,7 +6693,7 @@
                 <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">등록된 작성 권한자</span></div>
               </div>
               <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">아래 계정으로 로그인하면 공지·일정·당직의·OFF를 작성할 수 있습니다.</div>
-              <div id="master-operator-list-box" style="max-height:min(36vh,320px); overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+              <div id="master-operator-list-box" style="max-height:min(50vh,460px); overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:8px; align-content:start;"></div>
             </div>
           </div>
 
@@ -21315,6 +21321,44 @@
       return remHours ? `${days}일 ${remHours}시간` : `${days}일`;
     }
 
+    /** 「접속 PC」 표의 "진단" ℹ️ — title 툴팁이 표가 창 오른쪽 끝에 붙어 있으면 화면 밖으로
+     *  잘려 보기 어려웠다. 클릭하면 뜨고, 화면 안에 들어오도록 위치를 계산해 보여준다. */
+    let masterDiagPopoverOpenBtn = null;
+    function toggleMasterDiagPopover(btn) {
+      const pop = document.getElementById('master-diag-popover');
+      if (!pop || !btn) return;
+      if (masterDiagPopoverOpenBtn === btn && pop.style.display !== 'none') {
+        hideMasterDiagPopover();
+        return;
+      }
+      pop.innerHTML = escapeHtml(btn.getAttribute('data-diag') || '').replace(/ · /g, '<br>');
+      pop.style.display = 'block';
+      masterDiagPopoverOpenBtn = btn;
+      const rect = btn.getBoundingClientRect();
+      const margin = 8;
+      pop.style.left = '0px';
+      pop.style.top = '0px';
+      const popRect = pop.getBoundingClientRect();
+      let x = rect.left + rect.width / 2 - popRect.width / 2;
+      let y = rect.bottom + 6;
+      if (x + popRect.width > window.innerWidth - margin) x = window.innerWidth - margin - popRect.width;
+      if (x < margin) x = margin;
+      if (y + popRect.height > window.innerHeight - margin) y = rect.top - popRect.height - 6;
+      pop.style.left = `${Math.max(margin, x)}px`;
+      pop.style.top = `${Math.max(margin, y)}px`;
+    }
+    function hideMasterDiagPopover() {
+      const pop = document.getElementById('master-diag-popover');
+      if (pop) pop.style.display = 'none';
+      masterDiagPopoverOpenBtn = null;
+    }
+    document.addEventListener('click', (e) => {
+      if (masterDiagPopoverOpenBtn && !e.target.closest('.master-diag-btn')) hideMasterDiagPopover();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && masterDiagPopoverOpenBtn) hideMasterDiagPopover();
+    });
+
     function formatTrafficAge(ts) {
       const t = Number(ts) || 0;
       if (!t) return '-';
@@ -21725,9 +21769,16 @@
         const loadCell = traffic
           ? `<span title="1분 메시지 ${Number(traffic.msgs1m) || 0}건 · 1분 용량 ${formatTrafficBytes(traffic.bytes1m)}${traffic.overflowCount ? ` · 버퍼초과 ${traffic.overflowCount}회` : ''}">${loadLevelLabel[traffic.level] || traffic.level}</span>`
           : '<span style="color:#cbd5e1;">-</span>';
-        const uptimeText = u.online ? formatUptimeShort(u.bootTime) : '-';
-        const dbSizeText = u.dbSizeBytes != null ? formatTrafficBytes(u.dbSizeBytes) : '확인 중…';
-        const pendingText = `${Number(u.pendingRetryCount) || 0}건`;
+        // ⚠️ 실사고: 접속시간·DB크기 등은 상대 PC가 PING에 실어 보내야 알 수 있는데, 아직
+        // 이 기능이 없는 구버전 PC는 그 필드 자체를 안 보낸다. 그런 PC는 "확인 중…"이라고
+        // 표시하면 마치 곧 뜰 것처럼 보여 혼란스럽다("확인중이라면서 안나와"라는 신고) —
+        // 실제로는 그 PC가 최신 버전으로 업데이트되기 전까진 영원히 안 뜬다. 버전이 기준보다
+        // 낮으면 "구버전"이라고 명확히 알려주고, 최신 버전인데도 아직 값이 없을 때만
+        // "확인 중…"(다음 하트비트를 기다리는 중, 보통 수 초~15초 이내 채워짐)으로 표시한다.
+        const isOutdatedForDiag = ver !== '-' && verOutdated;
+        const uptimeText = !u.online ? '-' : (u.bootTime ? formatUptimeShort(u.bootTime) : (isOutdatedForDiag ? '구버전' : '확인 중…'));
+        const dbSizeText = u.dbSizeBytes != null ? formatTrafficBytes(u.dbSizeBytes) : (isOutdatedForDiag ? '구버전 PC (지원 안 함)' : '확인 중…');
+        const pendingText = u.pendingRetryCount != null ? `${Number(u.pendingRetryCount) || 0}건` : (isOutdatedForDiag ? '구버전 PC (지원 안 함)' : '확인 중…');
         const reconnectText = `${Number(u.reconnectCount) || 0}회`;
         const diagTitle = `DB(저장공간) 크기: ${dbSizeText} · 미확인 재전송 대기: ${pendingText} · 최근 재접속: ${reconnectText}`;
         const diagWarn = (Number(u.pendingRetryCount) || 0) > 0 || (Number(u.reconnectCount) || 0) >= 3;
@@ -21740,7 +21791,7 @@
           <td>${statusCell}</td>
           <td style="font-size:11px; text-align:center; color:#64748b;">${escapeHtml(uptimeText)}</td>
           <td style="font-size:11.5px; text-align:center;">${loadCell}</td>
-          <td style="text-align:center;"><span title="${escAttr(diagTitle)}" style="cursor:help; ${diagWarn ? 'color:#c2410c;' : 'color:#94a3b8;'}">ℹ️</span></td>
+          <td style="text-align:center;"><button type="button" class="master-diag-btn" data-diag="${escAttr(diagTitle)}" style="border:none; background:none; cursor:pointer; padding:2px; font-size:13px; ${diagWarn ? 'color:#c2410c;' : 'color:#94a3b8;'}">ℹ️</button></td>
           <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
           <td style="text-align:center;">
             <button type="button" class="master-client-menu-btn" data-ip="${escAttr(u.ip)}" title="관리" aria-label="관리">⋮</button>
@@ -21780,6 +21831,12 @@
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           openMasterClientMenu(btn.getAttribute('data-ip'), btn);
+        });
+      });
+      box.querySelectorAll('.master-diag-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleMasterDiagPopover(btn);
         });
       });
       box.querySelectorAll('th.is-sortable').forEach((th) => {
@@ -23367,6 +23424,8 @@
       document.getElementById('detail-dept-val').textContent = (u.dept && String(u.dept).trim()) || '없음';
       document.getElementById('detail-ext').textContent = (u.extNo && String(u.extNo).trim()) || '없음';
       document.getElementById('detail-phone').textContent = (u.phone && String(u.phone).trim()) || '없음';
+      const ipEl = document.getElementById('detail-ip');
+      if (ipEl) ipEl.textContent = (u.ip && String(u.ip).trim()) || '없음';
       const lastSeenEl = document.getElementById('detail-last-seen');
       if (lastSeenEl) {
         lastSeenEl.textContent = formatLastSeenRelative(u);
@@ -30341,6 +30400,21 @@
       return { hasAdmit, hasDischarge, hasRoomChange, hasFlow };
     }
 
+    /** 사이드바 미니 달력 날짜 칸에 마우스를 올렸을 때 보여줄 그날 입원·퇴원 인원수. */
+    function sidebarCalendarDayCounts(dateStr) {
+      const bucket = schedulesByDateStr.get(dateStr);
+      let admit = 0;
+      let discharge = 0;
+      if (bucket && bucket.length) {
+        for (let i = 0; i < bucket.length; i++) {
+          const t = bucket[i].type || 'GENERAL';
+          if (t === 'ADMISSION') admit++;
+          else if (t === 'DISCHARGE') discharge++;
+        }
+      }
+      return { admit, discharge };
+    }
+
     function sidebarCalendarMarksHtml(dateStr) {
       const { hasAdmit, hasDischarge, hasRoomChange, hasFlow } = sidebarCalendarDayMarks(dateStr);
       if (!hasAdmit && !hasDischarge && !hasRoomChange && !hasFlow) return '';
@@ -30386,7 +30460,16 @@
         if (!cell.other && cell.dateStr === todayStr) cls += ' today';
         if (!cell.other && cell.dateStr === selectedCalendarDateStr) cls += ' selected';
         el.className = cls;
-        if (!cell.other && cell.dateStr === todayStr) el.title = '오늘';
+        // ⚠️ 사이드바 미니 달력에 마우스를 올리면 그날 입원·퇴원 인원수가 바로 보이게 해
+        // 달라는 요청 — 날짜를 눌러 하루보기로 들어가지 않아도 미리 가늠할 수 있게 한다.
+        const titleParts = [];
+        if (!cell.other && cell.dateStr === todayStr) titleParts.push('오늘');
+        if (!cell.other) {
+          const { admit, discharge } = sidebarCalendarDayCounts(cell.dateStr);
+          if (admit) titleParts.push(`입원 ${admit}명`);
+          if (discharge) titleParts.push(`퇴원 ${discharge}명`);
+        }
+        if (titleParts.length) el.title = titleParts.join(' · ');
         el.textContent = String(cell.dayNum);
         if (!cell.other) {
           el.onclick = () => calendarSelectDate(cell.dateStr);
