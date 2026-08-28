@@ -4566,6 +4566,14 @@
       transition: border-color var(--transition-normal), transform var(--transition-fast), box-shadow var(--transition-normal);
     }
     .board-notice-row:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .board-load-more-btn {
+      display: block; width: 100%; margin-top: 4px; padding: 11px;
+      background: var(--surface-muted); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+      font-size: 12.5px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+      font-family: inherit; transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .board-load-more-btn:hover:not(:disabled) { background: var(--border-soft); color: var(--text-primary); }
+    .board-load-more-btn:disabled { cursor: default; opacity: 0.7; }
     /* 안 읽은 공지 — 파스텔 테두리 + 제목 앞 점 */
     .board-notice-row.is-unread { border-color: #c7d2fe; }
     .board-notice-row.is-unread .board-notice-title-text { font-weight: 800; }
@@ -5173,14 +5181,20 @@
       top: 0;
       z-index: 1;
     }
-    .master-clients-table col.c-name { width: 19%; }
-    .master-clients-table col.c-dept { width: 21%; }
-    .master-clients-table col.c-ip { width: 13%; }
-    .master-clients-table col.c-ver { width: 10%; }
-    .master-clients-table col.c-status { width: 12%; }
-    .master-clients-table col.c-load { width: 11%; }
-    .master-clients-table col.c-last { width: 12%; }
+    .master-clients-table col.c-name { width: 17%; }
+    .master-clients-table col.c-dept { width: 15%; }
+    .master-clients-table col.c-ip { width: 10%; }
+    .master-clients-table col.c-ver { width: 8%; }
+    .master-clients-table col.c-status { width: 10%; }
+    .master-clients-table col.c-uptime { width: 9%; }
+    .master-clients-table col.c-load { width: 9%; }
+    .master-clients-table col.c-diag { width: 7%; }
+    .master-clients-table col.c-last { width: 10%; }
     .master-clients-table col.c-actions { width: 44px; }
+    .master-clients-group-row td {
+      padding: 9px 10px 5px; font-size: 11.5px; font-weight: 800; color: #475569;
+      background: #f1f5f9; border-top: 1px solid var(--border-soft);
+    }
     .master-client-menu-btn {
       width: 26px; height: 26px; border: 1px solid var(--border); background: #fff; color: #64748b;
       border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; line-height: 1;
@@ -6686,6 +6700,7 @@
                 <button type="button" id="master-bulk-subdept-btn" onclick="openMasterBulkSubDeptModal()" disabled style="padding:6px 10px; background:#e0f2fe; border:1px solid #bae6fd; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#0369a1; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요 (부서가 서로 달라도 됩니다)">🏷️ 선택한 인원 소부서 일괄 변경</button>
                 <button type="button" id="master-bulk-force-update-btn" onclick="masterForceUpdateSelected()" disabled style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;" title="표에서 체크박스로 몇 명을 고른 뒤 눌러 주세요 (온라인 대상만 가능)">⚡ 선택한 PC 강제 업데이트</button>
                 <button type="button" onclick="masterForceUpdateOutdated()" style="padding:6px 10px; background:#fee2e2; border:1px solid #fecaca; border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#b91c1c; white-space:nowrap;">⚡ 구버전 강제 업데이트</button>
+                <button type="button" id="master-clients-group-toggle-btn" onclick="toggleMasterClientsGroupByDept()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;" title="부서별로 묶어서 인원수와 함께 보기">🗂️ 부서별로 묶어보기</button>
                 <button type="button" onclick="renderMasterOnlineClients()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
               </div>
             </div>
@@ -11181,6 +11196,9 @@
     let allLogsLastDateKey = '';
     let allLogsKeyword = '';
     let cachedNoticesList = [];
+    const NOTICES_PAGE_SIZE = 20;
+    let noticesHasMore = false;
+    let noticesLoadingMore = false;
     let boardCategoryFilter = localStorage.getItem('boardCategoryFilter') || '__all__';
     let chatSearchDebounce = null;
     /** 대화방 Ctrl+F 검색 중일 때 하이라이트용 키워드 */
@@ -20662,21 +20680,35 @@
         };
         container.appendChild(row);
       });
+      // 검색·필터가 걸려 있으면 "더 보기"가 무엇을 더 불러오는지 헷갈릴 수 있어(필터링은
+      // 지금까지 받아온 것 안에서만 이뤄짐), 필터 없이 볼 때만 이어서 받아오는 버튼을 보여준다.
+      const noFilterActive = boardCategoryFilter === '__all__' && !boardUnreadOnly && !boardSearchKeyword;
+      if (noFilterActive && noticesHasMore) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'board-load-more-btn';
+        moreBtn.disabled = noticesLoadingMore;
+        moreBtn.textContent = noticesLoadingMore ? '불러오는 중…' : '이전 공지 더 보기';
+        moreBtn.onclick = loadMoreNotices;
+        container.appendChild(moreBtn);
+      }
     }
 
+    /** ⚠️ 실사고: 공지가 몇 년치 쌓이면 게시판을 열 때마다 전부 불러오는 게 점점 무거워질
+     *  수 있어서("공지사항들이 계속 쌓일건데 문제 되려나"는 우려) 처음엔 최근 20개만 받고,
+     *  더 볼 사람만 「이전 공지 더 보기」로 이어서 받아온다. */
     async function loadNoticesList() {
-      let notices = [];
+      let res;
       try {
-        notices = await window.api.getNotices();
+        res = await window.api.getNotices({ limit: NOTICES_PAGE_SIZE, offset: 0 });
       } catch (e) {
         console.error('getNotices 실패:', e);
-        notices = [];
+        res = { notices: [], hasMore: false };
       }
-      if (notices && !Array.isArray(notices) && Array.isArray(notices.notices)) {
-        notices = notices.notices;
-      }
+      const notices = (res && Array.isArray(res.notices)) ? res.notices : (Array.isArray(res) ? res : []);
+      noticesHasMore = !!(res && res.hasMore);
       const seenUids = new Set();
-      cachedNoticesList = (Array.isArray(notices) ? notices : []).filter((n) => {
+      cachedNoticesList = notices.filter((n) => {
         if (!n || !n.uid || seenUids.has(n.uid)) return false;
         seenUids.add(n.uid);
         return true;
@@ -20692,6 +20724,27 @@
       renderBoardCategoryFilters(cachedNoticesList);
       renderFilteredNoticesList();
       refreshIconRailBadges();
+    }
+
+    async function loadMoreNotices() {
+      if (noticesLoadingMore || !noticesHasMore) return;
+      noticesLoadingMore = true;
+      renderFilteredNoticesList();
+      try {
+        const res = await window.api.getNotices({ limit: NOTICES_PAGE_SIZE, offset: cachedNoticesList.length });
+        const more = (res && Array.isArray(res.notices)) ? res.notices : [];
+        noticesHasMore = !!(res && res.hasMore);
+        const seenUids = new Set(cachedNoticesList.map((n) => n.uid));
+        const fresh = more.filter((n) => n && n.uid && !seenUids.has(n.uid))
+          .map((n) => ({ ...n, category: normalizeBoardCategory(n.category) }));
+        cachedNoticesList = cachedNoticesList.concat(fresh);
+      } catch (e) {
+        console.error('loadMoreNotices 실패:', e);
+      } finally {
+        noticesLoadingMore = false;
+        renderBoardCategoryFilters(cachedNoticesList);
+        renderFilteredNoticesList();
+      }
     }
 
     async function showBoardDetailView(uid) {
@@ -21245,6 +21298,23 @@
       return `${(v / (1024 * 1024)).toFixed(2)} MB`;
     }
 
+    /** 마스터 관리자 「접속 PC」 표의 "접속시간" 열 — bootTime(그 PC 메신저가 켜진 시각,
+     *  PING으로 전파됨)과 지금 시각의 차이를 "2시간 15분"처럼 짧게 보여준다. */
+    function formatUptimeShort(bootTime) {
+      const t = Number(bootTime) || 0;
+      if (!t) return '-';
+      const ms = Date.now() - t;
+      if (ms < 0) return '-';
+      const mins = Math.floor(ms / 60000);
+      if (mins < 60) return `${mins}분`;
+      const hours = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      if (hours < 24) return remMins ? `${hours}시간 ${remMins}분` : `${hours}시간`;
+      const days = Math.floor(hours / 24);
+      const remHours = hours % 24;
+      return remHours ? `${days}일 ${remHours}시간` : `${days}일`;
+    }
+
     function formatTrafficAge(ts) {
       const t = Number(ts) || 0;
       if (!t) return '-';
@@ -21479,6 +21549,16 @@
      *  훑어서 걸러낸다(사이드바 사람 검색과 같은 감각). Ctrl+F로도 이 칸에 바로 들어온다. */
     let masterClientsFilter = '';
 
+    /** 「접속 PC」 표를 부서별로 묶어 보여줄지 — 부서 인원이 몇 명인지 한눈에 보고 싶다는
+     *  요청으로 추가. 켜면 정렬 기준(masterClientsSortKey)과 별개로 부서 묶음이 우선한다. */
+    let masterClientsGroupByDept = localStorage.getItem('masterClientsGroupByDept') === '1';
+
+    function toggleMasterClientsGroupByDept() {
+      masterClientsGroupByDept = !masterClientsGroupByDept;
+      localStorage.setItem('masterClientsGroupByDept', masterClientsGroupByDept ? '1' : '0');
+      renderMasterOnlineClients();
+    }
+
     function onMasterClientsFilterInput(value) {
       masterClientsFilter = String(value || '').trim().toLowerCase();
       renderMasterOnlineClients();
@@ -21593,7 +21673,7 @@
       const tableHead = `<table class="master-clients-table">
         <colgroup>
           <col class="c-check" style="width:30px;"><col class="c-name"><col class="c-dept"><col class="c-ip"><col class="c-ver">
-          <col class="c-status"><col class="c-load"><col class="c-last"><col class="c-actions">
+          <col class="c-status"><col class="c-uptime"><col class="c-load"><col class="c-diag"><col class="c-last"><col class="c-actions">
         </colgroup>
         <thead><tr>
           <th><input type="checkbox" id="master-clients-select-all" title="전체 선택/해제"></th>
@@ -21602,14 +21682,16 @@
           ${sortableTh('ip', 'IP')}
           ${sortableTh('version', '버전')}
           ${sortableTh('status', '상태')}
+          <th style="text-align:center;" title="접속 중인 시간(이 PC가 켜진 뒤 지난 시간)">접속시간</th>
           <th style="text-align:center;" title="이 PC가 최근 1분간 보낸 트래픽 판정(부하 감시 탭과 동일 기준)">부하</th>
+          <th style="text-align:center;" title="DB(저장공간) 크기 · 미확인 재전송 대기 건수 · 최근 재접속 횟수">진단 ℹ️</th>
           ${sortableTh('last', '마지막', 'right')}
           <th style="text-align:center;">관리</th>
         </tr></thead><tbody>`;
 
       const escAttr = (s) => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
-      const tableBody = rows.map(u => {
+      const renderClientRow = (u) => {
         const isMe = !!u.isMe;
         const ver = u.appVersion || '-';
         const verOutdated = ver !== '-' && ver !== refVersion;
@@ -21643,6 +21725,12 @@
         const loadCell = traffic
           ? `<span title="1분 메시지 ${Number(traffic.msgs1m) || 0}건 · 1분 용량 ${formatTrafficBytes(traffic.bytes1m)}${traffic.overflowCount ? ` · 버퍼초과 ${traffic.overflowCount}회` : ''}">${loadLevelLabel[traffic.level] || traffic.level}</span>`
           : '<span style="color:#cbd5e1;">-</span>';
+        const uptimeText = u.online ? formatUptimeShort(u.bootTime) : '-';
+        const dbSizeText = u.dbSizeBytes != null ? formatTrafficBytes(u.dbSizeBytes) : '확인 중…';
+        const pendingText = `${Number(u.pendingRetryCount) || 0}건`;
+        const reconnectText = `${Number(u.reconnectCount) || 0}회`;
+        const diagTitle = `DB(저장공간) 크기: ${dbSizeText} · 미확인 재전송 대기: ${pendingText} · 최근 재접속: ${reconnectText}`;
+        const diagWarn = (Number(u.pendingRetryCount) || 0) > 0 || (Number(u.reconnectCount) || 0) >= 3;
         return `<tr class="${u.online && !usageDisabled ? '' : 'is-dim'}">
           <td><input type="checkbox" class="master-client-select-box" data-ip="${escAttr(u.ip)}" ${checked} ${selectable ? '' : 'disabled'} title="${selectable ? '선택' : '이 PC는 선택할 수 없습니다'}"></td>
           <td style="font-weight:700; color:#0f172a;" title="${escAttr(nameText)}">${escapeHtml(u.rank || '')} ${escapeHtml(u.username || '-')}${isMe ? ' <span style="color:var(--accent-dark); font-size:10px;">(이 PC)</span>' : ''}${wipePendingBadge}</td>
@@ -21650,15 +21738,44 @@
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
           <td><span class="master-pill ${verOutdated ? 'is-outdated' : 'is-uptodate'}">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</span></td>
           <td>${statusCell}</td>
+          <td style="font-size:11px; text-align:center; color:#64748b;">${escapeHtml(uptimeText)}</td>
           <td style="font-size:11.5px; text-align:center;">${loadCell}</td>
+          <td style="text-align:center;"><span title="${escAttr(diagTitle)}" style="cursor:help; ${diagWarn ? 'color:#c2410c;' : 'color:#94a3b8;'}">ℹ️</span></td>
           <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
           <td style="text-align:center;">
             <button type="button" class="master-client-menu-btn" data-ip="${escAttr(u.ip)}" title="관리" aria-label="관리">⋮</button>
           </td>
         </tr>`;
-      }).join('');
+      };
+
+      // ⚠️ 부서 인원 대비 표시를 정렬·그룹핑해 달라는 요청 — 켜면 부서별로 묶어서 보여주고
+      // (부서명 가나다순, 인원수 표시), 끄면 예전처럼 평평한 한 표로 보여준다.
+      let tableBody;
+      if (masterClientsGroupByDept) {
+        const groups = new Map();
+        rows.forEach((u) => {
+          const key = String(u.dept || '').trim() || '기타';
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(u);
+        });
+        const deptNames = [...groups.keys()].sort((a, b) => a === '기타' ? 1 : (b === '기타' ? -1 : a.localeCompare(b, 'ko')));
+        tableBody = deptNames.map((dept) => {
+          const list = groups.get(dept);
+          const onlineCount = list.filter((u) => u.online).length;
+          const header = `<tr class="master-clients-group-row"><td colspan="11">🗂️ ${escapeHtml(dept)} · ${list.length}명 (온라인 ${onlineCount}명)</td></tr>`;
+          return header + list.map(renderClientRow).join('');
+        }).join('');
+      } else {
+        tableBody = rows.map(renderClientRow).join('');
+      }
 
       box.innerHTML = tableHead + tableBody + '</tbody></table>';
+      const groupToggleBtn = document.getElementById('master-clients-group-toggle-btn');
+      if (groupToggleBtn) {
+        groupToggleBtn.style.background = masterClientsGroupByDept ? '#e0f2fe' : '#fff';
+        groupToggleBtn.style.borderColor = masterClientsGroupByDept ? '#bae6fd' : 'var(--border)';
+        groupToggleBtn.style.color = masterClientsGroupByDept ? '#0369a1' : '#475569';
+      }
       box.querySelectorAll('.master-client-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();

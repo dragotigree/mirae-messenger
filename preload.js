@@ -72,7 +72,7 @@ contextBridge.exposeInMainWorld('api', {
   saveMyProfile: (profile) => ipcRenderer.invoke('save-my-profile', profile),
 
   // 📢 공지사항 게시판
-  getNotices: () => ipcRenderer.invoke('get-notices'),
+  getNotices: (params) => ipcRenderer.invoke('get-notices', params),
   getNotice: (uid) => ipcRenderer.invoke('get-notice', uid),
   addNotice: (noticeData) => ipcRenderer.invoke('add-notice', noticeData),
   requestNoticeSync: () => ipcRenderer.invoke('request-notice-sync'),

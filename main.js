@@ -631,6 +631,15 @@ const KNOWN_SUBNET_HOST_IPS = buildKnownSubnetHostIps();
 const allKnownUsers = new Map();
 const persistedPhotos = {}; // ip -> photo (재시작 후에도 사진이 바로 보이도록 DB에서 미리 불러옴)
 const onlineUsers = new Map();
+// ⚠️ 마스터 관리자 「접속 PC」 표에 접속시간·DB크기·재전송 대기 건수를 보여 달라는 요청으로
+// 추가한 상태값들. registerSelf()가 PING에 실어 보내므로 다른 PC에서도 값을 볼 수 있다.
+const MY_BOOT_TIME = Date.now();
+let myDbSizeBytes = 0;
+let myPendingRetryCount = 0;
+/** @type {Map<string, number>} 재접속(오프라인→온라인) 횟수 — 이 PC 메모리에만 있고
+ *  네트워크로 전파하지 않는다(재접속 감지는 각 PC가 상대를 관찰한 결과일 뿐이라 공유할
+ *  공통의 "진실"이 없다 — 이 PC 화면에서 "최근 몇 번 다시 붙었는지"만 보여주면 충분하다). */
+const peerReconnectCounts = new Map();
 /** @type {Set<string>} 재전송 중인 PENDING msg_uid(또는 id) — 짧은 간격 중복 TCP 방지 */
 const pendingResendInflight = new Set();
 /** @type {Map<string, number>} SENT→ACK 재시도 횟수 */
@@ -7501,6 +7510,8 @@ function startUdpDiscovery() {
       setInterval(() => flushPendingFileXfers(), 5000);
       setTimeout(() => flushPendingGroupMessages(), 2500);
       setInterval(() => flushPendingGroupMessages(), 5000);
+      setTimeout(() => updateMyDiagnosticsInfo(), 3000);
+      setInterval(() => updateMyDiagnosticsInfo(), 45000);
     }
   });
 
@@ -7558,10 +7569,20 @@ function startUdpDiscovery() {
           if (same) {
             previouslyKnown.lastPingAt = now;
             previouslyKnown.online = true;
+            // ⚠️ 접속시간·DB크기·재전송 대기 건수는 프로필과 달리 거의 매 하트비트마다
+            // 바뀔 수 있는 값이라 위 same 비교엔 안 넣었지만(넣으면 이 빠른 경로가 무의미해짐),
+            // 그렇다고 안 갱신하면 마스터 화면에서 값이 계속 예전 그대로 멈춰 보인다. 여기서만
+            // 따로 최신화한다(DB 기록·전체 UI 알림 없이 메모리 값만 갱신 — 여전히 가볍다).
+            previouslyKnown.bootTime = data.bootTime || previouslyKnown.bootTime;
+            previouslyKnown.dbSizeBytes = data.dbSizeBytes;
+            previouslyKnown.pendingRetryCount = data.pendingRetryCount;
             const live = onlineUsers.get(rinfo.address);
             if (live) {
               live.lastPingAt = now;
               live.online = true;
+              live.bootTime = previouslyKnown.bootTime;
+              live.dbSizeBytes = previouslyKnown.dbSizeBytes;
+              live.pendingRetryCount = previouslyKnown.pendingRetryCount;
             } else {
               onlineUsers.set(rinfo.address, previouslyKnown);
             }
@@ -7584,7 +7605,10 @@ function startUdpDiscovery() {
           photo: (previouslyKnown && previouslyKnown.photo) || persistedPhotos[rinfo.address] || '',
           lastPingAt: now,
           online: true,
-          isMe: false
+          isMe: false,
+          bootTime: data.bootTime || (previouslyKnown && previouslyKnown.bootTime) || 0,
+          dbSizeBytes: data.dbSizeBytes,
+          pendingRetryCount: data.pendingRetryCount
         };
         let userObj = mergeUserProfile(previouslyKnown, overlay, true);
         // ⚠️ 실사고: 관리자가 소부서 등을 원격으로 고쳐도(master-update-user-profile),
@@ -7612,6 +7636,15 @@ function startUdpDiscovery() {
           || previouslyKnown.statusState !== userObj.statusState
           || previouslyKnown.appVersion !== userObj.appVersion
           || !!previouslyKnown.online !== true;
+
+        // ⚠️ 마스터 관리자 「접속 PC」 표에 "최근 접속 실패/재연결 횟수"를 보여 달라는 요청.
+        // 이 PC가 실제로 관찰한 재접속 횟수일 뿐이라 다른 PC와 공유할 필요는 없다(로컬 전용,
+        // PING엔 안 실음). previouslyKnown이 있을 때만 센다 — 이 PC가 방금 켜져서 처음 보는
+        // 상대까지 "재접속 1회"로 잡히는 걸 막기 위해서다.
+        if (wasOffline && previouslyKnown) {
+          peerReconnectCounts.set(rinfo.address, (peerReconnectCounts.get(rinfo.address) || 0) + 1);
+        }
+        userObj.reconnectCount = peerReconnectCounts.get(rinfo.address) || 0;
 
         onlineUsers.set(rinfo.address, userObj);
         allKnownUsers.set(rinfo.address, userObj);
@@ -7774,8 +7807,17 @@ function registerSelf() {
     // 내 카드는 보통 숨기지만, lastSeen은 이전 종료 시각을 유지
     lastSeen: (prev && Number(prev.lastSeen) > 0) ? Number(prev.lastSeen) : 0,
     online: true,
-    isMe: true
+    isMe: true,
+    // ⚠️ 마스터 관리자 「접속 PC」 표에 더 자세한 정보를 보여 달라는 요청으로 추가.
+    // 이 세 값은 PING에 실려 다른 PC에게도 전파되므로(broadcastPresence/sendPresencePingUnicast),
+    // 마스터가 아무 PC에서나 접속 PC 표를 열어도 상대 PC의 값을 그대로 볼 수 있다.
+    bootTime: MY_BOOT_TIME,
+    dbSizeBytes: myDbSizeBytes,
+    pendingRetryCount: myPendingRetryCount
   };
+  // ⚠️ dbSizeBytes/pendingRetryCount는 sig에 안 넣는다 — 메시지가 하나만 와도 바뀔 수
+  // 있는 값이라, 여기 넣으면 "하트비트마다 DB/UI 갱신하지 않음"(클릭 지연 방지)이 무력화된다.
+  // 이 두 값은 updateMyDiagnosticsInfo()가 훨씬 느린 주기로 따로 notifyUserList()를 부른다.
   const sig = [
     me.username, me.rank, me.dept, me.floor, me.extNo, me.phone, me.statusState, me.appVersion,
     me.photo ? '1' : '0'
@@ -7789,6 +7831,54 @@ function registerSelf() {
   notifyUserList();
 }
 
+/** 마스터 관리자 「접속 PC」 표에 보여줄 DB 크기·재전송 대기 건수를 느린 주기로 갱신한다.
+ *  registerSelf()의 하트비트 최적화(변경 없으면 갱신 안 함)를 우회하지 않도록 일부러
+ *  따로 뒀다 — 이 값들은 자주 바뀌어도 매번 UI를 갱신할 필요는 없다. */
+function updateMyDiagnosticsInfo() {
+  if (!profileLoaded) return;
+  try {
+    myDbSizeBytes = fs.statSync(dbPath).size;
+  } catch (e) { /* ignore */ }
+  // CLAUDE.md: 주기적으로 DB를 건드리는 작업은 dbRepairInProgress 중엔 건너뛴다.
+  if (dbRepairInProgress) {
+    applyDiagnosticsToSelf();
+    return;
+  }
+  db.get(
+    `SELECT COUNT(*) AS cnt FROM messages
+     WHERE sender_ip = ? AND status = 'PENDING' AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
+    [MY_IP],
+    (err, row) => {
+      const msgCount = (!err && row) ? (Number(row.cnt) || 0) : 0;
+      db.get(
+        `SELECT COUNT(*) AS cnt FROM pending_group_messages WHERE created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
+        [],
+        (err2, row2) => {
+          const groupCount = (!err2 && row2) ? (Number(row2.cnt) || 0) : 0;
+          db.get(
+            `SELECT COUNT(*) AS cnt FROM pending_file_xfers WHERE created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')`,
+            [],
+            (err3, row3) => {
+              const fileCount = (!err3 && row3) ? (Number(row3.cnt) || 0) : 0;
+              myPendingRetryCount = msgCount + groupCount + fileCount;
+              applyDiagnosticsToSelf();
+            }
+          );
+        }
+      );
+    }
+  );
+}
+
+/** 방금 갱신한 dbSizeBytes/pendingRetryCount를 이 PC 카드에 반영하고 화면에 알린다. */
+function applyDiagnosticsToSelf() {
+  const me = onlineUsers.get(MY_IP);
+  if (!me) return;
+  me.dbSizeBytes = myDbSizeBytes;
+  me.pendingRetryCount = myPendingRetryCount;
+  allKnownUsers.set(MY_IP, me);
+  notifyUserList();
+}
 
 function allowUdpReceive(fromIp) {
   const now = Date.now();
@@ -7845,7 +7935,10 @@ function broadcastPresence(socket) {
     phone: myProfile.phone,
     statusState: myProfile.statusState,
     appVersion: APP_VERSION,
-    note: myProfile.note || ''
+    note: myProfile.note || '',
+    bootTime: MY_BOOT_TIME,
+    dbSizeBytes: myDbSizeBytes,
+    pendingRetryCount: myPendingRetryCount
   }));
   // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
   try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
@@ -7889,7 +7982,10 @@ function sendPresencePingUnicast(ip) {
     phone: myProfile.phone,
     statusState: myProfile.statusState,
     appVersion: APP_VERSION,
-    note: myProfile.note || ''
+    note: myProfile.note || '',
+    bootTime: MY_BOOT_TIME,
+    dbSizeBytes: myDbSizeBytes,
+    pendingRetryCount: myPendingRetryCount
   }));
   try { globalUdpSocket.send(packet, 0, packet.length, UDP_PORT, ip); } catch (e) { /* ignore */ }
 }
@@ -9688,6 +9784,13 @@ function normalizeNoticeImagesField(raw) {
  */
 const NOTICE_SYNC_IMAGES_BUDGET_BYTES = 600 * 1024;
 const NOTICE_SYNC_RECENT_WITH_IMAGES = 8;
+// ⚠️ 실사고: 사진은 위 예산으로 이미 막아뒀지만, 공지 "개수"(제목·본문 텍스트) 자체는
+// 제한이 없어 재접속할 때마다 SELECT * FROM notices로 전체를 통째로 주고받았다. 몇 년치
+// 쌓이면 재접속마다 그 전체를 매번 다시 주고받게 되어 언젠가 부담이 될 수 있다("공지사항들이
+// 계속 쌓일건데 문제 되려나"는 우려). 재접속 동기화는 최근 것만으로 충분하므로(게시판 화면도
+// 최근 20개만 먼저 보여주고 「더 보기」로 이어받는 방식으로 바꿨다) 같은 개수로 맞춘다 — 오래된
+// 공지는 이미 각자 PC의 로컬 DB에 남아 있으므로 사라지지 않는다.
+const NOTICE_SYNC_RECENT_COUNT = 20;
 
 function slimNoticesForBulkSync(notices) {
   const list = Array.isArray(notices) ? notices.slice() : [];
@@ -10330,7 +10433,7 @@ function handleNoticeSyncRequest(senderIP) {
     const next = noticeSyncRequestQueue.shift();
     if (next) setTimeout(() => handleNoticeSyncRequest(next), 80);
   };
-  db.all(`SELECT * FROM notices`, [], (err, notices) => {
+  db.all(`SELECT * FROM notices ORDER BY created_at DESC LIMIT ${NOTICE_SYNC_RECENT_COUNT}`, [], (err, notices) => {
     if (err) {
       finishSync();
       return;
@@ -13683,34 +13786,43 @@ ipcMain.handle('reset-all-ui-text-overrides', async () => {
   }
 });
 
-ipcMain.handle('get-notices', async () => {
+// ⚠️ 실사고: 공지가 몇 년치 쌓이면 이 목록을 매번 통째로 렌더러에 보내는 것도,
+// (아래 NOTICE_SYNC_RESPONSE처럼) 재접속 때 매번 전부 동기화하는 것도 점점 무거워질
+// 수 있다("공지사항들이 계속 쌓일건데 문제가 되려나"는 우려). 화면은 최근 20개만 먼저
+// 받고, 더 볼 땐 게시판의 「이전 공지 더 보기」 버튼이 offset을 늘려 다시 요청한다.
+// limit을 안 주면(예: 다른 내부 호출) 예전처럼 전체를 반환해 하위 호환을 유지한다.
+ipcMain.handle('get-notices', async (event, params) => {
+  const limit = Number(params && params.limit) || 0;
+  const offset = Number(params && params.offset) || 0;
   return new Promise((resolve) => {
     ensureNoticesTableSchema(() => {
+      const finish = (rows) => {
+        const filtered = filterOutTombstonedNotices(rows || []).map((r) => mapNoticeRowForListIpc(r));
+        if (!limit) { resolve({ notices: filtered, hasMore: false }); return; }
+        resolve({ notices: filtered.slice(offset, offset + limit), hasMore: filtered.length > offset + limit });
+      };
       db.all(`SELECT * FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err, rows) => {
         if (err) {
           db.all(`SELECT * FROM notices ORDER BY created_at DESC`, [], (errNoFilter, rowsNoFilter) => {
-            if (!errNoFilter) { resolve(filterOutTombstonedNotices(rowsNoFilter).map((r) => mapNoticeRowForListIpc(r))); return; }
+            if (!errNoFilter) { finish(rowsNoFilter); return; }
             console.error('get-notices 실패:', errNoFilter.message);
             noticesSchemaReady = false;
             ensureNoticesTableSchema(() => {
               db.all(`SELECT uid, title, content, author_name, author_ip, created_at, images, category FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err2, rows2) => {
                 if (err2) {
                   db.all(`SELECT uid, title, content, author_name, author_ip, created_at FROM notices WHERE uid NOT IN (SELECT uid FROM deleted_notices) ORDER BY created_at DESC`, [], (err3, rows3) => {
-                    if (err3) {
-                      resolve([]);
-                      return;
-                    }
-                    resolve(filterOutTombstonedNotices(rows3).map((r) => mapNoticeRowForListIpc({ ...r, images: '[]' })));
+                    if (err3) { resolve({ notices: [], hasMore: false }); return; }
+                    finish((rows3 || []).map((r) => ({ ...r, images: '[]' })));
                   });
                   return;
                 }
-                resolve(filterOutTombstonedNotices(rows2).map((r) => mapNoticeRowForListIpc(r)));
+                finish(rows2);
               });
             });
           });
           return;
         }
-        resolve(filterOutTombstonedNotices(rows).map((r) => mapNoticeRowForListIpc(r)));
+        finish(rows);
       });
     });
   });
