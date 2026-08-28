@@ -7109,9 +7109,32 @@ ipcMain.handle('open-region-capture-overlay', async (event) => {
         captureRequesterWasHidden = true;
       }
     } catch (e) { /* ignore */ }
+
+    // ⚠️ 실사고: "캡처할 때 로딩이 걸린다"는 신고 — 메신저 창을 내린 순간부터 실제 화면
+    // 캡처(desktopCapturer.getSources, 고해상도 모니터일수록 오래 걸림)가 끝나 오버레이가
+    // 뜨기까지 화면에 아무것도 안 보였다(그냥 데스크톱만 보임). 아무 반응이 없어 보여
+    // "멈췄나?" 하고 느껴진 것 — 실제로 멈춘 게 아니라 그저 티가 안 났을 뿐이다. 오버레이
+    // 창은 이미 기본 배경이 짙은 남색(#0f172a)이고 아직 이미지를 안 보냈을 땐 스피너를
+    // 보여주므로(initCaptureOverlayStandaloneShell), 실제 캡처보다 먼저 살짝 띄워 즉시
+    // "캡처 준비 중" 반응을 주고, 진짜 캡처 직전에 다시 숨겨서 스크린샷에는 안 찍히게 한다.
+    try {
+      const displaysById = new Map(screen.getAllDisplays().map((d) => [String(d.id), d]));
+      captureOverlayWindows.forEach((win, key) => {
+        if (!win || win.isDestroyed()) return;
+        const d = displaysById.get(key);
+        if (d) win.setBounds({ x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height });
+        win.setAlwaysOnTop(true, 'screen-saver');
+        win.show();
+      });
+    } catch (e) { /* ignore */ }
+
     // 메신저 창이 화면 합성에서 완전히 빠지는 데 필요한 최소한의 시간만 기다린다
     // (너무 짧으면 캡처 결과에 메신저 창이 순간적으로 찍힐 수 있다).
     await new Promise((r) => setTimeout(r, 120));
+
+    // 실제 캡처 직전엔 방금 띄운 로딩 오버레이도 다시 내려서 스크린샷에 안 찍히게 한다.
+    try { captureOverlayWindows.forEach((win) => { if (win && !win.isDestroyed()) win.hide(); }); } catch (e) { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 90));
 
     // ⚠️ 실사고: 여기서 별도로 desktopCapturer.getSources를 먼저 불러 소스 id를 구한 뒤
     // 또 한 번 getSources를 부르는 식으로(원래 "전체 화면 캡처"가 하던 한 번 호출과 달리

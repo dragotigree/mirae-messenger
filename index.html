@@ -2442,6 +2442,17 @@
        오버레이 창 전용 스타일 — 화면 전체를 스크린샷으로 채우고 카드 여백/그림자를 없앤다. */
     body.capture-overlay-standalone { background: #0f172a; overflow: hidden; }
     body.capture-overlay-standalone #screen-capture-crop-modal { background: transparent; animation: none; }
+    #capture-overlay-loading {
+      position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 14px; background: #0f172a; z-index: 5;
+    }
+    .capture-overlay-spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid rgba(148, 163, 184, 0.25); border-top-color: #60a5fa;
+      animation: capture-overlay-spin 0.8s linear infinite;
+    }
+    @keyframes capture-overlay-spin { to { transform: rotate(360deg); } }
+    .capture-overlay-loading-text { font-size: 13px; font-weight: 600; color: #cbd5e1; letter-spacing: -0.01em; }
     body.capture-overlay-standalone #screen-capture-crop-modal .modal-card {
       width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
       border-radius: 0; padding: 0; margin: 0; box-shadow: none; gap: 0;
@@ -4323,6 +4334,31 @@
     }
     .all-logs-list::-webkit-scrollbar { width: 7px; }
     .all-logs-list::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 99px; }
+    .modal-card.remote-log-viewer-card { width: min(920px, 94vw); }
+    .remote-log-viewer-body {
+      flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+      padding: 14px 18px 20px; box-sizing: border-box;
+      background: linear-gradient(180deg, #f4f7fb 0%, #f8fafc 48px);
+      font-family: 'Consolas', 'D2Coding', monospace; font-size: 11.5px; line-height: 1.65;
+    }
+    .remote-log-viewer-body::-webkit-scrollbar { width: 7px; }
+    .remote-log-viewer-body::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 99px; }
+    .remote-log-line {
+      display: flex; gap: 8px; padding: 3px 8px; border-radius: 6px;
+      white-space: pre-wrap; word-break: break-all; color: #334155;
+    }
+    .remote-log-line:hover { background: rgba(148, 163, 184, 0.12); }
+    .remote-log-line .rl-idx { flex-shrink: 0; width: 34px; text-align: right; color: #cbd5e1; user-select: none; }
+    .remote-log-line .rl-text { flex: 1; min-width: 0; }
+    .remote-log-line.is-error { background: #fef2f2; color: #991b1b; }
+    .remote-log-line.is-error:hover { background: #fee2e2; }
+    .remote-log-line.is-warn { background: #fffbeb; color: #92400e; }
+    .remote-log-line.is-warn:hover { background: #fef3c7; }
+    .remote-log-line.is-info .rl-text { color: #334155; }
+    .remote-log-viewer-empty {
+      text-align: center; color: #94a3b8; font-size: 12.5px; padding: 40px 0;
+      font-family: var(--font-sans, inherit);
+    }
     .all-logs-date-sep {
       display: flex; align-items: center; gap: 10px;
       margin: 10px 4px 6px; color: #94a3b8; font-size: 11px; font-weight: 700;
@@ -6502,6 +6538,28 @@
     </div>
   </div>
 
+  <!-- 마스터 관리자 「원격 로그 가져오기」 결과 — 예전엔 작은 textarea 하나에 결과가 다
+       구겨져 들어가 있어 보기 불편했다("새 창/화면에서 깨끗하게 보이게 해줘"). 「전체 로그」
+       모달과 같은 뼈대를 재사용해 넓은 전용 화면으로 보여준다. -->
+  <div id="remote-log-viewer-modal" class="modal-overlay">
+    <div class="modal-card all-logs-modal-card remote-log-viewer-card">
+      <div class="all-logs-header">
+        <div class="all-logs-header-title">
+          <div class="all-logs-header-icon" aria-hidden="true">🩺</div>
+          <div>
+            <div class="all-logs-title">원격 로그</div>
+            <div class="all-logs-subtitle" id="remote-log-viewer-subtitle">-</div>
+          </div>
+        </div>
+        <div class="all-logs-header-actions">
+          <button type="button" class="all-logs-folder-btn" id="remote-log-viewer-copy-btn" onclick="copyRemoteLogViewerText()" title="전체 복사">📋 복사</button>
+          <button type="button" class="all-logs-close-btn" onclick="closeRemoteLogViewerModal()" title="닫기">✕</button>
+        </div>
+      </div>
+      <div class="remote-log-viewer-body" id="remote-log-viewer-body"></div>
+    </div>
+  </div>
+
   <!-- 🩺 주치의 OFF / 당직의 등록 -->
   <div id="duty-roster-modal" class="modal-overlay">
     <div class="modal-card" style="width:440px; gap:14px;">
@@ -6630,7 +6688,6 @@
                   <button type="button" onclick="requestLogExcerpt()" class="master-tool-btn is-primary master-tool-btn-full">가져오기</button>
                 </div>
                 <div id="log-excerpt-status" class="master-tool-status-line"></div>
-                <textarea id="log-excerpt-result" readonly placeholder="결과가 여기 표시됩니다." class="master-tool-result" style="display:none;"></textarea>
               </div>
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
@@ -10612,20 +10669,14 @@
           host.appendChild(clone);
         }
 
-        const prefs = left.querySelector('#sidebar-list-prefs');
-        if (prefs) {
-          const clone = prefs.cloneNode(true);
-          clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-          clone.style.cssText = 'display:flex;flex-wrap:nowrap;align-items:center;gap:5px;width:max-content;padding:0 10px;box-sizing:border-box;';
-          clone.querySelectorAll('.sidebar-pref-seg').forEach((seg) => {
-            seg.style.flex = '0 0 auto';
-          });
-          clone.querySelectorAll('.sidebar-pref-chip').forEach((chip) => {
-            chip.style.flex = '0 0 auto';
-            chip.style.padding = '5px 7px';
-          });
-          host.appendChild(clone);
-        }
+        // ⚠️ 실사고: 예전엔 이 필터 칩 줄(층/부서·전체/온라인·공용/숨김·안읽음)이 항상 한 줄
+        // 고정(nowrap)이라 "한 줄에 다 들어가는 최소 폭"을 측정해 사이드바 최소 폭에 반영했다.
+        // 그런데 그 줄 자체가 좁을 때 잘려 보이는 문제를 고치면서(칩이 부족하면 다음 줄로
+        // 자연스럽게 넘어가도록 flex-wrap:wrap으로 바꿈) 더 이상 "한 줄 유지"가 필요 없어졌다.
+        // 그런데 이 측정 함수는 여전히 강제로 nowrap을 적용해 측정하고 있었고, 각 세그먼트에
+        // 새로 준 min-width(84px)까지 그대로 반영되면서 측정값이 크게 부풀어 사이드바를
+        // 원하는 만큼 좁힐 수 없게 됐다("너비 조정이 안 된다"는 신고). 이제 줄바꿈을 허용하니
+        // 이 줄은 더 이상 최소 폭을 강제할 필요가 없어 측정 대상에서 뺀다.
 
         const multi = left.querySelector('#user-multi-select-bar');
         if (multi && multi.offsetParent !== null) {
@@ -11811,11 +11862,21 @@
       if (modal && modal.parentElement !== document.body) {
         document.body.appendChild(modal);
       }
+      // ⚠️ 실사고: 메신저 창을 내린 뒤 실제 화면 캡처(고해상도 모니터일수록 오래 걸림)가
+      // 끝날 때까지 이 창엔 아무 표시도 없어서 "캡처할 때 로딩이 걸린다"는 신고로 이어졌다
+      // (실제로는 멈춘 게 아니라 그냥 티가 안 났을 뿐). main.js가 진짜 캡처보다 먼저 이
+      // 창을 살짝 띄우므로, 이미지가 오기 전 기본 상태로 스피너를 보여줘 즉시 반응이
+      // 있다는 걸 알려준다.
+      const loadingEl = document.createElement('div');
+      loadingEl.id = 'capture-overlay-loading';
+      loadingEl.innerHTML = `<div class="capture-overlay-spinner"></div><div class="capture-overlay-loading-text">화면을 캡처하는 중…</div>`;
+      document.body.appendChild(loadingEl);
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); cancelScreenCrop(); }
       });
       if (window.api && typeof window.api.onCaptureOverlayInit === 'function') {
         window.api.onCaptureOverlayInit((dataUrl) => {
+          loadingEl.remove();
           if (dataUrl) openScreenCropModal(dataUrl);
         });
       }
@@ -12759,7 +12820,8 @@
         { test: () => isFlexOverlay('master-admin-modal'), close: () => closeMasterAdminModal(), confirm: true, name: '관리자' },
         { test: () => isFlexOverlay('settings-modal'), close: () => closeSettingsModal(), confirm: true, name: '환경설정' },
         { test: () => isFlexOverlay('board-modal'), close: () => closeBoardModal(), confirm: true, name: '공지 게시판' },
-        { test: () => isFlexOverlay('all-logs-modal'), close: () => closeAllLogsModal(), confirm: true, name: '전체 로그' }
+        { test: () => isFlexOverlay('all-logs-modal'), close: () => closeAllLogsModal(), confirm: true, name: '전체 로그' },
+        { test: () => isFlexOverlay('remote-log-viewer-modal'), close: () => closeRemoteLogViewerModal(), confirm: false }
       ];
     }
 
@@ -21865,6 +21927,7 @@
     }
 
     let logExcerptPendingRequestId = '';
+    let logExcerptPendingMeta = {};
     /** 「접속 PC」 행 관리 메뉴의 "로그 보기" — 매번 IP를 손으로 옮겨 적을 필요 없이,
      *  그 줄의 IP를 바로 채워서 「원격 로그 가져오기」 칸으로 스크롤·포커스만 해준다. */
     function jumpToLogExcerptForIp(ip) {
@@ -21891,11 +21954,9 @@
       const pattern = document.getElementById('log-excerpt-pattern').value.trim();
       const password = document.getElementById('log-excerpt-pwd').value || cachedMasterPassword;
       const statusEl = document.getElementById('log-excerpt-status');
-      const resultEl = document.getElementById('log-excerpt-result');
       if (!targetIp) { statusEl.textContent = 'IP를 입력해 주세요.'; return; }
       if (!password) { statusEl.textContent = '마스터 비밀번호를 입력해 주세요.'; return; }
       statusEl.textContent = `${targetIp}에 요청하는 중...`;
-      resultEl.style.display = 'none';
       let res;
       try {
         res = await window.api.masterRequestLogExcerpt({ targetIp, pattern, password });
@@ -21909,6 +21970,7 @@
       }
       cachedMasterPassword = password;
       logExcerptPendingRequestId = res.requestId;
+      logExcerptPendingMeta = { targetIp, pattern };
       statusEl.textContent = '응답 기다리는 중... (10초 이상 안 오면 대상 PC 로그인이 다르거나 오프라인일 수 있습니다)';
     }
 
@@ -21916,15 +21978,66 @@
       window.api.onLogExcerptResponse((data) => {
         if (!data || data.requestId !== logExcerptPendingRequestId) return;
         const statusEl = document.getElementById('log-excerpt-status');
-        const resultEl = document.getElementById('log-excerpt-result');
         if (!data.success) {
           statusEl.textContent = `${data.fromIp || ''} 응답: ${data.msg || '실패'}`;
           return;
         }
         statusEl.textContent = `${data.fromIp || ''}에서 ${data.lineCount}줄 받음`;
-        resultEl.value = data.text || '(일치하는 줄이 없습니다.)';
-        resultEl.style.display = 'block';
+        openRemoteLogViewerModal(data.text || '', {
+          fromIp: data.fromIp || logExcerptPendingMeta.targetIp || '',
+          pattern: logExcerptPendingMeta.pattern || '',
+          lineCount: data.lineCount
+        });
       });
+    }
+
+    let remoteLogViewerRawText = '';
+    /** 「원격 로그 가져오기」 결과를 작은 textarea가 아니라 전용 화면에 깨끗하게 보여준다
+     *  ("새 창/화면에서 보기 좋게 해줘"라는 요청). INFO/WARN/ERROR 줄은 색으로 구분한다. */
+    function openRemoteLogViewerModal(text, meta) {
+      const m = meta || {};
+      remoteLogViewerRawText = text || '';
+      const subtitleEl = document.getElementById('remote-log-viewer-subtitle');
+      if (subtitleEl) {
+        const parts = [m.fromIp || '-'];
+        if (m.pattern) parts.push(`검색어 "${m.pattern}"`);
+        parts.push(`${Number(m.lineCount) || 0}줄`);
+        subtitleEl.textContent = parts.join(' · ');
+      }
+      const bodyEl = document.getElementById('remote-log-viewer-body');
+      if (bodyEl) {
+        const lines = (text || '').split('\n').filter((l) => l.length > 0);
+        if (!lines.length) {
+          bodyEl.innerHTML = `<div class="remote-log-viewer-empty">일치하는 줄이 없습니다.</div>`;
+        } else {
+          bodyEl.innerHTML = lines.map((line, i) => {
+            const levelClass = /\[ERROR\]/.test(line) ? 'is-error' : (/\[WARN\]/.test(line) ? 'is-warn' : 'is-info');
+            return `<div class="remote-log-line ${levelClass}"><span class="rl-idx">${i + 1}</span><span class="rl-text">${escapeHtml(line)}</span></div>`;
+          }).join('');
+        }
+        bodyEl.scrollTop = 0;
+      }
+      document.getElementById('remote-log-viewer-modal').style.display = 'flex';
+      setModalOpenState(true);
+    }
+
+    function closeRemoteLogViewerModal() {
+      document.getElementById('remote-log-viewer-modal').style.display = 'none';
+      setModalOpenState(false);
+    }
+
+    async function copyRemoteLogViewerText() {
+      const btn = document.getElementById('remote-log-viewer-copy-btn');
+      try {
+        await navigator.clipboard.writeText(remoteLogViewerRawText);
+        if (btn) {
+          const orig = btn.textContent;
+          btn.textContent = '✅ 복사됨';
+          setTimeout(() => { btn.textContent = orig; }, 1400);
+        }
+      } catch (e) {
+        await appAlert('복사에 실패했습니다.');
+      }
     }
 
     async function confirmMasterForceUpdate() {
