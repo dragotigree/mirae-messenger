@@ -2686,6 +2686,11 @@
     .compact-search input:focus { background: var(--border-soft); }
     .compact-search-icon { position: absolute; left: 26px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0.45; pointer-events: none; display: flex; }
     .compact-search-clear { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border: none; background: var(--text-muted); color: #fff; border-radius: 50%; font-size: 14px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    /* 미니 모드 직원 목록: 검색창을 부서/층 선택과 같은 줄로 올려 세로 공간을 절약한다
+       ("검색창 폭을 줄여서 위에 올려주면 안될까" 요청). */
+    .compact-search.is-inline { padding: 0; flex: 1 1 74px; min-width: 62px; background: transparent; }
+    .compact-search.is-inline input { padding: 6px 10px 6px 26px; font-size: 12px; border-radius: 999px; }
+    .compact-search.is-inline .compact-search-icon { left: 9px; width: 13px; height: 13px; }
 
     #compact-list-items,
     #compact-friends-list-items { flex: 1; min-height: 0; overflow-y: auto; padding: 0; scrollbar-width: thin; background: #fff; }
@@ -6236,8 +6241,10 @@
         </div>
         <div class="compact-pane" data-compact-pane="friends" hidden>
           <div class="compact-filter-row">
-            <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('favorites')">즐겨찾기</button>
-            <button type="button" class="compact-filter-chip" onclick="setCompactRailTab('groups')">그룹대화방</button>
+            <div class="compact-search is-inline">
+              <span class="compact-search-icon" data-ui-icon="search"></span>
+              <input type="text" id="compact-search-input-friends" placeholder="직원 검색" title="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
+            </div>
             <select class="compact-filter-select" id="compact-dept-filter" title="고른 부서만 보기" onchange="setCompactDeptFilter(this.value)">
               <option value="">전체 부서</option>
             </select>
@@ -6248,10 +6255,6 @@
             <span class="sidebar-header-icon-btn" id="compact-alpha-sort-btn" onclick="toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="width:auto; padding:0 6px; font-size:10.5px; font-weight:800; line-height:1; letter-spacing:-0.03em; flex-shrink:0;">가나다</span>
             <span class="sidebar-header-icon-btn" onclick="toggleAllCompactUserGroupsCollapse()" title="부서·층 전체 접기/펴기" style="font-size:13px; line-height:1; flex-shrink:0;">⇕</span>
             <span class="sidebar-header-icon-btn" id="compact-toolbar-refresh-btn" onclick="manualRefreshUsers('compact-toolbar-refresh-btn')" title="사용자 목록 새로고침" data-ui-icon="refresh" style="flex-shrink:0;"></span>
-          </div>
-          <div class="compact-search">
-            <span class="compact-search-icon" data-ui-icon="search"></span>
-            <input type="text" id="compact-search-input-friends" placeholder="직원 검색 (Ctrl+Shift+F)" oninput="onCompactSearchInput(this.value)" onkeydown="onUserSearchKeyDown(event)">
           </div>
           <div id="compact-friends-list-items"></div>
           <div class="sidebar-list-prefs compact-list-prefs" role="toolbar" aria-label="목록 표시 방식">
