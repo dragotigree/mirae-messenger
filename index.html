@@ -1523,6 +1523,18 @@
     .msg-row.is-other .msg-text { background: var(--border-soft); color: var(--text-primary); }
     .msg-row.is-me .msg-text { background: var(--sidebar-active); color: #0f172a; border: none; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .msg-text:has(.chat-img-preview), .msg-text:has(.chat-file-box) { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0; }
+    /* 사진(들) 뒤에 같이 붙어온 글자 — 사진은 액자처럼 배경 없이, 글자만 원래
+       말풍선처럼 보이게 별도 상자로 감싼다(wrapImageCaptionIfNeeded 참고). */
+    .chat-img-caption {
+      display: inline-block; max-width: 100%; margin-top: 6px; padding: 8px 12px;
+      border-radius: 16px 16px 16px 5px; background: var(--border-soft); color: var(--text-primary);
+      font-size: var(--chat-font-size); line-height: 1.5; word-break: break-word;
+    }
+    .msg-row.is-me .chat-img-caption { background: var(--sidebar-active); color: #0f172a; border-radius: 16px 16px 5px 16px; }
+    .msg-row-bubble.is-me .chat-img-caption { background: var(--sidebar-active); color: #0f172a; border-radius: 16px 16px 5px 16px; }
+    .msg-row-bubble.is-other .chat-img-caption { background: var(--border-soft); }
+    body.compact-mode .is-other .chat-img-caption { background: var(--border-soft); border-radius: 16px 16px 16px 4px; }
+    body.compact-mode .is-me .chat-img-caption { background: var(--sidebar-active); border-radius: 16px 16px 4px 16px; }
     .msg-text, .chat-bubble { user-select: text; -webkit-user-select: text; }
     .msg-bubble-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 100%; }
     .msg-row.is-other .msg-bubble-stack { align-items: flex-start; }
@@ -5759,6 +5771,39 @@
     .settings-radio-row b { font-weight: 700; color: #0f172a; }
     .settings-radio-row small { display: block; font-size: 11.5px; color: #94a3b8; margin-top: 2px; line-height: 1.4; font-weight: 400; }
 
+    /* 🔔 알림 방식(토스트/데스크탑) 선택 옆에 실제로 어떻게 보이는지 미니 미리보기를
+       그림으로 보여준다("글로만 설명하지 말고 사진으로 보여달라"는 요청) — 진짜
+       스크린샷 대신 CSS로 그린 작은 목업이라 다크·라이트 테마에서도 항상 또렷하다. */
+    .settings-notify-mode-row { align-items: center; }
+    .settings-notify-mode-preview { flex-shrink: 0; }
+    .notify-preview-screen {
+      display: block; width: 72px; height: 46px; border-radius: 7px;
+      background: linear-gradient(180deg, #eef2f7 0%, #e2e8f0 100%);
+      border: 1px solid #dde3ea; position: relative; overflow: hidden;
+    }
+    .notify-preview-toast {
+      position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+      width: 56px; height: 16px; background: #fff; border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(15,23,42,0.18);
+      display: flex; align-items: center; gap: 4px; padding: 0 4px; box-sizing: border-box;
+    }
+    .notify-preview-toast-icon { font-size: 8px; line-height: 1; flex-shrink: 0; }
+    .notify-preview-toast-lines { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .notify-preview-toast-lines span { display: block; height: 2.5px; border-radius: 2px; background: #cbd5e1; }
+    .notify-preview-toast-lines span:first-child { width: 85%; background: #94a3b8; }
+    .notify-preview-toast-lines span:last-child { width: 55%; }
+    .notify-preview-desktop {
+      position: absolute; right: 5px; bottom: 5px;
+      width: 44px; height: 22px; background: #fff; border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(15,23,42,0.2); border: 1px solid #e5e9ef;
+      display: flex; align-items: center; gap: 3px; padding: 0 4px; box-sizing: border-box;
+    }
+    .notify-preview-desktop-icon { font-size: 8px; line-height: 1; flex-shrink: 0; }
+    .notify-preview-desktop-lines { display: flex; flex-direction: column; gap: 2.5px; flex: 1; min-width: 0; }
+    .notify-preview-desktop-lines span { display: block; height: 2.5px; border-radius: 2px; background: #cbd5e1; }
+    .notify-preview-desktop-lines span:first-child { width: 90%; background: #94a3b8; }
+    .notify-preview-desktop-lines span:last-child { width: 60%; }
+
     .settings-notify-section { gap: 10px !important; }
     .settings-schedule-alarm-options.is-disabled {
       opacity: 0.45; pointer-events: none; user-select: none;
@@ -7183,8 +7228,30 @@
             <div class="settings-divider"></div>
             <div class="settings-section-title">알림 방식</div>
             <div class="settings-radio-stack">
-              <label class="settings-radio-row"><input type="radio" name="incoming-notify-mode" value="toast" id="notify-mode-toast" checked> <span><b>토스트</b><small>화면 중앙 알림 (기본)</small></span></label>
-              <label class="settings-radio-row"><input type="radio" name="incoming-notify-mode" value="desktop" id="notify-mode-desktop"> <span><b>데스크탑</b><small>OS 알림</small></span></label>
+              <label class="settings-radio-row settings-notify-mode-row">
+                <input type="radio" name="incoming-notify-mode" value="toast" id="notify-mode-toast" checked>
+                <span class="settings-notify-mode-preview" aria-hidden="true">
+                  <span class="notify-preview-screen">
+                    <span class="notify-preview-toast">
+                      <span class="notify-preview-toast-icon">💬</span>
+                      <span class="notify-preview-toast-lines"><span></span><span></span></span>
+                    </span>
+                  </span>
+                </span>
+                <span><b>토스트</b><small>화면 중앙 알림 (기본)</small></span>
+              </label>
+              <label class="settings-radio-row settings-notify-mode-row">
+                <input type="radio" name="incoming-notify-mode" value="desktop" id="notify-mode-desktop">
+                <span class="settings-notify-mode-preview" aria-hidden="true">
+                  <span class="notify-preview-screen">
+                    <span class="notify-preview-desktop">
+                      <span class="notify-preview-desktop-icon">💬</span>
+                      <span class="notify-preview-desktop-lines"><span></span><span></span></span>
+                    </span>
+                  </span>
+                </span>
+                <span><b>데스크탑</b><small>OS 알림</small></span>
+              </label>
             </div>
             <div class="settings-divider"></div>
             <label class="settings-toggle-row" for="setting-notify-read-receipt">
@@ -25988,6 +26055,27 @@
       return html.replace(/(<div[^>]*class="[^"]*chat-file-box[^"]*"[^>]*>[\s\S]*?<a\b[^>]*>)\s*다운로드\s*(<\/a>)/gi, '$1받기$2');
     }
 
+    /** ⚠️ 실사고: 사진과 함께 짧은 글을 같이 보내면(예: "좌측에 물음표 동그라미 있는데"),
+     * 사진이 있는 말풍선은 배경을 투명하게 비워서(사진 자체가 액자처럼 보이게) 처리하는데,
+     * 그 배경 규칙이 말풍선 전체에 걸려있다 보니 사진 밑에 같이 붙은 글자도 배경 없이
+     * 맨 화면 위에 붕 뜬 것처럼 보였다("사진이랑 같이 보내면 글이 안 이쁘게 나온다" 신고).
+     * 사진(들) 바로 뒤에 실제 글자가 남아있으면 그 부분만 작은 말풍선으로 다시 감싸서
+     * 사진은 그대로 액자처럼, 글자는 원래 말풍선처럼 보이게 한다. */
+    function wrapImageCaptionIfNeeded(html) {
+      if (typeof html !== 'string') return html;
+      if (html.indexOf('chat-img-preview') === -1 && html.indexOf('chat-file-box') === -1 && html.indexOf('chat-shared-drive-box') === -1) return html;
+      const leadPattern = /^((?:\s|<br\s*\/?>|<img\b[^>]*class="[^"]*chat-img-preview[^"]*"[^>]*>|<div\b[^>]*class="[^"]*(?:chat-file-box|chat-shared-drive-box)[^"]*"[\s\S]*?<\/div>)+)([\s\S]*)$/i;
+      const m = html.match(leadPattern);
+      if (!m) return html;
+      const lead = m[1];
+      let rest = m[2];
+      // 맨 앞의 <br>들은 사진과 글자 사이 줄바꿈일 뿐이니 캡션 상자 안에 넣지 않는다.
+      rest = rest.replace(/^(\s|<br\s*\/?>)+/i, '');
+      const textOnly = rest.replace(/<[^>]*>/g, '').trim();
+      if (!textOnly) return html;
+      return `${lead}<div class="chat-img-caption">${rest}</div>`;
+    }
+
     function resolveChatDateKey(sentAtFull, opts) {
       if (opts && opts.dateKey) {
         const k = String(opts.dateKey).trim();
@@ -26139,6 +26227,7 @@
         let html = normalizeChatFileBoxHtml(
           isDeletedAlready ? msg.replace(/<span class="deleted-msg-flag"[^>]*><\/span>/, '<span style="color:#94a3b8; font-style:italic;">') + '</span>' : msg
         );
+        html = wrapImageCaptionIfNeeded(html);
         if (activeChatSearchKeyword) {
           html = highlightSearchKeywordInHtml(html, activeChatSearchKeyword);
         }
