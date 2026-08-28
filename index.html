@@ -21770,15 +21770,15 @@
           ? `<span title="1분 메시지 ${Number(traffic.msgs1m) || 0}건 · 1분 용량 ${formatTrafficBytes(traffic.bytes1m)}${traffic.overflowCount ? ` · 버퍼초과 ${traffic.overflowCount}회` : ''}">${loadLevelLabel[traffic.level] || traffic.level}</span>`
           : '<span style="color:#cbd5e1;">-</span>';
         // ⚠️ 실사고: 접속시간·DB크기 등은 상대 PC가 PING에 실어 보내야 알 수 있는데, 아직
-        // 이 기능이 없는 구버전 PC는 그 필드 자체를 안 보낸다. 그런 PC는 "확인 중…"이라고
-        // 표시하면 마치 곧 뜰 것처럼 보여 혼란스럽다("확인중이라면서 안나와"라는 신고) —
-        // 실제로는 그 PC가 최신 버전으로 업데이트되기 전까진 영원히 안 뜬다. 버전이 기준보다
-        // 낮으면 "구버전"이라고 명확히 알려주고, 최신 버전인데도 아직 값이 없을 때만
-        // "확인 중…"(다음 하트비트를 기다리는 중, 보통 수 초~15초 이내 채워짐)으로 표시한다.
-        const isOutdatedForDiag = ver !== '-' && verOutdated;
-        const uptimeText = !u.online ? '-' : (u.bootTime ? formatUptimeShort(u.bootTime) : (isOutdatedForDiag ? '구버전' : '확인 중…'));
-        const dbSizeText = u.dbSizeBytes != null ? formatTrafficBytes(u.dbSizeBytes) : (isOutdatedForDiag ? '구버전 PC (지원 안 함)' : '확인 중…');
-        const pendingText = u.pendingRetryCount != null ? `${Number(u.pendingRetryCount) || 0}건` : (isOutdatedForDiag ? '구버전 PC (지원 안 함)' : '확인 중…');
+        // 이 기능이 없는 구버전 PC는 그 필드 자체를 안 보낸다. 처음엔 "확인 중…"이라고
+        // 표시했는데, 온라인인데도 계속 그렇게 떠서 "아직 안 되는거 같다"는 신고가 반복됐다
+        // — "확인 중"은 곧 채워질 것처럼 보이지만 실제로는 상대가 최신 버전으로 켜질 때까지
+        // 영원히 안 채워질 수 있어 오해를 준다(버전 표시가 응답 지연·구버전 미표기 등
+        // 여러 이유로 항상 정확히 잡히지는 않아, 버전 일치 여부로 문구를 다르게 보여주는
+        // 대신 "값이 없다"는 사실 자체를 솔직하게 보여주는 쪽으로 바꾼다).
+        const uptimeText = !u.online ? '-' : (u.bootTime ? formatUptimeShort(u.bootTime) : '정보 없음');
+        const dbSizeText = u.dbSizeBytes != null ? formatTrafficBytes(u.dbSizeBytes) : '정보 없음(구버전일 수 있음)';
+        const pendingText = u.pendingRetryCount != null ? `${Number(u.pendingRetryCount) || 0}건` : '정보 없음(구버전일 수 있음)';
         const reconnectText = `${Number(u.reconnectCount) || 0}회`;
         const diagTitle = `DB(저장공간) 크기: ${dbSizeText} · 미확인 재전송 대기: ${pendingText} · 최근 재접속: ${reconnectText}`;
         const diagWarn = (Number(u.pendingRetryCount) || 0) > 0 || (Number(u.reconnectCount) || 0) >= 3;
