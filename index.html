@@ -5100,16 +5100,24 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 14px 20px;
-      background: #fff;
+      padding: 14px 22px;
+      background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
       border-bottom: 1px solid #e8edf2;
+    }
+    .master-admin-modal-title-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .master-admin-modal-icon {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      background: #eef2ff; box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.12);
     }
     .master-admin-modal-header h2 {
       margin: 0;
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 800;
       color: #0f172a;
+      letter-spacing: -0.02em;
     }
+    .master-admin-modal-subtitle { font-size: 11px; color: #64748b; font-weight: 500; margin-top: 1px; }
     .master-admin-header-actions {
       display: flex;
       gap: 6px;
@@ -5117,13 +5125,19 @@
     }
     .master-admin-header-actions button {
       padding: 7px 12px;
-      border: none;
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       font-family: inherit;
+      background: #fff;
+      color: #475569;
+      transition: background 0.12s, border-color 0.12s;
     }
+    .master-admin-header-actions button:hover { background: #f1f5f9; }
+    .master-admin-header-actions button.is-danger { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+    .master-admin-header-actions button.is-danger:hover { background: #fee2e2; }
     .master-online-clients-box {
       max-height: none;
       flex: 1;
@@ -6591,10 +6605,16 @@
   <div id="master-admin-modal" class="modal-overlay">
     <div class="modal-card master-admin-modal-card">
       <div class="master-admin-modal-header">
-        <h2>마스터 관리자</h2>
+        <div class="master-admin-modal-title-wrap">
+          <div class="master-admin-modal-icon" aria-hidden="true">🛡️</div>
+          <div>
+            <h2>마스터 관리자</h2>
+            <div class="master-admin-modal-subtitle">전체 병원 메신저 운영 도구</div>
+          </div>
+        </div>
         <div class="master-admin-header-actions">
-          <button type="button" style="background:#fee2e2; color:#dc2626;" onclick="logoutMasterAuth()">🔓 로그아웃</button>
-          <button type="button" style="background:var(--border-soft); color:#475569;" onclick="closeMasterAdminModal()">✖ 닫기</button>
+          <button type="button" class="is-danger" onclick="logoutMasterAuth()">🔓 로그아웃</button>
+          <button type="button" onclick="closeMasterAdminModal()">✖ 닫기</button>
         </div>
       </div>
       <div class="settings-modal-shell">
@@ -6612,7 +6632,10 @@
             <h3 class="settings-panel-title">운영자 계정</h3>
             <p class="settings-panel-desc">공지·병원 일정·당직의·주치의 OFF를 작성할 수 있는 계정을 발급하고 관리합니다. 어느 PC에서든 로그인할 수 있습니다.</p>
             <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:12px;">
-              <div style="font-size:13px; font-weight:700; color:var(--accent-dark);">➕ 신규 계정 추가</div>
+              <div class="master-tool-card-head">
+                <span class="master-tool-icon" style="background:#ecfdf5; color:#059669;">➕</span>
+                <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">신규 계정 추가</span></div>
+              </div>
               <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">
                 표시 이름 (예: 물리치료실장 정용범)
                 <input type="text" id="master-op-display-name" placeholder="표시 이름을 입력하세요" style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:13px;">
@@ -6633,7 +6656,10 @@
               <button type="button" onclick="addMasterNoticeOperator()" style="padding:11px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">💾 계정 발급 및 저장</button>
             </div>
             <div>
-              <div style="font-size:13px; font-weight:700; color:#1e293b; margin-bottom:6px;">📋 등록된 작성 권한자</div>
+              <div class="master-tool-card-head" style="margin-bottom:8px;">
+                <span class="master-tool-icon" style="background:#eff6ff; color:#1d4ed8;">📋</span>
+                <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">등록된 작성 권한자</span></div>
+              </div>
               <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">아래 계정으로 로그인하면 공지·일정·당직의·OFF를 작성할 수 있습니다.</div>
               <div id="master-operator-list-box" style="max-height:min(36vh,320px); overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
             </div>
@@ -6712,7 +6738,10 @@
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
 
             <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:var(--border);">
-              <div style="font-size:13px; font-weight:800; color:#0f172a;">🧪 부하 검사 스위트</div>
+              <div class="master-tool-card-head">
+                <span class="master-tool-icon" style="background:#fdf4ff; color:#a21caf;">🧪</span>
+                <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">부하 검사 스위트</span></div>
+              </div>
               <p style="font-size:12px; color:#64748b; margin:0; line-height:1.55;">이 PC에서 접속 폭주·목록 렌더·UDP 제한·TCP 연결·DB·이벤트루프 등을 모의합니다. 테스트망 IP를 쓰며 실제 LAN 동료에게 패킷을 보내지 않습니다.</p>
               <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                 <label style="font-size:12px; color:#475569; display:flex; align-items:center; gap:6px;">인원
@@ -6772,10 +6801,14 @@
             <h3 class="settings-panel-title">전체 일시중지</h3>
             <p class="settings-panel-desc">전 PC에 일시중지 안내 화면을 띄우거나 해제합니다. 기본은 꺼짐(사용 가능)입니다.</p>
             <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:12px; background:#fff7ed; border-color:#fed7aa;">
-              <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#9a3412; cursor:pointer; user-select:none;">
-                <input type="checkbox" id="master-service-pause-enabled" style="width:16px; height:16px;">
-                일시 중지 켜기
-              </label>
+              <div class="master-tool-card-head">
+                <span class="master-tool-icon" style="background:#ffedd5; color:#c2410c;">⏸️</span>
+                <div class="master-tool-card-head-text">
+                  <label class="master-tool-toggle-label" for="master-service-pause-enabled" style="color:#9a3412;">일시 중지 켜기</label>
+                  <span style="font-size:11px; color:#9a3412; opacity:0.8;">켜면 전 PC에 아래 안내가 즉시 뜹니다</span>
+                </div>
+                <input type="checkbox" id="master-service-pause-enabled" class="master-tool-switch" style="accent-color:#ea580c;">
+              </div>
               <label style="font-size:12px; color:#475569; display:flex; flex-direction:column; gap:4px;">안내 제목
                 <input type="text" id="master-service-pause-title" placeholder="메신저 일시 중지 안내" style="padding:9px 12px; border:1px solid #fdba74; border-radius:12px; font-size:13px;">
               </label>
@@ -6797,12 +6830,18 @@
             <h3 class="settings-panel-title">비밀번호</h3>
             <p class="settings-panel-desc">마스터 비밀번호를 바꾸거나, 작성 권한자가 비밀번호를 잊었을 때 재설정합니다.</p>
             <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:12px;">
-              <div style="font-size:13px; font-weight:700; color:var(--accent-dark);">🔑 마스터 비밀번호 변경</div>
+              <div class="master-tool-card-head">
+                <span class="master-tool-icon" style="background:#eef2ff; color:#4338ca;">🔑</span>
+                <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">마스터 비밀번호 변경</span></div>
+              </div>
               <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">이 PC에 저장된 마스터 비밀번호를 변경합니다. 원격 사용중지·로그삭제 등은 다른 PC도 같은 마스터 비밀번호여야 하므로, 변경 후 다른 PC에서도 맞춰 주세요.</p>
               <button type="button" onclick="openPasswordChangeModal({ mode: 'master-self' })" style="padding:11px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer;">마스터 비밀번호 변경</button>
             </div>
             <div class="settings-card settings-section" style="display:flex; flex-direction:column; gap:10px;">
-              <div style="font-size:13px; font-weight:700; color:#1e293b;">✍️ 작성 권한자 비밀번호 재설정</div>
+              <div class="master-tool-card-head">
+                <span class="master-tool-icon" style="background:#f0fdf4; color:#15803d;">✍️</span>
+                <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">작성 권한자 비밀번호 재설정</span></div>
+              </div>
               <p style="font-size:12px; color:#64748b; margin:0; line-height:1.5;">비밀번호를 잊은 작성 권한자 계정을 골라 새 비밀번호를 지정합니다. 「운영자 계정」 목록의 <b>비밀번호</b> 버튼으로도 동일하게 할 수 있습니다.</p>
               <div id="master-operator-reset-hint" style="font-size:11.5px; color:#64748b;">운영자 계정 탭에서 계정을 확인한 뒤 재설정해 주세요.</div>
             </div>
