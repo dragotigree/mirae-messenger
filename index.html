@@ -5554,6 +5554,11 @@
       background: #fff;
     }
     .settings-panel { display: none; flex-direction: column; gap: 18px; max-width: 760px; }
+    /* 마스터 관리자 창은 1520px까지 넓게 쓰는데(일반 설정창은 760px 고정), 탭 안 내용이
+       그대로 760px에 갇혀 있으면 넓은 창 오른쪽이 텅 비어 보였다("전체적으로 창이 너비에
+       맞게 조정해줘"). 폼 카드는 지나치게 안 늘어나도록 안쪽에서 따로 폭을 제한한다. */
+    #master-admin-modal .settings-panel { max-width: none; }
+    #master-admin-modal .settings-panel > .settings-card:not(.master-tool-card):not(.master-admin-wide-card) { max-width: 640px; }
     .settings-panel.active { display: flex; }
     .settings-panel-title {
       margin: 0 0 2px;
@@ -5651,6 +5656,14 @@
       display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 12px; margin-top: 16px; align-items: start;
     }
+    /* 「부하 감시」를 「접속 PC」 탭 안으로 합치며, 그 경계를 표시하는 구획선 헤더 —
+       완전히 다른 탭이던 두 화면을 하나로 붙였다는 게 스크롤해도 자연스럽게 보이도록. */
+    .master-admin-section-divider {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 26px; padding-top: 18px; border-top: 1px solid #e8edf2;
+    }
+    .master-admin-section-divider-title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.01em; }
+    .master-admin-section-divider-desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.5; }
     .master-tool-card { padding: 14px; }
     .master-tool-card-head { display: flex; align-items: center; gap: 10px; }
     .master-tool-icon {
@@ -6555,7 +6568,7 @@
   <!-- 마스터 관리자 「원격 로그 가져오기」 결과 — 예전엔 작은 textarea 하나에 결과가 다
        구겨져 들어가 있어 보기 불편했다("새 창/화면에서 깨끗하게 보이게 해줘"). 「전체 로그」
        모달과 같은 뼈대를 재사용해 넓은 전용 화면으로 보여준다. -->
-  <div id="remote-log-viewer-modal" class="modal-overlay">
+  <div id="remote-log-viewer-modal" class="modal-overlay" style="z-index:5200;">
     <div class="modal-card all-logs-modal-card remote-log-viewer-card">
       <div class="all-logs-header">
         <div class="all-logs-header-title">
@@ -6621,7 +6634,6 @@
         <nav class="settings-nav" aria-label="관리자 메뉴">
           <button type="button" class="settings-nav-btn active" data-master-tab="operators" onclick="setMasterAdminTab('operators')">운영자 계정</button>
           <button type="button" class="settings-nav-btn" data-master-tab="clients" onclick="setMasterAdminTab('clients')">접속 PC</button>
-          <button type="button" class="settings-nav-btn" data-master-tab="traffic" onclick="setMasterAdminTab('traffic')">부하 감시</button>
           <button type="button" class="settings-nav-btn" data-master-tab="pause" onclick="setMasterAdminTab('pause')">전체 일시중지</button>
           <button type="button" class="settings-nav-btn" data-master-tab="security" onclick="setMasterAdminTab('security')">비밀번호</button>
           <button type="button" class="settings-nav-btn" data-master-tab="uitext" onclick="setMasterAdminTab('uitext')">문구 수정</button>
@@ -6667,7 +6679,7 @@
 
           <div class="settings-panel" data-master-panel="clients" style="max-width:none;">
             <h3 class="settings-panel-title">접속 PC</h3>
-            <p class="settings-panel-desc">온라인·등록된 메신저 PC를 관리합니다. 정보 수정, 사용 중지(안내 문구), 강제 업데이트, 로그 삭제를 실행할 수 있고, 「부하」 열에서 각 PC의 최근 트래픽 상태를 바로 볼 수 있습니다. 관리(⋮) 메뉴의 「로그 보기」를 누르면 아래 원격 로그 칸에 IP가 자동으로 채워집니다.</p>
+            <p class="settings-panel-desc">온라인·등록된 메신저 PC를 관리합니다. 정보 수정, 사용 중지(안내 문구), 강제 업데이트, 로그 삭제를 실행할 수 있고, 「부하」 열에서 각 PC의 최근 트래픽 상태를 바로 볼 수 있습니다. 관리(⋮) 메뉴의 「로그 보기」를 누르면 해당 PC의 최근 로그를 바로 가져와 보여줍니다.</p>
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div style="font-size:12px; color:#64748b;">기준 버전: <strong id="master-ref-version" style="color:#0f172a;">-</strong></div>
               <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -6698,32 +6710,18 @@
                   <button type="button" onclick="cancelAutoOutdatedUpdateToggle()" class="master-tool-btn">취소</button>
                 </div>
               </div>
-
-              <div class="settings-card master-tool-card">
-                <div class="master-tool-card-head">
-                  <span class="master-tool-icon" style="background:#eff6ff; color:#1d4ed8;">🩺</span>
-                  <div class="master-tool-card-head-text">
-                    <span class="master-tool-toggle-label">원격 로그 가져오기</span>
-                  </div>
-                </div>
-                <div class="master-tool-desc">다른 PC의 오늘·어제 로그 중 검색어가 들어간 줄만 가져옵니다(온라인이어야 함).</div>
-                <div class="master-tool-fields">
-                  <input type="text" id="log-excerpt-ip" placeholder="대상 IP (예: 192.168.122.204)" class="master-tool-input">
-                  <input type="text" id="log-excerpt-pattern" placeholder="검색어" value="진단-override" class="master-tool-input">
-                  <input type="password" id="log-excerpt-pwd" placeholder="마스터 비밀번호" class="master-tool-input" onkeydown="if(event.key==='Enter') requestLogExcerpt()">
-                  <button type="button" onclick="requestLogExcerpt()" class="master-tool-btn is-primary master-tool-btn-full">가져오기</button>
-                </div>
-                <div id="log-excerpt-status" class="master-tool-status-line"></div>
-              </div>
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">「사용 중지」는 안내 문구와 함께 해당 PC만 잠급니다. 「로그 삭제」는 오프라인이어도 예약되며, 대상 PC가 접속하면 바로 실행됩니다. (대상 PC 마스터 비밀번호가 이 PC와 같아야 합니다.)</p>
-          </div>
 
-          <div class="settings-panel" data-master-panel="traffic" style="max-width:none;">
-            <h3 class="settings-panel-title">부하 감시</h3>
-            <p class="settings-panel-desc">이 PC가 <b>받은</b> 네트워크 트래픽 기준입니다. 최근 1분 메시지·용량이 많거나 버퍼 초과가 있으면 「주의/과다」로 표시됩니다. (앱 재시작 전까지만 집계)</p>
-            <div class="settings-card settings-section" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+            <div class="master-admin-section-divider">
+              <span class="master-tool-icon" style="background:#fef2f2; color:#b91c1c;">📶</span>
+              <div>
+                <div class="master-admin-section-divider-title">부하 감시</div>
+                <div class="master-admin-section-divider-desc">이 PC가 <b>받은</b> 네트워크 트래픽 기준입니다. 최근 1분 메시지·용량이 많거나 버퍼 초과가 있으면 「주의/과다」로 표시됩니다. (앱 재시작 전까지만 집계)</div>
+              </div>
+            </div>
+            <div class="settings-card settings-section master-admin-wide-card" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
               <div style="font-size:13px; color:#475569;">이 PC에 저장된 공지 개수: <strong id="master-notice-count" style="color:#0f172a;">-</strong></div>
               <button type="button" onclick="refreshMasterNoticeCount()" style="padding:6px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-weight:700; cursor:pointer; color:#475569; white-space:nowrap;">🔄 새로고침</button>
             </div>
@@ -6737,7 +6735,7 @@
             <div id="master-peer-traffic-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">판정: <b style="color:#b91c1c;">과다</b> = 버퍼초과 2회↑ 또는 1분 300메시지↑/5MB↑ · <b style="color:#c2410c;">주의</b> = 버퍼초과 1회 또는 1분 120메시지↑/1.5MB↑. 의심 IP는 「접속 PC」에서 사용 중지할 수 있습니다.</p>
 
-            <div class="settings-card settings-section" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:var(--border);">
+            <div class="settings-card settings-section master-admin-wide-card" style="margin-top:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-color:var(--border);">
               <div class="master-tool-card-head">
                 <span class="master-tool-icon" style="background:#fdf4ff; color:#a21caf;">🧪</span>
                 <div class="master-tool-card-head-text"><span class="master-tool-toggle-label">부하 검사 스위트</span></div>
@@ -12131,25 +12129,38 @@
     // (온라인 PC 수만큼) user-list-update가 짧은 간격으로 여러 번 오고, 그때마다 목록이
     // 통째로 다시 그려진다. 이 순간 사용자가 목록을 스크롤하고 있으면 스크롤 프레임과
     // 무거운 재구성 작업이 겹쳐 버벅거려 보인다("시작 직후 스크롤하면 버벅거린다"는 신고).
-    // 스크롤 중에는 네트워크발 재렌더를 잠깐 미뤄뒀다가, 스크롤이 멈춘 직후 한 번만
-    // 몰아서 반영한다 — 사용자가 직접 조작해서 부르는 렌더(필터·접기 등)는 그대로 즉시 실행된다.
-    let sidebarUserListIsScrolling = false;
+    // ⚠️ 실사고 추가: 스크롤뿐 아니라 이 순간 메시지 입력창 등에 "타이핑"을 하고 있어도
+    // 똑같이 버벅거렸다("사용자를 불러오는 동안 타이핑하면 느리다"는 신고) — 스크롤과
+    // 타이핑 둘 다 같은 렌더러 메인 스레드에서 처리되는데, 그 스레드가 무거운 전체 목록
+    // 재구성 때문에 잠깐씩 막히면 키 입력 반응도 함께 늦어진다. 그래서 스크롤 중일 때뿐
+    // 아니라 입력창(문서 전체의 input/textarea)에 타이핑 중일 때도 네트워크발 재렌더를
+    // 잠깐 미뤄뒀다가, 조작이 멈춘 직후 한 번만 몰아서 반영한다 — 사용자가 직접 눌러서
+    // 부르는 렌더(필터·접기 등)는 그대로 즉시 실행된다.
+    let sidebarUserListIsBusy = false;
     let sidebarUserListRenderPending = false;
-    let sidebarUserListScrollEndTimer = null;
+    let sidebarUserListBusyEndTimer = null;
+    function markSidebarUserListBusy() {
+      sidebarUserListIsBusy = true;
+      if (sidebarUserListBusyEndTimer) clearTimeout(sidebarUserListBusyEndTimer);
+      sidebarUserListBusyEndTimer = setTimeout(() => {
+        sidebarUserListIsBusy = false;
+        if (sidebarUserListRenderPending) {
+          sidebarUserListRenderPending = false;
+          renderUserListTree();
+        }
+      }, 200);
+    }
     (function bindSidebarUserListScrollGuard() {
       const treeEl = document.getElementById('user-list-tree');
-      if (!treeEl) return;
-      treeEl.addEventListener('scroll', () => {
-        sidebarUserListIsScrolling = true;
-        if (sidebarUserListScrollEndTimer) clearTimeout(sidebarUserListScrollEndTimer);
-        sidebarUserListScrollEndTimer = setTimeout(() => {
-          sidebarUserListIsScrolling = false;
-          if (sidebarUserListRenderPending) {
-            sidebarUserListRenderPending = false;
-            renderUserListTree();
-          }
-        }, 200);
-      }, { passive: true });
+      if (treeEl) treeEl.addEventListener('scroll', markSidebarUserListBusy, { passive: true });
+      // capture 단계에서 문서 전체의 타이핑을 감지 — 채팅 입력창뿐 아니라 검색창 등
+      // 어디에 타이핑 중이어도 똑같이 적용된다.
+      document.addEventListener('input', (e) => {
+        const t = e.target;
+        if (!t) return;
+        const tag = t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || t.isContentEditable) markSidebarUserListBusy();
+      }, { capture: true, passive: true });
     })();
 
     function applyUserListUpdate(users) {
@@ -12157,7 +12168,7 @@
       allUsers = (users || []).map((u) => userWithSavedContactSnapshot(attachCachedPhotoToUser(u)));
       queueProfilePhotoLoads(users);
       const selecting = sidebarSelectedUserIps.size > 0;
-      if (sidebarUserListIsScrolling) {
+      if (sidebarUserListIsBusy) {
         sidebarUserListRenderPending = true;
       } else {
         renderUserListTree();
@@ -21199,9 +21210,10 @@
       const panels = modal.querySelector('.settings-panels');
       if (panels) panels.scrollTop = 0;
       if (key === 'clients') {
+        // ⚠️ 실사고: 「부하 감시」 탭을 「접속 PC」 탭 안으로 합쳤다("부하 감시랑 접속PC는
+        // 통합시켜도 될거 같아"는 의견) — 예전엔 탭이 따로라 이 세 가지가 traffic 탭을 열
+        // 때만 갱신됐는데, 이제 clients 탭 하나로 합쳐졌으니 여기서 함께 갱신한다.
         try { renderMasterOnlineClients(); } catch (_) {}
-      }
-      if (key === 'traffic') {
         try { renderMasterPeerTraffic(); } catch (_) {}
         try { refreshMasterLoadSimStatus(); } catch (_) {}
         try { refreshMasterNoticeCount(); } catch (_) {}
@@ -21285,7 +21297,7 @@
         </colgroup>
         <thead><tr>
           <th>판정</th><th>이름</th><th>IP</th><th>1분 메시지</th>
-          <th>1분 용량</th><th>버퍼초과</th><th>최근</th><th>주요 유형</th>
+          <th>1분 용량</th><th>버퍼초과</th><th>최근</th><th title="최근 1분간 이 PC가 이 상대로부터 가장 많이 받은 메시지 종류 상위 3개와 건수(예: '공지 동기화 응답×4'는 공지 동기화 응답 메시지를 4번 받았다는 뜻)">주요 유형 ℹ️</th>
         </tr></thead><tbody>`;
       const body = rows.map((r) => {
         const name = (r.username || '').trim() || '-';
@@ -21967,61 +21979,52 @@
 
     let logExcerptPendingRequestId = '';
     let logExcerptPendingMeta = {};
-    /** 「접속 PC」 행 관리 메뉴의 "로그 보기" — 매번 IP를 손으로 옮겨 적을 필요 없이,
-     *  그 줄의 IP를 바로 채워서 「원격 로그 가져오기」 칸으로 스크롤·포커스만 해준다. */
-    function jumpToLogExcerptForIp(ip) {
-      const ipInput = document.getElementById('log-excerpt-ip');
-      const patternInput = document.getElementById('log-excerpt-pattern');
-      if (ipInput) ipInput.value = ip || '';
-      // 검색어를 비워두면 특정 문구로 걸러지지 않고 최근 로그 전체(최대 400줄)를 가져온다.
-      if (patternInput) patternInput.value = '';
-      const box = ipInput ? ipInput.closest('div') : null;
-      (box || ipInput)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const pwdInput = document.getElementById('log-excerpt-pwd');
-      // 이번 로그인 세션에서 이미 마스터 비밀번호를 입력했으면 그대로 채워서, 매번 다시
-      // 타이핑하지 않고 바로 「가져오기」를 누를 수 있게 한다.
-      if (pwdInput && cachedMasterPassword) pwdInput.value = cachedMasterPassword;
-      if (pwdInput) setTimeout(() => { if (cachedMasterPassword) requestLogExcerpt(); else pwdInput.focus(); }, 300);
+    /** 「접속 PC」 행 관리 메뉴의 "로그 보기" — 예전엔 별도 입력 카드에 IP를 채워 넣고
+     *  「가져오기」를 다시 눌러야 했는데("원격 로그 가져오기 칸은 이제 없어져도 될 것
+     *  같다"는 의견), 이제는 그 카드 자체를 없애고 이 함수가 곧바로 요청부터 실행한다. */
+    async function jumpToLogExcerptForIp(ip) {
+      await requestLogExcerpt(ip, '');
     }
 
-    async function requestLogExcerpt() {
+    /** @param {string} [targetIpArg] 관리 메뉴에서 바로 호출할 때의 대상 IP.
+     *  @param {string} [patternArg] 검색어(비우면 최근 로그 전체, 최대 400줄). */
+    async function requestLogExcerpt(targetIpArg, patternArg) {
       if (!isMasterAuthenticated) {
         await appAlert('마스터 관리자 로그인이 필요합니다.');
         return;
       }
-      const targetIp = document.getElementById('log-excerpt-ip').value.trim();
-      const pattern = document.getElementById('log-excerpt-pattern').value.trim();
-      const password = document.getElementById('log-excerpt-pwd').value || cachedMasterPassword;
-      const statusEl = document.getElementById('log-excerpt-status');
-      if (!targetIp) { statusEl.textContent = 'IP를 입력해 주세요.'; return; }
-      if (!password) { statusEl.textContent = '마스터 비밀번호를 입력해 주세요.'; return; }
-      statusEl.textContent = `${targetIp}에 요청하는 중...`;
+      const targetIp = String(targetIpArg || '').trim();
+      const pattern = String(patternArg || '').trim();
+      const password = cachedMasterPassword;
+      if (!targetIp) { await appAlert('대상 PC의 IP가 없습니다.'); return; }
+      if (!password) {
+        await appAlert('마스터 비밀번호가 필요합니다. 「비밀번호」 탭에서 로그아웃 후 다시 로그인해 주세요.');
+        return;
+      }
       let res;
       try {
         res = await window.api.masterRequestLogExcerpt({ targetIp, pattern, password });
       } catch (e) {
-        statusEl.textContent = '이 PC가 최신 버전이 아닙니다. 업데이트 후 프로그램을 완전히 재시작해 주세요.';
+        await appAlert('이 PC가 최신 버전이 아닙니다. 업데이트 후 프로그램을 완전히 재시작해 주세요.');
         return;
       }
       if (!res || !res.success) {
-        statusEl.textContent = (res && res.msg) || '요청 실패';
+        await appAlert((res && res.msg) || '요청 실패');
         return;
       }
-      cachedMasterPassword = password;
       logExcerptPendingRequestId = res.requestId;
       logExcerptPendingMeta = { targetIp, pattern };
-      statusEl.textContent = '응답 기다리는 중... (10초 이상 안 오면 대상 PC 로그인이 다르거나 오프라인일 수 있습니다)';
+      openRemoteLogViewerModal('', { fromIp: targetIp, pattern, loading: true });
     }
 
     if (window.api.onLogExcerptResponse) {
       window.api.onLogExcerptResponse((data) => {
         if (!data || data.requestId !== logExcerptPendingRequestId) return;
-        const statusEl = document.getElementById('log-excerpt-status');
         if (!data.success) {
-          statusEl.textContent = `${data.fromIp || ''} 응답: ${data.msg || '실패'}`;
+          closeRemoteLogViewerModal();
+          appAlert(`${data.fromIp || ''} 응답: ${data.msg || '실패'}`);
           return;
         }
-        statusEl.textContent = `${data.fromIp || ''}에서 ${data.lineCount}줄 받음`;
         openRemoteLogViewerModal(data.text || '', {
           fromIp: data.fromIp || logExcerptPendingMeta.targetIp || '',
           pattern: logExcerptPendingMeta.pattern || '',
@@ -22038,21 +22041,29 @@
       remoteLogViewerRawText = text || '';
       const subtitleEl = document.getElementById('remote-log-viewer-subtitle');
       if (subtitleEl) {
-        const parts = [m.fromIp || '-'];
-        if (m.pattern) parts.push(`검색어 "${m.pattern}"`);
-        parts.push(`${Number(m.lineCount) || 0}줄`);
-        subtitleEl.textContent = parts.join(' · ');
+        if (m.loading) {
+          subtitleEl.textContent = `${m.fromIp || '-'} · 응답 기다리는 중… (10초 이상 안 오면 대상 PC 로그인이 다르거나 오프라인일 수 있습니다)`;
+        } else {
+          const parts = [m.fromIp || '-'];
+          if (m.pattern) parts.push(`검색어 "${m.pattern}"`);
+          parts.push(`${Number(m.lineCount) || 0}줄`);
+          subtitleEl.textContent = parts.join(' · ');
+        }
       }
       const bodyEl = document.getElementById('remote-log-viewer-body');
       if (bodyEl) {
-        const lines = (text || '').split('\n').filter((l) => l.length > 0);
-        if (!lines.length) {
-          bodyEl.innerHTML = `<div class="remote-log-viewer-empty">일치하는 줄이 없습니다.</div>`;
+        if (m.loading) {
+          bodyEl.innerHTML = `<div class="remote-log-viewer-empty"><div class="capture-overlay-spinner" style="margin:0 auto 14px; border-top-color:#94a3b8;"></div>불러오는 중…</div>`;
         } else {
-          bodyEl.innerHTML = lines.map((line, i) => {
-            const levelClass = /\[ERROR\]/.test(line) ? 'is-error' : (/\[WARN\]/.test(line) ? 'is-warn' : 'is-info');
-            return `<div class="remote-log-line ${levelClass}"><span class="rl-idx">${i + 1}</span><span class="rl-text">${escapeHtml(line)}</span></div>`;
-          }).join('');
+          const lines = (text || '').split('\n').filter((l) => l.length > 0);
+          if (!lines.length) {
+            bodyEl.innerHTML = `<div class="remote-log-viewer-empty">일치하는 줄이 없습니다.</div>`;
+          } else {
+            bodyEl.innerHTML = lines.map((line, i) => {
+              const levelClass = /\[ERROR\]/.test(line) ? 'is-error' : (/\[WARN\]/.test(line) ? 'is-warn' : 'is-info');
+              return `<div class="remote-log-line ${levelClass}"><span class="rl-idx">${i + 1}</span><span class="rl-text">${escapeHtml(line)}</span></div>`;
+            }).join('');
+          }
         }
         bodyEl.scrollTop = 0;
       }

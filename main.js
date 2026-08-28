@@ -756,7 +756,10 @@ const TRAFFIC_TYPE_LABELS = {
   WIPE_CHAT_HISTORY: '대화 기록 삭제', WIPE_CHAT_HISTORY_RESULT: '대화 기록 삭제 결과',
   WIPE_CLAIM: '삭제 작업 선점', WIPE_QUEUE_CLEAR: '삭제 대기열 정리', WIPE_QUEUE_SYNC: '삭제 대기열 동기화',
   TCP_BUFFER_OVERFLOW: '수신 버퍼 초과', TCP_CHUNK_OVERSIZE: '수신 데이터 과대',
-  LOADTEST_CMD: '부하 테스트 명령', PING: '연결 확인', GOODBYE: '접속 종료'
+  LOADTEST_CMD: '부하 테스트 명령', PING: '연결 확인', GOODBYE: '접속 종료',
+  UI_TEXT_SYNC: '문구 수정 동기화', UI_TEXT_SYNC_REQUEST: '문구 수정 동기화 요청',
+  LOG_EXCERPT_REQUEST: '원격 로그 요청', LOG_EXCERPT_RESPONSE: '원격 로그 응답',
+  MASTER_SESSION_STATE: '마스터 로그인 상태 동기화'
 };
 function trafficTypeLabel(t) { return TRAFFIC_TYPE_LABELS[t] || t; }
 
