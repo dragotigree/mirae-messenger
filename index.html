@@ -740,6 +740,19 @@
       box-shadow: inset 3px 0 0 hsl(var(--group-hue, 205), 60%, 76%);
     }
     .subsection-label.has-group-color:hover { background: hsl(var(--group-hue, 205), 55%, 91%); }
+    /* 즐겨찾기 섹션 안의 "즐겨찾기 채널"/"즐겨찾기 직원" 소제목 — 예전엔 그냥 회색 글씨라
+       구분이 잘 안 되고 눈에도 안 띈다는 지적("통일성도 없어보이고 이쁘지도 않고 눈에
+       띄지도 않는다")이 있어, 알약(pill) 배지 형태 + 채널/직원 각각 다른 색으로 구분했다. */
+    .favorites-subgroup-label {
+      display: flex; align-items: center; gap: 5px; width: fit-content;
+      margin: 8px 12px 4px; padding: 3px 9px 3px 7px;
+      font-size: 10.5px; font-weight: 800; letter-spacing: -0.01em;
+      border-radius: 999px; line-height: 1.4;
+    }
+    .favorites-subgroup-label:first-child { margin-top: 6px; }
+    .favorites-subgroup-label .favorites-subgroup-icon { font-size: 11px; line-height: 1; }
+    .favorites-subgroup-label.is-channels { background: #eff6ff; color: #1d4ed8; }
+    .favorites-subgroup-label.is-people { background: #fffbeb; color: #b45309; }
     .subsection-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 4px; font-size: 10px; opacity: .75; }
     .subsection-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
     .subsection-label.user-group-header { cursor: default; }
@@ -6072,9 +6085,9 @@
             <span class="group-count-badge" id="favorites-section-count">0</span>
           </span>
         </div>
-        <div id="favorites-channels-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:6px 16px 2px;">⭐ 즐겨찾기 채널</div>
+        <div id="favorites-channels-label" class="favorites-subgroup-label is-channels" style="display:none;"><span class="favorites-subgroup-icon">#</span>즐겨찾기 채널</div>
         <div id="favorites-channels-body"></div>
-        <div id="favorites-people-label" style="display:none; font-size:11px; font-weight:700; color:var(--sidebar-text-dim); padding:8px 16px 2px;">⭐ 즐겨찾기 직원</div>
+        <div id="favorites-people-label" class="favorites-subgroup-label is-people" style="display:none;"><span class="favorites-subgroup-icon">⭐</span>즐겨찾기 직원</div>
         <div id="favorites-section-body"></div>
       </div>
 
