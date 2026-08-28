@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ko">
-<!-- 천 일의 연습을 단(鍛)이라 하고, 만 일의 연습을 련(鍊)이라 한다. — v1.0.1000을 기념하며. -->
 <head>
   <meta charset="UTF-8">
   <title>Mirae Messenger</title>
@@ -745,12 +744,12 @@
        띄지도 않는다")이 있어, 알약(pill) 배지 형태 + 채널/직원 각각 다른 색으로 구분했다. */
     .favorites-subgroup-label {
       display: flex; align-items: center; gap: 5px; width: fit-content;
-      margin: 8px 12px 4px; padding: 3px 9px 3px 7px;
-      font-size: 10.5px; font-weight: 800; letter-spacing: -0.01em;
+      margin: 8px 12px 4px; padding: 4px 10px 4px 8px;
+      font-size: 12px; font-weight: 800; letter-spacing: -0.01em;
       border-radius: 999px; line-height: 1.4;
     }
     .favorites-subgroup-label:first-child { margin-top: 6px; }
-    .favorites-subgroup-label .favorites-subgroup-icon { font-size: 11px; line-height: 1; }
+    .favorites-subgroup-label .favorites-subgroup-icon { font-size: 12px; line-height: 1; }
     .favorites-subgroup-label.is-channels { background: #eff6ff; color: #1d4ed8; }
     .favorites-subgroup-label.is-people { background: #fffbeb; color: #b45309; }
     .subsection-label .group-chevron { display: inline-block; transition: transform .15s ease; margin-right: 4px; font-size: 10px; opacity: .75; }
@@ -3005,7 +3004,7 @@
       flex-shrink: 0; min-width: 0;
       display: flex; align-items: center; justify-content: space-between; gap: 6px 8px;
       flex-wrap: wrap;
-      padding: 10px 12px 0;
+      padding: 10px 12px 9px;
     }
     /* ⚠️ 실사고: 날짜 글자에 flex-shrink가 없어서(병동·종류 필터는 flex-shrink:0으로
        안 줄어드는데 날짜만 줄어들 수 있었음) 폭이 좁아지면 "8···"처럼 날짜만 잘려
@@ -3025,12 +3024,12 @@
     }
     .cal-day-filter-trigger {
       display: flex; align-items: center; gap: 5px;
-      border: 1px solid var(--border-soft); background: var(--surface-muted);
-      border-radius: 999px; padding: 4px 9px 4px 11px; font-size: 11.5px; font-weight: 700;
+      border: none; background: var(--surface-muted);
+      border-radius: 999px; padding: 4px 10px 4px 11px; font-size: 11px; font-weight: 800;
       color: var(--accent-dark); cursor: pointer; white-space: nowrap;
-      transition: background 0.12s, border-color 0.12s;
+      transition: background 0.12s, transform 0.08s;
     }
-    .cal-day-filter-trigger:hover { background: var(--sidebar-active); border-color: var(--sidebar-active); }
+    .cal-day-filter-trigger:hover { background: var(--sidebar-active); transform: translateY(-1px); }
     .cal-day-filter-trigger .cal-day-filter-chevron {
       width: 13px; height: 13px; flex-shrink: 0; transition: transform 0.15s;
       display: flex; align-items: center; justify-content: center;
@@ -3209,13 +3208,21 @@
       background: var(--sidebar-active); border-color: #90CAF9; color: var(--accent-dark);
     }
     .sidebar-duty-block {
-      padding: 10px 12px; margin: 0; border-bottom: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 5px; background: #f8fafc;
+      padding: 9px 12px; margin: 0; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; background: #f8fafc;
       border-radius: 11px 11px 0 0; box-sizing: border-box;
     }
-    .sidebar-duty-line { font-size: 11.5px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; word-break: keep-all; }
-    .sidebar-duty-line.is-duty { color: var(--accent-dark); }
-    .sidebar-duty-line.is-off { color: #b45309; font-weight: 700; }
+    /* 당직·OFF 표시를 다른 곳(즐겨찾기 소제목 등)과 같은 알약 배지 언어로 통일 —
+       너비가 줄어도 배지 자체가 통째로 줄바꿈될 뿐 글자가 잘리지 않는다. */
+    .sidebar-duty-line {
+      display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+      font-size: 11px; font-weight: 800; line-height: 1.4; letter-spacing: -0.01em;
+      padding: 3px 10px 3px 9px; border-radius: 999px;
+      word-break: keep-all; white-space: normal; box-sizing: border-box;
+    }
+    .sidebar-duty-line .sidebar-duty-icon { flex-shrink: 0; font-size: 10.5px; line-height: 1; }
+    .sidebar-duty-line.is-duty { background: #eff6ff; color: #1d4ed8; }
+    .sidebar-duty-line.is-off { background: #fffbeb; color: #b45309; }
     .mini-cal-day .duty-mark { position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: #6366f1; }
     .mini-cal-day.selected .duty-mark { background: #c7d2fe; }
     .mini-cal-day.today .duty-mark { top: 3px; right: 4px; }
@@ -6092,7 +6099,7 @@
         </div>
         <div id="favorites-channels-label" class="favorites-subgroup-label is-channels" style="display:none;"><span class="favorites-subgroup-icon">#</span>즐겨찾기 채널</div>
         <div id="favorites-channels-body"></div>
-        <div id="favorites-people-label" class="favorites-subgroup-label is-people" style="display:none;"><span class="favorites-subgroup-icon">⭐</span>즐겨찾기 직원</div>
+        <div id="favorites-people-label" class="favorites-subgroup-label is-people" style="display:none;">즐겨찾기 직원</div>
         <div id="favorites-section-body"></div>
       </div>
 
@@ -7298,6 +7305,7 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">시스템</button>
+          <button type="button" class="settings-nav-btn" data-settings-tab="about" onclick="setSettingsTab('about')">소개</button>
           <!-- 관리자화면은 설정 탭이 아니라 별도 화면으로 나가는 항목이라, 탭 목록과 섞이지 않게
                맨 아래로 내리고 위쪽에 여백·구분선을 둔다. -->
           <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
@@ -7795,18 +7803,6 @@
       <div class="settings-panel" data-settings-panel="system">
         <h3 class="settings-panel-title">시스템</h3>
         <p class="settings-panel-desc">시작 방식, 안정성, 네트워크 연결, 프로그램 업데이트를 관리합니다.</p>
-        <div class="settings-card" style="display:flex; gap:14px; align-items:flex-start;">
-          <div style="flex-shrink:0; width:44px; height:44px; border-radius:14px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:22px;">💬</div>
-          <div style="flex:1; min-width:0;">
-            <div style="font-size:15px; font-weight:800; color:var(--text-primary); letter-spacing:-0.01em;">미래병원 메신저</div>
-            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; line-height:1.5;">인터넷 없이 <b>병원 내부망</b>에서만 동작하는 사내 전용 메신저입니다. 1:1·그룹 채팅, 파일·사진 전송, 공지사항, 병동/RM/주치의 일정 현황판, 당직표 등을 하나로 모았습니다.</div>
-            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
-              <span style="font-size:11.5px; color:var(--text-secondary);">현재 버전 <b id="about-current-version" style="color:var(--text-primary);">-</b></span>
-              <button type="button" class="settings-btn-secondary" style="padding:5px 12px; font-size:11.5px;" onclick="openFeatureGuideModal()">✨ 새 기능 안내 보기</button>
-            </div>
-            <p class="settings-rams-quote" style="margin-top:10px;">천 일의 연습을 단(鍛)이라 하고, 만 일의 연습을 련(鍊)이라 한다.</p>
-          </div>
-        </div>
         <div class="settings-card">
           <div class="settings-section-title">시작</div>
           <label class="settings-inline-check">
@@ -7863,6 +7859,22 @@
           </div>
           <div id="update-check-result" class="settings-hint"></div>
           <p class="settings-rams-quote">“Less, but better.” — Dieter Rams</p>
+        </div>
+      </div>
+
+      <div class="settings-panel" data-settings-panel="about">
+        <h3 class="settings-panel-title">소개</h3>
+        <p class="settings-panel-desc">이 프로그램에 대한 소개와 버전 정보입니다.</p>
+        <div class="settings-card" style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="flex-shrink:0; width:44px; height:44px; border-radius:14px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:22px;">💬</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:15px; font-weight:800; color:var(--text-primary); letter-spacing:-0.01em;">미래병원 메신저</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; line-height:1.5;">인터넷 없이 <b>병원 내부망</b>에서만 동작하는 사내 전용 메신저입니다. 1:1·그룹 채팅, 파일·사진 전송, 공지사항, 병동/RM/주치의 일정 현황판, 당직표 등을 하나로 모았습니다.</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
+              <span style="font-size:11.5px; color:var(--text-secondary);">현재 버전 <b id="about-current-version" style="color:var(--text-primary);">-</b></span>
+              <button type="button" class="settings-btn-secondary" style="padding:5px 12px; font-size:11.5px;" onclick="openFeatureGuideModal()">✨ 새 기능 안내 보기</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -28658,13 +28670,13 @@
         if (offNames.length) {
           const offLine = document.createElement('div');
           offLine.className = 'sidebar-duty-line is-off';
-          offLine.textContent = `주치의 OFF · ${offNames.join(', ')}`;
+          offLine.innerHTML = `<span class="sidebar-duty-icon">🛌</span>주치의 OFF · ${escapeHtml(offNames.join(', '))}`;
           dutyBlock.appendChild(offLine);
         }
         if (dutyNames.length) {
           const dutyLine = document.createElement('div');
           dutyLine.className = 'sidebar-duty-line is-duty';
-          dutyLine.textContent = `당직의 · ${dutyNames.join(', ')}`;
+          dutyLine.innerHTML = `<span class="sidebar-duty-icon">🩺</span>당직의 · ${escapeHtml(dutyNames.join(', '))}`;
           dutyBlock.appendChild(dutyLine);
         }
         dutyEl.appendChild(dutyBlock);
