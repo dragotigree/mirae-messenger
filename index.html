@@ -3212,17 +3212,17 @@
       display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; background: #f8fafc;
       border-radius: 11px 11px 0 0; box-sizing: border-box;
     }
-    /* 당직·OFF 표시를 다른 곳(즐겨찾기 소제목 등)과 같은 알약 배지 언어로 통일 —
-       너비가 줄어도 배지 자체가 통째로 줄바꿈될 뿐 글자가 잘리지 않는다. */
+    /* 당직·OFF 표시 — 배경은 흰색으로 두고 글자 색으로만 구분한다("색 배경 말고 흰색에
+       넣어달라, 아이콘도 빼달라" 요청). 너비가 줄어도 배지 자체가 통째로 줄바꿈될 뿐
+       글자가 잘리지 않는다. */
     .sidebar-duty-line {
-      display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+      display: inline-flex; align-items: center; max-width: 100%;
       font-size: 11px; font-weight: 800; line-height: 1.4; letter-spacing: -0.01em;
-      padding: 3px 10px 3px 9px; border-radius: 999px;
+      padding: 3px 10px; border-radius: 999px; background: #fff;
       word-break: keep-all; white-space: normal; box-sizing: border-box;
     }
-    .sidebar-duty-line .sidebar-duty-icon { flex-shrink: 0; font-size: 10.5px; line-height: 1; }
-    .sidebar-duty-line.is-duty { background: #eff6ff; color: #1d4ed8; }
-    .sidebar-duty-line.is-off { background: #fffbeb; color: #b45309; }
+    .sidebar-duty-line.is-duty { color: #1d4ed8; }
+    .sidebar-duty-line.is-off { color: #b45309; }
     .mini-cal-day .duty-mark { position: absolute; top: 2px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: #6366f1; }
     .mini-cal-day.selected .duty-mark { background: #c7d2fe; }
     .mini-cal-day.today .duty-mark { top: 3px; right: 4px; }
@@ -28670,13 +28670,13 @@
         if (offNames.length) {
           const offLine = document.createElement('div');
           offLine.className = 'sidebar-duty-line is-off';
-          offLine.innerHTML = `<span class="sidebar-duty-icon">🛌</span>주치의 OFF · ${escapeHtml(offNames.join(', '))}`;
+          offLine.innerHTML = `주치의 OFF · ${escapeHtml(offNames.join(', '))}`;
           dutyBlock.appendChild(offLine);
         }
         if (dutyNames.length) {
           const dutyLine = document.createElement('div');
           dutyLine.className = 'sidebar-duty-line is-duty';
-          dutyLine.innerHTML = `<span class="sidebar-duty-icon">🩺</span>당직의 · ${escapeHtml(dutyNames.join(', '))}`;
+          dutyLine.innerHTML = `당직의 · ${escapeHtml(dutyNames.join(', '))}`;
           dutyBlock.appendChild(dutyLine);
         }
         dutyEl.appendChild(dutyBlock);
