@@ -7295,6 +7295,7 @@
       </div>
       <div class="settings-modal-shell">
         <nav class="settings-nav" aria-label="설정 메뉴">
+          <button type="button" class="settings-nav-btn" data-settings-tab="about" onclick="setSettingsTab('about')">소개</button>
           <button type="button" class="settings-nav-btn active" data-settings-tab="profile" onclick="setSettingsTab('profile')">프로필</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="list" onclick="setSettingsTab('list')">목록·상태</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="chat" onclick="setSettingsTab('chat')">채팅</button>
@@ -7305,7 +7306,6 @@
           <button type="button" class="settings-nav-btn" data-settings-tab="auth" onclick="setSettingsTab('auth')">작성 로그인</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="data" onclick="setSettingsTab('data')">데이터</button>
           <button type="button" class="settings-nav-btn" data-settings-tab="system" onclick="setSettingsTab('system')">시스템</button>
-          <button type="button" class="settings-nav-btn" data-settings-tab="about" onclick="setSettingsTab('about')">소개</button>
           <!-- 관리자화면은 설정 탭이 아니라 별도 화면으로 나가는 항목이라, 탭 목록과 섞이지 않게
                맨 아래로 내리고 위쪽에 여백·구분선을 둔다. -->
           <button type="button" class="settings-nav-btn settings-nav-btn-admin" onclick="closeSettingsModal(); handleMasterLockClick();">🛡️ 관리자화면</button>
