@@ -773,23 +773,30 @@
     .user-search-box input:focus { border-color: rgba(33, 150, 243, 0.45); background: #ffffff; box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.12); }
     .user-search-box input::placeholder { color: var(--text-muted); }
 
-    /* 사용자 목록: 층/부서 · 온오프 · 공용PC — 균등 세그먼트.
-       ⚠️ 실사고: 한 번 flex-wrap:wrap으로 바꿔봤는데, 실제 사이드바 너비에서는 살짝만
-       모자라도 "N" 세그먼트 하나만 덜렁 다음 줄로 떨어져 오히려 더 어색해 보였다(화면이
-       깨진 것처럼 보인다는 신고). 실제 사용 폭에서는 원래 nowrap으로도 문제가 없었으므로
-       되돌린다 — 미니 모드의 진짜 최소 창 크기(480px)에서는 한 줄에 다 들어감을 이미 확인했다. */
+    /* 사용자 목록: 층/부서 · 온오프 · 공용PC · 안읽음 — 균등 세그먼트.
+       ⚠️ 실사고: 예전엔 nowrap으로 고정해뒀는데, 세그먼트가 4개(층/부서, 전체/온라인,
+       공용/숨김, 안읽음)로 늘어난 뒤에는 좁은 폭에서 "안읽음" 칩이 잘려 보인다는 신고가
+       들어왔다. 예전에 flex-wrap만 켰을 때는 세그먼트에 min-width가 없어 끝까지 줄어들다
+       "N" 하나만 덜렁 다음 줄로 떨어져 더 어색했던 것 — 이번엔 각 세그먼트에 최소 폭을
+       줘서 일정 폭 아래로는 아예 줄어들지 않고 통째로 다음 줄로 자연스럽게 넘어가게 한다. */
     .sidebar-list-prefs {
-      display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
+      display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; row-gap: 6px;
       padding: 8px 10px 10px 10px; flex-shrink: 0;
     }
     .sidebar-list-prefs-footer {
       border-top: 1px solid var(--border-soft); background: var(--sidebar-bg);
       padding: 8px 10px; margin: 0;
     }
-    .sidebar-pref-seg-solo { flex: 0 0 auto; margin-left: auto; }
+    .sidebar-pref-seg-solo { flex: 1 1 68px; min-width: 60px; margin-left: auto; }
     .sidebar-pref-seg-solo .sidebar-pref-chip { min-width: 18px; padding: 5px 4px; font-size: 10px; }
+    /* ⚠️ 실사고: 이 줄(직원/채널 등 목록 제목 + 가나다·새로고침·검색·층·부서 아이콘들)이
+       white-space:nowrap 한 줄 고정이라, 사이드바를 좁게 끌면 아이콘이 화면 밖으로
+       밀려 잘려 보였다("새로고침 아이콘이 잘린다"는 신고). 폭이 부족하면 아이콘 묶음이
+       통째로 다음 줄로 자연스럽게 내려가도록 줄바꿈을 허용한다. */
     .sidebar-block-head {
-      white-space: nowrap;
+      white-space: normal;
+      flex-wrap: wrap;
+      row-gap: 4px;
       gap: 8px;
       min-width: 0;
     }
@@ -801,7 +808,7 @@
       flex: 0 0 auto;
     }
     .sidebar-pref-seg {
-      display: inline-flex; align-items: stretch; flex: 1 1 0; min-width: 0;
+      display: inline-flex; align-items: stretch; flex: 1 1 92px; min-width: 84px;
       border-radius: 8px; overflow: hidden;
       border: 1px solid var(--border);
       background: var(--surface-muted);
@@ -2966,11 +2973,16 @@
     }
     .sidebar-cal-day-toprow {
       flex-shrink: 0; min-width: 0;
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px 8px;
+      flex-wrap: wrap;
       padding: 10px 12px 0;
     }
+    /* ⚠️ 실사고: 날짜 글자에 flex-shrink가 없어서(병동·종류 필터는 flex-shrink:0으로
+       안 줄어드는데 날짜만 줄어들 수 있었음) 폭이 좁아지면 "8···"처럼 날짜만 잘려
+       보였다("아무리 간격을 줄여도 이쁘게 나왔으면 좋겠다"는 요청). 이제 날짜는 절대
+       줄어들지 않고, 정 자리가 없으면 줄바꿈돼서 필터 줄 위에 온전한 문구로 뜬다. */
     .sidebar-cal-day-date {
-      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      flex-shrink: 0; white-space: nowrap;
       font-size: 12.5px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em;
     }
     .sidebar-cal-day-duty {
@@ -5949,7 +5961,7 @@
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
         <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px; padding-right:12px;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
           <span style="display:flex; align-items:center; gap:6px; min-width:0; flex-shrink:0;"><span data-ui-icon="users"></span></span>
-          <span style="display:flex; align-items:center; gap:2px; flex-shrink:0;">
+          <span style="display:flex; align-items:center; flex-wrap:wrap; row-gap:4px; gap:2px; flex-shrink:0;">
             <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; letter-spacing:-0.03em;">가나다</span>
             <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" data-ui-icon="chevronsUpDown"></span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
