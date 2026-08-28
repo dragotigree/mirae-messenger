@@ -6153,6 +6153,13 @@ function createWindow() {
     title: "Mirae Messenger",
     icon: getAppNativeIcon(),
     frame: false,
+    // ⚠️ 실사고: index.html이 1.7MB짜리 큰 단일 파일이라 파싱·최상위 스크립트 실행에
+    // 시간이 좀 걸리는데, show:false가 없으면 그 시간 내내 흰 창이 그대로 보여서
+    // "처음 켤 때 버벅거린다/멈춘 것 같다"는 인상을 준다. 창을 숨겨뒀다가 렌더러가
+    // 실제로 화면을 그릴 준비가 됐을 때(ready-to-show)만 보여주면, 걸리는 총 시간은
+    // 같아도 사용자 눈에는 "빈 화면이 잠깐 멈춰있는" 대신 "곧바로 완성된 화면"으로 보인다.
+    show: false,
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: getMainPreloadPath(),
       contextIsolation: true,
@@ -6173,6 +6180,14 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', () => {
     notifyUsageLockState();
   });
+  const showMainWindow = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try { mainWindow.show(); } catch (e) { /* ignore */ }
+  };
+  mainWindow.once('ready-to-show', showMainWindow);
+  // ready-to-show가 늦거나 누락돼도(초기화가 오래 걸리는 PC 등) 창이 영원히 안 보이는
+  // 일은 없도록 안전장치를 둔다.
+  setTimeout(showMainWindow, 4000);
   // ⚠️ 위 backgroundThrottling만으로 안 잡히는 경우에 대비한 이중 안전장치 — 창이 다시
   // 활성화되거나 보일 때 마지막으로 그려진 프레임이 새로 고쳐지도록 한 번 더 강제한다.
   const forceRepaint = () => {
@@ -6248,10 +6263,9 @@ function createWindow() {
     // 이 경로(렌더러 크래시/응답없음/OOM 등)일 가능성이 높다.
     try { writeToLogFile('error', `화면 프로세스 종료(재생성 시도) — reason: ${details.reason}, exitCode: ${details.exitCode}`); } catch (e) { /* ignore */ }
     if (mainWindow) { mainWindow.destroy(); mainWindow = null; }
-    setTimeout(() => {
-      createWindow();
-      if (mainWindow) mainWindow.show();
-    }, 500);
+    // createWindow() 안에서 ready-to-show가 되면 알아서 보여준다 — 여기서 곧바로
+    // show()까지 부르면 새로 만든 창이 아직 흰 화면일 때 바로 보여버리게 된다.
+    setTimeout(() => { createWindow(); }, 500);
   });
 }
 
