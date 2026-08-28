@@ -2759,14 +2759,23 @@
     }
     .compact-window-tools-row button:hover { background: var(--border-soft); color: var(--text-primary); }
 
-    .msg-row-bubble { display: flex; flex-direction: column; max-width: 78%; margin: 4px 0; }
+    /* ⚠️ 실사고: 미니 모드 그룹채팅방에서 창을 넓게 늘리면 내가 보낸(여러 줄짜리) 말풍선이
+       오른쪽 끝에 딱 붙지 않고 화면 가운데쯤에 떠 보이는 신고가 있었다. 원인을 좁혀보니
+       이 줄 자체가 자기 폭을 못 정해서(width 없음, max-width만) 벌어진 문제 + 안쪽
+       .chat-bubble의 max-width가 `min(280px, 100%)`처럼 CSS min() 함수로 되어 있으면,
+       중첩된 flex 조상들이 자기 크기를 계산할 때(fit-content) 이 안쪽 요소의 진짜 상한을
+       못 알아채고 "줄바꿈 없이 한 줄로 쓰면 얼마나 넓을지"(수백~수천px)를 그대로 반영해
+       버리는 크로미움 특성이 겹친 것이었다. width: fit-content로 이 줄 자체는 내용 폭에
+       맞게 줄어들도록 하고, 아래 .chat-bubble의 max-width는 min() 없이 고정 px로 바꿔서
+       (좁은 창에서는 이 줄 자체의 max-width: 78% 사슬이 넘치지 않게 잡아준다) 해결한다. */
+    .msg-row-bubble { display: flex; flex-direction: column; width: fit-content; max-width: 78%; margin: 4px 0; }
     .msg-row-bubble.is-me { align-items: flex-end; align-self: flex-end; margin-left: auto; }
     .msg-row-bubble.is-other { align-items: flex-start; align-self: flex-start; margin-right: auto; }
     .bubble-sender { font-size: 11px; color: #475569; font-weight: 700; margin: 0 6px 3px 4px; letter-spacing: -0.01em; }
     .bubble-line { display: flex; align-items: flex-end; gap: 6px; max-width: 100%; }
     .bubble-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 100%; }
     .msg-row-bubble.is-other .bubble-stack { align-items: flex-start; }
-    .bubble-line .chat-bubble { max-width: min(280px, 100%); padding: 10px 14px; font-size: 13px; line-height: 1.5; word-break: break-word; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
+    .bubble-line .chat-bubble { max-width: 280px; padding: 10px 14px; font-size: 13px; line-height: 1.5; word-break: break-word; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
     .is-me .chat-bubble { background: var(--sidebar-active); color: #0f172a; border-radius: 18px 18px 6px 18px; box-shadow: none; }
     .is-other .chat-bubble { background: var(--border-soft); color: var(--text-primary); border: none; border-radius: 18px 18px 18px 6px; box-shadow: none; }
     .bubble-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
