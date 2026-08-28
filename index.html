@@ -5123,11 +5123,11 @@
       z-index: 1;
     }
     .master-clients-table col.c-name { width: 19%; }
-    .master-clients-table col.c-dept { width: 17%; }
+    .master-clients-table col.c-dept { width: 21%; }
     .master-clients-table col.c-ip { width: 13%; }
     .master-clients-table col.c-ver { width: 10%; }
     .master-clients-table col.c-status { width: 12%; }
-    .master-clients-table col.c-load { width: 15%; }
+    .master-clients-table col.c-load { width: 11%; }
     .master-clients-table col.c-last { width: 12%; }
     .master-clients-table col.c-actions { width: 44px; }
     .master-client-menu-btn {
@@ -5592,6 +5592,48 @@
     .settings-card.danger {
       background: #fef2f2;
       border-color: #fde2e2;
+    }
+    /* 마스터 관리자 「접속 PC」 하단의 구버전 자동 업데이트·원격 로그 도구 카드 —
+       예전엔 라벨·설명·입력칸이 평범한 회색 박스 하나에 다닥다닥 붙어 있어 보기 불편했다
+       ("이 부분이 보기가 안좋아"). 카드 2개를 나란히, 아이콘 칩 + 토글 스위치로 정리한다. */
+    .master-tool-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px; margin-top: 16px; align-items: start;
+    }
+    .master-tool-card { padding: 14px; }
+    .master-tool-card-head { display: flex; align-items: center; gap: 10px; }
+    .master-tool-icon {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+    }
+    .master-tool-card-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .master-tool-toggle-label { font-size: 13px; font-weight: 800; color: #0f172a; cursor: default; }
+    label.master-tool-toggle-label { cursor: pointer; }
+    .master-tool-status { font-size: 11px; font-weight: 600; color: #64748b; }
+    .master-tool-switch { flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; accent-color: #c2410c; }
+    .master-tool-desc { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+    .master-tool-pwd-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .master-tool-fields { display: flex; flex-direction: column; gap: 7px; }
+    .master-tool-input {
+      width: 100%; box-sizing: border-box; padding: 8px 10px;
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px;
+      background: #fff;
+    }
+    .master-tool-input:focus { outline: 2px solid rgba(37, 99, 235, 0.25); border-color: #93c5fd; }
+    .master-tool-btn {
+      padding: 8px 12px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md);
+      font-size: 11.5px; font-weight: 700; cursor: pointer; color: #475569; white-space: nowrap;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .master-tool-btn:hover { background: #f1f5f9; }
+    .master-tool-btn.is-primary { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .master-tool-btn.is-primary:hover { background: #1e293b; }
+    .master-tool-btn-full { width: 100%; }
+    .master-tool-status-line { font-size: 11px; color: #64748b; min-height: 14px; }
+    .master-tool-result {
+      width: 100%; box-sizing: border-box; height: 160px; padding: 8px;
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 11px;
+      font-family: 'Consolas', monospace; resize: vertical; background: #fff;
     }
     /* ⚠️ 실사고: 처음엔 브라우저 기본 title 툴팁만 달았는데, Electron에서는 창이나
      * 마우스 상태에 따라 안 뜨거나 한참 있어야 뜬다는 신고가 있었다("롤오버해도 안
@@ -6555,33 +6597,41 @@
             <div style="font-size:11px; color:#64748b; margin-top:2px;">체크박스는 온라인·오프라인 상관없이 고를 수 있습니다. 부서가 서로 다른 사람을 함께 골라도 소부서 일괄 변경은 정상 동작합니다.</div>
             <div id="master-clients-filter-count" style="font-size:11px; color:#64748b; min-height:14px;"></div>
 
-            <div style="margin-top:16px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; color:#0f172a; cursor:pointer;">
-                  <input type="checkbox" id="auto-outdated-update-toggle" onchange="onAutoOutdatedUpdateToggle(this.checked)">
-                  ⚡ 구버전 PC 자동 업데이트
-                </label>
-                <span id="auto-outdated-update-status" style="font-size:11px; color:#64748b;">꺼짐</span>
+            <div class="master-tool-grid">
+              <div class="settings-card master-tool-card">
+                <div class="master-tool-card-head">
+                  <span class="master-tool-icon" style="background:#fff7ed; color:#c2410c;">⚡</span>
+                  <div class="master-tool-card-head-text">
+                    <label class="master-tool-toggle-label" for="auto-outdated-update-toggle">구버전 PC 자동 업데이트</label>
+                    <span id="auto-outdated-update-status" class="master-tool-status">꺼짐</span>
+                  </div>
+                  <input type="checkbox" id="auto-outdated-update-toggle" class="master-tool-switch" onchange="onAutoOutdatedUpdateToggle(this.checked)">
+                </div>
+                <div class="master-tool-desc">켜두면 이 PC가 켜져 있는 동안, 구버전 PC가 접속하는 순간 자동으로 강제 업데이트를 보냅니다. 어디 있는지 몰라 직접 클릭하기 어려운 PC를 챙길 때 유용합니다.</div>
+                <div id="auto-outdated-update-pwd-row" class="master-tool-pwd-row" style="display:none;">
+                  <input type="password" id="auto-outdated-update-pwd" placeholder="마스터 비밀번호" class="master-tool-input" onkeydown="if(event.key==='Enter') confirmAutoOutdatedUpdate()">
+                  <button type="button" onclick="confirmAutoOutdatedUpdate()" class="master-tool-btn is-primary">켜기</button>
+                  <button type="button" onclick="cancelAutoOutdatedUpdateToggle()" class="master-tool-btn">취소</button>
+                </div>
               </div>
-              <div style="font-size:11.5px; color:#64748b; margin-top:4px;">켜두면 이 PC가 켜져 있는 동안, 구버전 PC가 접속하는 순간 자동으로 강제 업데이트를 보냅니다. 어디 있는지 몰라 직접 클릭하기 어려운 PC를 챙길 때 유용합니다.</div>
-              <div id="auto-outdated-update-pwd-row" style="display:none; gap:6px; margin-top:8px; align-items:center;">
-                <input type="password" id="auto-outdated-update-pwd" placeholder="마스터 비밀번호" style="flex:1 1 auto; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;" onkeydown="if(event.key==='Enter') confirmAutoOutdatedUpdate()">
-                <button type="button" onclick="confirmAutoOutdatedUpdate()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">켜기</button>
-                <button type="button" onclick="cancelAutoOutdatedUpdateToggle()" style="padding:7px 10px; background:#fff; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; color:#475569;">취소</button>
-              </div>
-            </div>
 
-            <div style="margin-top:10px; padding:12px; border:1px solid var(--border); border-radius: var(--radius-md); background:#f8fafc;">
-              <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:6px;">🩺 원격 로그 가져오기</div>
-              <div style="font-size:11.5px; color:#64748b; margin-bottom:8px;">다른 PC의 오늘·어제 로그 중 검색어가 들어간 줄만 가져옵니다(온라인이어야 함).</div>
-              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                <input type="text" id="log-excerpt-ip" placeholder="대상 IP (예: 192.168.122.204)" style="flex:1 1 160px; min-width:140px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;">
-                <input type="text" id="log-excerpt-pattern" placeholder="검색어" value="진단-override" style="flex:1 1 140px; min-width:120px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;">
-                <input type="password" id="log-excerpt-pwd" placeholder="마스터 비밀번호" style="flex:1 1 120px; min-width:110px; padding:7px 10px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:12px;" onkeydown="if(event.key==='Enter') requestLogExcerpt()">
-                <button type="button" onclick="requestLogExcerpt()" style="padding:7px 12px; background:#0f172a; color:#fff; border:none; border-radius: var(--radius-md); font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap;">가져오기</button>
+              <div class="settings-card master-tool-card">
+                <div class="master-tool-card-head">
+                  <span class="master-tool-icon" style="background:#eff6ff; color:#1d4ed8;">🩺</span>
+                  <div class="master-tool-card-head-text">
+                    <span class="master-tool-toggle-label">원격 로그 가져오기</span>
+                  </div>
+                </div>
+                <div class="master-tool-desc">다른 PC의 오늘·어제 로그 중 검색어가 들어간 줄만 가져옵니다(온라인이어야 함).</div>
+                <div class="master-tool-fields">
+                  <input type="text" id="log-excerpt-ip" placeholder="대상 IP (예: 192.168.122.204)" class="master-tool-input">
+                  <input type="text" id="log-excerpt-pattern" placeholder="검색어" value="진단-override" class="master-tool-input">
+                  <input type="password" id="log-excerpt-pwd" placeholder="마스터 비밀번호" class="master-tool-input" onkeydown="if(event.key==='Enter') requestLogExcerpt()">
+                  <button type="button" onclick="requestLogExcerpt()" class="master-tool-btn is-primary master-tool-btn-full">가져오기</button>
+                </div>
+                <div id="log-excerpt-status" class="master-tool-status-line"></div>
+                <textarea id="log-excerpt-result" readonly placeholder="결과가 여기 표시됩니다." class="master-tool-result" style="display:none;"></textarea>
               </div>
-              <div id="log-excerpt-status" style="font-size:11px; color:#64748b; margin-top:6px; min-height:14px;"></div>
-              <textarea id="log-excerpt-result" readonly placeholder="결과가 여기 표시됩니다." style="width:100%; box-sizing:border-box; margin-top:6px; height:160px; padding:8px; border:1px solid var(--border); border-radius: var(--radius-md); font-size:11px; font-family: 'Consolas', monospace; resize:vertical; display:none;"></textarea>
             </div>
             <div id="master-online-clients-box" class="master-online-clients-box"></div>
             <p style="font-size:11px; color:#64748b; margin:0; line-height:1.55;">「사용 중지」는 안내 문구와 함께 해당 PC만 잠급니다. 「로그 삭제」는 오프라인이어도 예약되며, 대상 PC가 접속하면 바로 실행됩니다. (대상 PC 마스터 비밀번호가 이 PC와 같아야 합니다.)</p>
@@ -8655,6 +8705,13 @@
     }
     let channelReadNotifyWatermark = '';
     let isMasterAuthenticated = false;
+    // ⚠️ 실사고: 이미 마스터로 로그인해서 관리자 창에 들어와 있는데도, 「로그 보기」·「구버전
+    // 자동 업데이트 켜기」 등 민감한 동작마다 마스터 비밀번호를 또 입력해야 했다("이미 로그인한
+    // 상태인데 왜 또 물어보냐"는 신고). 각 원격 동작은 대상 PC 쪽에서도 비밀번호 자체를 다시
+    // 검증하므로(다른 PC 로그를 함부로 못 열람하게 하는 실제 보안장치) 완전히 없앨 수는 없지만,
+    // 이번 로그인 세션 동안 입력한 비밀번호를 메모리에만 잠깐 기억해 뒀다가 같은 세션 안에서는
+    // 자동으로 채워 넣어 다시 타이핑할 필요가 없게 한다. 로그아웃하거나 프로그램을 새로 켜면 사라진다.
+    let cachedMasterPassword = '';
     let isNoticeOperatorAuthenticated = false;
     let currentOperatorName = '';
     let currentOperatorUsername = '';
@@ -8804,6 +8861,7 @@
       const o = opts || {};
       isMasterAuthenticated = false;
       dutyOnlyMasterSession = false;
+      cachedMasterPassword = '';
       if (window.api.clearMasterSession) {
         try { await window.api.clearMasterSession(); } catch (e) { /* ignore */ }
       }
@@ -21409,7 +21467,10 @@
       }
 
       const sortArrow = (key) => masterClientsSortKey === key ? (masterClientsSortDir > 0 ? ' ▲' : ' ▼') : '';
-      const sortableTh = (key, label) => `<th class="is-sortable" data-sort-key="${key}" style="cursor:pointer; user-select:none;" title="눌러서 이 기준으로 정렬">${label}${sortArrow(key)}</th>`;
+      // ⚠️ 실사고: "마지막"/"관리" 헤더는 기본값(왼쪽 정렬)인데, 그 아래 실제 값(마지막 접속 시각,
+      // ⋮ 버튼)은 셀 안에서 오른쪽 정렬로 그려서 헤더 글자와 실제 값이 서로 다른 쪽에 떠 있었다
+      // ("열이 안 맞는다"는 신고). 헤더 정렬을 데이터와 같은 쪽으로 맞춘다.
+      const sortableTh = (key, label, align) => `<th class="is-sortable" data-sort-key="${key}" style="cursor:pointer; user-select:none;${align ? ` text-align:${align};` : ''}" title="눌러서 이 기준으로 정렬">${label}${sortArrow(key)}</th>`;
 
       // 체크박스로 골라둔 대상은 목록이 다시 그려져도(정렬·검색 등) 그대로 유지한다.
       // 지금 화면에 없는(필터링된) IP는 셀렉트-올 등에서 실수로 포함되지 않게 정리한다.
@@ -21428,9 +21489,9 @@
           ${sortableTh('ip', 'IP')}
           ${sortableTh('version', '버전')}
           ${sortableTh('status', '상태')}
-          <th title="이 PC가 최근 1분간 보낸 트래픽 판정(부하 감시 탭과 동일 기준)">부하</th>
-          ${sortableTh('last', '마지막')}
-          <th>관리</th>
+          <th style="text-align:center;" title="이 PC가 최근 1분간 보낸 트래픽 판정(부하 감시 탭과 동일 기준)">부하</th>
+          ${sortableTh('last', '마지막', 'right')}
+          <th style="text-align:center;">관리</th>
         </tr></thead><tbody>`;
 
       const escAttr = (s) => String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -21476,9 +21537,9 @@
           <td style="font-family:monospace; color:#334155; font-size:11.5px;" title="${escAttr(u.ip || '-')}">${escapeHtml(u.ip || '-')}</td>
           <td><span class="master-pill ${verOutdated ? 'is-outdated' : 'is-uptodate'}">${escapeHtml(ver)}${verOutdated ? ' ⚠' : ''}</span></td>
           <td>${statusCell}</td>
-          <td style="font-size:11.5px;">${loadCell}</td>
+          <td style="font-size:11.5px; text-align:center;">${loadCell}</td>
           <td style="color:#64748b; text-align:right;"${lastTitle ? ` title="${escAttr(lastTitle)}"` : ''}>${escapeHtml(lastSeenText)}</td>
-          <td style="text-align:right;">
+          <td style="text-align:center;">
             <button type="button" class="master-client-menu-btn" data-ip="${escAttr(u.ip)}" title="관리" aria-label="관리">⋮</button>
           </td>
         </tr>`;
@@ -21815,7 +21876,10 @@
       const box = ipInput ? ipInput.closest('div') : null;
       (box || ipInput)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       const pwdInput = document.getElementById('log-excerpt-pwd');
-      if (pwdInput) setTimeout(() => pwdInput.focus(), 300);
+      // 이번 로그인 세션에서 이미 마스터 비밀번호를 입력했으면 그대로 채워서, 매번 다시
+      // 타이핑하지 않고 바로 「가져오기」를 누를 수 있게 한다.
+      if (pwdInput && cachedMasterPassword) pwdInput.value = cachedMasterPassword;
+      if (pwdInput) setTimeout(() => { if (cachedMasterPassword) requestLogExcerpt(); else pwdInput.focus(); }, 300);
     }
 
     async function requestLogExcerpt() {
@@ -21825,7 +21889,7 @@
       }
       const targetIp = document.getElementById('log-excerpt-ip').value.trim();
       const pattern = document.getElementById('log-excerpt-pattern').value.trim();
-      const password = document.getElementById('log-excerpt-pwd').value;
+      const password = document.getElementById('log-excerpt-pwd').value || cachedMasterPassword;
       const statusEl = document.getElementById('log-excerpt-status');
       const resultEl = document.getElementById('log-excerpt-result');
       if (!targetIp) { statusEl.textContent = 'IP를 입력해 주세요.'; return; }
@@ -21843,6 +21907,7 @@
         statusEl.textContent = (res && res.msg) || '요청 실패';
         return;
       }
+      cachedMasterPassword = password;
       logExcerptPendingRequestId = res.requestId;
       statusEl.textContent = '응답 기다리는 중... (10초 이상 안 오면 대상 PC 로그인이 다르거나 오프라인일 수 있습니다)';
     }
@@ -22807,6 +22872,7 @@
       if (wantDuty) {
         const masterRes = await window.api.verifyMasterAuth({ id: username, password });
         if (masterRes && masterRes.success) {
+          cachedMasterPassword = password;
           pendingOpenDutyRosterAfterLogin = false;
           closeOperatorLoginModal();
           await applyMasterAuthSuccess({ openDutyRoster: true, openAdmin: false });
@@ -22836,6 +22902,7 @@
       if (!wantDuty) {
         const masterRes = await window.api.verifyMasterAuth({ id: username, password });
         if (masterRes && masterRes.success) {
+          cachedMasterPassword = password;
           pendingOpenDutyRosterAfterLogin = false;
           const boardOpen = document.getElementById('board-modal')?.style.display === 'flex';
           const scheduleBoardOpen = document.getElementById('schedule-board-modal')?.style.display === 'flex'
@@ -30686,6 +30753,7 @@
       const res = await window.api.verifyMasterAuth({ id, password: pwd });
 
       if (res.success) {
+        cachedMasterPassword = pwd;
         const shouldOpenDuty = pendingOpenDutyRosterAfterLogin;
         pendingOpenDutyRosterAfterLogin = false;
         closeMasterAuthModal();
