@@ -5425,6 +5425,11 @@ db.serialize(() => {
   // 한 번 1이 되면 이후 다른 작성자가 손대도 다시 0으로 내려가지 않는다(마스터가
   // 관여했던 일정이라는 사실 자체를 계속 기억해야 하므로).
   alterAddColumn('hospital_schedules', `author_is_master INTEGER DEFAULT 0`);
+  // 「최근 24시간 변동」 요약에 "기존 ~에서 ~로 변경"을 보여 달라는 요청 — 수정 직전 값과
+  // 비교한 짧은 요약 문장을 수정한 그 PC가 한 번만 만들어서 저장해 두고, SCHEDULE_EDIT로
+  // 그대로 전파한다(받는 쪽마다 따로 계산하면 서로 다른 "이전 값"을 기준으로 삼을 수 있어
+  // 어긋날 위험이 있다 — 수정한 PC가 만든 요약을 그대로 믿는 게 가장 정확하다).
+  alterAddColumn('hospital_schedules', `change_summary TEXT DEFAULT ''`);
 
   /** 삭제된 일정 UID — 피어 NOTICE_SYNC 가 INSERT OR IGNORE 로 되살리는 것 방지 */
   db.run(`CREATE TABLE IF NOT EXISTS deleted_schedules (
@@ -10826,6 +10831,35 @@ function scheduleRemarkFromPayload(p) {
   return String(o.remark || o.memo || '').trim();
 }
 
+/** hospital_schedules.time_str(ISO 문자열)에서 "HH:MM"만 뽑는다. 미정이면 그 사실을 보여준다. */
+function scheduleTimeLabel(isoStr, undecided) {
+  if (undecided) return '미정';
+  const d = new Date(isoStr || '');
+  if (Number.isNaN(d.getTime())) return '-';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** 「최근 24시간 변동」 툴팁에 "기존 ~에서 ~로" 형태로 보여줄 짧은 요약을 만든다.
+ *  화면에 굳이 필요없는 항목(비고 등)까지 다 비교하면 사소한 수정에도 요약이 길어지므로,
+ *  실제로 자주 문제되는 핵심 항목(출발/귀원 시각·병동·호실)만 비교한다. */
+function buildScheduleChangeSummary(oldRow, next) {
+  if (!oldRow) return '';
+  const parts = [];
+  const oldStart = scheduleTimeLabel(oldRow.time_str, Number(oldRow.time_start_undecided) === 1);
+  const newStart = scheduleTimeLabel(next.time_str, Number(next.time_start_undecided) === 1);
+  if (oldStart !== newStart) parts.push(`출발 ${oldStart}→${newStart}`);
+  const oldEnd = scheduleTimeLabel(oldRow.time_end_str, Number(oldRow.time_end_undecided) === 1);
+  const newEnd = scheduleTimeLabel(next.time_end_str, Number(next.time_end_undecided) === 1);
+  if (oldEnd !== newEnd) parts.push(`귀원 ${oldEnd}→${newEnd}`);
+  const oldWard = String(oldRow.ward || '').trim();
+  const newWard = String(next.ward || '').trim();
+  if (oldWard && newWard && oldWard !== newWard) parts.push(`병동 ${oldWard}→${newWard}`);
+  const oldRoom = String(oldRow.room_no || '').trim();
+  const newRoom = String(next.room_no || '').trim();
+  if (oldRoom && newRoom && oldRoom !== newRoom) parts.push(`호실 ${oldRoom}→${newRoom}`);
+  return parts.join(', ');
+}
+
 /** 삭제 tombstone 보관 기간 (다른 PC가 오래된 삭제를 영원히 들고 있지 않도록) */
 const SCHEDULE_TOMBSTONE_KEEP_MS = 120 * 24 * 60 * 60 * 1000;
 /** DB 기록 전에도 동기화 INSERT 레이스를 막기 위한 즉시 기억 */
@@ -11194,9 +11228,12 @@ function handleScheduleEdit(s) {
     const modName = s.modified_by_name || '';
     const modIp = s.modified_by_ip || '';
     const masterFlagSql = Number(s.author_is_master) === 1 ? '1' : 'author_is_master';
+    // 수정한 PC가 이미 계산해서 보낸 "기존→변경" 요약을 그대로 저장한다 — 이 PC에서
+    // 다시 계산하지 않는다(수정 직전 로컬 값이 상대와 어긋나 있을 수 있어, 실제로
+    // 수정한 PC의 판단을 그대로 믿는 게 가장 정확하다).
     db.run(
-      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql} WHERE uid = ?`,
-      [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, s.uid],
+      `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql}, change_summary = ? WHERE uid = ?`,
+      [s.type, s.title, s.time_str, s.remind_before || 0, s.attending_physician || '', s.time_end_str || '', meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, modAt, modName, modIp, String(s.change_summary || ''), s.uid],
       () => { notifySchedulesChanged(); }
     );
   });
@@ -13216,6 +13253,11 @@ ipcMain.handle('get-all-chat-history', async (event, opts) => {
       clauses.push(`(message LIKE '%chat-file-box%')`);
     } else if (kind === 'link') {
       clauses.push(`(message LIKE '%http://%' OR message LIKE '%https://%')`);
+    } else if (kind === 'dm') {
+      // 1:1 대화만 — 전체공지·부서·층·그룹 채널이 아닌, 상대 IP로 직접 주고받은 것.
+      clauses.push(`(receiver_ip NOT IN ('BROADCAST') AND receiver_ip NOT LIKE 'DEPT:%' AND receiver_ip NOT LIKE 'FLOOR:%' AND receiver_ip NOT LIKE 'GROUP:%')`);
+    } else if (kind === 'group') {
+      clauses.push(`(receiver_ip LIKE 'GROUP:%')`);
     }
 
     let sql = `SELECT id, sender_name, sender_ip, receiver_ip, message, status, strftime('%Y-%m-%d %H:%M', created_at, 'localtime') as created_time FROM messages`;
@@ -14442,39 +14484,49 @@ ipcMain.handle('edit-schedule', async (event, payload) => {
       // 마스터가 지금 수정하면, 앞으로 이 일정은 어떤 작성 권한자든 고칠 수 있게 표시해 둔다
       // (원래부터 마스터가 만든 것이었다면 이미 1이므로 그대로 유지됨).
       const masterFlagSql = masterSessionActive ? '1' : 'author_is_master';
-      db.run(
-        `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql} WHERE uid = ?`,
-        [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, p.uid],
-        function onEditSchedule(err) {
-          if (err) {
-            resolve({ success: false, msg: err.message || '수정 실패' });
-            return;
-          }
-          if (this.changes === 0) {
-            resolve({ success: false, msg: '일정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.' });
-            return;
-          }
-          db.get(`SELECT author_is_master FROM hospital_schedules WHERE uid = ?`, [p.uid], (selErr, selRow) => {
-            const authorIsMaster = selErr ? (masterSessionActive ? 1 : 0) : Number((selRow && selRow.author_is_master) || 0);
-            broadcastToOnlinePeers({
-              type: 'SCHEDULE_EDIT',
-              schedule: {
-                uid: p.uid, type: p.type, title: p.title, time_str: p.timeStr,
-                remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
-                ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
-                time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
-                meal_cancel_breakfast: meal.meal_cancel_breakfast, meal_cancel_lunch: meal.meal_cancel_lunch, meal_cancel_dinner: meal.meal_cancel_dinner,
-                remark,
-                guardian_only: guardianOnly,
-                modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip,
-                author_is_master: authorIsMaster
-              }
+      // ⚠️ "최근 24시간 변동"에 기존→변경 요약을 보여 달라는 요청 — 덮어쓰기 전에 이전 값을
+      // 먼저 읽어서 비교해야 하므로, UPDATE 전에 한 번 SELECT한다.
+      db.get(`SELECT time_str, time_end_str, time_start_undecided, time_end_undecided, ward, room_no FROM hospital_schedules WHERE uid = ?`, [p.uid], (oldErr, oldRow) => {
+        const changeSummary = oldErr ? '' : buildScheduleChangeSummary(oldRow, {
+          time_str: p.timeStr, time_end_str: timeEnd,
+          time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
+          ward: meta.ward, room_no: meta.room_no
+        });
+        db.run(
+          `UPDATE hospital_schedules SET type = ?, title = ?, time_str = ?, remind_before = ?, attending_physician = ?, time_end_str = ?, ward = ?, rm_team = ?, room_no = ?, patient_name = ?, time_start_undecided = ?, time_end_undecided = ?, meal_cancel_breakfast = ?, meal_cancel_lunch = ?, meal_cancel_dinner = ?, remark = ?, guardian_only = ?, modified_at = ?, modified_by_name = ?, modified_by_ip = ?, author_is_master = ${masterFlagSql}, change_summary = ? WHERE uid = ?`,
+          [p.type, p.title, p.timeStr, p.remindBefore ? 1 : 0, attending, timeEnd, meta.ward, meta.rm_team, meta.room_no, meta.patient_name, und.time_start_undecided, und.time_end_undecided, meal.meal_cancel_breakfast, meal.meal_cancel_lunch, meal.meal_cancel_dinner, remark, guardianOnly, audit.modified_at, audit.modified_by_name, audit.modified_by_ip, changeSummary, p.uid],
+          function onEditSchedule(err) {
+            if (err) {
+              resolve({ success: false, msg: err.message || '수정 실패' });
+              return;
+            }
+            if (this.changes === 0) {
+              resolve({ success: false, msg: '일정을 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.' });
+              return;
+            }
+            db.get(`SELECT author_is_master FROM hospital_schedules WHERE uid = ?`, [p.uid], (selErr, selRow) => {
+              const authorIsMaster = selErr ? (masterSessionActive ? 1 : 0) : Number((selRow && selRow.author_is_master) || 0);
+              broadcastToOnlinePeers({
+                type: 'SCHEDULE_EDIT',
+                schedule: {
+                  uid: p.uid, type: p.type, title: p.title, time_str: p.timeStr,
+                  remind_before: p.remindBefore ? 1 : 0, attending_physician: attending, time_end_str: timeEnd,
+                  ward: meta.ward, rm_team: meta.rm_team, room_no: meta.room_no, patient_name: meta.patient_name,
+                  time_start_undecided: und.time_start_undecided, time_end_undecided: und.time_end_undecided,
+                  meal_cancel_breakfast: meal.meal_cancel_breakfast, meal_cancel_lunch: meal.meal_cancel_lunch, meal_cancel_dinner: meal.meal_cancel_dinner,
+                  remark,
+                  guardian_only: guardianOnly,
+                  modified_at: audit.modified_at, modified_by_name: audit.modified_by_name, modified_by_ip: audit.modified_by_ip,
+                  author_is_master: authorIsMaster,
+                  change_summary: changeSummary
+                }
+              });
             });
-          });
-          notifySchedulesChanged();
-          resolve({ success: true });
-        }
-      );
+            notifySchedulesChanged();
+            resolve({ success: true });
+          }
+        );
+      });
     });
   });
 });

@@ -6527,7 +6527,7 @@
 
   <!-- 📜 IPMsg 스타일 전체 대화 기록 모달 -->
   <!-- ✨ 새 기능 안내 -->
-  <div id="feature-guide-modal" class="modal-overlay" onclick="if(event.target===this) closeFeatureGuideModal()">
+  <div id="feature-guide-modal" class="modal-overlay" style="z-index:5100;" onclick="if(event.target===this) closeFeatureGuideModal()">
     <div class="modal-card feature-guide-modal-card">
       <button type="button" class="feature-guide-close-btn" onclick="closeFeatureGuideModal()" title="닫기">✕</button>
       <div class="feature-guide-rail">
@@ -6571,6 +6571,8 @@
         </div>
         <div class="all-logs-filterbar" role="tablist" aria-label="대화 기록 종류">
           <button type="button" class="all-logs-filter-tab is-active" data-all-logs-filter="all" onclick="setAllLogsFilter('all')">전체</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="dm" onclick="setAllLogsFilter('dm')">일대일대화</button>
+          <button type="button" class="all-logs-filter-tab" data-all-logs-filter="group" onclick="setAllLogsFilter('group')">그룹대화</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="photo" onclick="setAllLogsFilter('photo')">사진</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="file" onclick="setAllLogsFilter('file')">파일</button>
           <button type="button" class="all-logs-filter-tab" data-all-logs-filter="link" onclick="setAllLogsFilter('link')">링크</button>
@@ -7777,6 +7779,18 @@
       <div class="settings-panel" data-settings-panel="system">
         <h3 class="settings-panel-title">시스템</h3>
         <p class="settings-panel-desc">시작 방식, 안정성, 네트워크 연결, 프로그램 업데이트를 관리합니다.</p>
+        <div class="settings-card" style="display:flex; gap:14px; align-items:flex-start;">
+          <div style="flex-shrink:0; width:44px; height:44px; border-radius:14px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:22px;">💬</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:15px; font-weight:800; color:var(--text-primary); letter-spacing:-0.01em;">미래병원 메신저</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; line-height:1.5;">인터넷 없이 <b>병원 내부망</b>에서만 동작하는 사내 전용 메신저입니다. 1:1·그룹 채팅, 파일·사진 전송, 공지사항, 병동/RM/주치의 일정 현황판, 당직표 등을 하나로 모았습니다.</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap;">
+              <span style="font-size:11.5px; color:var(--text-secondary);">현재 버전 <b id="about-current-version" style="color:var(--text-primary);">-</b></span>
+              <button type="button" class="settings-btn-secondary" style="padding:5px 12px; font-size:11.5px;" onclick="openFeatureGuideModal()">✨ 새 기능 안내 보기</button>
+            </div>
+            <p class="settings-rams-quote" style="margin-top:10px;">천 일의 연습을 단(鍛)이라 하고, 만 일의 연습을 련(鍊)이라 한다.</p>
+          </div>
+        </div>
         <div class="settings-card">
           <div class="settings-section-title">시작</div>
           <label class="settings-inline-check">
@@ -7961,7 +7975,7 @@
             <div class="sb-quick-field sb-quick-field--time">
               <label for="sb-quick-time-start" id="sb-quick-time-start-label">출발</label>
               <div class="sb-quick-time-row">
-                <input type="time" id="sb-quick-time-start" value="09:00">
+                <input type="time" id="sb-quick-time-start" value="09:00" title="Ctrl+U: 미정으로 표시 (마우스 없이)" onkeydown="if(event.ctrlKey && event.key==='u'){event.preventDefault(); toggleScheduleQuickTimeUndecided('start');}">
                 <label class="sb-quick-undecided" title="출발 시간 미정">
                   <input type="checkbox" id="sb-quick-time-start-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
                 </label>
@@ -7970,7 +7984,7 @@
             <div class="sb-quick-field sb-quick-field--time" id="sb-quick-time-end-wrap">
               <label for="sb-quick-time-end">귀원</label>
               <div class="sb-quick-time-row">
-                <input type="time" id="sb-quick-time-end" value="12:00">
+                <input type="time" id="sb-quick-time-end" value="12:00" title="Ctrl+U: 미정으로 표시 (마우스 없이)" onkeydown="if(event.ctrlKey && event.key==='u'){event.preventDefault(); toggleScheduleQuickTimeUndecided('end');}">
                 <label class="sb-quick-undecided" title="귀원 시간 미정">
                   <input type="checkbox" id="sb-quick-time-end-undecided" onchange="syncScheduleBoardQuickTimeUndecidedUi()">미정
                 </label>
@@ -8016,6 +8030,7 @@
             </div>
           </div>
           <div id="schedule-board-recent-changes" class="sb-recent-changes" hidden aria-live="polite"></div>
+          <div id="sb-recent-change-tooltip" class="storage-tooltip" style="display:none; pointer-events:none;"></div>
           <div class="schedule-board-body" id="schedule-board-body"></div>
         </div>
       </div>
@@ -10259,8 +10274,8 @@
     let scheduleBoardView = 'main';
     let scheduleBoardWardTab = 'all';
     let scheduleBoardTypeFilter = 'all';
-    /** 메인 주간표: 구분 다중 선택 (Set of type keys) */
-    let scheduleBoardMainTypeFilters = new Set(['OUTPATIENT']);
+    /** 메인 주간표: 구분 다중 선택 (Set of type keys) — 기본값은 전체(외진·외출·외박 모두) */
+    let scheduleBoardMainTypeFilters = new Set(SCHEDULE_BOARD_FLOW_TYPES);
     let scheduleBoardDoctorFilter = 'all';
     let scheduleBoardCalViewDate = new Date();
     let quickPhrases = JSON.parse(localStorage.getItem('quickPhrases') || '["환자 이동 도움 요청드립니다.","치료실 변경 안내드립니다.","확인했습니다.","잠시 후 연락드리겠습니다."]');
@@ -18633,6 +18648,18 @@
         tip: '예: 「5병동」+「입원」을 함께 고르면 그날 5병동 입원 환자만 보입니다.'
       },
       {
+        cat: 'schedule', icon: '⌨️', color: '#7c3aed', title: '빠른 등록 시간 미정 단축키', tag: '현황판 · 빠른등록',
+        path: '현황판 빠른 등록 → 출발/귀원 시간 칸에서 <b>Ctrl+U</b>',
+        chips: ['마우스로 「미정」 체크박스 안 눌러도 바로 미정 처리', '다시 누르면 해제'],
+        tip: '시간을 아직 몰라 빨리 다음 항목으로 넘어가고 싶을 때 키보드만으로 처리할 수 있습니다.'
+      },
+      {
+        cat: 'schedule', icon: '🕓', color: '#c2410c', title: '최근 변동 내역 보기', tag: '현황판',
+        path: '현황판 상단 「최근 24시간 OO 일정 변동 N건」에 <b>마우스 올리기</b>',
+        chips: ['어떤 환자의 무엇이 바뀌었는지 기존→변경 형태로 표시', '누가 고쳤는지도 함께 표시'],
+        tip: null
+      },
+      {
         cat: 'manage', icon: '💾', color: '#334155', title: '저장공간 상세', tag: '환경설정 · 데이터',
         path: '환경설정 → <b>데이터</b> 탭',
         chips: ['구성 막대그래프로 확인', '안전 정리', 'DB 최적화·캐시 정리'],
@@ -18869,7 +18896,7 @@
     }
 
     function setAllLogsFilter(kind) {
-      const next = ['all', 'photo', 'file', 'link'].includes(kind) ? kind : 'all';
+      const next = ['all', 'dm', 'group', 'photo', 'file', 'link'].includes(kind) ? kind : 'all';
       allLogsFilter = next;
       document.querySelectorAll('.all-logs-filter-tab').forEach((btn) => {
         btn.classList.toggle('is-active', btn.getAttribute('data-all-logs-filter') === next);
@@ -19090,6 +19117,8 @@
 
       const emptyByKind = {
         all: keyword ? '검색어에 일치하는 대화 내역이 없습니다.' : '아직 기록된 대화 내역이 없습니다.',
+        dm: keyword ? '검색 조건에 맞는 1:1 대화가 없습니다.' : '1:1 대화 내역이 없습니다.',
+        group: keyword ? '검색 조건에 맞는 그룹 대화가 없습니다.' : '그룹 대화 내역이 없습니다.',
         photo: keyword ? '검색 조건에 맞는 사진이 없습니다.' : '사진이 포함된 대화가 없습니다.',
         file: keyword ? '검색 조건에 맞는 파일이 없습니다.' : '파일이 포함된 대화가 없습니다.',
         link: keyword ? '검색 조건에 맞는 링크가 없습니다.' : '링크가 포함된 대화가 없습니다.'
@@ -20988,7 +21017,10 @@
     }
 
     async function loadUpdatePanel() {
-      document.getElementById('update-current-version').textContent = await window.api.getAppVersion();
+      const ver = await window.api.getAppVersion();
+      document.getElementById('update-current-version').textContent = ver;
+      const aboutVerEl = document.getElementById('about-current-version');
+      if (aboutVerEl) aboutVerEl.textContent = ver;
       const savedPath = await window.api.getUpdateSourcePath();
       const pathInput = document.getElementById('update-source-path-input');
       pathInput.value = savedPath || '';
@@ -27790,8 +27822,10 @@
 
     function applyScheduleBoardMainDefaults() {
       scheduleBoardWardTab = 'all';
-      scheduleBoardMainTypeFilters = new Set(['OUTPATIENT']);
-      scheduleBoardTypeFilter = 'OUTPATIENT';
+      // ⚠️ 실사고: 예전엔 현황판을 열면 항상 "외진"만 먼저 보였는데("전체로 해달라"는 요청),
+      // 이제 기본값을 외진·외출·외박 전체로 바꾼다.
+      scheduleBoardMainTypeFilters = new Set(SCHEDULE_BOARD_FLOW_TYPES);
+      scheduleBoardTypeFilter = 'all';
       scheduleBoardDoctorFilter = 'all';
       const pat = document.getElementById('schedule-board-search-patient');
       const room = document.getElementById('schedule-board-search-room');
@@ -28802,6 +28836,17 @@
       if (endEl) endEl.disabled = endUnd;
     }
 
+    /** 출발/귀원 "미정" 체크를 마우스 없이 바로 켤 수 있게 — 시간 입력칸에서
+     *  Ctrl+U를 누르면 바로 미정으로 표시된다("키보드로 후다닥 작업하고 싶다"는 요청).
+     *  다시 시간을 입력하고 싶으면 체크박스에서 스페이스로 풀면 된다(포커스가 거기 남는다). */
+    function toggleScheduleQuickTimeUndecided(which) {
+      const cb = document.getElementById(`sb-quick-time-${which}-undecided`);
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      syncScheduleBoardQuickTimeUndecidedUi();
+      if (cb.checked) cb.focus();
+    }
+
     function collectScheduleBoardQuickSharedFields() {
       const dateStr = scheduleBoardDateStr || formatDateStr(new Date());
       const type = document.getElementById('sb-quick-type')?.value || 'OUTPATIENT';
@@ -29425,16 +29470,27 @@
       return Date.now() - at <= windowMs;
     }
 
-    function collectScheduleBoardRecentChangeCounts(list) {
-      const counts = { OUTPATIENT: 0, OUTING: 0, OVERNIGHT: 0 };
+    /** 종류별로 최근 24시간 내 바뀐 일정들을 모은다 — 개수뿐 아니라 각 건의 "기존→변경"
+     *  요약(change_summary, 수정한 PC가 만들어 둔 값)도 함께 담아서 호버 툴팁에 쓴다. */
+    function collectScheduleBoardRecentChangeItems(list) {
+      const byType = { OUTPATIENT: [], OUTING: [], OVERNIGHT: [] };
       const seen = new Set();
       (list || []).forEach((sch) => {
         if (!sch?.uid || seen.has(sch.uid)) return;
         if (!isScheduleFlowChangedRecently(sch)) return;
         seen.add(sch.uid);
-        if (counts[sch.type] != null) counts[sch.type]++;
+        if (byType[sch.type] == null) return;
+        byType[sch.type].push(sch);
       });
-      return counts;
+      Object.keys(byType).forEach((k) => {
+        byType[k].sort((a, b) => getScheduleFlowChangeAtMs(b) - getScheduleFlowChangeAtMs(a));
+      });
+      return byType;
+    }
+
+    function collectScheduleBoardRecentChangeCounts(list) {
+      const byType = collectScheduleBoardRecentChangeItems(list);
+      return { OUTPATIENT: byType.OUTPATIENT.length, OUTING: byType.OUTING.length, OVERNIGHT: byType.OVERNIGHT.length };
     }
 
     function renderScheduleBoardRecentChanges(list) {
@@ -29445,14 +29501,14 @@
         host.innerHTML = '';
         return;
       }
-      const counts = collectScheduleBoardRecentChangeCounts(list);
+      const byType = collectScheduleBoardRecentChangeItems(list);
       const items = SCHEDULE_BOARD_FLOW_TYPES.map((key) => {
-        const n = counts[key] || 0;
-        if (!n) return '';
+        const schs = byType[key];
+        if (!schs.length) return '';
         const label = (SCHEDULE_TYPE_ORDER.find((m) => m.key === key) || {}).label || key;
-        return `<div class="sb-recent-change-item" role="status">` +
+        return `<div class="sb-recent-change-item" role="status" data-change-type="${escapeHtml(key)}">` +
           `<span class="sb-recent-change-dot" aria-hidden="true"></span>` +
-          `<span>최근 24시간 ${escapeHtml(label)} 일정 변동 <b>${n}</b>건</span></div>`;
+          `<span>최근 24시간 ${escapeHtml(label)} 일정 변동 <b>${schs.length}</b>건</span></div>`;
       }).filter(Boolean);
       if (!items.length) {
         host.hidden = true;
@@ -29461,6 +29517,45 @@
       }
       host.hidden = false;
       host.innerHTML = items.join('');
+      host.querySelectorAll('.sb-recent-change-item').forEach((el) => {
+        const key = el.getAttribute('data-change-type');
+        bindScheduleRecentChangeTooltip(el, byType[key] || []);
+      });
+    }
+
+    /** "최근 24시간 OO 일정 변동 N건"에 마우스를 올리면 어떤 환자가 무엇이(기존→변경)
+     *  바뀌었는지 짧게 보여준다("어떻게 변경되었는지 알 수 있을까"라는 요청). change_summary가
+     *  없으면(시간·병동·호실 외의 사소한 항목만 고친 경우) "내용 수정"이라고만 표시한다. */
+    function bindScheduleRecentChangeTooltip(el, schs) {
+      const tip = document.getElementById('sb-recent-change-tooltip');
+      if (!tip) return;
+      const lines = schs.slice(0, 8).map((sch) => {
+        const name = escapeHtml(sch.patient_name || sch.title || '환자 미상');
+        const summary = escapeHtml(String(sch.change_summary || '').trim() || '내용 수정');
+        const by = escapeHtml(sch.modified_by_name || sch.author_name || '');
+        return `<div style="margin-top:3px;">· <b>${name}</b>: ${summary}${by ? ` <span style="opacity:0.7;">(${by})</span>` : ''}</div>`;
+      });
+      const more = schs.length > 8 ? `<div style="margin-top:3px; opacity:0.7;">외 ${schs.length - 8}건 더…</div>` : '';
+      el.addEventListener('mouseenter', (e) => {
+        tip.innerHTML = `<strong>최근 변경 내역</strong>${lines.join('')}${more}`;
+        tip.style.display = 'block';
+        positionScheduleRecentChangeTooltip(e);
+      });
+      el.addEventListener('mousemove', positionScheduleRecentChangeTooltip);
+      el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    }
+
+    function positionScheduleRecentChangeTooltip(e) {
+      const tip = document.getElementById('sb-recent-change-tooltip');
+      if (!tip || tip.style.display === 'none') return;
+      const margin = 14;
+      let x = e.clientX + margin;
+      let y = e.clientY + margin;
+      const rect = tip.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth - 8) x = e.clientX - rect.width - margin;
+      if (y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - margin;
+      tip.style.left = `${Math.max(8, x)}px`;
+      tip.style.top = `${Math.max(8, y)}px`;
     }
 
     function updateScheduleBoardDaySummary(filteredCount) {
