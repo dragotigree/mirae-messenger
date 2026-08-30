@@ -1443,6 +1443,19 @@
     #chat-header-status-text.is-clickable:hover { text-decoration-color: currentColor; }
 
     #chat-messages-area { flex: 1; min-height: 0; padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(180deg, #fafbfc 0%, #ffffff 120px); scroll-behavior: smooth; }
+    /* 채팅창 맨 아래로 이동 버튼 — 대화를 위로 스크롤해서 올려봤을 때만 뜨고,
+       누르면 최신 메시지로 부드럽게 내려간다("가장 밑으로 내려갈 수 있는 버튼" 요청). */
+    #chat-scroll-bottom-btn {
+      display: none; align-items: center; justify-content: center;
+      position: absolute; right: 22px; bottom: 96px; z-index: 40;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #fff; border: 1px solid var(--border-soft); color: var(--text-secondary);
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12); cursor: pointer;
+      transition: background 0.12s, transform 0.08s;
+    }
+    #chat-scroll-bottom-btn:hover { background: var(--surface-muted); transform: translateY(-1px); }
+    #chat-scroll-bottom-btn.is-visible { display: flex; }
+    #chat-scroll-bottom-btn .icon-glyph { width: 17px; height: 17px; }
     .chat-date-sep {
       display: flex; align-items: center; gap: 12px;
       margin: 12px 4px 8px; flex-shrink: 0; user-select: none;
@@ -6397,6 +6410,9 @@
       </div>
 
       <div id="chat-messages-area"></div>
+      <button type="button" id="chat-scroll-bottom-btn" title="맨 아래로 이동" onclick="scrollChatToBottom(true)">
+        <span data-ui-icon="chevronDown"></span>
+      </button>
       <div id="read-receipt-note" class="read-receipt-note" style="display:none;"></div>
 
       <div id="scheduled-indicator">
@@ -8822,7 +8838,9 @@
       /* 부서·층 전체 접기/펴기 — 위아래로 함께 움직이는 화살표(chevrons) */
       chevronsUpDown: _uiSvg('<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>'),
       /* 순서 초기화 — 되돌리기(반시계 화살표) */
-      rotateCcw: _uiSvg('<path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.36"/><path d="M3 3v5h5"/>')
+      rotateCcw: _uiSvg('<path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.36"/><path d="M3 3v5h5"/>'),
+      /* 채팅 맨 아래로 이동 버튼 등에 쓰는 아래방향 화살표 */
+      chevronDown: _uiSvg('<path d="m6 9 6 6 6-6"/>')
     };
     function uiIcon(name) { return UI_SVG[name] || ''; }
 
@@ -18564,6 +18582,12 @@
         tip: '이름이나 찾을 문장을 입력한 뒤 결과를 클릭하면 대화창이 열리고 그 위치로 바로 이동합니다.'
       },
       {
+        cat: 'chat', icon: '⬇️', color: '#0891b2', title: '맨 아래로 이동 버튼', tag: '1:1·그룹 공통',
+        path: '옛 대화를 위로 스크롤하면 채팅창 오른쪽 아래에 자동으로 표시',
+        chips: ['클릭하면 최신 메시지로 부드럽게 이동', '이미 맨 아래 근처면 자동으로 숨겨짐'],
+        tip: null
+      },
+      {
         cat: 'chat', icon: '📎', color: '#059669', title: '사진·파일 전송', tag: '1:1·그룹 공통',
         path: '채팅창 하단 클립 아이콘, <b>붙여넣기(Ctrl+V)</b>, 또는 파일을 대화창에 끌어다 놓기',
         chips: ['파일을 끌어다 놓거나 골라도 "보낼까요?" 확인 후 전송', '사진 미리보기', '원본 그대로 전달', '받은 파일 폴더에서 모아보기'],
@@ -23664,6 +23688,7 @@
         } else {
           scrollChatToBottom(false);
         }
+        setTimeout(updateChatScrollBottomBtn, 60);
         updateMineOutboundStatusLabels();
         await refreshAllVisibleReactions();
         if (!keyword) {
@@ -26229,7 +26254,15 @@
       openMsgActionsForRow(row, e.clientX, e.clientY);
     });
 
-    chatMessagesAreaEl.addEventListener('scroll', () => { closeOpenMsgActions(); }, { passive: true });
+    /** 채팅창을 위로 스크롤해서 최신 메시지가 화면 밖으로 벗어났을 때만 "맨 아래로" 버튼을
+     *  보여준다 — 이미 맨 아래 근처면 눌러도 할 일이 없으니 감춰서 화면을 덜 어지럽힌다. */
+    function updateChatScrollBottomBtn() {
+      const btn = document.getElementById('chat-scroll-bottom-btn');
+      if (!btn || !chatMessagesAreaEl) return;
+      const distanceFromBottom = chatMessagesAreaEl.scrollHeight - chatMessagesAreaEl.scrollTop - chatMessagesAreaEl.clientHeight;
+      btn.classList.toggle('is-visible', distanceFromBottom > 200);
+    }
+    chatMessagesAreaEl.addEventListener('scroll', () => { closeOpenMsgActions(); updateChatScrollBottomBtn(); }, { passive: true });
 
     document.addEventListener('pointerdown', (e) => {
       if (!document.querySelector('.msg-actions-open')) return;
