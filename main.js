@@ -600,6 +600,23 @@ const SENT_ACK_MAX_RETRIES = 20;
 const SENT_ACK_RESEND_WINDOW = "-7 days";
 /** 사용자 목록 IPC 디바운스 — 프레즌스 폭주 시 렌더러 재렌더 완화 */
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
+/** ⚠️ 실사고: 부팅 직후 몇 초 동안은 동료들의 PING 응답이 몰려 들어오면서 900ms마다
+ * user-list-update가 계속 밀려온다. 렌더러 쪽 사이드바 목록은 층/부서 소속이 있는 사람이
+ * 하나라도 있으면(거의 항상 그렇다) "제자리 패치"를 포기하고 매번 전체를 다시 그리므로,
+ * 접속자가 많을수록 이 부팅 직후 구간에서 전체 리빌드가 잦고 무거워져 버벅거림으로
+ * 느껴진다("접속자가 많으면 초기 부팅 시 버벅거린다" 신고). 렌더러의 다시 그리기 로직은
+ * 건드리지 않고(위험 최소화), 부팅 후 짧은 구간에서만 이 디바운스 간격을 늘려 같은 시간
+ * 동안 렌더러로 밀어보내는 전체 리빌드 횟수 자체를 줄인다 — 각 배치에 더 많은 인원이
+ * 한 번에 반영될 뿐, 최종적으로 보이는 목록은 동일하다.
+ */
+const USER_LIST_NOTIFY_BOOT_DEBOUNCE_MS = 2500;
+const USER_LIST_NOTIFY_BOOT_WINDOW_MS = 15000;
+const appBootTs = Date.now();
+function currentUserListNotifyDebounceMs() {
+  return (Date.now() - appBootTs) < USER_LIST_NOTIFY_BOOT_WINDOW_MS
+    ? USER_LIST_NOTIFY_BOOT_DEBOUNCE_MS
+    : USER_LIST_NOTIFY_DEBOUNCE_MS;
+}
 /** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
 const PRESENCE_HEARTBEAT_MS = 15000;
 // ⚠️ 1.0.486에서 15초 하트비트마다 전체 서브넷 508개 유니캐스트를 껐던(PRESENCE_FULL_SCAN_ENABLED)
@@ -8838,7 +8855,7 @@ function notifyUserList(force) {
       writeToLogFile('warn', `[진단] notifyUserList 총 ${__dt}ms (인원 ${list.length}) — buildDirectoryUserList ${__tBuilt - __t0}ms, notifyChatWindows ${__tChatWin - __tBuilt}ms, safeWebContentsSend ${__tSend - __tChatWin}ms, notifyNetworkStatus ${Date.now() - __tSend}ms`);
     }
     if (forced) { /* keep API compatible */ }
-  }, USER_LIST_NOTIFY_DEBOUNCE_MS);
+  }, currentUserListNotifyDebounceMs());
 }
 
 function notifyUserListNow() {
