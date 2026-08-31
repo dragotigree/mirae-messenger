@@ -430,19 +430,30 @@
      * top/left를 직접 찍어준다 — 그러면 어떤 조상의 overflow에도 잘리지 않는다. */
     .sidebar-jump-menu {
       position: fixed; z-index: 3000;
-      min-width: 108px; max-height: 260px; overflow-y: auto;
+      min-width: 132px; max-height: 280px; overflow-y: auto;
       background: var(--surface); border: 1px solid var(--border-soft);
-      border-radius: 12px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
-      padding: 5px; display: none; flex-direction: column; gap: 1px;
+      border-radius: 14px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16), 0 3px 10px rgba(15, 23, 42, 0.08);
+      padding: 6px; display: flex; flex-direction: column; gap: 2px;
+      /* 원래 display:none <-> flex로 즉시 나타났다 사라졌었는데, 살짝 커지며 떠오르는
+       * 느낌을 주려고 opacity/transform 트랜지션으로 바꿨다("드랍박스를 좀 더 유려하게"
+       * 요청). display는 항상 flex로 두고 opacity/pointer-events로 숨긴다 — display:none이면
+       * 트랜지션이 아예 안 걸리기 때문. 닫혀 있을 땐 pointer-events:none이라 클릭도 안 먹는다. */
+      opacity: 0; transform: translateY(-6px) scale(0.96); pointer-events: none;
+      transform-origin: top right;
+      transition: opacity 0.15s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .sidebar-jump-trigger-wrap.is-open .sidebar-jump-menu { display: flex; }
+    .sidebar-jump-trigger-wrap.is-open .sidebar-jump-menu {
+      opacity: 1; transform: translateY(0) scale(1); pointer-events: auto;
+    }
     .sidebar-jump-menu-item {
-      border: none; background: transparent; border-radius: 8px; padding: 7px 9px;
+      border: none; background: transparent; border-radius: 9px; padding: 8px 10px;
       font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: left;
-      white-space: nowrap;
+      white-space: nowrap; transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
     }
-    .sidebar-jump-menu-item:hover { background: var(--surface-muted); color: var(--text-primary); }
-    .sidebar-jump-menu-empty { padding: 8px 9px; font-size: 12px; color: #94a3b8; }
+    .sidebar-jump-menu-item:hover { background: var(--surface-muted); color: var(--text-primary); transform: translateX(1px); }
+    .sidebar-jump-menu-item:active { transform: scale(0.97); }
+    .sidebar-jump-menu-empty { padding: 10px 9px; font-size: 12px; color: #94a3b8; text-align: center; }
     #toolbar-refresh-btn.is-spinning .icon-glyph { animation: toolbar-refresh-spin 0.7s linear infinite; }
     @keyframes toolbar-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
