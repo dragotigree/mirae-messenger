@@ -11023,22 +11023,17 @@
         return Math.max(0, Math.min(SIDEBAR_RIGHT_MAX, cap));
       }
 
-      // ⚠️ 실사고: 창이 좁거나 오른쪽 패널이 넓으면 maxLeftSidebarWidthForWindow()가 거의 0(심하면
-      // 1px)까지 내려갈 수 있었다. 그러면 effectiveMin도 같이 1px로 따라 내려가 사이드바가 실제로
-      // 1px짜리 선이 되고, 그 안의 층/부서 같은 버튼은 화면에 넘쳐 보이기만 할 뿐 클릭 영역은 없는
-      // 상태가 됐다("층/부서를 눌러도 반응이 없다" 신고). 채팅 영역을 지키는 것도 중요하지만,
-      // 사이드바가 아예 못 쓰게 되는 것보다는 채팅 영역이 조금 좁아지는 편이 낫다 — 최소한
-      // SIDEBAR_HARD_FLOOR만큼은 항상 보장한다.
-      const SIDEBAR_HARD_FLOOR = 160;
+      // ⚠️ 실사고: 예전엔 창이 좁거나 오른쪽 패널이 넓으면 "채팅 영역 보호"를 우선해 사이드바
+      // 최소 폭(minW)까지 창 여유(maxW)에 맞춰 깎아버렸다 — 심하면 1px까지. 그러면 사이드바
+      // 내용(층/부서 버튼, 이름 글자)이 화면에 넘쳐 보이기만 할 뿐 클릭도 안 되고 글자도 잘려
+      // 보였다("층/부서를 눌러도 반응이 없다", "글자가 잘려서 보인다" 신고). "사이드바 폭은
+      // 잘리지 않는 범위까지만 조정되게 해달라"는 요청대로, 이제 minW(실측 콘텐츠 최소 폭)
+      // 밑으로는 창이 아무리 좁아도 절대 안 내려간다 — 채팅 영역이 그만큼 좁아지는 건 감수한다.
       function applySidebarWidth(px) {
         const minW = getLeftSidebarMinWidth();
         const maxW = maxLeftSidebarWidthForWindow();
-        // 창이 너무 좁으면 콘텐츠 최소보다 창 여유(max)를 우선해 채팅 영역을 보호하되,
-        // 그래도 SIDEBAR_HARD_FLOOR 밑으로는 절대 내려가지 않는다(버튼이 아예 안 눌리는
-        // 상태 방지 — 채팅 영역이 좁아지는 것을 감수).
-        const effectiveMin = maxW > 0 ? Math.max(SIDEBAR_HARD_FLOOR, Math.min(minW, maxW)) : SIDEBAR_HARD_FLOOR;
-        const effectiveMax = Math.max(maxW, effectiveMin);
-        const clamped = Math.max(effectiveMin, Math.min(effectiveMax, Math.round(px)));
+        const effectiveMax = Math.max(maxW, minW);
+        const clamped = Math.max(minW, Math.min(effectiveMax, Math.round(px)));
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
         return clamped;
       }
