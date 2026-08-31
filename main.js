@@ -9178,6 +9178,20 @@ function handleProfilePhotoRequest(fromIP) {
   client.on('timeout', () => client.destroy());
 }
 
+/** 오프라인이던 상대가 나중에 다시 접속해 예전에 보낸 메시지를 뒤늦게 받을 때, 저장되는
+ * 시각이 "지금"(받은 시각)이 아니라 상대가 실제로 "보낸" 원래 시각이 되게 한다
+ * ("금요일에 오프였는데 컴퓨터를 켜니 금요일에 온 메시지가 월요일에 보낸 것처럼 보인다"
+ * 신고 대응). 보낸 쪽이 sentAt을 실어 보내면 그 값을 신뢰하고, 없거나(구버전 상대) 형식이
+ * 이상하거나 미래 시각이면(시계 오차·조작 등) 지금까지처럼 받은 시각을 쓴다. */
+function resolveIncomingCreatedAt(payload) {
+  const nowSql = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const raw = payload && payload.sentAt;
+  if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return nowSql;
+  const futureLimit = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  if (raw > futureLimit) return nowSql;
+  return raw;
+}
+
 function handleIncomingChat(payload, senderIP) {
   if (senderIP === MY_IP) return;
 
@@ -9234,8 +9248,8 @@ function handleIncomingChat(payload, senderIP) {
 
     const storedMessage = compactStoredMessageHtml(payload.message);
     db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, uid],
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid, created_at) VALUES (?, ?, ?, ?, 'SENT', ?, ?)`,
+      [formatSenderDisplay(payload.sender, senderIP), senderIP, MY_IP, storedMessage, uid, resolveIncomingCreatedAt(payload)],
       (err) => {
         if (err) {
           logDbErrSkipUidConflict(err);
@@ -9347,8 +9361,8 @@ function handleIncomingDeptMessage(payload, senderIP) {
     });
 
     db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid, created_at) VALUES (?, ?, ?, ?, 'SENT', ?, ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid, resolveIncomingCreatedAt(payload)],
       (err) => {
         if (err) {
           logDbErrSkipUidConflict(err);
@@ -9390,8 +9404,8 @@ function handleIncomingFloorMessage(payload, senderIP) {
     });
 
     db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid, created_at) VALUES (?, ?, ?, ?, 'SENT', ?, ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid, resolveIncomingCreatedAt(payload)],
       (err) => {
         if (err) {
           logDbErrSkipUidConflict(err);
@@ -9744,8 +9758,8 @@ function handleIncomingBroadcast(payload, senderIP) {
     });
 
     db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?)`,
-      [senderName, senderIP, storedMessage, msgUid],
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid, created_at) VALUES (?, ?, 'BROADCAST', ?, 'SENT', ?, ?)`,
+      [senderName, senderIP, storedMessage, msgUid, resolveIncomingCreatedAt(payload)],
       (err) => {
         if (err) {
           logDbErrSkipUidConflict(err);
@@ -11310,8 +11324,8 @@ function handleIncomingGroupMessage(payload, senderIP) {
     }
 
     db.run(
-      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid) VALUES (?, ?, ?, ?, 'SENT', ?)`,
-      [senderName, senderIP, receiverKey, storedMessage, msgUid],
+      `INSERT INTO messages (sender_name, sender_ip, receiver_ip, message, status, msg_uid, created_at) VALUES (?, ?, ?, ?, 'SENT', ?, ?)`,
+      [senderName, senderIP, receiverKey, storedMessage, msgUid, resolveIncomingCreatedAt(payload)],
       (err) => {
         if (err) {
           logDbErrSkipUidConflict(err);
@@ -11552,7 +11566,8 @@ function resendPendingGroupMessages(targetIP) {
           groupName: row.group_name,
           sender: row.sender_name,
           message: row.message,
-          msgUid: row.msg_uid
+          msgUid: row.msg_uid,
+          sentAt: row.created_at || undefined
         }) + '\n';
         client.connect(TCP_PORT, targetIP, () => {
           done = true;
@@ -11735,6 +11750,7 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
     const partnerName = (allKnownUsers.get(targetIP) || {}).username || targetIP;
     const msgUid = generateMsgUid();
     const sentAt = new Date();
+    const sentAtSql = sentAt.toISOString().slice(0, 19).replace('T', ' ');
     const createdAt = sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const createdAtFull = sentAt.toLocaleString('ko-KR', {
       year: 'numeric', month: 'long', day: 'numeric',
@@ -11752,7 +11768,8 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       sender: myProfile.username,
       message,
       urgent: !!urgent,
-      uid: msgUid
+      uid: msgUid,
+      sentAt: sentAtSql
     };
     if (isChatWireTooLarge(chatPayload)) {
       finish({
@@ -12495,7 +12512,8 @@ function deliverPendingChatRow(row, targetIP) {
       sender: senderLogin,
       message: wireMessage,
       urgent: false,
-      uid: row.msg_uid || undefined
+      uid: row.msg_uid || undefined,
+      sentAt: row.created_at || undefined
     }) + '\n');
     client.end();
   });
@@ -12522,7 +12540,8 @@ function deliverPendingBroadcastRow(row, targetIP) {
       type: 'BROADCAST',
       sender: myProfile.username || row.sender_name,
       message: wireMessage,
-      msgUid: row.msg_uid || undefined
+      msgUid: row.msg_uid || undefined,
+      sentAt: row.created_at || undefined
     }) + '\n');
     client.end();
     db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
@@ -12554,7 +12573,8 @@ function deliverPendingDeptPeerRow(row, targetIP, dept) {
       dept,
       sender: myProfile.username || row.sender_name,
       message: wireMessage,
-      msgUid: row.msg_uid || undefined
+      msgUid: row.msg_uid || undefined,
+      sentAt: row.created_at || undefined
     }) + '\n');
     client.end();
     db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
@@ -12586,7 +12606,8 @@ function deliverPendingFloorPeerRow(row, targetIP, floor) {
       floor,
       sender: myProfile.username || row.sender_name,
       message: wireMessage,
-      msgUid: row.msg_uid || undefined
+      msgUid: row.msg_uid || undefined,
+      sentAt: row.created_at || undefined
     }) + '\n');
     client.end();
     db.run(`UPDATE messages SET status = 'SENT' WHERE id = ? AND status = 'PENDING'`, [row.id], (err) => {
@@ -12628,7 +12649,7 @@ function resendPendingMessages(targetIP) {
   );
 
   db.all(
-    `SELECT id, sender_name, message, msg_uid FROM messages
+    `SELECT id, sender_name, message, msg_uid, created_at FROM messages
      WHERE sender_ip = ? AND receiver_ip = ? AND status = 'PENDING'
        AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}') ORDER BY id ASC`,
     [MY_IP, `BCAST:${targetIP}`],
@@ -12642,7 +12663,7 @@ function resendPendingMessages(targetIP) {
   );
 
   db.all(
-    `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
+    `SELECT id, sender_name, message, msg_uid, receiver_ip, created_at FROM messages
      WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
        AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
      ORDER BY id ASC`,
@@ -12660,7 +12681,7 @@ function resendPendingMessages(targetIP) {
   );
 
   db.all(
-    `SELECT id, sender_name, message, msg_uid, receiver_ip FROM messages
+    `SELECT id, sender_name, message, msg_uid, receiver_ip, created_at FROM messages
      WHERE sender_ip = ? AND status = 'PENDING' AND receiver_ip LIKE ?
        AND created_at >= datetime('now', '${SENT_ACK_RESEND_WINDOW}')
      ORDER BY id ASC`,
