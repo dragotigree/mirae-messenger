@@ -10714,7 +10714,15 @@
       }
       const peers = [...pendingDmReadPeers];
       peers.forEach((ip) => {
-        requestDmReadReceipt(ip, { force: true }).catch(() => {});
+        // ⚠️ 실사고: 여기서 force:true를 쓰고 있었는데, 이 함수 자체가 resetIdleTimer()를
+        // 거쳐 keydown·mousemove마다(즉 타이핑 한 글자, 마우스 한 번 움직일 때마다) 호출된다.
+        // force는 이미 보낸 읽음 확인(dmReadReceiptSentFor)까지 매번 무시하고 새 TCP 연결을
+        // 열어 재전송했다 — 대화창을 열어둔 채 타이핑만 해도 글자마다 상대에게 새 연결을
+        // 맺어 READ_RECEIPT를 다시 보낸 셈이라, 타이핑이 뚝뚝 끊기는 원인이었다("키보드
+        // 타이핑을 하는데 오래 걸린다" 신고). force를 빼면 requestDmReadReceipt 안의
+        // dmReadReceiptSentFor 캐시가 알아서 중복을 걸러, 새 메시지가 와서 캐시가 지워졌을
+        // 때만(정말 보낼 게 있을 때만) 실제로 연결을 연다.
+        requestDmReadReceipt(ip, {}).catch(() => {});
         // ⚠️ 창을 보고 있지 않는 사이(최소화·다른 앱) 이미 열려 있던 대화로 메시지가
         // 오면 안읽음 배지를 올려두는데(위 onReceiveMessage 참고), 사람이 돌아와서
         // 그 대화를 실제로 보기 시작하면(활동 재개) 그 배지도 같이 지워줘야 한다 —
