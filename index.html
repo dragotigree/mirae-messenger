@@ -3182,6 +3182,14 @@
       font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
     }
     .sidebar-ad-rm-badge .icon-glyph { width: 10px; height: 10px; }
+    /* 사이드바 달력의 좁은 한 줄 안에서는 "보호자만" 전체 글자 대신 작은 아이콘 배지로만
+     * 표시한다(환자는 병실에 남고 보호자만 외진하는 경우 — 현황판의 badge-guardian-only와
+     * 같은 의미, 자리가 부족해 아이콘만 씀). */
+    .sidebar-ad-guardian-badge {
+      flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #f3e8ff; color: #6d28d9; font-size: 9.5px;
+    }
     /* 병동 배지(sidebar-ward-badge)와 같은 팔레트(파랑4·초록6·주황7·보라8·분홍9)로
        RM끼리 한눈에 구분되게 한다 — 예전엔 전부 같은 색이라 목록을 죽 훑어도 구분이
        안 됐다는 요청. */
@@ -28571,15 +28579,18 @@
           const norm = normalizeSchedulePatient(sch);
           const row = document.createElement('div');
           row.className = 'sidebar-ad-row';
+          const guardianOnly = isScheduleGuardianOnly(sch);
           row.title = [
             formatSidebarAdmitDischargeRoom(sch, norm),
             scheduleBoardPatientLabel(norm.patient_name) || sch.title || '',
+            guardianOnly ? '보호자만' : '',
             formatSidebarAdmitDischargeRm(sch, norm) ? `RM${formatSidebarAdmitDischargeRm(sch, norm)}` : '',
             formatSidebarAdmitDischargeTime(sch)
           ].filter(Boolean).join(' · ');
           row.innerHTML =
             `<span class="sidebar-ad-room" style="--room-c:${wardColorHex(norm.ward)};">${escapeHtml(formatSidebarAdmitDischargeRoom(sch, norm))}</span>` +
             `<span class="sidebar-ad-name">${escapeHtml(scheduleBoardPatientLabel(norm.patient_name) || '—')}</span>` +
+            (guardianOnly ? `<span class="sidebar-ad-guardian-badge" title="보호자만 외진">👤</span>` : '') +
             formatSidebarAdmitDischargeRmBadgeHtml(sch, norm) +
             `<span class="sidebar-ad-time">${escapeHtml(formatSidebarAdmitDischargeTime(sch))}</span>`;
           rows.appendChild(row);
