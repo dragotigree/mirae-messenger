@@ -454,6 +454,26 @@
     .sidebar-jump-menu-item:hover { background: var(--surface-muted); color: var(--text-primary); transform: translateX(1px); }
     .sidebar-jump-menu-item:active { transform: scale(0.97); }
     .sidebar-jump-menu-empty { padding: 10px 9px; font-size: 12px; color: #94a3b8; text-align: center; }
+    /* 층 드랍박스에서 층 이름 옆 ▾를 누르면, 그 층에 있는 부서(서브 카테고리) 목록이
+     * 펼쳐진다 — 사이드바 목록에서 층별 보기를 펼치면 이미 부서별로 소그룹되는 구조를
+     * 드랍박스에도 그대로 노출한 것("층 눌렀을 때 서브 카테고리도" 요청). */
+    .sidebar-jump-menu-group { display: flex; flex-direction: column; }
+    .sidebar-jump-menu-item-row { display: flex; align-items: center; gap: 1px; }
+    .sidebar-jump-menu-item-row .sidebar-jump-menu-item { flex: 1; min-width: 0; }
+    .sidebar-jump-menu-subtoggle {
+      border: none; background: transparent; cursor: pointer; flex-shrink: 0;
+      width: 22px; height: 26px; display: flex; align-items: center; justify-content: center;
+      border-radius: 7px; font-size: 10px; color: var(--text-secondary);
+      transition: transform 0.15s ease, background 0.12s ease;
+    }
+    .sidebar-jump-menu-subtoggle:hover { background: var(--surface-muted); }
+    .sidebar-jump-menu-subtoggle.is-open { transform: rotate(180deg); }
+    .sidebar-jump-submenu {
+      display: none; flex-direction: column; gap: 1px;
+      margin: 1px 0 3px 14px; padding-left: 8px; border-left: 2px solid var(--border-soft);
+    }
+    .sidebar-jump-submenu.is-open { display: flex; }
+    .sidebar-jump-menu-subitem { font-size: 11.5px; font-weight: 500; color: var(--text-secondary); padding: 6px 9px; }
     #toolbar-refresh-btn.is-spinning .icon-glyph { animation: toolbar-refresh-spin 0.7s linear infinite; }
     @keyframes toolbar-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -16205,13 +16225,32 @@
       const floorMenu = document.getElementById('sidebar-floor-jump-menu');
       const deptMenu = document.getElementById('sidebar-dept-jump-menu');
       if (!floorMenu && !deptMenu) return;
+      const jsQuote = (s) => escapeHtml(s).replace(/'/g, "\\'");
       const buildItems = (keys, kind) => keys.length
-        ? keys.map((name) => `<button type="button" class="sidebar-jump-menu-item" onclick="event.stopPropagation(); pickSidebarJump('${kind}', '${escapeHtml(name).replace(/'/g, "\\'")}')">${escapeHtml(name)}</button>`).join('')
+        ? keys.map((name) => `<button type="button" class="sidebar-jump-menu-item" onclick="event.stopPropagation(); pickSidebarJump('${kind}', '${jsQuote(name)}')">${escapeHtml(name)}</button>`).join('')
         : '<div class="sidebar-jump-menu-empty">항목 없음</div>';
       const restAll = allUsers || [];
       if (floorMenu) {
         const floorKeys = getOrderedUserGroupKeys('floor', collectUserGroupKeys('floor', restAll));
-        floorMenu.innerHTML = buildItems(floorKeys, 'floor');
+        // ⚠️ 실사고: "층 눌렀을 때 부서(서브 카테고리)도 볼 수 있게" 요청 — 사이드바 목록에서는
+        // 층별 보기를 펼치면 그 층 안이 이미 부서별로 소그룹(renderDeptGroupMembers)돼 있다.
+        // 그 구조를 그대로 드랍박스에 노출해, 층 이름 옆 화살표를 펼치면 그 층에 있는 부서
+        // 목록이 나오고, 부서를 고르면 그 층의 그 부서 소그룹으로 바로 스크롤되게 한다.
+        floorMenu.innerHTML = floorKeys.length ? floorKeys.map((floorName) => {
+          const deptsInFloor = defaultSortGroupKeys([...new Set(
+            restAll.filter((u) => (u.floor || '기타 층') === floorName).map((u) => (u.dept && String(u.dept).trim()) || '').filter(Boolean)
+          )]);
+          const hasSub = deptsInFloor.length > 0;
+          return `
+            <div class="sidebar-jump-menu-group">
+              <div class="sidebar-jump-menu-item-row">
+                <button type="button" class="sidebar-jump-menu-item" onclick="event.stopPropagation(); pickSidebarJump('floor', '${jsQuote(floorName)}')">${escapeHtml(floorName)}</button>
+                ${hasSub ? `<button type="button" class="sidebar-jump-menu-subtoggle" onclick="event.stopPropagation(); toggleSidebarJumpSubmenu(this)" title="부서별로 펼치기">▾</button>` : ''}
+              </div>
+              ${hasSub ? `<div class="sidebar-jump-submenu">${deptsInFloor.map((deptName) => `<button type="button" class="sidebar-jump-menu-item sidebar-jump-menu-subitem" onclick="event.stopPropagation(); pickSidebarJumpSub('floor', '${jsQuote(floorName)}', '${jsQuote(deptName)}')">${escapeHtml(deptName)}</button>`).join('')}</div>` : ''}
+            </div>
+          `;
+        }).join('') : '<div class="sidebar-jump-menu-empty">항목 없음</div>';
       }
       if (deptMenu) {
         const deptKeys = getOrderedUserGroupKeys('dept', collectUserGroupKeys('dept', restAll));
@@ -16260,6 +16299,22 @@
       jumpToUserGroupWithMode(kind, name);
     }
 
+    /** 층 드랍박스의 부서(서브 카테고리) 항목 클릭 — 그 층으로 이동한 뒤, 그 층 안의
+     *  해당 부서 소그룹(user-subdept-block)까지 곧바로 스크롤한다. */
+    function pickSidebarJumpSub(kind, groupName, subName) {
+      closeSidebarJumpMenus();
+      jumpToUserGroupWithMode(kind, groupName, subName);
+    }
+
+    /** 층 드랍박스 항목 옆 ▾ — 메뉴를 닫지 않고 그 층에 속한 부서 목록만 펼치거나 접는다. */
+    function toggleSidebarJumpSubmenu(btn) {
+      const group = btn.closest('.sidebar-jump-menu-group');
+      const sub = group && group.querySelector('.sidebar-jump-submenu');
+      if (!sub) return;
+      const isOpen = sub.classList.toggle('is-open');
+      btn.classList.toggle('is-open', isOpen);
+    }
+
     document.addEventListener('click', (e) => {
       ['sidebar-floor-jump-wrap', 'sidebar-dept-jump-wrap'].forEach((id) => {
         const wrap = document.getElementById(id);
@@ -16270,20 +16325,35 @@
     /** 사이드바 상단 "층별"/"부서별" 바로가기 선택상자 — 고른 기준으로 목록을 묶어 보여주고
      *  (기존 setDirectoryListPref 재사용, 하단 토글 버튼과 완전히 같은 동작), 고른 층·부서
      *  자리로 화면을 스크롤한다. 접혀 있었으면 펼친다. */
-    function jumpToUserGroupWithMode(groupingKey, groupName) {
+    function jumpToUserGroupWithMode(groupingKey, groupName, subName) {
       if (!groupName) return;
       if ((appSettings.userGrouping || 'floor') !== groupingKey) {
         setDirectoryListPref('grouping', groupingKey);
       }
+      let needsRerender = false;
       const collapseKey = `${groupingKey}:${groupName}`;
       if (collapsedGroups.has(collapseKey)) {
         collapsedGroups.delete(collapseKey);
+        needsRerender = true;
+      }
+      if (subName) {
+        const subCollapseKey = `${groupingKey}:${groupName}::sub:${subName}`;
+        if (collapsedGroups.has(subCollapseKey)) {
+          collapsedGroups.delete(subCollapseKey);
+          needsRerender = true;
+        }
+      }
+      if (needsRerender) {
         localStorage.setItem('collapsedGroups', JSON.stringify([...collapsedGroups]));
         renderUserListTree(true);
       }
       requestAnimationFrame(() => {
-        const block = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"]`);
-        if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        let target = null;
+        if (subName) {
+          target = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"] .user-subdept-block[data-sub-dept-name="${CSS.escape(subName)}"]`);
+        }
+        if (!target) target = document.querySelector(`.user-group-block[data-group-name="${CSS.escape(groupName)}"]`);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     }
 
@@ -18802,6 +18872,12 @@
         path: '사용자 목록 하단 표시 방식 바 — <b>층 · 부서 · 전체 · 온라인 · 공용 · 숨김</b>',
         chips: ['층별/부서별로 묶어서 보기 전환', '층별 보기는 각 층 안에서 부서별로 다시 묶여 나옴', '전체·온라인만 보기', '공용 PC 표시/숨김'],
         tip: '이 표시 방식은 미니 모드 「직원」 탭에도 똑같이 적용됩니다.'
+      },
+      {
+        cat: 'manage', icon: '🧭', color: '#0369a1', title: '층·부서로 바로 이동', tag: '사용자 목록',
+        path: '사용자 목록 위쪽 <b>층 / 부서</b> 버튼',
+        chips: ['눌러서 원하는 층·부서를 고르면 그 자리로 바로 스크롤', '층 이름 옆 ▾를 누르면 그 층에 있는 부서 목록이 펼쳐짐', '부서를 고르면 그 층의 그 부서 자리로 바로 이동'],
+        tip: null
       },
       {
         cat: 'manage', icon: '↕️', color: '#ca8a04', title: '목록 순서 바꾸기', tag: '사용자 목록·즐겨찾기·채널',
