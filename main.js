@@ -602,8 +602,9 @@ const SENT_ACK_RESEND_WINDOW = "-7 days";
 const USER_LIST_NOTIFY_DEBOUNCE_MS = 900;
 /** 평소 하트비트 간격 — 4초×508유니캐스트는 메인루프를 막아 클릭이 안 됨 */
 const PRESENCE_HEARTBEAT_MS = 15000;
-/** 전체 서브넷 508 스캔 OFF (1.0.486). 브로드캐스트 + 온라인 동료만 */
-const PRESENCE_FULL_SCAN_ENABLED = false;
+// ⚠️ 1.0.486에서 15초 하트비트마다 전체 서브넷 508개 유니캐스트를 껐던(PRESENCE_FULL_SCAN_ENABLED)
+// 자리 — 그 뒤로 층(서브넷) 간 최초 발견이 안 되는 문제가 재발했다. 삭제 대신 훨씬 낮은 빈도로
+// 돌리는 sweepUnknownSubnetPeers()로 대체했다(아래 SUBNET_SWEEP_INTERVAL_MS 참고).
 /** 수신 UDP 폭주 보호: 초당 전역/IP 상한 (병원망 구버전 508스캔 대비) */
 const UDP_RX_MAX_PER_SEC = 30;
 const UDP_RX_MAX_PER_IP_PER_SEC = 3;
@@ -7525,6 +7526,10 @@ function startUdpDiscovery() {
       setInterval(() => flushPendingGroupMessages(), 5000);
       setTimeout(() => updateMyDiagnosticsInfo(), 3000);
       setInterval(() => updateMyDiagnosticsInfo(), 45000);
+      // 부팅 10초 뒤 한 번 먼저 스윕해 다른 층(서브넷) 동료를 빨리 찾고, 이후로는
+      // SUBNET_SWEEP_INTERVAL_MS(3분)마다 반복 — network quiet 기간과 겹치지 않게 여유를 둠.
+      setTimeout(() => { if (globalUdpSocket) sweepUnknownSubnetPeers(globalUdpSocket); }, 10000);
+      setInterval(() => { if (globalUdpSocket) sweepUnknownSubnetPeers(globalUdpSocket); }, SUBNET_SWEEP_INTERVAL_MS);
     }
   });
 
@@ -7941,11 +7946,8 @@ function collectPresenceHeartbeatIps() {
   return out;
 }
 
-function broadcastPresence(socket) {
-  if (!socket) return;
-  if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
-  if (isPresenceBlocked()) return; // 서비스 전체 일시중지 시에만 접속 신호를 보내지 않음(개별 잠금은 목록 표시를 위해 계속 보냄)
-  const packet = Buffer.from(JSON.stringify({
+function buildPresencePingPacket() {
+  return Buffer.from(JSON.stringify({
     type: 'PING',
     username: myProfile.username,
     rank: myProfile.rank,
@@ -7961,14 +7963,12 @@ function broadcastPresence(socket) {
     dbSizeBytes: myDbSizeBytes,
     pendingRetryCount: myPendingRetryCount
   }));
-  // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
-  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
+}
 
-  // 수신 UDP 폭주 중에는 유니캐스트 하트비트를 잠시 멈춰 메인루프를 지킨다
-  if (Date.now() < udpStormUntil) return;
-
-  // 1.0.486: 기본은 온라인 동료만. 전체 508 유니캐스트는 클릭/커서 프리징의 주원인.
-  const ips = PRESENCE_FULL_SCAN_ENABLED ? KNOWN_SUBNET_HOST_IPS : collectPresenceHeartbeatIps();
+/** ips 목록에 소켓 실제 전송을 batch(24개)씩 setImmediate로 나눠 보낸다 — 한 번에 다
+ * 쏘면(수백 개) 그 호출 하나가 메인 스레드를 오래 붙잡아 클릭·커서가 버벅이므로,
+ * 매 배치 사이에 이벤트 루프가 다른 일을 처리할 틈을 준다. */
+function unicastPresenceToIps(socket, packet, ips) {
   if (!ips.length) return;
   let i = 0;
   const BATCH = 24;
@@ -7981,6 +7981,44 @@ function broadcastPresence(socket) {
     if (i < ips.length) setImmediate(sendBatch);
   };
   sendBatch();
+}
+
+function broadcastPresence(socket) {
+  if (!socket) return;
+  if (!profileLoaded) return; // 아직 DB에서 실제 프로필을 못 불러왔으면 기본값을 내보내지 않는다.
+  if (isPresenceBlocked()) return; // 서비스 전체 일시중지 시에만 접속 신호를 보내지 않음(개별 잠금은 목록 표시를 위해 계속 보냄)
+  const packet = buildPresencePingPacket();
+  // 같은 대역은 기존 방식(브로드캐스트)으로 빠르게 전송
+  try { socket.send(packet, 0, packet.length, UDP_PORT, '255.255.255.255'); } catch (e) { /* ignore */ }
+
+  // 수신 UDP 폭주 중에는 유니캐스트 하트비트를 잠시 멈춰 메인루프를 지킨다
+  if (Date.now() < udpStormUntil) return;
+
+  // 1.0.486: 매 15초 하트비트는 "이미 온라인인 걸 아는 동료"에게만 — 전체 508 유니캐스트는
+  // 클릭/커서 프리징의 주원인이라 여기서는 뺐다. 서로 다른 층(서브넷) 간 최초 발견은
+  // sweepUnknownSubnetPeers()가 훨씬 낮은 빈도로 대신 맡는다(아래 참고).
+  unicastPresenceToIps(socket, packet, collectPresenceHeartbeatIps());
+}
+
+/** 🏢 "예전엔 다른 층 동료도 잘 보였는데 요즘은 특정 층이 계속 오프라인으로만 보인다" 신고
+ * 대응. 층마다 네트워크 대역(서브넷)이 나뉘어 있어 일반 브로드캐스트가 못 넘어가는 문제를
+ * 풀려고 KNOWN_SUBNET_HOST_IPS(대역별 1~254 전체) 유니캐스트가 있었는데, 이걸 15초
+ * 하트비트마다 508개씩 쏘던 게 "클릭/커서 프리징"을 일으켜 1.0.486에서 완전히 꺼버렸다
+ * (PRESENCE_FULL_SCAN_ENABLED = false) — 그 결과 서로 처음부터 못 보던 층 간 상대는 다시
+ * 영영 발견되지 않게 됐다.
+ * 절충안: 이 전체 스캔은 몇 분에 한 번만 돌린다. 이미 온라인인 상대(=15초 하트비트가 이미
+ * 챙기고 있음)는 빼고, "아직 모르는 나머지 주소"만 쏘므로 트래픽도 훨씬 적다 — 네트워크가
+ * 안정되면(다 서로 알게 되면) 스윕 대상이 자연히 줄어든다. */
+const SUBNET_SWEEP_INTERVAL_MS = 3 * 60 * 1000;
+function sweepUnknownSubnetPeers(socket) {
+  if (!socket) return;
+  if (!profileLoaded) return;
+  if (isPresenceBlocked()) return;
+  if (Date.now() < udpStormUntil) return;
+  if (!KNOWN_SUBNET_HOST_IPS.length) return;
+  const ips = KNOWN_SUBNET_HOST_IPS.filter((ip) => ip !== MY_IP && !onlineUsers.has(ip));
+  if (!ips.length) return;
+  unicastPresenceToIps(socket, buildPresencePingPacket(), ips);
 }
 
 /** 처음 보거나(또는 방금 오프라인→온라인 된) 상대에게만 내 신호(PING)를 그 즉시 한 번 더
