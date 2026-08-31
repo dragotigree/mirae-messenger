@@ -422,8 +422,14 @@
      * HTMLSelectElement.showPicker()를 아직 지원하지 않아(막 그 다음 버전에서 추가됨)
      * 숨긴 select를 여는 방식이 통하지 않았다. 아이콘 버튼 + 직접 그린 목록(팝오버)으로 교체. */
     .sidebar-jump-trigger-wrap { position: relative; }
+    /* ⚠️ 실사고: 이 메뉴가 position:absolute로 트리거 바로 밑에 뜨게 돼 있었는데, 조상인
+     * #sidebar-block-users(.sidebar-main-block-grow)가 자기 안의 사용자 목록을 스크롤하려고
+     * overflow:hidden을 쓰고 있어서, 그 경계를 넘어가는 이 팝업이 그대로 잘려(안 보이게)
+     * 버렸다("눌러도 반응이 없다", "사용자 목록 뒤에 가려져서 나온다" 신고). position:fixed로
+     * 바꿔 뷰포트 기준으로 띄우고, 열 때 JS(toggleSidebarJumpMenu)가 실제 좌표를 계산해
+     * top/left를 직접 찍어준다 — 그러면 어떤 조상의 overflow에도 잘리지 않는다. */
     .sidebar-jump-menu {
-      position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+      position: fixed; z-index: 3000;
       min-width: 108px; max-height: 260px; overflow-y: auto;
       background: var(--surface); border: 1px solid var(--border-soft);
       border-radius: 12px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
@@ -11013,12 +11019,22 @@
         return Math.max(0, Math.min(SIDEBAR_RIGHT_MAX, cap));
       }
 
+      // ⚠️ 실사고: 창이 좁거나 오른쪽 패널이 넓으면 maxLeftSidebarWidthForWindow()가 거의 0(심하면
+      // 1px)까지 내려갈 수 있었다. 그러면 effectiveMin도 같이 1px로 따라 내려가 사이드바가 실제로
+      // 1px짜리 선이 되고, 그 안의 층/부서 같은 버튼은 화면에 넘쳐 보이기만 할 뿐 클릭 영역은 없는
+      // 상태가 됐다("층/부서를 눌러도 반응이 없다" 신고). 채팅 영역을 지키는 것도 중요하지만,
+      // 사이드바가 아예 못 쓰게 되는 것보다는 채팅 영역이 조금 좁아지는 편이 낫다 — 최소한
+      // SIDEBAR_HARD_FLOOR만큼은 항상 보장한다.
+      const SIDEBAR_HARD_FLOOR = 160;
       function applySidebarWidth(px) {
         const minW = getLeftSidebarMinWidth();
         const maxW = maxLeftSidebarWidthForWindow();
-        // 창이 너무 좁으면 콘텐츠 최소보다 창 여유(max)를 우선해 채팅 영역을 보호
-        const effectiveMin = maxW > 0 ? Math.min(minW, maxW) : 0;
-        const clamped = Math.max(effectiveMin, Math.min(maxW, Math.round(px)));
+        // 창이 너무 좁으면 콘텐츠 최소보다 창 여유(max)를 우선해 채팅 영역을 보호하되,
+        // 그래도 SIDEBAR_HARD_FLOOR 밑으로는 절대 내려가지 않는다(버튼이 아예 안 눌리는
+        // 상태 방지 — 채팅 영역이 좁아지는 것을 감수).
+        const effectiveMin = maxW > 0 ? Math.max(SIDEBAR_HARD_FLOOR, Math.min(minW, maxW)) : SIDEBAR_HARD_FLOOR;
+        const effectiveMax = Math.max(maxW, effectiveMin);
+        const clamped = Math.max(effectiveMin, Math.min(effectiveMax, Math.round(px)));
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
         return clamped;
       }
@@ -16193,13 +16209,33 @@
       }
     }
 
+    /** position:fixed로 뜨는 층/부서 팝업의 좌표를 트리거 버튼 실제 위치 기준으로 계산해
+     *  찍어준다 — 뷰포트 오른쪽/아래로 넘치면 안쪽으로 당겨 항상 화면 안에 보이게 한다. */
+    function positionSidebarJumpMenu(wrap) {
+      const trigger = wrap.querySelector('.sidebar-header-icon-btn-labeled');
+      const menu = wrap.querySelector('.sidebar-jump-menu');
+      if (!trigger || !menu) return;
+      const tr = trigger.getBoundingClientRect();
+      const menuWidth = Math.max(menu.offsetWidth || 0, 108);
+      let left = tr.right - menuWidth;
+      left = Math.max(6, Math.min(left, window.innerWidth - menuWidth - 6));
+      let top = tr.bottom + 6;
+      const menuHeight = menu.offsetHeight || 260;
+      if (top + menuHeight > window.innerHeight - 6) top = Math.max(6, tr.top - menuHeight - 6);
+      menu.style.left = `${Math.round(left)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+    }
+
     function toggleSidebarJumpMenu(kind) {
       const targetId = kind === 'floor' ? 'sidebar-floor-jump-wrap' : 'sidebar-dept-jump-wrap';
       const otherId = kind === 'floor' ? 'sidebar-dept-jump-wrap' : 'sidebar-floor-jump-wrap';
       const other = document.getElementById(otherId);
       if (other) other.classList.remove('is-open');
       const wrap = document.getElementById(targetId);
-      if (wrap) wrap.classList.toggle('is-open');
+      if (!wrap) return;
+      const willOpen = !wrap.classList.contains('is-open');
+      wrap.classList.toggle('is-open');
+      if (willOpen) positionSidebarJumpMenu(wrap);
     }
 
     function closeSidebarJumpMenus() {
