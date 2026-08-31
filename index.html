@@ -447,6 +447,10 @@
     @keyframes toolbar-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     #sidebar-left .section-label { padding: 5px 12px 3px 12px; font-size: var(--sidebar-item-font-size); font-weight: var(--sidebar-item-font-weight); }
+    /* 사용자 목록 위쪽 아이콘 줄(가나다·층·부서 등)은 줄바꿈 대신 항상 한 줄로 유지하고,
+     * 자리가 부족하면 가로 스크롤되게 한다("이 부분은 한줄로 보이게 해줘" 요청).
+     * 스크롤바는 시각적으로 감춘다(휠/트랙패드로는 여전히 스크롤 가능). */
+    #users-section-label::-webkit-scrollbar { display: none; }
     .section-label { text-transform: uppercase; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); padding: 6px 12px 3px 12px; letter-spacing: 0.02em; }
     .section-label .group-chevron { display: inline-block; transition: transform var(--transition-fast); margin-right: 4px; font-size: 11px; opacity: .75; }
     .section-label.is-collapsed .group-chevron { transform: rotate(-90deg); }
@@ -6131,8 +6135,8 @@
       </div>
 
       <div id="sidebar-block-users" class="sidebar-main-block sidebar-main-block-grow" data-sidebar-block="users">
-        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; padding-right:12px; min-width:0;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
-          <span style="display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; row-gap:4px; gap:2px; min-width:0; max-width:100%;">
+        <div class="section-label sidebar-block-head" id="users-section-label" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; padding-right:12px; min-width:0; overflow-x:auto; scrollbar-width:none;" title="Ctrl(⌘)+클릭으로 여러 명 선택 후 그룹 만들기">
+          <span style="display:flex; align-items:center; justify-content:flex-start; flex-wrap:nowrap; gap:2px; min-width:0; flex-shrink:0;">
             <span class="sidebar-header-icon-btn" id="sidebar-alpha-sort-btn" onclick="event.stopPropagation(); toggleSidebarAlphaSort()" title="가나다순 정렬 (켜면 이름순, 끄면 온라인 우선)" style="font-size:10.5px; font-weight:800; letter-spacing:-0.03em;">가나다</span>
             <span class="sidebar-header-icon-btn" id="toolbar-collapse-all-btn" onclick="event.stopPropagation(); toggleAllUserGroupsCollapse()" title="부서·층 전체 접기/펴기" data-ui-icon="chevronsUpDown"></span>
             <span class="sidebar-header-icon-btn" id="toolbar-refresh-btn" onclick="event.stopPropagation(); manualRefreshUsers()" title="사용자 목록 새로고침" data-ui-icon="refresh"></span>
