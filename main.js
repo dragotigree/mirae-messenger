@@ -5798,11 +5798,21 @@ db.serialize(() => {
   });
 
   function onProfileLoadedForPresence() {
-    if (!onlineUsers.has(MY_IP)) {
-      registerSelf();
-      if (globalUdpSocket) broadcastPresence(globalUdpSocket);
-    }
+    // ⚠️ 실사고(장기 미해결 "업데이트 재시작할 때마다 남의 소부서·비고가 가끔 풀린다"의
+    // 진짜 원인): 예전엔 이 PC가 profileOverrides를 DB에서 다 불러오기(loadProfileOverrides,
+    // 비동기) 전에 먼저 자기 존재를 알려버렸다(registerSelf+broadcastPresence). 그러면 그
+    // 신호를 받은 동료 PC들이 "재접속했다"고 판단해 곧바로 자기가 들고 있는 profileOverrides
+    // 사본들을 PROFILE_OVERRIDE_SYNC로 이 PC에 밀어준다(7745행 근처 로직) — 그런데 이게
+    // loadProfileOverrides의 DB 조회보다 먼저 도착하면, storeProfileOverride()가 "이 IP는
+    // 처음 본다"고 착각해(아직 메모리에 못 실었을 뿐 DB에는 이미 올바른 값이 있어도) 남이
+    // 들고 있던 옛/빈 값을 무조건 새 값으로 받아들이고 DB에 그대로 덮어써 버렸다. 자기 존재를
+    // 알리는 시점을 profileOverrides를 다 불러온 뒤로만 미루면, 동료들의 응답이 도착할
+    // 때쯤엔 이미 내 DB의 진짜 값이 메모리에 올라와 있어 이 경합이 없어진다.
     loadProfileOverrides(() => {
+      if (!onlineUsers.has(MY_IP)) {
+        registerSelf();
+        if (globalUdpSocket) broadcastPresence(globalUdpSocket);
+      }
       // 🩺 진단용 — "부팅할 때마다 소부서·비고가 자꾸 풀린다"는 반복 신고의 원인을 아직
       // 못 찾았다. 부팅 시점에 이 PC가 실제로 들고 있는 override 목록을 로그에 남겨,
       // DB에서부터 이미 비어 있는 건지(저장 자체가 안 된 것) 아니면 재적용 단계에서
