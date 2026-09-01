@@ -11798,10 +11798,7 @@ ipcMain.handle('send-file-transfer', async (event, opts) => {
 ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
   if (isMessengerUsageBlocked()) return messengerBlockedResponse();
   return new Promise((resolve) => {
-    const client = new net.Socket();
-    let isConnected = false;
     let settled = false;
-    client.setTimeout(900);
     const partnerName = (allKnownUsers.get(targetIP) || {}).username || targetIP;
     const msgUid = generateMsgUid();
     const sentAt = new Date();
@@ -11859,9 +11856,18 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       return;
     }
 
-    const startTcpSend = (localRowId) => {
-      extractAndSaveAttachments(message, { msgUid });
-      appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
+    // ⚠️ 실사고: 상대가 사이드바에는 분명히 온라인으로 떠 있어도(온라인 표시는 UDP
+    // 하트비트로 따로 판단), 메시지 전송은 그와 무관하게 매번 새 TCP 연결을 열어 900ms
+    // 안에 붙는지로 별도 판단했다. 병원 망의 순간적인 혼잡이나 상대 PC의 찰나의 지연으로
+    // 이 연결 하나가 실패하면 실제로는 접속 중인 상대에게도 곧바로 "오프라인"으로
+    // 확정돼 버렸다("보낼 때마다 가끔 오프라인이라고 뜨면서 멈칫한다" 신고). 첫 시도가
+    // 실패해도 곧바로 포기하지 않고 새 소켓으로 한 번만 더 즉시 재시도한다 — 정상적으로
+    // 붙는 대다수 경우는 지금과 속도가 완전히 같고, 진짜 오프라인일 때만 "오프라인" 확정
+    // 까지 걸리는 시간이 최대 900ms에서 약 1.8초로 늘어난다(결과 자체는 동일).
+    const attemptTcpSend = (localRowId, isRetry) => {
+      const client = new net.Socket();
+      let isConnected = false;
+      client.setTimeout(900);
 
       client.connect(TCP_PORT, targetIP, () => {
         isConnected = true;
@@ -11885,6 +11891,10 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
       const handleFailure = () => {
         if (isConnected || settled) return;
         client.destroy();
+        if (!isRetry) {
+          attemptTcpSend(localRowId, true);
+          return;
+        }
         db.run(
           `UPDATE messages SET status = 'PENDING' WHERE msg_uid = ? AND sender_ip = ?`,
           [msgUid, MY_IP],
@@ -11898,6 +11908,12 @@ ipcMain.handle('send-message', async (event, { targetIP, message, urgent }) => {
 
       client.on('timeout', handleFailure);
       client.on('error', handleFailure);
+    };
+
+    const startTcpSend = (localRowId) => {
+      extractAndSaveAttachments(message, { msgUid });
+      appendChatLog(`DM_${targetIP}`, partnerName, myProfile.username, message);
+      attemptTcpSend(localRowId, false);
     };
 
     // TCP 연결 전에 먼저 저장 → 루프백 수신과의 msg_uid 레이스·보관함 중복 방지
